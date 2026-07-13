@@ -228,6 +228,7 @@ export default function Home() {
   const [latest, setLatest] = useState({});
   const [email, setEmail] = useState("");
   const [msg, setMsg] = useState({ text:"", ok:true });
+  const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
     fetch(BASE + "/-/reports.json", { cache:"no-store" })
@@ -260,11 +261,15 @@ export default function Home() {
     return () => io.disconnect();
   }, []);
 
+  const doSubscribe = () => {
+    window.open(SUBSTACK + "/subscribe?email=" + encodeURIComponent(email.trim()), "_blank");
+    setShowGuide(false);
+  };
   const subscribe = () => {
     const v = email.trim();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) { setMsg({ text:"請輸入有效的 Email", ok:false }); return; }
-    setMsg({ text:"正在前往訂閱確認頁…", ok:true });
-    window.open(SUBSTACK + "/subscribe?email=" + encodeURIComponent(v), "_blank");
+    setMsg({ text:"", ok:true });
+    setShowGuide(true);
   };
 
   return (
@@ -277,11 +282,17 @@ export default function Home() {
   <br />
   解碼美股與台股的真實訊號
 </p>
-        <div className="hero-cta reveal">
-          <a className="btn btn-ghost" href="#subscribe" style={{ color:"var(--gold-lg)", borderColor:"var(--gold-lg)" }}>
+        <div className="hero-cta reveal" style={{ flexDirection:"column", gap:"14px" }}>
+          <a className="btn btn-gold" href={d.latestBrief} style={{ minWidth:220 }}>
+            今日簡報
+          </a>
+          <a className="btn btn-ghost" href="#subscribe" style={{ color:"var(--gold-lg)", borderColor:"var(--gold-lg)", minWidth:220 }}>
             免費訂閱簡報　直送信箱
           </a>
         </div>
+      <div style={{ textAlign:"center", marginTop:"calc(-32px*var(--scale))", paddingBottom:"calc(16px*var(--scale))", animation:"arrow-bob 2s ease-in-out infinite", pointerEvents:"none" }}>
+        <span style={{ fontSize:"calc(22px*var(--scale))", color:"var(--gold-lg)", opacity:.7 }}>⌄</span>
+      </div>
       </header>
 
       <div className="wrap">
@@ -395,6 +406,40 @@ export default function Home() {
           </div>
         </section>
       </div>
+
+      {/* 訂閱引導 Modal */}
+      {showGuide && (
+        <div onClick={()=>setShowGuide(false)}
+          style={{ position:"fixed", inset:0, zIndex:300, background:"rgba(0,0,0,.65)",
+            backdropFilter:"blur(4px)", display:"flex", alignItems:"center",
+            justifyContent:"center", padding:24 }}>
+          <div onClick={e=>e.stopPropagation()}
+            style={{ background:"var(--surface)", border:"1px solid var(--border)",
+              borderRadius:18, padding:"calc(28px*var(--scale))", maxWidth:440, width:"100%" }}>
+            <div style={{ fontWeight:700, fontSize:"calc(19px*var(--scale))", marginBottom:16 }}>
+              訂閱步驟
+            </div>
+            <ol style={{ paddingLeft:"1.3em", fontSize:"calc(15px*var(--scale))", lineHeight:2, color:"var(--text)" }}>
+              <li>點下方「前往訂閱」，會開啟 Substack 訂閱頁</li>
+              <li>在頁面上按下 <b>Subscribe</b> 即完成</li>
+              <li>前往信箱確認訂閱信，點一下確認連結</li>
+              <li>之後每次發布簡報，會直接寄到你的信箱</li>
+            </ol>
+            <div style={{ fontSize:"calc(13px*var(--scale))", color:"var(--dim)", margin:"12px 0 20px", lineHeight:1.8 }}>
+              ✦ 不需要安裝 Substack App，也不需要建立帳號<br/>
+              ✦ 隨時可以取消訂閱，完全免費
+            </div>
+            <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+              <button className="btn btn-gold" style={{ flex:1 }} onClick={doSubscribe}>
+                前往訂閱 →
+              </button>
+              <button className="btn btn-ghost" style={{ flex:1 }} onClick={()=>setShowGuide(false)}>
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <footer>
         <div className="wrap">
