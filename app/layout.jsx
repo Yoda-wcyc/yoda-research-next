@@ -3,8 +3,8 @@ import Controls from "../components/Controls";
 import PwaRegister from "../components/PwaRegister";
 
 export const metadata = {
-  metadataBase: new URL("https://yoda-research.vercel.app"),
-  title: "Yoda Research｜用可證偽的判斷,追蹤美股與台股的真實訊號",
+  metadataBase: new URL("https://yoda-research-next.vercel.app"),
+  title: "Yoda Research｜用最清澈的白話，凌駕喧囂，解碼美股與台股的真實訊號。",
   description:
     "Yoda Research 市場簡報與深度研究:市場觀察、美股、台股、AI 泡沫評估、總體經濟。",
   openGraph: {
