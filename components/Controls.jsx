@@ -38,10 +38,7 @@ export default function Controls() {
         </svg>
         粉專
       </a>
-      <a href="https://yoda-wcyc.github.io/-/" className="ctrl-home" title="研究報告中心">
-        ⌂
-      </a>
-      <span className="ctrl-sep"></span>
+<span className="ctrl-sep"></span>
       {SIZES.map(([v, label]) => (
         <button key={v} className={size === v ? "on" : ""} onClick={() => applySize(v)}>
           {label}
