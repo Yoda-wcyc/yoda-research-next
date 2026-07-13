@@ -1,4 +1,4 @@
-const BASE = "https://yoda-research.vercel.app"; // 部署後若綁自訂網域,改這裡
+const BASE = "https://yoda-research-next.vercel.app"; // 部署後若綁自訂網域,改這裡
 export default function sitemap() {
   return [
     { url: BASE + "/", lastModified: new Date(), changeFrequency: "daily", priority: 1 },
