@@ -291,7 +291,8 @@ export default function Home() {
           </a>
         </div>
       <div style={{ textAlign:"center", marginTop:"calc(8px*var(--scale))", paddingBottom:"calc(40px*var(--scale))", animation:"arrow-bob 2s ease-in-out infinite", pointerEvents:"none" }}>
-        <span style={{ fontSize:"calc(22px*var(--scale))", color:"var(--gold-lg)", opacity:.7 }}>⌄</span>
+      <span style={{ fontSize:"calc(22px*var(--scale))", color:"var(--gold-lg)", opacity:.7, display:"block", lineHeight:1 }}>⌄</span>
+<span style={{ fontSize:"calc(22px*var(--scale))", color:"var(--gold-lg)", opacity:.4, display:"block", lineHeight:1, marginTop:"-4px" }}>⌄</span>
       </div>
       </header>
 
