@@ -45,7 +45,7 @@ export default function InstallApp() {
 
   return (
     <>
-      <button className="btn btn-ghost install-btn" onClick={click}>
+      <button className="btn btn-gold breathe install-btn" onClick={click}>
         📲 安裝 App 到主畫面
       </button>
       {showIOSGuide && (
