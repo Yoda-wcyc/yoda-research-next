@@ -342,12 +342,34 @@ export default function Home() {
         <section id="bubble">
           <div className="eyebrow reveal">AI Bubble Monitor</div>
           <h2 className="reveal">AI 泡沫監測</h2>
-          <div className="card reveal" style={{ padding:"calc(28px*var(--scale))" }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:"calc(18px*var(--scale))" }}>
-              <div style={{ fontWeight:600, fontSize:"calc(15px*var(--scale))" }}>崩盤風險區（75/100）</div>
-              <a href={d.bUrl} style={{ fontSize:"calc(12px*var(--scale))", color:"var(--accent)" }}>完整評估 →</a>
+          <div className="score-bar-section reveal">
+            <div className="score-bar-header">
+              <div className="score-bar-header-title">崩盤風險區（75/100）</div>
+              <a href="https://yoda-wcyc.github.io/-/AI%E6%B3%A1%E6%B2%AB%E8%A9%95%E4%BC%B0%E8%A1%A8_20260701.html"
+                style={{ fontSize:"calc(12px*var(--scale))", color:"var(--accent)" }}>完整評估 →</a>
             </div>
-            <BubbleScoreBar score={d.bScore} note={d.bNote} />
+            <div className="score-bar-label-row">
+              <span className="score-bar-label sbl-safe">🟢 理性成長</span>
+              <span className="score-bar-label sbl-caution">🔵 溫和過熱</span>
+              <span className="score-bar-label sbl-warn">🟡 泡沫警戒</span>
+              <span className="score-bar-label sbl-bubble">🔴 崩盤風險</span>
+            </div>
+            <div className="score-bar-track">
+              <div className="score-zone-div" style={{left:"25%"}}></div>
+              <div className="score-zone-div" style={{left:"50%"}}></div>
+              <div className="score-zone-div" style={{left:"75%"}}></div>
+              <div className="score-pointer" style={{left:"75%"}}>
+                <div className="score-pointer-label">當前 75/100</div>
+                <div className="score-pointer-dot"></div>
+              </div>
+            </div>
+            <div className="score-bar-footer">
+              <span>0 — 基本面完全支撐</span>
+              <span>25 — 估值略偏高</span>
+              <span>50 — 泡沫特徵明顯</span>
+              <span>75+ — 崩盤前夕</span>
+            </div>
+            <div className="score-note">▸ PEG 0.73 與 EPS +28.6% 提供盈餘緩衝，但 CAPE 40.3x、巴菲特指標 236%、Mag-7 集中度 33.8%、CapEx ROI 缺口 -$1,850 億四重警示同步亮燈，Oracle FY2026 已實際轉負 FCF -$237 億，BofA 泡沫風險指標逼近 0.8 警戒線且 Kospi/Nikkei 已進入極端區，歷史相似度同步跳升至「極高相似」區間（0.96/0.92）。情緒面雖轉向恐慌（CNN F&G 28），但市場結構/機構持倉訊號仍持續惡化。</div>
           </div>
         </section>
 
@@ -355,12 +377,8 @@ export default function Home() {
         <section id="subscribe">
           <div className="sub-box">
             <div className="eyebrow reveal">Newsletter</div>
-            <h2 className="reveal">市場簡報{"\u00A0\u00A0\u00A0"}直送信箱</h2>
-            <p className="reveal">
-  盤後解碼{"\u00A0\u00A0\u00A0"}洞察無價
-  <br />
-  每個交易日，收到一封真正值得閱讀的市場研究。
-</p>
+            <h2 className="reveal">市場簡報,直送信箱</h2>
+            <p className="reveal">盤後解碼,洞察無價,簡報永久免費訂閱。</p>
             <div className="sub-form reveal">
               <input type="email" placeholder="you@example.com" aria-label="Email"
                 value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&subscribe()}/>
