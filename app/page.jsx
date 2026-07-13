@@ -207,7 +207,7 @@ export default function Home() {
         <section id="subscribe">
           <div className="sub-box">
             <div className="eyebrow reveal">Newsletter</div>
-            <h2 className="reveal">市場簡報,直送信箱</h2>
+            <h2 className="reveal">市場簡報  直送信箱</h2>
             <p className="reveal">盤後解碼,洞察無價,簡報永久免費訂閱。</p>
             <div className="sub-form reveal">
               <input
