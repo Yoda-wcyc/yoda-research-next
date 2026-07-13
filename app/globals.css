@@ -54,21 +54,23 @@ html[data-theme="light"] .ctrl{background:rgba(255,255,255,.72)}
 .ctrl button:active{transform:scale(.95)}
 .ctrl button.on{background:var(--text);color:var(--bg);font-weight:600}
 .ctrl-sep{width:1px;height:16px;background:var(--divider)}
-@keyframes fan-breathe{
-  0%,100%{background:#b8960a;box-shadow:0 0 4px 1px rgba(255,215,0,.35);color:#1a1200}
-  50%{background:#ffd700;box-shadow:0 0 10px 3px rgba(255,215,0,.75);color:#000}
+@keyframes gold-breathe{
+  0%,100%{background:var(--gold-dim);box-shadow:0 0 4px 1px rgba(224,165,38,.35)}
+  50%{background:var(--gold-lg);box-shadow:0 0 10px 3px rgba(224,165,38,.75)}
 }
+.breathe{animation:gold-breathe 1.8s ease-in-out infinite}
 .ctrl-fan{
   display:flex;align-items:center;gap:5px;
   padding:5px 12px;
   font-size:calc(12px*var(--scale));
-  color:#1a1200;text-decoration:none;white-space:nowrap;
-  background:#b8960a;border-radius:9999px;
-  animation:fan-breathe 1.8s ease-in-out infinite;
+  color:#000;text-decoration:none;white-space:nowrap;
+  background:var(--gold-dim);border-radius:9999px;
+  animation:gold-breathe 1.8s ease-in-out infinite;
   font-weight:700;
 }
+html[data-theme="light"] .ctrl-fan{color:#fff}
 @media (prefers-reduced-motion:reduce){
-  .ctrl-fan{animation:none;background:#ffd700;color:#000}
+  .breathe,.ctrl-fan{animation:none;background:var(--gold-lg)}
   .reveal{opacity:1 !important;transform:none !important}
   .sig-dot{animation:none !important}
 }
@@ -231,7 +233,7 @@ footer .disc{line-height:1.8;max-width:820px}
 }
 
 /* ===== 安裝 App ===== */
-.install-btn{margin-top:16px}
+.install-btn{margin-top:16px;background:var(--gold-dim)}
 .ios-guide{
   position:fixed;inset:0;z-index:200;
   background:rgba(0,0,0,.6);backdrop-filter:blur(4px);
