@@ -400,8 +400,7 @@ export default function Home() {
         <div className="wrap">
           <div className="links">
             <a href="https://www.facebook.com/profile.php?id=100069223220386" target="_blank" rel="noopener">Facebook 粉專</a>
-            <a href="https://yoda-wcyc.github.io/-/">研究報告中心</a>
-          </div>
+                      </div>
           <div className="disc">
             免責聲明:本站所有內容僅為個人研究記錄與資訊分享,不構成任何投資建議或買賣邀約。投資有風險,任何決策請自行判斷並承擔結果。數據來源力求準確,但不保證即時與完整。<br/>© 2026 Yoda Research
           </div>
