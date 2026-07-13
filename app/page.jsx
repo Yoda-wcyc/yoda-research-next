@@ -12,12 +12,12 @@ const SIG_MAP = {
 };
 
 const CATS = [
-  { key: "市場觀察", tag: "每日", title: "市場觀察", desc: "三區塊驅動力矩陣、板塊輪動、主線聚焦與多空劇本。" },
-  { key: "美股", tag: "每日", title: "美股分析", desc: "REL5 / REL20 / WA 三層篩選,A 級強勢股與輪漲偵測。" },
-  { key: "台股", tag: "每日", title: "台股分析", desc: "強勢股篩選疊加法人籌碼四型態:吸籌、反轉、換手、警示。" },
-  { key: "AI泡沫", tag: "週更", title: "AI 泡沫評估", desc: "8 維度加權相似度 + ROI 缺口模型,量化這輪牛市的泡沫程度。" },
+  { key: "簡報", tag: "每週三次", title: "公開簡報", desc: "一到兩屏讀完的白話市場摘要,附深讀連結。" },
+  { key: "市場觀察", tag: "每週三次", title: "市場觀察", desc: "三區塊驅動力矩陣、板塊輪動、主線聚焦與多空劇本。" },
+  { key: "美股", tag: "每週三次", title: "美股分析", desc: "REL5 / REL20 / WA 三層篩選,A 級強勢股與輪漲偵測。" },
+  { key: "台股", tag: "每週三次", title: "台股分析", desc: "強勢股篩選疊加法人籌碼四型態:吸籌、反轉、換手、警示。" },
+  { key: "AI泡沫", tag: "不定期", title: "AI 泡沫評估", desc: "8 維度加權相似度 + ROI 缺口模型,量化這輪牛市的泡沫程度。" },
   { key: "總經", tag: "月更", title: "總體經濟", desc: "Fed、通膨、就業與景氣循環的監控儀表板。" },
-  { key: "簡報", tag: "不定期", title: "公開簡報", desc: "一到兩屏讀完的白話市場摘要,附深讀連結。" },
 ];
 
 const DEFAULTS = {
@@ -107,7 +107,7 @@ export default function Home() {
         <h1 className="reveal">
           Yoda <span className="gold">Research</span>
         </h1>
-        <p className="reveal">用可證偽的判斷,追蹤美股與台股的真實訊號</p>
+        <p className="reveal">用最清澈的白話，凌駕喧囂，解碼美股與台股的真實訊號</p>
         <div className="hero-cta reveal">
           <a className="btn btn-gold" href="https://yoda-wcyc.github.io/-/">
             今日簡報
