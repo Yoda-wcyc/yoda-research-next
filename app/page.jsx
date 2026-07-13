@@ -272,7 +272,11 @@ export default function Home() {
       {/* Hero */}
       <header className="hero">
         <h1 className="reveal">Yoda <span className="gold">Research</span></h1>
-        <p className="reveal">用最清澈的白話，凌駕喧囂，解碼美股與台股的真實訊號</p>
+       <p className="reveal">
+  用最清澈的白話，凌駕喧囂
+  <br />
+  解碼美股與台股的真實訊號
+</p>
         <div className="hero-cta reveal">
           <a className="btn btn-ghost" href="#subscribe" style={{ color:"var(--gold-lg)", borderColor:"var(--gold-lg)" }}>
             免費訂閱簡報　直送信箱
