@@ -229,3 +229,20 @@ footer .disc{line-height:1.8;max-width:820px}
   .awrap h1{font-size:calc(31px*var(--scale))}
   .awrap{padding-top:calc(84px*var(--scale))}
 }
+
+/* ===== 安裝 App ===== */
+.install-btn{margin-top:16px}
+.ios-guide{
+  position:fixed;inset:0;z-index:200;
+  background:rgba(0,0,0,.6);backdrop-filter:blur(4px);
+  display:flex;align-items:center;justify-content:center;padding:24px;
+}
+.ios-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:18px;padding:calc(28px*var(--scale));
+  max-width:420px;text-align:left;
+}
+.ios-card h3{font-size:calc(21px*var(--scale));font-weight:600;margin-bottom:14px}
+.ios-card ol{padding-left:1.3em;font-size:calc(17px*var(--scale));color:var(--text)}
+.ios-card li{margin-bottom:8px}
+.ios-note{font-size:calc(14px*var(--scale));color:var(--dim);margin:12px 0 18px}

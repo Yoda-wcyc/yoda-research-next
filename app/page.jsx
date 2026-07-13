@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import InstallApp from "../components/InstallApp";
 
 const BASE = "https://yoda-wcyc.github.io";
 const SUBSTACK = "https://iamtwispin.substack.com";
@@ -228,6 +229,7 @@ export default function Home() {
             >
               {msg.text}
             </div>
+            <InstallApp />
           </div>
         </section>
       </div>
