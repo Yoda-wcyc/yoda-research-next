@@ -290,7 +290,7 @@ export default function Home() {
             免費訂閱簡報　直送信箱
           </a>
         </div>
-      <div style={{ textAlign:"center", marginTop:"calc(-32px*var(--scale))", paddingBottom:"calc(16px*var(--scale))", animation:"arrow-bob 2s ease-in-out infinite", pointerEvents:"none" }}>
+      <div style={{ textAlign:"center", marginTop:"calc(-32px*var(--scale))", paddingBottom:"calc(40px*var(--scale))", animation:"arrow-bob 2s ease-in-out infinite", pointerEvents:"none" }}>
         <span style={{ fontSize:"calc(22px*var(--scale))", color:"var(--gold-lg)", opacity:.7 }}>⌄</span>
       </div>
       </header>
