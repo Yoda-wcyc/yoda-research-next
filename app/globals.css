@@ -248,3 +248,5 @@ footer .disc{line-height:1.8;max-width:820px}
 .ios-card ol{padding-left:1.3em;font-size:calc(17px*var(--scale));color:var(--text)}
 .ios-card li{margin-bottom:8px}
 .ios-note{font-size:calc(14px*var(--scale));color:var(--dim);margin:12px 0 18px}
+
+@keyframes bubble-pulse{0%,100%{box-shadow:0 0 0 3px rgba(240,165,0,.2)}50%{box-shadow:0 0 0 7px rgba(240,165,0,.45)}}
