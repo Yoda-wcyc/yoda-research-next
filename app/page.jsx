@@ -301,7 +301,6 @@ export default function Home() {
         {/* 市場溫度儀表板 */}
         <section id="dashboard">
           <br />
-          <br />
           <div className="eyebrow reveal">Market Temperature</div>
           <h2 className="reveal">市場溫度儀表板</h2>
           <div className="card reveal" style={{ padding:"calc(24px*var(--scale))" }}>
