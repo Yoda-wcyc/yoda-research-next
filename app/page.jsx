@@ -383,33 +383,8 @@ export default function Home() {
         <section id="subscribe">
           <div className="sub-box">
             <div className="eyebrow reveal">Newsletter</div>
-            <h2 
-  className="reveal" 
-  style={{
-    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif',
-    fontSize: '40px',
-    fontWeight: '700',
-    letterSpacing: '-0.022em', // Apple 大標標誌性的微緊字距
-    color: '#1d1d1f',          // Apple 專用深黑
-    marginBottom: '16px'
-  }}
->
-  市場簡報，直送信箱
-</h2>
-
-<p 
-  className="reveal" 
-  style={{
-    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif',
-    fontSize: '19px',
-    fontWeight: '400',
-    letterSpacing: '-0.012em',
-    lineHeight: '1.47059',     // Apple 官方文字行高比例
-    color: '#86868b'           // Apple 經典次要灰（營造階層感）
-  }}
->
-  盤後解碼，洞察無價。簡報永久免費訂閱。
-</p>
+            <h2 className="reveal">市場簡報,直送信箱</h2>
+            <p className="reveal">盤後解碼,洞察無價,簡報永久免費訂閱。</p>
             <div className="sub-form reveal">
               <input type="email" placeholder="you@example.com" aria-label="Email"
                 value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&subscribe()}/>
