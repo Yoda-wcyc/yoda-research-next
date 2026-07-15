@@ -210,6 +210,7 @@ function BubbleScoreBar({ score, note }) {
 const DEFAULTS = {
   sig: ["綠燈", "var(--green)"],
   sigNote: "新資金週期進行中",
+  heroNote: "",
   updated: "數據更新:2026-07-13 收盤。",
   temp: [
     { name:"資金流判定",   label:"穩定",          labelColor:"#4da8e0", pct:56, bubbleColor:"#4da8e0" },
@@ -240,6 +241,7 @@ export default function Home() {
           if (db.signal && SIG_MAP[db.signal]) next.sig = SIG_MAP[db.signal];
           if (db.signal_note) next.sigNote = db.signal_note;
           if (db.temp?.length === 4) next.temp = db.temp;
+          if (db.hero_note) next.heroNote = db.hero_note;
           if (data.updated) next.updated = "數據更新:" + data.updated + "。";
           const bb = data.bubble || {};
           if (bb.score != null) next.bScore = Number(bb.score);
@@ -277,6 +279,9 @@ export default function Home() {
       {/* Hero */}
       <header className="hero">
         <h1 className="reveal">Yoda <span className="gold">Research</span></h1>
+        {d.heroNote ? (
+          <p className="reveal" style={{ fontSize:"calc(17px*var(--scale))", color:"var(--gold-lg)", marginBottom:4 }}>{d.heroNote}</p>
+        ) : null}
        <p className="reveal">
   用最清澈的白話，凌駕喧囂
   <br />
@@ -290,16 +295,15 @@ export default function Home() {
             免費訂閱簡報　直送信箱
           </a>
         </div>
-      <div style={{ textAlign:"center", marginTop:"calc(170px*var(--scale))", paddingBottom:"calc(20px*var(--scale))", animation:"arrow-bob 2s ease-in-out infinite", pointerEvents:"none" }}>
-     <span style={{ fontSize:"calc(22px*var(--scale))", color:"var(--gold-lg)", opacity:.7, display:"block", lineHeight:1 }}>⌄</span>
-<span style={{ fontSize:"calc(22px*var(--scale))", color:"var(--gold-lg)", opacity:.5, display:"block", lineHeight:1, marginTop:"-8px" }}>⌄</span>
-<span style={{ fontSize:"calc(22px*var(--scale))", color:"var(--gold-lg)", opacity:.3, display:"block", lineHeight:1, marginTop:"-8px" }}>⌄</span>
+      <div style={{ textAlign:"center", marginTop:"calc(-32px*var(--scale))", paddingBottom:"calc(16px*var(--scale))", animation:"arrow-bob 2s ease-in-out infinite", pointerEvents:"none" }}>
+        <span style={{ fontSize:"calc(22px*var(--scale))", color:"var(--gold-lg)", opacity:.7 }}>⌄</span>
       </div>
       </header>
 
       <div className="wrap">
         {/* 市場溫度儀表板 */}
         <section id="dashboard">
+          <br />
           <br />
           <div className="eyebrow reveal">Market Temperature</div>
           <h2 className="reveal">市場溫度儀表板</h2>
