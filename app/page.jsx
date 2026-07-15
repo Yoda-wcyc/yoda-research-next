@@ -295,8 +295,10 @@ export default function Home() {
             免費訂閱簡報　直送信箱
           </a>
         </div>
-      <div style={{ textAlign:"center", marginTop:"calc(-32px*var(--scale))", paddingBottom:"calc(16px*var(--scale))", animation:"arrow-bob 2s ease-in-out infinite", pointerEvents:"none" }}>
-        <span style={{ fontSize:"calc(22px*var(--scale))", color:"var(--gold-lg)", opacity:.7 }}>⌄</span>
+      <div style={{ textAlign:"center", marginTop:"calc(170px*var(--scale))", paddingBottom:"calc(20px*var(--scale))", animation:"arrow-bob 2s ease-in-out infinite", pointerEvents:"none" }}>
+        <span style={{ fontSize:"calc(22px*var(--scale))", color:"var(--gold-lg)", opacity:.7, display:"block", lineHeight:1 }}>⌄</span>
+        <span style={{ fontSize:"calc(22px*var(--scale))", color:"var(--gold-lg)", opacity:.5, display:"block", lineHeight:1, marginTop:"-8px" }}>⌄</span>
+        <span style={{ fontSize:"calc(22px*var(--scale))", color:"var(--gold-lg)", opacity:.3, display:"block", lineHeight:1, marginTop:"-8px" }}>⌄</span>
       </div>
       </header>
 
