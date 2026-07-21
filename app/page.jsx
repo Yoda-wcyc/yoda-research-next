@@ -18,6 +18,7 @@ const CATS = [
   { key: "台股",    tag: "每週三次", title: "台股分析",   desc: "強勢股篩選疊加法人籌碼四型態:吸籌、反轉、換手、警示。" },
   { key: "AI泡沫",  tag: "不定期",  title: "AI 泡沫評估",desc: "8 維度加權相似度 + ROI 缺口模型,量化這輪牛市的泡沫程度。" },
   { key: "總經",    tag: "月更",    title: "總體經濟",   desc: "Fed、通膨、就業與景氣循環的監控儀表板。" },
+  { key: "專題",    tag: "不定期",  title: "專題研究",   desc: "單一主題深度分析：動能因子、事件驅動、產業結構與市場機制拆解。" },
 ];
 
 /* ── 市場觀察四條溫度計 ── */
@@ -295,10 +296,8 @@ export default function Home() {
             免費訂閱簡報　直送信箱
           </a>
         </div>
-      <div style={{ textAlign:"center", marginTop:"calc(170px*var(--scale))", paddingBottom:"calc(20px*var(--scale))", animation:"arrow-bob 2s ease-in-out infinite", pointerEvents:"none" }}>
-        <span style={{ fontSize:"calc(22px*var(--scale))", color:"var(--gold-lg)", opacity:.7, display:"block", lineHeight:1 }}>⌄</span>
-        <span style={{ fontSize:"calc(22px*var(--scale))", color:"var(--gold-lg)", opacity:.5, display:"block", lineHeight:1, marginTop:"-8px" }}>⌄</span>
-        <span style={{ fontSize:"calc(22px*var(--scale))", color:"var(--gold-lg)", opacity:.3, display:"block", lineHeight:1, marginTop:"-8px" }}>⌄</span>
+      <div style={{ textAlign:"center", marginTop:"calc(-32px*var(--scale))", paddingBottom:"calc(16px*var(--scale))", animation:"arrow-bob 2s ease-in-out infinite", pointerEvents:"none" }}>
+        <span style={{ fontSize:"calc(22px*var(--scale))", color:"var(--gold-lg)", opacity:.7 }}>⌄</span>
       </div>
       </header>
 
