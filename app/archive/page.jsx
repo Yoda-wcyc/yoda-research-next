@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 
 const BASE = "https://yoda-wcyc.github.io";
-const TABS = ["全部", "市場觀察", "美股", "台股", "AI泡沫", "總經", "簡報"];
+const TABS = ["全部", "市場觀察", "美股", "台股", "AI泡沫", "總經", "簡報", "專題"];
 
 export default function Archive() {
   const [all, setAll] = useState(null); // null=載入中, []=空, false=失敗
