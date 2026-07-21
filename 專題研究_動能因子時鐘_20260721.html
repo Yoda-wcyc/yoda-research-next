@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="zh-TW" data-theme="dark" data-size="md">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>動能因子時鐘 · Yoda Research</title>
+<style>
+:root{--sans:-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display','PingFang TC','Noto Sans TC','Microsoft JhengHei','Segoe UI',sans-serif;--serif:var(--sans);--mono:var(--sans);}
+[data-theme="dark"]{
+  --bg:#000000;--bg2:#1d1d1f;--bg3:#272729;--bg4:#2a2a2c;
+  --border:rgba(255,255,255,.14);--border2:rgba(255,255,255,.22);
+  --accent:#2997ff;--accent2:#ff9f0a;--accent3:#2997ff;--danger:#ff453a;--muted:#a1a1a6;
+  --text:#f5f5f7;--text2:#a1a1a6;--text3:#6e6e73;--header:#ffffff;
+  --ctrl-bg:rgba(29,29,31,.72);--ctrl-border:rgba(255,255,255,.22);--ctrl-hover:#2a2a2c;
+  --ctrl-act-bg:#0071e3;--ctrl-act-txt:#ffffff;
+  --hero-grad:#000000;
+  --thead-bg:#272729;--row-hover:rgba(255,255,255,.04);
+  --note-bg:#272729;--chk-bg:#272729;--formula-bg:#272729;
+  --sig-bg:rgba(255,69,58,.05);--sig-b:rgba(255,69,58,.22);
+  --warn-bg:rgba(255,69,58,.04);--warn-lb:#ff453a;
+  --izy-g1-bg:rgba(48,209,88,.05);--izy-g1-b:rgba(48,209,88,.25);
+  --izy-g2-bg:rgba(41,151,255,.05);--izy-g2-b:rgba(41,151,255,.22);
+  --izy-g3-bg:rgba(255,159,10,.05);--izy-g3-b:rgba(255,159,10,.22);
+  --izy-g4-bg:rgba(255,69,58,.05);--izy-g4-b:rgba(255,69,58,.22);
+  --nav-bg:#1d1d1f;--scroll-thumb:rgba(255,255,255,.22);
+  --badge-bg:#272729;--badge-b:rgba(48,209,88,.35);
+  --scen-hold-bg:rgba(41,151,255,.05);--scen-hold-b:rgba(41,151,255,.22);--scen-hold-c:#2997ff;
+  --scen-hike-bg:rgba(255,159,10,.05);--scen-hike-b:rgba(255,159,10,.22);--scen-hike-c:#ff9f0a;
+  --scen-cut-bg:rgba(48,209,88,.05);--scen-cut-b:rgba(48,209,88,.22);--scen-cut-c:#30d158;
+}
+[data-theme="light"]{
+  --bg:#f5f5f7;--bg2:#ffffff;--bg3:#fafafc;--bg4:#f0f0f0;
+  --border:#e0e0e0;--border2:#d1d1d6;
+  --accent:#0066cc;--accent2:#c93400;--accent3:#0071e3;--danger:#d70015;--muted:#7a7a7a;
+  --text:#1d1d1f;--text2:#515154;--text3:#7a7a7a;--header:#1d1d1f;
+  --ctrl-bg:rgba(245,245,247,.8);--ctrl-border:#e0e0e0;--ctrl-hover:#fafafc;
+  --ctrl-act-bg:#0066cc;--ctrl-act-txt:#ffffff;
+  --hero-grad:#ffffff;
+  --thead-bg:#fafafc;--row-hover:rgba(0,0,0,.025);
+  --note-bg:#fafafc;--chk-bg:#fafafc;--formula-bg:#fafafc;
+  --sig-bg:rgba(215,0,21,.04);--sig-b:rgba(215,0,21,.20);
+  --warn-bg:rgba(215,0,21,.04);--warn-lb:#d70015;
+  --izy-g1-bg:rgba(36,138,61,.06);--izy-g1-b:rgba(36,138,61,.25);
+  --izy-g2-bg:rgba(0,102,204,.06);--izy-g2-b:rgba(0,102,204,.22);
+  --izy-g3-bg:rgba(201,52,0,.06);--izy-g3-b:rgba(201,52,0,.22);
+  --izy-g4-bg:rgba(215,0,21,.06);--izy-g4-b:rgba(215,0,21,.22);
+  --nav-bg:#ffffff;--scroll-thumb:#d1d1d6;
+  --badge-bg:#fafafc;--badge-b:rgba(36,138,61,.35);
+  --scen-hold-bg:rgba(0,102,204,.05);--scen-hold-b:rgba(0,102,204,.22);--scen-hold-c:#0071e3;
+  --scen-hike-bg:rgba(201,52,0,.05);--scen-hike-b:rgba(201,52,0,.22);--scen-hike-c:#c93400;
+  --scen-cut-bg:rgba(36,138,61,.05);--scen-cut-b:rgba(36,138,61,.22);--scen-cut-c:#248a3d;
+}
+[data-size="lg"] body{font-size:27px}[data-size="md"] body{font-size:24px}[data-size="sm"] body{font-size:21px}
+[data-size="lg"] table{font-size:24px}[data-size="md"] table{font-size:21px}[data-size="sm"] table{font-size:19px}
+[data-size="lg"] .section-title{font-size:39px}[data-size="md"] .section-title{font-size:33px}[data-size="sm"] .section-title{font-size:29px}
+[data-size="lg"] .hero-title{font-size:64px}[data-size="md"] .hero-title{font-size:55px}[data-size="sm"] .hero-title{font-size:45px}
+:root{--fs-scale:1}
+[data-size="sm"]{--fs-scale:1}
+[data-size="md"]{--fs-scale:1.16667}
+[data-size="lg"]{--fs-scale:1.33333}
+body{-webkit-user-select:none;-moz-user-select:none;user-select:none}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.7;display:flex;min-height:100vh;transition:background .25s,color .25s}
+
+
+
+.ctrl-sep{width:1px;height:18px;background:var(--border);margin:0 2px}
+@keyframes fan-breathe{
+  0%,100%{background:#b8960a;box-shadow:0 0 4px 1px rgba(255,215,0,.35);color:#1a1200}
+  50%{background:#ffd700;box-shadow:0 0 10px 3px rgba(255,215,0,.75);color:#000}
+}
+.ctrl-fan{display:inline-flex;align-items:center;gap:4px;padding:4px 12px;font-family:var(--mono);font-size:calc(11px * var(--fs-scale));font-weight:600;color:#e8f2ff;text-decoration:none;background:#1a3a5c;border:1px solid #2a4a6c;border-radius:9999px;transition:all 0.15s ease;white-space:nowrap;line-height:1}
+.ctrl-fan:hover{background:#2a4a6c;border-color:#3a5a7c;transform:scale(1.02)}.plain-fan{animation:none!important;background:var(--bg3);color:var(--text2);border:1px solid var(--border)}
+.plain-fan:hover{background:var(--bg4);color:var(--header);border-color:var(--border2)}
+.ctrl-home{display:inline-flex;align-items:center;padding:4px 12px;font-family:var(--sans);font-size:calc(12px * var(--fs-scale));font-weight:700;color:#1a1200;text-decoration:none;background:#b8960a;border-radius:9999px;animation:fan-breathe 1.8s ease-in-out infinite;white-space:nowrap;margin-left:1px;transition:all .15s}
+.ctrl-home:hover{background:#ffd700;color:#000;box-shadow:0 0 10px 3px rgba(255,215,0,.75);animation:none}
+.ctrl-fan:hover{animation:none;background:#ffd700;color:#000;box-shadow:0 0 10px 3px rgba(255,215,0,.75)}
+nav{width:230px;min-width:230px;background:var(--nav-bg);border-right:1px solid var(--border);position:sticky;top:0;height:100vh;overflow-y:auto;padding:28px 0 40px;display:flex;flex-direction:column;scrollbar-width:thin;scrollbar-color:var(--scroll-thumb) transparent;transition:background .25s,border-color .25s}
+.nav-brand{padding:0 18px 22px;border-bottom:1px solid var(--border);margin-bottom:14px}
+.nav-brand-title{font-family:var(--serif);font-size:calc(14px * var(--fs-scale));font-weight:600;color:var(--header);line-height:1.35;letter-spacing:.02em}
+/* AI泡沫評估表標題樣式 - 與 macro-dashboard 一致 */
+.subsection-title, 
+.td-id-inline,  
+.nav-brand-title {
+    font-size: calc(24px * var(--fs-scale)) !important;
+    color: #ff9f0a;
+    font-weight: 600;
+}
+.nav-brand-sub{font-family:var(--mono);font-size:calc(9.5px * var(--fs-scale));color:var(--accent);letter-spacing:.1em;margin-top:6px;text-transform:uppercase}
+.nav-section-label{font-family:var(--mono);font-size:calc(8.5px * var(--fs-scale));letter-spacing:.02em;text-transform:uppercase;color:var(--text3);padding:12px 18px 5px}
+nav a{display:flex;align-items:center;gap:9px;padding:7px 18px;color:var(--text2);text-decoration:none;font-size:calc(12.5px * var(--fs-scale));transition:all .14s;border-left:2px solid transparent}
+nav a:hover{color:var(--header);background:var(--bg3);border-left-color:var(--accent)}
+.nav-num{font-family:var(--mono);font-size:calc(9.5px * var(--fs-scale));color:var(--text3);min-width:16px}
+.nav-dot{width:5px;height:5px;border-radius:50%;background:var(--border2);min-width:5px}
+.izy-section{margin-top:auto;padding:10px;border-top:1px solid var(--border)}
+.izy-badge{background:var(--badge-bg);border:1px solid var(--badge-b);border-radius:7px;padding:8px 10px}
+.izy-badge-label{font-family:var(--mono);font-size:calc(8.5px * var(--fs-scale));letter-spacing:.02em;color:var(--accent);text-transform:uppercase;margin-bottom:4px}
+.izy-badge-text{font-size:calc(9px * var(--fs-scale));color:var(--text2);line-height:1.5}
+main{flex:1;overflow-x:hidden;padding-bottom:80px}
+.hero{background:var(--hero-grad);border-bottom:1px solid var(--border);padding:46px 48px 38px;position:relative;overflow:hidden;transition:background .25s}
+.hero::before{content:'';position:absolute;top:-40px;right:-40px;width:300px;height:300px;background:radial-gradient(circle,rgba(255,159,10,.06) 0%,transparent 70%);border-radius:50%;pointer-events:none}
+.hero-tag{font-family:var(--mono);font-size:calc(9.5px * var(--fs-scale));letter-spacing:.02em;text-transform:uppercase;color:var(--accent2);margin-bottom:13px;display:flex;align-items:center;gap:8px}
+.hero-tag::before{content:'';width:22px;height:1px;background:var(--accent2)}
+.hero-title{font-family:var(--serif);font-size:calc(34px * var(--fs-scale));font-weight:600;color:var(--header);line-height:1.2;margin-bottom:11px;letter-spacing:-.01em}
+.hero-sub{color:var(--text2);font-size:.9em;max-width:560px;line-height:1.65}
+.hero-meta{margin-top:22px;display:flex;gap:20px;flex-wrap:wrap}
+.meta-chip{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:calc(10.5px * var(--fs-scale));color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:4px 10px}
+.meta-chip-dot{width:5px;height:5px;border-radius:50%;background:var(--accent)}
+.content-section{padding:38px 48px;border-bottom:1px solid var(--border)}
+.section-header{display:flex;align-items:flex-start;gap:14px;margin-bottom:26px;padding-bottom:18px;border-bottom:1px solid var(--border)}
+.section-num{font-family:var(--mono);font-size:calc(10.5px * var(--fs-scale));color:var(--accent);background:rgba(48,209,88,.08);border:1px solid rgba(48,209,88,.22);border-radius:4px;padding:4px 10px;white-space:nowrap;margin-top:4px}
+[data-theme="light"] .section-num{background:rgba(36,138,61,.08);border-color:rgba(36,138,61,.22)}
+.section-title{font-family:var(--serif);font-size:calc(21px * var(--fs-scale));font-weight:600;color:var(--header);line-height:1.3}
+.section-desc{font-size:calc(11px * var(--fs-scale));color:var(--text3);margin-top:4px;font-family:var(--mono);letter-spacing:.05em}
+.subsection{margin-bottom:30px}
+.subsection-title{font-family:var(--mono);font-size:calc(10px * var(--fs-scale));letter-spacing:.02em;text-transform:uppercase;color:var(--accent2);margin-bottom:13px;display:flex;align-items:center;gap:10px}
+.subsection-title::after{content:'';flex:1;height:1px;background:var(--border);max-width:100px}
+.table-wrap{overflow-x:auto;border-radius:7px;border:1px solid var(--border);margin-bottom:16px}
+table{width:100%;border-collapse:collapse}
+thead tr{background:var(--thead-bg);border-bottom:1px solid var(--border2)}
+thead th{padding:9px 13px;text-align:left;font-family:var(--mono);font-size:calc(9.5px * var(--fs-scale));letter-spacing:.1em;text-transform:uppercase;color:var(--text3);font-weight:500;white-space:nowrap}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--row-hover)}
+tbody td{padding:9px 13px;color:var(--text);vertical-align:top}
+.td-name{font-weight:500;color:var(--header);white-space:nowrap}
+.td-val{font-family:var(--mono);font-size:calc(12px * var(--fs-scale));font-weight:600}
+.td-base{font-family:var(--mono);font-size:calc(10.5px * var(--fs-scale));color:var(--text3)}
+.td-interpret{font-size:.81em;color:var(--text2);line-height:1.55;max-width:280px}
+.td-signal{font-family:var(--mono);font-size:calc(11px * var(--fs-scale));white-space:nowrap}
+.sig-ok{color:var(--accent)}.sig-warn{color:var(--accent2)}.sig-danger{color:var(--danger)}.sig-neutral{color:var(--text3)}
+.notes-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:14px}
+.note-card{background:var(--note-bg);border:1px solid var(--border);border-radius:7px;padding:13px 15px}
+.note-card-label{font-family:var(--mono);font-size:calc(8.5px * var(--fs-scale));letter-spacing:.02em;text-transform:uppercase;margin-bottom:5px;display:flex;align-items:center;gap:6px}
+.note-card-label.leading{color:var(--accent)}.note-card-label.warning{color:var(--danger)}.note-card-label.key{color:var(--accent2)}
+.note-card-body{font-size:.86em;color:var(--text2);line-height:1.6}
+.checkpoint-list{display:flex;flex-direction:column;gap:7px}
+.checkpoint-item{display:flex;gap:11px;align-items:flex-start;padding:9px 13px;background:var(--chk-bg);border:1px solid var(--border);border-radius:6px}
+.checkpoint-marker{font-family:var(--mono);font-size:calc(9.5px * var(--fs-scale));color:var(--accent2);background:rgba(255,159,10,.08);border:1px solid rgba(255,159,10,.2);border-radius:3px;padding:2px 7px;white-space:nowrap;margin-top:1px}
+[data-theme="light"] .checkpoint-marker{background:rgba(160,88,0,.08);border-color:rgba(160,88,0,.2)}
+.checkpoint-text{font-size:.87em;color:var(--text);line-height:1.6}
+.signal-block{background:var(--sig-bg);border:1px solid var(--sig-b);border-radius:7px;padding:15px 18px;margin:14px 0}
+.signal-block-title{font-family:var(--mono);font-size:calc(9.5px * var(--fs-scale));letter-spacing:.02em;text-transform:uppercase;color:var(--danger);margin-bottom:7px}
+.warning-box{background:var(--warn-bg);border:1px solid var(--sig-b);border-left:3px solid var(--warn-lb);border-radius:0 7px 7px 0;padding:13px 16px;margin:10px 0}
+.warning-box-title{font-family:var(--mono);font-size:calc(9px * var(--fs-scale));color:var(--danger);letter-spacing:.02em;text-transform:uppercase;margin-bottom:5px}
+.warning-box-text{font-size:.86em;color:var(--text2);line-height:1.7}
+.context-box{background:var(--note-bg);border:1px solid var(--border);border-left:3px solid var(--accent3);border-radius:0 8px 8px 0;padding:14px 18px;margin:14px 0}
+.context-box-title{font-family:var(--mono);font-size:calc(9px * var(--fs-scale));letter-spacing:.02em;text-transform:uppercase;color:var(--accent3);margin-bottom:8px}
+.context-box-text{font-size:.87em;color:var(--text2);line-height:1.7}
+.conclusion-box{background:rgba(48,209,88,.04);border:1px solid rgba(48,209,88,.2);border-radius:8px;padding:16px 20px;margin-top:16px}
+[data-theme="light"] .conclusion-box{background:rgba(36,138,61,.04);border-color:rgba(36,138,61,.2)}
+.conclusion-box-title{font-family:var(--mono);font-size:calc(9px * var(--fs-scale));letter-spacing:.02em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+.conclusion-box-text{font-size:.87em;color:var(--text2);line-height:1.75}
+.izy-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:22px}
+.izy-card{border-radius:9px;padding:16px 18px;border:1px solid;position:relative;overflow:hidden}
+.izy-card::before{content:'';position:absolute;top:0;right:0;width:70px;height:70px;border-radius:50%;opacity:.06;pointer-events:none}
+.izy-card-g1{background:var(--izy-g1-bg);border-color:var(--izy-g1-b)}.izy-card-g1::before{background:var(--accent)}
+.izy-card-g2{background:var(--izy-g2-bg);border-color:var(--izy-g2-b)}.izy-card-g2::before{background:var(--accent3)}
+.izy-card-g3{background:var(--izy-g3-bg);border-color:var(--izy-g3-b)}.izy-card-g3::before{background:var(--accent2)}
+.izy-card-g4{background:var(--izy-g4-bg);border-color:var(--izy-g4-b)}.izy-card-g4::before{background:var(--danger)}
+.izy-card-num{font-family:var(--serif);font-size:calc(26px * var(--fs-scale));font-weight:600;line-height:1;margin-bottom:7px}
+.izy-card-g1 .izy-card-num{color:var(--accent)}.izy-card-g2 .izy-card-num{color:var(--accent3)}
+.izy-card-g3 .izy-card-num{color:var(--accent2)}.izy-card-g4 .izy-card-num{color:var(--danger)}
+.izy-card-risk{font-family:var(--mono);font-size:calc(10.5px * var(--fs-scale));margin-bottom:9px;color:var(--text2)}
+.izy-card-stages{font-size:.82em;color:var(--text3);line-height:1.55}
+/* SCORE BAR */
+.score-bar-wrap{width:100%;background:var(--bg2);border-bottom:1px solid var(--border);padding:18px 0 15px;position:sticky;top:0;z-index:900;backdrop-filter:blur(12px)}
+.score-bar-inner{padding:0 48px}
+.score-bar-label-row{display:flex;justify-content:space-between;margin-bottom:6px}
+.score-bar-label{font-family:var(--mono);font-size:calc(9px * var(--fs-scale));letter-spacing:.1em;text-transform:uppercase;font-weight:600}
+.sbl-safe{color:#30d158}.sbl-caution{color:#2997ff}.sbl-warn{color:#ff9f0a}.sbl-bubble{color:#ff453a}
+.score-bar-track{position:relative;height:14px;border-radius:8px;background:linear-gradient(90deg,#30d158 0%,#2997ff 35%,#ff9f0a 65%,#ff453a 100%);box-shadow:0 2px 12px rgba(0,0,0,.25)}
+.score-zone-div{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.2)}
+.score-pointer{position:absolute;top:50%;transform:translate(-50%,-50%);z-index:10}
+.score-pointer-dot{width:20px;height:20px;border-radius:50%;background:#fff;border:3px solid #ff9f0a;box-shadow:0 0 0 3px rgba(255,159,10,.3);animation:scp 2s ease-in-out infinite}
+@keyframes scp{0%,100%{box-shadow:0 0 0 3px rgba(255,159,10,.2)}50%{box-shadow:0 0 0 7px rgba(255,159,10,.5)}}
+.score-pointer-label{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:calc(9px * var(--fs-scale));background:#ff9f0a;color:#000000;padding:2px 8px;border-radius:3px;white-space:nowrap;font-weight:600}
+.score-pointer-label::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:4px solid transparent;border-top-color:#ff9f0a}
+.score-bar-footer{display:flex;justify-content:space-between;margin-top:6px;font-family:var(--mono);font-size:calc(8px * var(--fs-scale));color:var(--text3)}
+.score-note{font-family:var(--mono);font-size:calc(9px * var(--fs-scale));color:var(--accent2);margin-top:6px;line-height:1.6}
+/* SCENARIO */
+.scen-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px}
+@media(max-width:1000px){.scen-grid{grid-template-columns:1fr}}
+.scen-card{border-radius:10px;border:1px solid;overflow:hidden}
+.scen-card-hold{background:var(--scen-hold-bg);border-color:var(--scen-hold-b)}
+.scen-card-hike{background:var(--scen-hike-bg);border-color:var(--scen-hike-b)}
+.scen-card-cut{background:var(--scen-cut-bg);border-color:var(--scen-cut-b)}
+.scen-summary{padding:16px 18px;cursor:pointer}
+.scen-top{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.scen-prob{font-family:var(--mono);font-size:calc(13px * var(--fs-scale));font-weight:600}
+.prob-hold{color:var(--scen-hold-c)}.prob-hike{color:var(--scen-hike-c)}.prob-cut{color:var(--scen-cut-c)}
+.scen-badge{font-family:var(--mono);font-size:calc(9.5px * var(--fs-scale));letter-spacing:.02em;padding:2px 8px;border-radius:20px;white-space:nowrap}
+.sbadge-hold{background:rgba(41,151,255,.15);color:var(--scen-hold-c);border:1px solid var(--scen-hold-b)}
+.sbadge-hike{background:rgba(255,159,10,.15);color:var(--scen-hike-c);border:1px solid var(--scen-hike-b)}
+.sbadge-cut{background:rgba(48,209,88,.15);color:var(--scen-cut-c);border:1px solid var(--scen-cut-b)}
+.scen-title{font-family:var(--serif);font-size:calc(13.5px * var(--fs-scale));font-weight:600;color:var(--header);margin:8px 0 6px}
+.scen-desc{font-size:.81em;color:var(--text2);line-height:1.6}
+.scen-tag{font-family:var(--mono);font-size:calc(9px * var(--fs-scale));padding:2px 8px;border-radius:20px;margin-top:8px;display:inline-block}
+.stag-hold{background:rgba(41,151,255,.14);color:var(--scen-hold-c)}
+.stag-hike{background:rgba(255,159,10,.14);color:var(--scen-hike-c)}
+.stag-cut{background:rgba(48,209,88,.14);color:var(--scen-cut-c)}
+.scen-detail{display:none;border-top:1px solid var(--border);padding:14px 18px}
+.scen-detail.open{display:block;animation:fd .2s ease}
+@keyframes fd{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.scen-col-title{font-family:var(--mono);font-size:calc(8.5px * var(--fs-scale));letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:7px;margin-top:10px}
+.scen-col-title:first-child{margin-top:0}
+.scen-list{list-style:none;padding:0}
+.scen-list li{padding:4px 0 4px 13px;position:relative;font-size:.82em;color:var(--text2);border-bottom:1px solid var(--border)}
+.scen-list li:last-child{border-bottom:none}
+.scen-list li::before{content:'▸';position:absolute;left:0;font-size:calc(8px * var(--fs-scale));top:6px;color:var(--text3)}
+.fire-item{color:var(--danger)!important}
+.fire-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--danger);animation:scp 1.2s ease-in-out infinite;margin-right:4px;vertical-align:middle}
+/* HIST CARDS */
+.hist-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+@media(max-width:900px){.hist-grid{grid-template-columns:1fr}}
+.hist-card{background:var(--note-bg);border:1px solid var(--border);border-radius:9px;padding:16px 18px}
+.hist-card-era{font-family:var(--mono);font-size:calc(8.5px * var(--fs-scale));letter-spacing:.02em;text-transform:uppercase;color:var(--accent2);margin-bottom:6px}
+.hist-card-title{font-family:var(--serif);font-size:calc(14px * var(--fs-scale));font-weight:600;color:var(--header);margin-bottom:8px}
+.hist-card-row{display:flex;justify-content:space-between;font-size:.8em;padding:4px 0;border-bottom:1px solid var(--border);color:var(--text2)}
+.hist-card-row:last-child{border-bottom:none}
+.hv{font-family:var(--mono);font-size:calc(10.5px * var(--fs-scale))}.hv.red{color:var(--danger)}.hv.green{color:var(--accent)}
+/* METER */
+.meter-wrap{display:flex;flex-direction:column;gap:9px;margin:14px 0}
+.meter-item{display:flex;align-items:center;gap:10px}
+.meter-label{font-family:var(--mono);font-size:calc(10px * var(--fs-scale));color:var(--text2);min-width:150px;white-space:nowrap}
+.meter-track{flex:1;height:9px;border-radius:5px;background:var(--bg4);overflow:hidden}
+.meter-fill{height:100%;border-radius:5px;transition:width .6s}
+.mf-safe{background:linear-gradient(90deg,#30d158,#1ab8b0)}
+.mf-warn{background:linear-gradient(90deg,#ff9f0a,#e08800)}
+.mf-danger{background:linear-gradient(90deg,#ff453a,#d03050)}
+.meter-val{font-family:var(--mono);font-size:calc(10px * var(--fs-scale));min-width:44px;text-align:right}
+/* TOGGLE BTN */
+.toggle-btn{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;cursor:pointer;border:none;background:transparent;padding:0;margin-left:auto;transition:transform .2s;flex-shrink:0}
+.toggle-btn.open{transform:rotate(180deg)}
+.toggle-arrow{font-size:calc(10px * var(--fs-scale));color:var(--text3)}
+/* ═══ DIAGRAM CARD (collapsible static diagrams) ═══ */
+.diagram-card{border-radius:10px;border:1px solid var(--border);background:var(--note-bg);overflow:hidden;margin:14px 0}
+.diagram-summary{padding:13px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;user-select:none}
+.diagram-summary-left{display:flex;align-items:center;gap:9px}
+.diagram-summary-title{font-family:var(--serif);font-weight:600;color:var(--header);font-size:calc(13.5px * var(--fs-scale))}
+.diagram-summary-sub{font-family:var(--mono);font-size:calc(9.5px * var(--fs-scale));color:var(--text3);margin-top:2px}
+.diagram-body{display:none;padding:8px 18px 20px;border-top:1px solid var(--border)}
+.diagram-body.open{display:block;animation:fd .2s ease}
+.diagram-body svg{width:100%;display:block;margin:0 auto}
+.diagram-link{font-family:var(--mono);font-size:calc(8.5px * var(--fs-scale));letter-spacing:.02em;color:var(--text3);text-transform:uppercase}
+/* ═══ SIMILARITY CALCULATOR WIDGET ═══ */
+.sim-calc-wrap{background:var(--note-bg);border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin:14px 0}
+.sim-calc-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:14px}
+@media(max-width:800px){.sim-calc-grid{grid-template-columns:1fr}}
+.sim-slider-row{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+.sim-slider-label{font-family:var(--mono);font-size:calc(10px * var(--fs-scale));color:var(--text2);min-width:175px;line-height:1.3}
+.sim-slider-row input[type=range]{flex:1;height:4px;border-radius:2px;background:var(--bg4);outline:none;-webkit-appearance:none;cursor:pointer}
+.sim-slider-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent3);border:2px solid var(--bg2);cursor:pointer;box-shadow:0 0 0 1px var(--accent3)}
+.sim-slider-row input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--accent3);border:2px solid var(--bg2);cursor:pointer}
+.sim-slider-val{font-family:var(--mono);font-size:calc(11px * var(--fs-scale));font-weight:600;color:var(--accent3);min-width:24px;text-align:right}
+.sim-ref-table{width:100%;border-collapse:collapse;font-size:calc(11px * var(--fs-scale))}
+.sim-ref-table th{font-family:var(--mono);font-size:calc(8.5px * var(--fs-scale));color:var(--text3);text-align:left;padding:5px 6px;border-bottom:1px solid var(--border2);letter-spacing:.05em;text-transform:uppercase}
+.sim-ref-table td{padding:5px 6px;border-bottom:1px solid var(--border);color:var(--text2)}
+.sim-ref-table td:first-child{color:var(--header);white-space:nowrap}
+.sim-ref-fixed{font-family:var(--mono);color:var(--text3)}
+.sim-result-row{display:flex;gap:14px;margin-top:16px;flex-wrap:wrap}
+.sim-result-card{flex:1;min-width:200px;border-radius:8px;padding:14px 16px;border:1px solid}
+.sim-result-card.tel{background:rgba(255,69,58,.05);border-color:rgba(255,69,58,.22)}
+.sim-result-card.semi{background:rgba(255,159,10,.05);border-color:rgba(255,159,10,.22)}
+.sim-result-label{font-family:var(--mono);font-size:calc(9px * var(--fs-scale));letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:6px}
+.sim-result-val{font-family:var(--serif);font-size:calc(26px * var(--fs-scale));font-weight:600}
+.sim-result-card.tel .sim-result-val{color:var(--danger)}
+.sim-result-card.semi .sim-result-val{color:var(--accent2)}
+.sim-result-tier{font-family:var(--mono);font-size:calc(9.5px * var(--fs-scale));margin-top:4px;color:var(--text2)}
+.sim-reset-btn{font-family:var(--mono);font-size:calc(10px * var(--fs-scale));color:var(--accent3);background:transparent;border:1px solid var(--accent3);border-radius:5px;padding:4px 12px;cursor:pointer;margin-top:12px}
+.sim-reset-btn:hover{background:rgba(41,151,255,.1)}
+.sim-update-log{font-family:var(--mono);font-size:calc(9px * var(--fs-scale));color:var(--text3);margin-top:10px;line-height:1.6}
+.cite-link{color:var(--accent3);text-decoration:none;border-bottom:1px dotted var(--accent3)}
+.cite-link:hover{color:var(--header);border-bottom-color:var(--header)}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--scroll-thumb);border-radius:3px}
+@media(max-width:900px){nav{display:none}.hero,.content-section{padding:26px 18px}.izy-grid,.scen-grid{grid-template-columns:1fr}}
+/* 容器 */
+.fc{position:fixed;top:14px;right:14px;z-index:999;display:flex;gap:2px;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:3px;}
+
+/* 字體/主題按鈕 */
+.fb{padding:4px 10px;font-size:11px;font-family:'SF Mono','Consolas','Monaco','Courier New',monospace;background:transparent;border:none;color:var(--dim);cursor:pointer;border-radius:3px;transition:all .15s;}
+.fb:hover{color:var(--text);background:var(--surface2);}
+.fb.on{color:#00c8f0;background:rgba(0,200,240,.15);}
+
+/* 粉專按鈕 */
+.ctrl-fan{display:inline-flex;align-items:center;gap:4px;padding:4px 12px;font-size:11px;font-family:'SF Mono','Consolas','Monaco','Courier New',monospace;color:#e8f2ff;text-decoration:none;background:#1a3a5c;border:1px solid #2a4a6c;border-radius:9999px;transition:all 0.15s ease;white-space:nowrap;}
+.ctrl-fan svg{width:12px;height:12px;fill:currentColor;flex-shrink:0;}
+.ctrl-fan:hover{background:#2a4a6c;border-color:#3a5a7c;transform:scale(1.02);}
+
+/* Yoda Research 按鈕 */
+.ctrl-home{display:inline-flex;align-items:center;padding:4px 12px;font-size:11px;font-family:'SF Mono','Consolas','Monaco','Courier New',monospace;color:#1a1200;font-weight:700;text-decoration:none;background:#b8960a;border-radius:9999px;animation:fan-breathe 1.8s ease-in-out infinite;white-space:nowrap;transition:all 0.15s ease;}
+.ctrl-home:hover{background:#ffd700;color:#000;box-shadow:0 0 10px 3px rgba(255,215,0,.75);animation:none;}
+
+/* 呼吸動畫 */
+@keyframes fan-breathe{0%,100%{background:#b8960a;box-shadow:0 0 4px 1px rgba(255,215,0,.35);color:#1a1200;}50%{background:#ffd700;box-shadow:0 0 10px 3px rgba(255,215,0,.75);color:#000;}}
+</style>
+</head>
+<body>
+
+<!-- CONTROLS -->
+<div class="fc">
+  <a class="ctrl-fan" href="https://www.facebook.com/profile.php?id=100069223220386" target="_blank" title="Facebook粉專">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+      <path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.791-4.697 4.533-4.697 1.312 0 2.686.235 2.686.235v2.97h-1.513c-1.491 0-1.956.93-1.956 1.886v2.268h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/>
+    </svg>粉專
+  </a>
+  <a href="https://yoda-research-next.vercel.app/" class="ctrl-home" title="Yoda Research">Yoda Research</a>
+  <button class="fb" id="fs-small" onclick="setSize('sm')">小</button>
+  <button class="fb on" id="fs-normal" onclick="setSize('md')">中</button>
+  <button class="fb" id="fs-large" onclick="setSize('lg')">大</button>
+  <button class="fb" style="margin-left:4px;border-left:1px solid var(--border);padding-left:10px;" onclick="setTheme('dark')" id="btn-dark">深</button>
+  <button class="fb" onclick="setTheme('light')" id="btn-light">淺</button>
+</div>
+<!-- NAV -->
+<nav>
+  <div class="nav-brand">
+    <div class="nav-brand-title">動能因子<br>時鐘</div>
+    <div class="nav-brand-sub">▸ 2026 · JULY</div>
+  </div>
+  <div class="nav-section-label">一、基礎概念</div>
+  <a href="#sec-what"><span class="nav-num">一</span><div class="nav-dot"></div>什麼是動能因子</a>
+  <a href="#sec-chart"><span class="nav-num">二</span><div class="nav-dot"></div>高盛圖解讀</a>
+  <a href="#sec-why"><span class="nav-num">三</span><div class="nav-dot"></div>為什麼有用</a>
+  <div class="nav-section-label">二、實戰應用</div>
+  <a href="#sec-how"><span class="nav-num">四</span><div class="nav-dot"></div>接上資料表</a>
+  <a href="#sec-now"><span class="nav-num">五</span><div class="nav-dot"></div>本期實際判讀</a>
+  <div class="nav-section-label">三、框架說明</div>
+  <a href="#sec-weight"><span class="nav-num">六</span><div class="nav-dot"></div>為何高權重</a>
+  <a href="#sec-check"><span class="nav-num">七</span><div class="nav-dot"></div>驗證點</a>
+</nav>
+
+<!-- MAIN -->
+<main>
+
+<div class="content-section" id="sec-what">
+  <div class="section-header"><div class="section-num">01</div><div><div class="section-title">什麼是動能因子</div><div class="section-desc">Momentum Factor 基礎概念</div></div></div>
+  <p style="margin:0 0 18px;line-height:1.8;">市場上有一群「最近漲最兇的股票」——過去一年表現最強的那批。買強者、避開弱者，這個策略叫<strong>動能因子（Momentum Factor）</strong>。觀察動能因子有兩個直接工具：</p>
+  <div class="notes-grid">
+    <div class="note-card"><div class="note-card-label">SPMO</div><div class="note-card-body">iShares MSCI USA Momentum Factor ETF，持有 S&amp;P 500 裡動能最強的成分股，是動能因子的寬基代表。</div></div>
+    <div class="note-card"><div class="note-card-label">QQQA</div><div class="note-card-body">ProShares Nasdaq-100 Dorsey Wright Momentum ETF，在 Nasdaq-100 裡進一步精選動能最強的個股，科技集中度更高、動能訊號更敏感。</div></div>
+  </div>
+  <div class="context-box" style="margin-top:18px;"><div class="context-box-title">關鍵特性</div><div class="context-box-text">動能因子平時跑贏大盤，但一旦崩落，速度往往比大盤快——因為這批股票是市場最<strong>擁擠的交易</strong>，最先被平倉。SPMO 與 QQQA 同步走強，代表擁擠度上升；同步走弱，代表最擁擠的部位正在被清出。</div></div>
+</div>
+
+<div class="content-section" id="sec-chart">
+  <div class="section-header"><div class="section-num">02</div><div><div class="section-title">高盛那張圖在說什麼</div><div class="section-desc">1980 年以來 11 次事件的統計劇本</div></div></div>
+  <p style="margin:0 0 16px;line-height:1.8;">Goldman Sachs 回顧 1980 年以來，找出 11 次「動能因子在 3 個月內暴漲 20%+」的歷史事件，把每次後續 6 個月的走勢疊加，得出一個重複出現的劇本：</p>
+  <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:20px;">
+    <div style="font-size:calc(11px * var(--fs-scale));color:var(--dim);margin-bottom:10px;font-family:var(--mono);">Exhibit 1 | Historical path of Momentum following sharp rallies（概念重製，非原始數據）</div>
+    <svg viewBox="0 0 640 320" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:640px;display:block;">
+  <defs><linearGradient id="bandGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#888" stop-opacity="0.18"/><stop offset="100%" stop-color="#888" stop-opacity="0.05"/></linearGradient></defs>
+  <rect width="640" height="320" fill="none"/>
+  <g stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3,3"><line x1="60" y1="50" x2="610" y2="50"/><line x1="60" y1="90" x2="610" y2="90"/><line x1="60" y1="130" x2="610" y2="130"/><line x1="60" y1="210" x2="610" y2="210"/><line x1="60" y1="250" x2="610" y2="250"/><line x1="60" y1="290" x2="610" y2="290"/></g>
+  <line x1="60" y1="170" x2="610" y2="170" stroke="var(--text3)" stroke-width="1.2"/>
+  <line x1="280" y1="45" x2="280" y2="295" stroke="var(--accent2)" stroke-width="1" stroke-dasharray="4,3"/>
+  <polygon points="60,230 130,210 200,175 280,130 340,110 395,120 450,145 500,150 550,148 610,140 610,200 550,210 500,215 450,220 395,230 340,225 280,200 200,215 130,230 60,260" fill="url(#bandGrad)" stroke="none"/>
+  <polyline points="60,230 130,210 200,175 280,130 340,110 395,120 450,145 500,150 550,148 610,140" fill="none" stroke="#aaa" stroke-width="1" stroke-dasharray="4,2"/>
+  <polyline points="60,260 130,230 200,215 280,200 340,225 395,230 450,220 500,215 550,210 610,200" fill="none" stroke="#aaa" stroke-width="1" stroke-dasharray="4,2"/>
+  <polyline points="60,242 130,220 200,196 280,168 340,185 395,190 450,188 500,186 550,182 610,178" fill="none" stroke="var(--text)" stroke-width="2"/>
+  <polyline points="60,238 100,228 130,244 170,200 200,185 230,168 260,148 280,140 300,128 320,118 340,132 360,138 380,148 395,155 420,162 450,168" fill="none" stroke="#4d9fff" stroke-width="2.2"/>
+  <text x="284" y="42" fill="var(--accent2)" font-size="10" font-family="monospace">t=0 暴漲結束</text>
+  <circle cx="450" cy="188" r="5" fill="none" stroke="var(--accent)" stroke-width="1.5"/>
+  <text x="455" y="183" fill="var(--accent)" font-size="9" font-family="monospace">t+3 歷史平均谷底</text>
+  <g fill="var(--dim,#888)" font-size="9" font-family="monospace" text-anchor="end"><text x="55" y="54">20%</text><text x="55" y="94">15%</text><text x="55" y="134">10%</text><text x="55" y="174">5%</text><text x="55" y="214">0%</text><text x="55" y="254">-10%</text><text x="55" y="294">-20%</text></g>
+  <g fill="var(--dim,#888)" font-size="9" font-family="monospace" text-anchor="middle"><text x="60" y="308">-3</text><text x="130" y="308">-2</text><text x="200" y="308">-1</text><text x="280" y="308">0</text><text x="340" y="308">1</text><text x="395" y="308">2</text><text x="450" y="308">3</text><text x="500" y="308">4</text><text x="550" y="308">5</text><text x="610" y="308">6</text></g>
+  <text x="335" y="318" fill="var(--dim,#888)" font-size="9" font-family="monospace" text-anchor="middle">Months around Momentum rally</text>
+  <line x1="380" y1="58" x2="400" y2="58" stroke="#4d9fff" stroke-width="2.2"/><text x="404" y="62" fill="#4d9fff" font-size="9" font-family="monospace">Current episode</text>
+  <line x1="380" y1="72" x2="400" y2="72" stroke="var(--text)" stroke-width="2"/><text x="404" y="76" fill="var(--text)" font-size="9" font-family="monospace">Average episode</text>
+  <rect x="380" y="82" width="20" height="8" fill="url(#bandGrad)"/><text x="404" y="91" fill="#aaa" font-size="9" font-family="monospace">20th-80th pct</text>
+</svg>
+    <div style="font-size:calc(10.5px * var(--fs-scale));color:var(--dim);margin-top:8px;">Source: Goldman Sachs Global Investment Research</div>
+  </div>
+  <div class="table-wrap"><table><thead><tr><th>時間位置</th><th>劇本描述</th><th>操作含義</th></tr></thead><tbody>
+    <tr><td class="td-name">t = 0</td><td>動能暴漲結束點</td><td class="td-base">劇本開始播放</td></tr>
+    <tr><td class="td-name">t+1 ~ t+2</td><td>動能股繼續衝，斜率放緩</td><td class="td-signal sig-warn">高點附近，不宜追買</td></tr>
+    <tr><td class="td-name">t+2 ~ t+3</td><td>開始回落修正，跌勢有慣性</td><td class="td-signal sig-warn">不要急著接刀</td></tr>
+    <tr><td class="td-name">t+3</td><td>歷史平均谷底</td><td class="td-signal sig-ok">修復窗口開始</td></tr>
+    <tr><td class="td-name">t+4 ~ t+6</td><td>緩慢爬升，分散度大</td><td class="td-base">觀察，不保證</td></tr>
+  </tbody></table></div>
+</div>
+
+<div class="content-section" id="sec-why">
+  <div class="section-header"><div class="section-num">03</div><div><div class="section-title">為什麼有用</div><div class="section-desc">這張地圖的核心價值</div></div></div>
+  <div class="context-box" style="margin-bottom:18px;"><div class="context-box-title">地圖 vs 沒有地圖</div><div class="context-box-text">沒有這張地圖的人，只看到「強勢股在跌，好可怕」。有這張地圖的人知道「這段跌勢在歷史上平均持續到 t+3，現在在哪個位置，應該怎麼對應」。同樣是動能股在跌，意義完全不同。</div></div>
+  <div class="notes-grid">
+    <div class="note-card"><div class="note-card-label" style="color:var(--danger);">剛暴漲完就開始跌（t+2 附近）</div><div class="note-card-body">劇本裡的正常回落段，還沒跌完，不要急著接刀。</div></div>
+    <div class="note-card"><div class="note-card-label" style="color:var(--accent);">已跌至歷史平均谷底附近（t+3 前後）</div><div class="note-card-body">修復窗口快到了，反而不該再追空。用實際天數計算 t 值，不目測位置。</div></div>
+  </div>
+</div>
+
+<div class="content-section" id="sec-how">
+  <div class="section-header"><div class="section-num">04</div><div><div class="section-title">怎麼接上你的資料表</div><div class="section-desc">Structure.csv 的三欄判讀方式</div></div></div>
+  <div class="table-wrap"><table><thead><tr><th>欄位</th><th>代表什麼</th><th>警示門檻</th></tr></thead><tbody>
+    <tr><td class="td-name">REL5（5日）</td><td>最短線動能即時讀數，反應最快</td><td class="td-signal sig-warn">超過 +5% 短線擁擠警示</td></tr>
+    <tr><td class="td-name">REL20（1個月）</td><td>動能擁擠程度主要觀察欄位</td><td class="td-signal sig-warn">超過 +8% 中線警示觸發</td></tr>
+    <tr><td class="td-name">REL60（3個月）</td><td>暴漲事件是否觸發、劇本是否開始</td><td class="td-base">超過 +8% 劇本開始（t=0）</td></tr>
+  </tbody></table></div>
+  <div class="context-box" style="margin-top:16px;"><div class="context-box-title">警示邏輯</div><div class="context-box-text">SPMO 或 QQQA 的 REL20 任一超過 +8%，代表動能因子在近一個月已顯著跑贏大盤，擁擠度上升。這不是預測下跌，而是提醒「最擁擠的交易一旦被平倉，往往比市場平均跌得更快更深」。SPMO 與 QQQA 同時觸發時，警示層級升高為「<strong>雙動能同步過熱</strong>」。</div></div>
+  <div class="context-box" style="margin-top:10px;"><div class="context-box-title">時鐘定位</div><div class="context-box-text">用今天日期減去 t=0，換算成月數（÷30.44），即可在高盛圖上找到當前位置——不估算、不目測，只用實際天數計算。本次 t=0 = 2026-06-22。</div></div>
+</div>
+
+<div class="content-section" id="sec-now">
+  <div class="section-header"><div class="section-num">05</div><div><div class="section-title">本期實際判讀</div><div class="section-desc">2026-07-21 讀數 · t=0 日期：2026-06-22</div></div></div>
+  <div class="table-wrap" style="margin-bottom:16px;"><table><thead><tr><th>指標</th><th>數值</th><th>警示狀態</th></tr></thead><tbody>
+    <tr><td class="td-name">SPMO REL5</td><td class="td-val">（每日更新）</td><td class="td-base">超過 +5% 時標注警示</td></tr>
+    <tr><td class="td-name">SPMO REL20</td><td class="td-val">-9.55%</td><td class="td-signal sig-ok">遠低於 +8% 門檻，無警示</td></tr>
+    <tr><td class="td-name">SPMO REL60</td><td class="td-val">+6.94%</td><td class="td-base">接近觸發門檻，持續觀察</td></tr>
+    <tr><td class="td-name">QQQA REL5</td><td class="td-val">（每日更新）</td><td class="td-base">超過 +5% 時標注警示</td></tr>
+    <tr><td class="td-name">QQQA REL20</td><td class="td-val">（待補）</td><td class="td-base">每次市場觀察時更新</td></tr>
+    <tr><td class="td-name">劇本位置</td><td class="td-val">t = 0.95 個月</td><td class="td-base">29 天 / 30.44，2026-06-22 起算</td></tr>
+  </tbody></table></div>
+  <div class="context-box" style="border-left-color:var(--accent);"><div class="context-box-title" style="color:var(--accent);">目前燈號：無動能擁擠警示</div><div class="context-box-text">SPMO REL20 = -9.55%，遠低於 +8% 警示門檻。動能因子近一個月已大幅回落，擁擠做多的問題暫不存在。REL60 +6.94% 仍在高位，三個月累積的暴漲殘影尚未消散，但短線已充分釋壓。<br><br>劇本位置 t = 0.95，對照高盛圖仍在峰值後第一個月。不做階段預測，以 REL5 站上 +5% 或 REL20 重新站上 +8% 作為下一個警示觸發點。</div></div>
+</div>
+
+<div class="content-section" id="sec-weight">
+  <div class="section-header"><div class="section-num">06</div><div><div class="section-title">為什麼放進情緒過熱區塊</div><div class="section-desc">與 BAR2 計分系統的整合邏輯</div></div></div>
+  <div class="notes-grid">
+    <div class="note-card"><div class="note-card-label">互補性</div><div class="note-card-body">情緒過熱原本的指標看的是「人有多瘋」；動能因子看的是「價格結構有多擁擠」。兩者互補——瘋狂情緒與結構擁擠同時出現，才是最高風險訊號。</div></div>
+    <div class="note-card"><div class="note-card-label">領先性</div><div class="note-card-body">動能崩落往往是大盤回檔的<strong>領先訊號</strong>——最擁擠的交易最先被平倉。這也是六月底機構半年再平衡「先砍漲最多的持股」論點的同一個機制。</div></div>
+  </div>
+  <div class="context-box" style="margin-top:16px;"><div class="context-box-title">BAR2 配分更新（2026-07-21）</div><div class="context-box-text">SPMO 今日相對 SPY 佔 20 分（舊 25 分），新增 QQQA 今日相對 SPY 佔 10 分，SPHD 從 15 分降至 10 分，滿分維持 100 分。REL20 警示制與 BAR2 每日分數相互獨立——BAR2 看「今日單日相對強弱」，REL20 看「一個月累積擁擠度」，兩者互補不重複。</div></div>
+</div>
+
+<div class="content-section" id="sec-check">
+  <div class="section-header"><div class="section-num">07</div><div><div class="section-title">驗證點</div><div class="section-desc">警示重新觸發條件與時間窗口</div></div></div>
+  <div class="checkpoint-list">
+    <div class="checkpoint-item"><span class="checkpoint-marker">CHECK 1</span><span class="checkpoint-text">SPMO 或 QQQA <strong>REL5 站上 +5%</strong>——動能擁擠警示重新觸發，在市場觀察報告中標注警示</span></div>
+    <div class="checkpoint-item"><span class="checkpoint-marker">CHECK 2</span><span class="checkpoint-text">t+3 時間窗口（<strong>2026-09-22 前後</strong>）：SPMO REL20 是否止跌回穩？若仍深度負值，代表劇本往低百分位延伸</span></div>
+    <div class="checkpoint-item"><span class="checkpoint-marker">CHECK 3</span><span class="checkpoint-text">SPMO 與 QQQA 同步 REL5 站上 +5%（<strong>雙動能同步觸發</strong>）——作為最高警示等級登錄時間軸</span></div>
+  </div>
+</div>
+
+<div class="content-section">
+  <div class="conclusion-box">
+    <div class="conclusion-box-title">核心結論</div>
+    <div class="conclusion-box-text">動能因子時鐘只做兩件事：<strong>① REL5 站上 +5% 或 REL20 站上 +8% 時提出擁擠警示；② 用實際天數計算 t 值定位劇本位置，不估算、不預測</strong>。當前 SPMO REL20 = -9.55%，無警示；t = 0.95，劇本剛開始播放，下一個觸發點是 REL5 重新站上 +5%。</div>
+  </div>
+</div>
+
+</main>
+
+<script>
+document.addEventListener('contextmenu',function(e){e.preventDefault();return false;});
+document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&['c','a','u','s','p'].includes(e.key.toLowerCase())){e.preventDefault();}if(e.key==='F12'){e.preventDefault();}});
+document.addEventListener('copy',function(e){e.preventDefault();return false;});
+document.addEventListener('dragstart',function(e){e.preventDefault();return false;});
+function toggleScen(el){var card=el.closest('.scen-card');var det=card.querySelector('.scen-detail');var btn=card.querySelector('.toggle-btn');det.classList.toggle('open');if(btn)btn.classList.toggle('open',det.classList.contains('open'));}
+function toggleCard(el){var card=el.closest('.diagram-card');var body=card.querySelector('.diagram-body');var btn=card.querySelector('.toggle-btn');body.classList.toggle('open');if(btn)btn.classList.toggle('open',body.classList.contains('open'));}
+
+/* ═══ 5-3 動態相似度計算器 ═══ */
+var SIM_DEFAULTS = [6,5,8,6,5,3,4,8];
+var SIM_TELECOM  = [8,9,7,9,10,6,9,8];
+var SIM_SEMI     = [7,4,8,3,9,8,3,4];
+var SIM_WEIGHTS  = [1,8,1,1.3,1,1,8,1];
+
+function simWeightedCos(a,b,w){
+  var dot=0, na=0, nb=0;
+  for(var i=0;i<8;i++){
+    var aw=a[i]*Math.sqrt(w[i]), bw=b[i]*Math.sqrt(w[i]);
+    dot+=aw*bw; na+=aw*aw; nb+=bw*bw;
+  }
+  return dot/(Math.sqrt(na)*Math.sqrt(nb));
+}
+function simTier(v){
+  if(v>=0.85) return '極高相似 → 雙重風險特徵已非常明確';
+  if(v>=0.7)  return '＞0.7門檻 → 具顯著結構相似特徵';
+  if(v>=0.5)  return '中度相似 → 部分特徵重疊，需持續觀察';
+  return '低相似 → 結構性差異仍是主導因素';
+}
+function simRecalc(){
+  var ai=[];
+  for(var i=0;i<8;i++){
+    var el=document.getElementById('sv'+i);
+    var v=parseFloat(el.value);
+    ai.push(v);
+    document.getElementById('sv'+i+'val').textContent=v.toFixed(1);
+  }
+  var tel=simWeightedCos(ai,SIM_TELECOM,SIM_WEIGHTS);
+  var semi=simWeightedCos(ai,SIM_SEMI,SIM_WEIGHTS);
+  document.getElementById('simTel').textContent=tel.toFixed(2);
+  document.getElementById('simSemi').textContent=semi.toFixed(2);
+  document.getElementById('simTelTier').textContent=simTier(tel);
+  document.getElementById('simSemiTier').textContent=simTier(semi);
+}
+function simReset(){
+  for(var i=0;i<8;i++){
+    document.getElementById('sv'+i).value=SIM_DEFAULTS[i];
+  }
+  simRecalc();
+}
+document.addEventListener('DOMContentLoaded', function(){
+  if(document.getElementById('sv0')) simRecalc();
+});
+function setSize(sz){document.documentElement.setAttribute('data-size',sz);document.querySelectorAll('[onclick*="setSize"]').forEach(b=>{b.classList.toggle('active',b.textContent=={sm:'小',md:'中',lg:'大'}[sz]);});localStorage.setItem('bubble-size',sz);}
+function setTheme(th){document.documentElement.setAttribute('data-theme',th);document.querySelectorAll('[onclick*="setTheme"]').forEach(b=>{b.classList.toggle('active',b.textContent=={dark:'深',light:'淺'}[th]);});localStorage.setItem('bubble-theme',th);}
+(function(){var sz=localStorage.getItem('bubble-size')||'md';var th=localStorage.getItem('bubble-theme')||'dark';document.documentElement.setAttribute('data-size',sz);document.documentElement.setAttribute('data-theme',th);document.querySelectorAll('[onclick*="setSize"]').forEach(b=>{b.classList.toggle('active',b.textContent=={sm:'小',md:'中',lg:'大'}[sz])});document.querySelectorAll('[onclick*="setTheme"]').forEach(b=>{b.classList.toggle('active',b.textContent=={dark:'深',light:'淺'}[th])});})();
+</script>
+</body>
+</html>
