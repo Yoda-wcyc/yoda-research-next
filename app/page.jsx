@@ -296,13 +296,11 @@ export default function Home() {
             免費訂閱簡報　直送信箱
           </a>
         </div>
-      {showArrow && (
-        <div style={{ position:"fixed", bottom:"18px", left:0, right:0, textAlign:"center", pointerEvents:"none", zIndex:50 }}>
+      <div style={{ position:"fixed", bottom:"18px", left:0, right:0, textAlign:"center", pointerEvents:"none", zIndex:50 }}>
           <span style={{ fontSize:"calc(24px*var(--scale))", color:"var(--gold-lg)", opacity:.75, display:"block", lineHeight:1, animation:"arrow-bob 2s ease-in-out infinite" }}>⌄</span>
           <span style={{ fontSize:"calc(24px*var(--scale))", color:"var(--gold-lg)", opacity:.45, display:"block", lineHeight:1, marginTop:"-8px", animation:"arrow-bob 2s ease-in-out infinite", animationDelay:"0.15s" }}>⌄</span>
           <span style={{ fontSize:"calc(24px*var(--scale))", color:"var(--gold-lg)", opacity:.2, display:"block", lineHeight:1, marginTop:"-8px", animation:"arrow-bob 2s ease-in-out infinite", animationDelay:"0.3s" }}>⌄</span>
         </div>
-      )}
       </header>
 
       <div className="wrap">
@@ -464,4 +462,3 @@ export default function Home() {
     </>
   );
 }
-
