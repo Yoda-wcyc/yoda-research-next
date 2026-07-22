@@ -249,7 +249,7 @@ export default function Home() {
           if (bb.note)  next.bNote = bb.note;
           if (bb.url)   next.bUrl  = bb.url;
           const lt = data.latest || {};
-          if (lt["簡報"]?.file) next.latestBrief = BASE + "/-/" + encodeURIComponent(lt["簡報"].file);
+          if (lt["簡報"]?.file) next.latestBrief = BASE + "/-/" + lt["簡報"].file;
           setD(next);
           setLatest(lt);
         } catch(e) {}
@@ -315,7 +315,7 @@ export default function Home() {
           <div className="card reveal" style={{ padding:"calc(24px*var(--scale))" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:"calc(18px*var(--scale))" }}>
               <div style={{ fontWeight:600, fontSize:"calc(15px*var(--scale))" }}>市場溫度</div>
-              <a href={latest["市場觀察"]?.file ? BASE + "/-/" + encodeURIComponent(latest["市場觀察"].file) : BASE + "/-/"}
+              <a href={latest["市場觀察"]?.file ? BASE + "/-/" + latest["市場觀察"].file : BASE + "/-/"}
                 style={{ fontSize:"calc(12px*var(--scale))", color:"var(--accent)" }}>完整市場觀察 →</a>
             </div>
             {d.temp.map(t => <TempBar key={t.name} {...t} />)}
@@ -331,7 +331,7 @@ export default function Home() {
             {CATS.map(c => {
               const e = latest[c.key];
               const has = e && e.file;
-              const href = has ? BASE + "/-/" + encodeURIComponent(e.file) : BASE + "/-/";
+              const href = has ? BASE + "/-/" + e.file : BASE + "/-/";
               const desc = has && e.summary && e.summary.indexOf("占位") === -1 ? e.summary : c.desc;
               const go   = has && e.date ? `閱讀最新(${e.date})→` : "閱讀最新 →";
               return (
@@ -356,7 +356,7 @@ export default function Home() {
           <div className="card reveal" style={{ padding:"calc(28px*var(--scale))" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:"calc(20px*var(--scale))" }}>
               <div style={{ fontWeight:600, fontSize:"calc(15px*var(--scale))" }}>市場位階總覽</div>
-              <a href={latest["總經"]?.file ? BASE + "/-/" + encodeURIComponent(latest["總經"].file) : BASE + "/-/"}
+              <a href={latest["總經"]?.file ? BASE + "/-/" + latest["總經"].file : BASE + "/-/"}
                 style={{ fontSize:"calc(12px*var(--scale))", color:"var(--accent)" }}>完整總經報告 →</a>
             </div>
             <CycleTempBar />
