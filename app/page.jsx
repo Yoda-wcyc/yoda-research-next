@@ -389,6 +389,15 @@ export default function Home() {
                 </a>
               );
             })}
+            {/* 遊戲庫（固定卡片，不吃 latest 動態資料） */}
+            <a className="card cat reveal"
+               href="https://yoda-wcyc.github.io/game/"
+               target="_blank" rel="noopener noreferrer">
+              <span className="tag">玩玩看</span>
+              <h3>🎮 遊戲庫</h3>
+              <p>用遊戲體會投資世界裡的道理與心法。</p>
+              <span className="go">進遊戲庫 →</span>
+            </a>
           </div>
           <div style={{ textAlign:"center", marginTop:"calc(28px*var(--scale))" }}>
             <a className="btn btn-ghost" href="/archive">瀏覽全部報告 →</a>
