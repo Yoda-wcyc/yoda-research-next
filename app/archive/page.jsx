@@ -29,6 +29,7 @@ export default function Archive() {
   return (
     <>
       <div className="awrap">
+        <a className="aback" href="https://yoda-research-next.vercel.app/">← 回 Yoda Research</a>
         <div className="eyebrow">Archive</div>
         <h1>研究總覽</h1>
         <div className="sub">
