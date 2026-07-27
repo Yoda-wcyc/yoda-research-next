@@ -74,7 +74,10 @@ export default function Archive() {
           )}
         </div>
       </div>
-      <footer className="afoot">© 2026 Yoda Research｜本站內容不構成投資建議</footer>
+      <footer className="afoot">
+        <a className="afoot-home" href="https://yoda-research-next.vercel.app/">← 回 Yoda Research</a>
+        <div>© 2026 Yoda Research｜本站內容不構成投資建議</div>
+      </footer>
     </>
   );
 }
