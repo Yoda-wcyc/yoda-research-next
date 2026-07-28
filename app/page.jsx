@@ -314,40 +314,19 @@ export default function Home() {
     <p style={{ fontSize: "calc(16px*var(--scale))", lineHeight: 1.9, color: "var(--dim)", margin: 0 }}>有時準，有時不準——但你永遠不知道這次算哪種。</p>
   </div>
 
-  <div style={{ marginBottom: "2rem" }}>
-    <p style={{ fontSize: "calc(16px*var(--scale))", lineHeight: 1.9, color: "var(--text)", fontWeight: 500, margin: "0 0 0.5rem" }}>這裡不做預言。</p>
-    <p style={{ fontSize: "calc(16px*var(--scale))", lineHeight: 1.9, color: "var(--dim)", margin: "0 0 0.5rem" }}>Yoda Research 做的事只有一件：</p>
-    <p style={{ fontSize: "calc(16px*var(--scale))", lineHeight: 1.9, color: "var(--dim)", margin: "0 0 0.5rem" }}>根據總經大方向，告訴你現在該踩油門還是踩煞車。</p>
-    <p style={{ fontSize: "calc(16px*var(--scale))", lineHeight: 1.9, color: "var(--dim)", margin: 0 }}>然後持續觀察市場訊號，搞清楚路況怎麼變化、轉折在哪。</p>
-  </div>
-
-  <div style={{ marginBottom: "2rem" }}>
-    <p style={{ fontSize: "calc(16px*var(--scale))", lineHeight: 1.9, color: "var(--dim)", margin: "0 0 0.5rem" }}>每月更新總經路徑，每週更新市場觀察，追蹤美股與台股的強弱輪動。</p>
-    <p style={{ fontSize: "calc(16px*var(--scale))", lineHeight: 1.9, color: "var(--dim)", margin: "0 0 0.5rem" }}>每次有訊號，就提出預期與底線——</p>
-    <p style={{ fontSize: "calc(16px*var(--scale))", lineHeight: 1.9, color: "var(--dim)", margin: "0 0 0.5rem" }}>如果合乎預期，做這個；如果跌破底線，做那個。</p>
-    <p style={{ fontSize: "calc(16px*var(--scale))", lineHeight: 1.9, color: "var(--text)", fontWeight: 500, margin: 0 }}>因為股市沒有答案，只有地圖。</p>
-  </div>
-
-  <div style={{ marginBottom: "2rem" }}>
-    <p style={{ fontSize: "calc(16px*var(--scale))", lineHeight: 1.9, color: "var(--text)", fontWeight: 500, margin: "0 0 0.75rem" }}>如果你這樣想，這裡絕對不適合你：</p>
-    {[
-      "看到新聞說 Fed 要降息就急著進場",
-      "看錯了就凹著，騙自己長期一定回來",
-      "不是全押就是空手，從來沒有中間地帶",
-      "喜歡有人給你答案，而不是地圖",
-    ].map((t, i) => (
-      <div key={i} style={{ display: "flex", alignItems: "baseline", gap: "0.7rem", fontSize: "calc(15px*var(--scale))", lineHeight: 1.65, color: "var(--dim)", marginBottom: "0.4rem" }}>
-        <span style={{ color: "#e0a526", fontSize: "calc(12px*var(--scale))", flexShrink: 0 }}>✕</span>
-        <span>{t}</span>
-      </div>
-    ))}
-  </div>
-
-  <div style={{ paddingTop: "1.5rem", borderTop: "0.5px solid var(--border)" }}>
-    <p style={{ fontSize: "calc(16px*var(--scale))", lineHeight: 1.9, color: "var(--dim)", margin: "0 0 0.4rem" }}>如果你不想賭方向，只想在對的時機做對的動作；</p>
-    <p style={{ fontSize: "calc(16px*var(--scale))", lineHeight: 1.9, color: "var(--dim)", margin: "0 0 0.4rem" }}>願意根據新的訊號調整判斷，而不是死守一個預測等它兌現；</p>
-    <p style={{ fontSize: "calc(16px*var(--scale))", lineHeight: 1.9, color: "var(--dim)", margin: "0 0 0.9rem" }}>知道投資最重要的不是做對，是在做錯的時候不會傷得太重。</p>
-    <p style={{ fontSize: "calc(18px*var(--scale))", fontWeight: 500, color: "#e0a526", margin: 0 }}>那麼，歡迎你。</p>
+  <div style={{ paddingTop: "1.5rem", borderTop: "0.5px solid var(--border)", textAlign: "center" }}>
+    <p style={{ fontSize: "calc(16px*var(--scale))", lineHeight: 1.9, color: "var(--text)", fontWeight: 500, margin: "0 0 0.4rem" }}>這裡不做預言，只做一件事：告訴你該踩油門，還是踩煞車。</p>
+    <p style={{ fontSize: "calc(16px*var(--scale))", lineHeight: 1.9, color: "var(--dim)", margin: "0 0 1.6rem" }}>因為股市沒有答案，只有地圖。這裡適不適合你，玩一次就知道。</p>
+    <a href="https://yoda-wcyc.github.io/game/answer-or-map.html"
+       target="_blank" rel="noopener noreferrer"
+       style={{ display: "inline-block", padding: "0.95rem 2.8rem", borderRadius: 8,
+         background: "#e0a526", color: "#080b10", fontWeight: 700,
+         fontSize: "calc(16px*var(--scale))", letterSpacing: "0.02em", textDecoration: "none",
+         boxShadow: "0 4px 20px rgba(224,165,38,.35)", transition: "transform .18s, box-shadow .18s" }}
+       onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 6px 26px rgba(224,165,38,.5)"; }}
+       onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(224,165,38,.35)"; }}>
+      🎮 玩玩看，你適不適合這裡 →
+    </a>
   </div>
 
 </section>
