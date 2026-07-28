@@ -308,11 +308,7 @@ export default function Home() {
 {/* Manifesto */}
 <section id="manifesto" style={{ borderLeft: "3px solid #e0a526", paddingLeft: "2rem", margin: "calc(48px*var(--scale)) 0" }}>
 
-  <div style={{ marginBottom: "2rem" }}>
-    <h2 style={{ fontSize: "calc(22px*var(--scale))", fontWeight: 500, color: "var(--text)", margin: "0 0 1rem", letterSpacing: "-0.01em" }}>市場不需要預言家</h2>
-    <p style={{ fontSize: "calc(16px*var(--scale))", lineHeight: 1.9, color: "var(--dim)", margin: "0 0 0.5rem" }}>很多分析師告訴你「接下來會漲」「這波要跌」。</p>
-    <p style={{ fontSize: "calc(16px*var(--scale))", lineHeight: 1.9, color: "var(--dim)", margin: 0 }}>有時準，有時不準——但你永遠不知道這次算哪種。</p>
-  </div>
+  
 
   <div style={{ paddingTop: "1.5rem", borderTop: "0.5px solid var(--border)", textAlign: "center" }}>
     <p style={{ fontSize: "calc(16px*var(--scale))", lineHeight: 1.9, color: "var(--text)", fontWeight: 500, margin: "0 0 0.4rem" }}>這裡不做預言，只做一件事：告訴你該踩油門，還是踩煞車。</p>
