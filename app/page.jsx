@@ -279,7 +279,7 @@ export default function Home() {
     <>
       {/* Hero */}
       <header className="hero">
-        <h1 className="reveal hero-title"><span className="sr-only">Yoda Research</span></h1>
+        <h1 className="reveal">Yoda <span className="gold">Research</span></h1>
         {d.heroNote ? (
           <p className="reveal" style={{ fontSize:"calc(17px*var(--scale))", color:"var(--gold-lg)", marginBottom:4 }}>{d.heroNote}</p>
         ) : null}
