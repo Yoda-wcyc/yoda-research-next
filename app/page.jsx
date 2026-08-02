@@ -21,33 +21,6 @@ const CATS = [
   { key: "專題",    tag: "不定期",  title: "專題研究",   desc: "單一主題深度分析：動能因子、事件驅動、產業結構與市場機制拆解。" },
 ];
 
-/* ── 判斷紀錄 track record（覆盤 2026-08-02；資料靜態，不吃 reports.json）── */
-const RC = { "✅":"var(--green)", "❌":"var(--red)", "➖":"var(--yellow)", "⏸":"var(--dim)" };
-const TRACK = {
-  asOf: "2026-08-02",
-  overall: { rate: 56, total: 8, note: "✅ 命中 ×4　➖ 部分 ×1　❌ 未達 ×3　·　⏸ 條件未觸發 ×3（不計入）" },
-  cats: [
-    { name: "事件反應", w: "2 / 3" },
-    { name: "廣度轉折", w: "1.5 / 3" },
-    { name: "殖利率方向", w: "1 / 1" },
-    { name: "板塊輪動", w: "0 / 1" },
-  ],
-  // 依登錄日降序（最新在上）；d=登錄日、v=到期驗證日
-  items: [
-    { d:"7/10", v:"7/15", r:"✅", t:"CPI 當天先別追，等隔天看清楚再說", c:"事件反應", note:"公布前市場 Call 買到爆、樂觀到有點過頭；我們選擇不追。結果 7/16–17 一路反轉下殺，這個『先按住手』的紀律剛好躲過。" },
-    { d:"7/10", v:"7/14", r:"✅", t:"CPI 前，US10Y 會守在 4.50–4.57%、不破 4.60%", c:"殖利率方向", note:"整段就黏在 4.55–4.57% 這個窄帶裡，沒有往上失控，最關鍵的那道利率防線守住了。" },
-    { d:"7/09", v:"7/14", r:"❌", t:"SP20、RSP、SOXX 三條件湊齊，就是底部、可以加碼", c:"廣度轉折", note:"三個條件週中一度真的到齊，但那是假底——兩天內全部吐回、NQ 廣度還跌破 50%。照這訊號加碼會挨刀，這次最該記住。" },
-    { d:"7/09", v:"7/14", r:"❌", t:"SOXX 五日翻正，就升格成強勢主線", c:"板塊輪動", note:"五日是翻正沒錯，但同一天月線又翻回負，之後 SOXX 一路深跌，根本沒站穩。升格沒發生。" },
-    { d:"7/09", v:"7/10", r:"✅", t:"IWM 月線再翻負，廣度架構就正式降一級", c:"廣度轉折", note:"隔天 IWM 月線果然翻負，撐盤的最後一條腿也倒了，該降的級如期降。這條是高信心，也真的中了。" },
-    { d:"7/08", v:"7/14", r:"❌", t:"CPI 只要溫和，QQQ 就會上攻 740–750", c:"事件反應", note:"價位是看錯了——CPI 真的溫和，QQQ 卻不漲反跌到 695。但這個『錯』本身就是最強的訊號：利多都出來了還跌，正是天秤在喊偏空（利多不漲＝賣壓在後面等），事後看就是那波轉折的起點。判斷失手，卻讀到了對的方向。" },
-    { d:"7/08", v:"7/10", r:"➖", t:"MDY 跟 RSP 月線一起翻負，廣度就往 S−/M− 降", c:"廣度轉折", note:"兩個條件確實都到位、架構也照降了；只是那幾天回調沒有立刻擴大，市場短線還撐著，所以只能算對一半。" },
-    { d:"7/08", v:"7/14", r:"⏸", t:"US10Y 在 CPI 前，自己回落到 4.527% 以下", c:"殖利率方向", note:"一樣沒回落到那，條件沒成立，不計入。" },
-    { d:"7/07", v:"7/10", r:"⏸", t:"US10Y 在紀要後兩天內，收復到 4.527% 以下", c:"殖利率方向", note:"US10Y 沒收復到那個位置，設定的條件沒被觸發，不計入。" },
-    { d:"7/07", v:"7/14", r:"⏸", t:"SOXX 沒回收的話，QQQ 會被拖去測 675–690", c:"板塊輪動", note:"但 SOXX 提早就自己回收了，前提根本沒成立，所以這條不列入計分。" },
-    { d:"6/29", v:"7/15", r:"✅", t:"6/27–30 那波是技術性賣壓，不是基本面壞掉", c:"事件反應", note:"整段期間信用利差都穩穩的、沒有異常，代表底層沒破洞；7 月一開月，市場也照著回神了。" },
-  ],
-};
-
 /* ── 市場觀察四條溫度計 ── */
 function TempBar({ name, label, labelColor, pct, bubbleColor }) {
   return (
@@ -400,73 +373,18 @@ export default function Home() {
               <p>用遊戲體會投資世界裡的道理與心法。</p>
               <span className="go">進遊戲庫 →</span>
             </a>
+            {/* 判斷紀錄卡（緊鄰遊戲庫；點進去才看完整紀錄頁） */}
+            <a className="card cat reveal"
+               href="https://yoda-wcyc.github.io/-/track-record.html"
+               target="_blank" rel="noopener noreferrer">
+              <span className="tag">命中 56%</span>
+              <h3>📊 判斷紀錄<span className="ttl-arrow" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span></h3>
+              <p>我們下過的判斷，到期就一條條對答案——對的、錯的都攤在同一張表。</p>
+              <span className="go">看完整紀錄 →</span>
+            </a>
           </div>
           <div style={{ textAlign:"center", marginTop:"calc(28px*var(--scale))" }}>
             <a className="btn btn-ghost" href="/archive">瀏覽全部報告 →</a>
-          </div>
-        </section>
-
-        {/* 判斷紀錄 Track Record */}
-        <section id="track">
-          <div className="eyebrow reveal">Track Record</div>
-          <h2 className="reveal">判斷紀錄</h2>
-          <p className="reveal" style={{ fontSize:"calc(16px*var(--scale))", color:"var(--dim)", lineHeight:1.85, maxWidth:760, marginBottom:"calc(24px*var(--scale))" }}>
-            我們每天在報告裡下的判斷，都寫成有明確方向、有時間窗、事後能對答案的樣子。這裡就是到期之後、一條一條翻出來對過的成績單——不是挑好看的講，是連沒中的也擺在同一張表上。
-          </p>
-          <div className="card reveal" style={{ padding:"calc(28px*var(--scale))" }}>
-
-            {/* 標頭：整體命中 */}
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"12px 20px", marginBottom:"calc(4px*var(--scale))" }}>
-              <div style={{ display:"flex", alignItems:"baseline", gap:14 }}>
-                <span style={{ fontSize:"calc(52px*var(--scale))", fontWeight:700, letterSpacing:"-.02em", color:"var(--gold-lg)", lineHeight:1 }}>{TRACK.overall.rate}%</span>
-                <span style={{ fontSize:"calc(15px*var(--scale))", color:"var(--dim)", lineHeight:1.4 }}>整體命中率<br/>{TRACK.overall.total} 條已到期驗證</span>
-              </div>
-              <span style={{ fontSize:"calc(14px*var(--scale))", color:"var(--text)", fontWeight:600 }}>對的、錯的，全部攤開</span>
-            </div>
-            <div style={{ fontSize:"calc(12px*var(--scale))", color:"var(--dim)", marginBottom:"calc(24px*var(--scale))" }}>{TRACK.overall.note}</div>
-
-            {/* 四類命中 */}
-            <div className="dash" style={{ marginBottom:"calc(24px*var(--scale))" }}>
-              {TRACK.cats.map(c => (
-                <div key={c.name} style={{ background:"var(--surface2)", border:"1px solid var(--border)", borderRadius:12, padding:"calc(14px*var(--scale))" }}>
-                  <div style={{ fontSize:"calc(11px*var(--scale))", color:"var(--dim)", letterSpacing:".04em", marginBottom:6 }}>{c.name}</div>
-                  <div style={{ fontSize:"calc(22px*var(--scale))", fontWeight:700, letterSpacing:"-.01em" }}>{c.w}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* 逐條判斷（依時間排序；左欄＝登錄日／驗證日）*/}
-            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-              {TRACK.items.map((it,i) => (
-                <div key={i} style={{ display:"flex", gap:12, alignItems:"flex-start", padding:"calc(11px*var(--scale)) calc(13px*var(--scale))", background:"var(--surface2)", borderLeft:`3px solid ${RC[it.r]}`, borderRadius:"0 8px 8px 0" }}>
-                  <div style={{ width:"calc(46px*var(--scale))", flexShrink:0, textAlign:"right", lineHeight:1.35, paddingTop:1 }}>
-                    <div style={{ fontSize:"calc(13px*var(--scale))", fontWeight:700, color:"var(--text)" }}>{it.d}</div>
-                    <div style={{ fontSize:"calc(10px*var(--scale))", color:"var(--dim)" }}>驗 {it.v}</div>
-                  </div>
-                  <span style={{ fontSize:"calc(15px*var(--scale))", lineHeight:1.5, flexShrink:0 }}>{it.r}</span>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:"calc(14px*var(--scale))", fontWeight:600, lineHeight:1.55 }}>{it.t}</div>
-                    <div style={{ fontSize:"calc(12.5px*var(--scale))", color:"var(--dim)", marginTop:3, lineHeight:1.65 }}>
-                      <span style={{ color:RC[it.r], fontWeight:700 }}>{it.c}</span>　{it.note}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* 概念鉤子：落底訊號遊戲（飛輪 §0-4，接「假底」那一條）*/}
-            <a href="https://yoda-wcyc.github.io/game/%E8%90%BD%E5%BA%95%E8%A8%8A%E8%99%9F-20260729.html"
-               target="_blank" rel="noopener noreferrer"
-               style={{ display:"inline-flex", alignItems:"center", gap:8, marginTop:"calc(18px*var(--scale))",
-                 padding:"calc(10px*var(--scale)) calc(18px*var(--scale))", borderRadius:9999,
-                 background:"var(--surface2)", border:"1px solid var(--gold-dim)", color:"var(--gold-lg)",
-                 fontSize:"calc(13px*var(--scale))", fontWeight:600, textDecoration:"none" }}>
-              🎮 這張表最痛的一條，是把「假底」當成真底——玩〈落底訊號〉，練怎麼分 →
-            </a>
-
-            <div style={{ fontSize:"calc(12px*var(--scale))", color:"var(--dim)", marginTop:"calc(20px*var(--scale))", lineHeight:1.75 }}>
-              ▸ 這些判斷都是在報告當下就寫死的，一條方向配一個時間窗；時間到了用實際行情對答案：✅ 命中、➖ 部分對、❌ 沒中、⏸ 當初設的條件根本沒發生、所以不計分。寫過的一律留著、不回頭改一個字。截至 {TRACK.asOf}。
-            </div>
           </div>
         </section>
 
