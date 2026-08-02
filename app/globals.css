@@ -59,18 +59,23 @@ html[data-theme="light"] .ctrl{background:rgba(255,255,255,.72)}
   50%{background:var(--gold-lg);box-shadow:0 0 10px 3px rgba(224,165,38,.75)}
 }
 .breathe{animation:gold-breathe 1.8s ease-in-out infinite}
+/* 粉專鈕呼吸燈:全系統報告共用元件,固定 #b8960a↔#ffd700,不隨網站雙金階、不隨主題變(DESIGN-TOKENS §6 逐字正本) */
+@keyframes fan-breathe{
+  0%,100%{background:#b8960a;box-shadow:0 0 4px 1px rgba(255,215,0,.35);color:#1a1200}
+  50%{background:#ffd700;box-shadow:0 0 10px 3px rgba(255,215,0,.75);color:#000}
+}
 .ctrl-fan{
   display:flex;align-items:center;gap:5px;
   padding:5px 12px;
   font-size:calc(12px*var(--scale));
-  color:#000;text-decoration:none;white-space:nowrap;
-  background:var(--gold-dim);border-radius:9999px;
-  animation:gold-breathe 1.8s ease-in-out infinite;
+  color:#1a1200;text-decoration:none;white-space:nowrap;
+  background:#b8960a;border-radius:9999px;
+  animation:fan-breathe 1.8s ease-in-out infinite;
   font-weight:700;
 }
-html[data-theme="light"] .ctrl-fan{color:#fff}
 @media (prefers-reduced-motion:reduce){
-  .breathe,.ctrl-fan{animation:none;background:var(--gold-lg)}
+  .breathe{animation:none;background:var(--gold-lg)}
+  .ctrl-fan{animation:none;background:#ffd700;color:#000}
   .reveal{opacity:1 !important;transform:none !important}
   .sig-dot{animation:none !important}
 }
@@ -102,6 +107,21 @@ h2{
   font-weight:600;letter-spacing:-.022em;line-height:1.1;
 }
 .hero h1 .gold{color:var(--gold-lg)}
+/* 主標改用品牌 logo 圖(Yoda + 金 Research);已裁切到字邊,margin:auto 置中,隨主題切換來源 */
+.hero h1.hero-title{
+  width:calc(560px*var(--scale));
+  max-width:84vw;
+  aspect-ratio:454 / 57;
+  margin:0 auto;
+  background:center / contain no-repeat url("/yoda-research-title-dark.png");
+}
+html[data-theme="light"] .hero h1.hero-title{
+  background-image:url("/yoda-research-title-light.png");
+}
+.sr-only{
+  position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;
+}
 .hero p{
   font-size:calc(24px*var(--scale));
   color:var(--dim);margin:calc(20px*var(--scale)) 0 calc(36px*var(--scale));
@@ -259,24 +279,6 @@ footer .disc{line-height:1.8;max-width:820px}
 .item .summary{font-size:calc(15px*var(--scale));color:var(--dim);margin-top:4px}
 .empty{color:var(--dim);text-align:center;padding:calc(48px*var(--scale)) 0;font-size:calc(17px*var(--scale))}
 .afoot{border-top:1px solid var(--divider);padding:calc(32px*var(--scale)) 24px;font-size:calc(13px*var(--scale));color:var(--dim);text-align:center}
-/* ═══ Archive footer 回首頁連結 ═══ */
-.afoot-home{
-  display:inline-block;
-  margin-bottom:10px;
-  color:var(--dim);
-  font-size:calc(13px*var(--scale));
-  transition:color .18s;
-}
-.afoot-home:hover{color:var(--accent)}
-/* ═══ Archive 頂部回首頁連結 ═══ */
-.aback{
-  display:inline-block;
-  margin-bottom:calc(20px*var(--scale));
-  color:var(--dim);
-  font-size:calc(14px*var(--scale));
-  transition:color .18s;
-}
-.aback:hover{color:var(--accent)}
 @media (max-width:600px){
   .awrap h1{font-size:calc(31px*var(--scale))}
   .awrap{padding-top:calc(84px*var(--scale))}
