@@ -469,7 +469,7 @@ export default function Home() {
             <h2 className="reveal" style={{ marginBottom:0 }}>最新研究</h2>
             {/* 報告導航遊戲（金色呼吸小鈕，貼標題旁；規格參考 manifesto 玩玩看但縮小） */}
             <a href="https://yoda-wcyc.github.io/game/報告導航.html" target="_blank" rel="noopener noreferrer" className="breathe"
-              style={{ display:"inline-block", padding:"calc(7px*var(--scale)) calc(16px*var(--scale))", borderRadius:9999, background:"#e0a526", color:"#080b10", fontWeight:700, fontSize:"calc(15px*var(--scale))", letterSpacing:".01em", textDecoration:"none", whiteSpace:"nowrap" }}
+              style={{ display:"inline-block", margin:"0 auto", padding:"calc(7px*var(--scale)) calc(16px*var(--scale))", borderRadius:9999, background:"#e0a526", color:"#080b10", fontWeight:700, fontSize:"calc(15px*var(--scale))", letterSpacing:".01em", textDecoration:"none", whiteSpace:"nowrap" }}
               onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; }}
               onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; }}>
               🧭 這麼多報告，不知道從何看起？我來幫你導航 →
