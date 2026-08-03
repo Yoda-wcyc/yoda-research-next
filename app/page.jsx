@@ -48,6 +48,21 @@ function TempBar({ name, label, labelColor, pct, bubbleColor }) {
   );
 }
 
+/* ── 全球槓桿 mini 走勢圖（sparkline） ── */
+function Spark({ pts, color }) {
+  const w = 118, h = 34, pad = 4;
+  const mn = Math.min(...pts), mx = Math.max(...pts), rng = (mx - mn) || 1;
+  const step = pts.length > 1 ? w / (pts.length - 1) : 0;
+  const y = v => (h - pad) - ((v - mn) / rng) * (h - 2 * pad);
+  const d = pts.map((v, i) => `${i ? "L" : "M"}${(i * step).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display:"block", flexShrink:0 }}>
+      <path d={d} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"/>
+      <circle cx={(pts.length - 1) * step} cy={y(pts[pts.length - 1])} r="2.8" fill={color}/>
+    </svg>
+  );
+}
+
 /* ── 總經景氣大循環溫度條 ── */
 function CycleTempBar({ cycle }) {
   return (
@@ -225,7 +240,10 @@ const DEFAULTS = {
   bHeadline: "估值更貴（CAPE 41.3、巴菲特 230%）但 Q2 巨頭盈餘接棒、破底翻洗掉投機浮額——泡沫警戒而非崩盤前夕，最需盯 CapEx ROI 缺口能否收斂。",
   latestBrief: BASE + "/-/",
   cycle: { big_pct:74, big_label:"榮景末段·逼近循環峰", mfg_pct:70, mfg_label:"擴產近過熱·近製造業峰", note:"景氣大循環榮景末段（74%）· 製造業週期近過熱（70%）", updated:"8月更新" },
-  leverage: { headline:"台灣去槓桿壓力最高·正在發生；美股水位最高·尚未洩壓", url: BASE + "/-/global-leverage.html", updated:"每日記錄（2026-07-31 起）" },
+  leverage: { url: BASE + "/-/global-leverage.html", updated:"資料截至 2026-07-31", markets:[
+    { flag:"🇹🇼", name:"台灣", index:"加權指數", pressure:48, trend:"▼ 從高點回落·去槓桿早期", history:[44,51,48,48] },
+    { flag:"🇰🇷", name:"韓國", index:"KOSPI", pressure:82, trend:"▲ 融資強平螺旋進行中", history:[62,72,74,77,84,82] },
+  ] },
 };
 
 export default function Home() {
@@ -344,15 +362,17 @@ export default function Home() {
           <h2 className="reveal">市場儀表板</h2>
           <div className="dash2">
 
-            {/* 1 市場溫度 */}
-            <div className="card reveal" style={{ padding:"calc(24px*var(--scale))" }}>
+            {/* 1 市場溫度（拉長至與總經同高，溫度計均分填滿） */}
+            <div className="card reveal" style={{ padding:"calc(24px*var(--scale))", display:"flex", flexDirection:"column" }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:"calc(18px*var(--scale))" }}>
                 <div style={{ fontWeight:600, fontSize:"calc(15px*var(--scale))" }}>市場溫度</div>
                 <a href={latest["市場觀察"]?.file ? BASE + "/-/" + latest["市場觀察"].file : BASE + "/-/"}
                   style={{ fontSize:"calc(12px*var(--scale))", color:"var(--accent)" }}>完整市場觀察 →</a>
               </div>
-              {d.temp.map(t => <TempBar key={t.name} {...t} />)}
-              <div style={{ fontSize:"calc(12px*var(--scale))", color:"var(--dim)", marginTop:6 }}>{d.updated}</div>
+              <div style={{ flex:1, display:"flex", flexDirection:"column", justifyContent:"space-between" }}>
+                {d.temp.map(t => <TempBar key={t.name} {...t} />)}
+              </div>
+              <div style={{ fontSize:"calc(12px*var(--scale))", color:"var(--dim)", marginTop:"calc(10px*var(--scale))" }}>{d.updated}</div>
             </div>
 
             {/* 2 總經景氣位階 */}
@@ -370,7 +390,7 @@ export default function Home() {
             {/* 3 AI 泡沫監測（資料化：讀 reports.json bubble） */}
             <div className="score-bar-section reveal">
               <div className="score-bar-header">
-                <div className="score-bar-header-title">{bZone}（{bScore100}/100）</div>
+                <div className="score-bar-header-title">AI泡沫評估</div>
                 <a href={d.bUrl}
                   style={{ fontSize:"calc(12px*var(--scale))", color:"var(--accent)" }}>完整評估 →</a>
               </div>
@@ -398,20 +418,32 @@ export default function Home() {
               <div className="score-note">▸ {d.bHeadline}</div>
             </div>
 
-            {/* 4 全球槓桿觀察（資料化：讀 reports.json leverage） */}
+            {/* 4 全球槓桿觀察（台灣＋韓國去槓桿壓力走勢，讀 reports.json leverage.markets） */}
             <div className="card reveal" style={{ padding:"calc(24px*var(--scale))", display:"flex", flexDirection:"column" }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:"calc(14px*var(--scale))" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:"calc(6px*var(--scale))" }}>
                 <div style={{ fontWeight:600, fontSize:"calc(15px*var(--scale))" }}>全球槓桿觀察</div>
                 <a href={d.leverage.url} target="_blank" rel="noopener noreferrer"
                   style={{ fontSize:"calc(12px*var(--scale))", color:"var(--accent)" }}>完整觀察表 →</a>
               </div>
-              <p style={{ color:"var(--dim)", fontSize:"calc(13px*var(--scale))", lineHeight:1.7, marginBottom:12 }}>
-                用同一把尺量台／美／韓／日的融資槓桿水位與去槓桿壓力（0–100）。
-              </p>
-              <div style={{ color:"var(--text)", fontSize:"calc(15px*var(--scale))", fontWeight:600, lineHeight:1.7, flex:1 }}>
-                {d.leverage.headline}
+              <div style={{ fontSize:"calc(12px*var(--scale))", color:"var(--dim)", marginBottom:"calc(4px*var(--scale))" }}>去槓桿壓力指數（0–100，高＝壓力大）· {d.leverage.updated}</div>
+              <div style={{ flex:1, display:"flex", flexDirection:"column", justifyContent:"space-around" }}>
+                {(d.leverage.markets || []).map(m => {
+                  const c = m.pressure >= 70 ? "var(--red)" : m.pressure >= 45 ? "var(--orange)" : "var(--green)";
+                  return (
+                    <div key={m.name} style={{ display:"flex", alignItems:"center", gap:12, paddingTop:"calc(12px*var(--scale))", borderTop:"1px solid var(--divider)" }}>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontWeight:600, fontSize:"calc(14px*var(--scale))" }}>{m.flag} {m.name} <span style={{ color:"var(--dim)", fontWeight:400, fontSize:"calc(11px*var(--scale))" }}>{m.index}</span></div>
+                        <div style={{ fontSize:"calc(12px*var(--scale))", color:"var(--dim)", marginTop:2 }}>{m.trend}</div>
+                      </div>
+                      <Spark pts={m.history} color={c} />
+                      <div style={{ textAlign:"right", minWidth:"calc(46px*var(--scale))" }}>
+                        <span style={{ fontSize:"calc(22px*var(--scale))", fontWeight:700, color:c }}>{m.pressure}</span>
+                        <span style={{ fontSize:"calc(11px*var(--scale))", color:"var(--dim)" }}>/100</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <div style={{ fontSize:"calc(11px*var(--scale))", color:"var(--dim)", marginTop:12 }}>{d.leverage.updated}</div>
             </div>
 
           </div>
