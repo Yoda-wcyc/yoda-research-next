@@ -465,7 +465,16 @@ export default function Home() {
         {/* 最新研究 */}
         <section id="research">
           <div className="eyebrow reveal">Research</div>
-          <h2 className="reveal">最新研究</h2>
+          <div style={{ display:"flex", alignItems:"center", gap:"calc(14px*var(--scale))", flexWrap:"wrap", marginBottom:"calc(28px*var(--scale))" }}>
+            <h2 className="reveal" style={{ marginBottom:0 }}>最新研究</h2>
+            {/* 報告導航遊戲（金色呼吸小鈕，貼標題旁；規格參考 manifesto 玩玩看但縮小） */}
+            <a href="https://yoda-wcyc.github.io/game/報告導航.html" target="_blank" rel="noopener noreferrer" className="breathe"
+              style={{ display:"inline-block", padding:"calc(7px*var(--scale)) calc(16px*var(--scale))", borderRadius:9999, background:"#e0a526", color:"#080b10", fontWeight:700, fontSize:"calc(15px*var(--scale))", letterSpacing:".01em", textDecoration:"none", whiteSpace:"nowrap" }}
+              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; }}>
+              🧭 這麼多報告，不知道從何看起？我來幫你導航 →
+            </a>
+          </div>
           <div className="grid3">
             {CATS.map(c => {
               const e = latest[c.key];
@@ -501,15 +510,8 @@ export default function Home() {
               <span className="go">看完整紀錄 →</span>
             </a>
           </div>
-          <div style={{ display:"flex", justifyContent:"center", alignItems:"center", gap:14, flexWrap:"wrap", marginTop:"calc(28px*var(--scale))" }}>
+          <div style={{ textAlign:"center", marginTop:"calc(28px*var(--scale))" }}>
             <a className="btn btn-ghost" href="/archive">瀏覽全部報告 →</a>
-            {/* 報告導航遊戲（金色呼吸，規格同 manifesto 玩玩看鈕）；遊戲連結待 Yoda 上傳後填入，暫 # */}
-            <a href="#" target="_blank" rel="noopener noreferrer" className="breathe"
-              style={{ display:"inline-block", padding:"0.95rem 2.8rem", borderRadius:8, background:"#e0a526", color:"#080b10", fontWeight:700, fontSize:"calc(16px*var(--scale))", letterSpacing:".02em", textDecoration:"none" }}
-              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; }}>
-              🧭 這麼多報告，不知道從何看起？我來幫你導航 →
-            </a>
           </div>
         </section>
 
