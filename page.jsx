@@ -24,7 +24,7 @@ const CATS = [
 /* ── 市場觀察四條溫度計 ── */
 function TempBar({ name, label, labelColor, pct, bubbleColor }) {
   return (
-    <div style={{ marginBottom: 18 }}>
+    <div style={{ marginBottom: 12 }}>
       <div style={{ display:"flex", justifyContent:"space-between", marginBottom:5 }}>
         <span style={{ fontSize:"calc(12px*var(--scale))", letterSpacing:".1em", textTransform:"uppercase", fontWeight:700, color:"var(--dim)" }}>{name}</span>
         <span style={{ fontSize:"calc(13px*var(--scale))", fontWeight:700, color:labelColor }}>{label}</span>
@@ -45,6 +45,21 @@ function TempBar({ name, label, labelColor, pct, bubbleColor }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/* ── 全球槓桿 mini 走勢圖（sparkline） ── */
+function Spark({ pts, color }) {
+  const w = 118, h = 34, pad = 4;
+  const mn = Math.min(...pts), mx = Math.max(...pts), rng = (mx - mn) || 1;
+  const step = pts.length > 1 ? w / (pts.length - 1) : 0;
+  const y = v => (h - pad) - ((v - mn) / rng) * (h - 2 * pad);
+  const d = pts.map((v, i) => `${i ? "L" : "M"}${(i * step).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display:"block", flexShrink:0 }}>
+      <path d={d} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"/>
+      <circle cx={(pts.length - 1) * step} cy={y(pts[pts.length - 1])} r="2.8" fill={color}/>
+    </svg>
   );
 }
 
@@ -221,11 +236,16 @@ const DEFAULTS = {
   ],
   bScore: 63,
   bNote: "PEG 0.73 與 EPS +28.6% 提供盈餘緩衝，但 CAPE 40.3x、巴菲特指標 236%、Mag-7 集中度 33.8%、CapEx ROI 缺口 -$1,850 億四重警示同步亮燈。Oracle FY2026 已實際轉負 FCF -$237 億，歷史相似度跳升至「極高相似」區間（0.96/0.92）。情緒面雖轉恐慌（CNN F&G 28），但市場結構與機構持倉訊號仍持續惡化。",
-  bUrl: BASE + "/-/AI泡沫評估表_20260701.html",
+  bUrl: BASE + "/-/AI泡沫評估表_20260803.html",
   bHeadline: "估值更貴（CAPE 41.3、巴菲特 230%）但 Q2 巨頭盈餘接棒、破底翻洗掉投機浮額——泡沫警戒而非崩盤前夕，最需盯 CapEx ROI 缺口能否收斂。",
   latestBrief: BASE + "/-/",
   cycle: { big_pct:74, big_label:"榮景末段·逼近循環峰", mfg_pct:70, mfg_label:"擴產近過熱·近製造業峰", note:"景氣大循環榮景末段（74%）· 製造業週期近過熱（70%）", updated:"8月更新" },
-  leverage: { headline:"台灣去槓桿壓力最高·正在發生；美股水位最高·尚未洩壓", url: BASE + "/-/global-leverage.html", updated:"每日記錄（2026-07-31 起）" },
+  leverage: { url: BASE + "/-/global-leverage.html", updated:"資料截至 2026-07-31", markets:[
+    { flag:"🇰🇷", name:"韓國", index:"KOSPI", pressure:82, trend:"▲ 融資強平螺旋進行中", history:[62,72,74,77,84,82] },
+    { flag:"🇺🇸", name:"美國", index:"S&P 500", pressure:58, trend:"▲ 水位創高·尚未洩壓", history:[52,57,58,58] },
+    { flag:"🇹🇼", name:"台灣", index:"加權指數", pressure:48, trend:"▼ 從高點回落·去槓桿早期", history:[44,51,48,48] },
+    { flag:"🇯🇵", name:"日本", index:"日經225", pressure:44, trend:"— 多方滿載·壓力計待補", history:[40,45,44,44] },
+  ] },
 };
 
 export default function Home() {
@@ -304,6 +324,12 @@ export default function Home() {
           <a className="btn btn-ghost" href="#subscribe" style={{ color:"var(--gold-lg)", borderColor:"var(--gold-lg)", minWidth:220 }}>
             免費訂閱簡報　直送信箱
           </a>
+          {/* 創始會員按鈕：訂閱收款上線前先隱藏（2026-08-03）。綠界審核過、付款連結串好後，把這段註解的頭尾拿掉即可恢復。
+          <a className="btn" href="https://yoda-wcyc.github.io/-/subscribe.html"
+            style={{ minWidth:220, color:"#fff", background:"linear-gradient(135deg,#8b5cf6,#ec4899)", boxShadow:"0 6px 22px rgba(139,92,246,.38)" }}>
+            ✦ 創始會員 · 看方案
+          </a>
+          */}
         </div>
       <div style={{ position:"fixed", bottom:"18px", left:0, right:0, textAlign:"center", pointerEvents:"none", zIndex:50 }}>
           <span style={{ fontSize:"calc(24px*var(--scale))", color:"var(--gold-lg)", opacity:.75, display:"block", lineHeight:1, animation:"arrow-bob 2s ease-in-out infinite" }}>⌄</span>
@@ -344,74 +370,93 @@ export default function Home() {
           <h2 className="reveal">市場儀表板</h2>
           <div className="dash2">
 
-            {/* 1 市場溫度 */}
-            <div className="card reveal" style={{ padding:"calc(24px*var(--scale))" }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:"calc(18px*var(--scale))" }}>
-                <div style={{ fontWeight:600, fontSize:"calc(15px*var(--scale))" }}>市場溫度</div>
-                <a href={latest["市場觀察"]?.file ? BASE + "/-/" + latest["市場觀察"].file : BASE + "/-/"}
-                  style={{ fontSize:"calc(12px*var(--scale))", color:"var(--accent)" }}>完整市場觀察 →</a>
-              </div>
-              {d.temp.map(t => <TempBar key={t.name} {...t} />)}
-              <div style={{ fontSize:"calc(12px*var(--scale))", color:"var(--dim)", marginTop:6 }}>{d.updated}</div>
-            </div>
+            {/* ── 左欄：總經景氣位階（拉長）＋ AI泡沫評估 ── */}
+            <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
 
-            {/* 2 總經景氣位階 */}
-            <div className="card reveal" style={{ padding:"calc(24px*var(--scale))" }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:"calc(20px*var(--scale))" }}>
-                <div style={{ fontWeight:600, fontSize:"calc(15px*var(--scale))" }}>總經景氣位階</div>
-                <a href={latest["總經"]?.file ? BASE + "/-/" + latest["總經"].file : BASE + "/-/"}
-                  style={{ fontSize:"calc(12px*var(--scale))", color:"var(--accent)" }}>完整總經報告 →</a>
-              </div>
-              <CycleTempBar cycle={d.cycle} />
-              <MfgTempBar cycle={d.cycle} />
-              <MarketWaveSvg cycle={d.cycle} />
-            </div>
-
-            {/* 3 AI 泡沫監測（資料化：讀 reports.json bubble） */}
-            <div className="score-bar-section reveal">
-              <div className="score-bar-header">
-                <div className="score-bar-header-title">{bZone}（{bScore100}/100）</div>
-                <a href={d.bUrl}
-                  style={{ fontSize:"calc(12px*var(--scale))", color:"var(--accent)" }}>完整評估 →</a>
-              </div>
-              <div className="score-bar-label-row">
-                <span className="score-bar-label sbl-safe">🟢 理性成長</span>
-                <span className="score-bar-label sbl-caution">🔵 溫和過熱</span>
-                <span className="score-bar-label sbl-warn">🟡 泡沫警戒</span>
-                <span className="score-bar-label sbl-bubble">🔴 崩盤風險</span>
-              </div>
-              <div className="score-bar-track">
-                <div className="score-zone-div" style={{left:"25%"}}></div>
-                <div className="score-zone-div" style={{left:"50%"}}></div>
-                <div className="score-zone-div" style={{left:"75%"}}></div>
-                <div className="score-pointer" style={{left:`${bScore100}%`}}>
-                  <div className="score-pointer-label">當前 {bScore100}/100</div>
-                  <div className="score-pointer-dot"></div>
+              {/* 總經景氣位階 */}
+              <div className="card reveal" style={{ padding:"calc(26px*var(--scale))" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:"calc(24px*var(--scale))" }}>
+                  <div style={{ fontWeight:600, fontSize:"calc(15px*var(--scale))" }}>總經景氣位階</div>
+                  <a href={latest["總經"]?.file ? BASE + "/-/" + latest["總經"].file : BASE + "/-/"}
+                    style={{ fontSize:"calc(12px*var(--scale))", color:"var(--accent)" }}>完整總經報告 →</a>
                 </div>
+                <CycleTempBar cycle={d.cycle} />
+                <MfgTempBar cycle={d.cycle} />
+                <MarketWaveSvg cycle={d.cycle} />
               </div>
-              <div className="score-bar-footer">
-                <span>0 — 基本面完全支撐</span>
-                <span>25 — 估值略偏高</span>
-                <span>50 — 泡沫特徵明顯</span>
-                <span>75+ — 崩盤前夕</span>
+
+              {/* AI 泡沫評估（資料化：讀 reports.json bubble） */}
+              <div className="score-bar-section reveal">
+                <div className="score-bar-header">
+                  <div className="score-bar-header-title">AI泡沫評估</div>
+                  <a href={d.bUrl} style={{ fontSize:"calc(12px*var(--scale))", color:"var(--accent)" }}>完整評估 →</a>
+                </div>
+                <div className="score-bar-label-row">
+                  <span className="score-bar-label sbl-safe">🟢 理性成長</span>
+                  <span className="score-bar-label sbl-caution">🔵 溫和過熱</span>
+                  <span className="score-bar-label sbl-warn">🟡 泡沫警戒</span>
+                  <span className="score-bar-label sbl-bubble">🔴 崩盤風險</span>
+                </div>
+                <div className="score-bar-track">
+                  <div className="score-zone-div" style={{left:"25%"}}></div>
+                  <div className="score-zone-div" style={{left:"50%"}}></div>
+                  <div className="score-zone-div" style={{left:"75%"}}></div>
+                  <div className="score-pointer" style={{left:`${bScore100}%`}}>
+                    <div className="score-pointer-label">當前 {bScore100}/100</div>
+                    <div className="score-pointer-dot"></div>
+                  </div>
+                </div>
+                <div className="score-bar-footer">
+                  <span>0 — 基本面完全支撐</span>
+                  <span>25 — 估值略偏高</span>
+                  <span>50 — 泡沫特徵明顯</span>
+                  <span>75+ — 崩盤前夕</span>
+                </div>
+                <div className="score-note">▸ {d.bHeadline}</div>
               </div>
-              <div className="score-note">▸ {d.bHeadline}</div>
+
             </div>
 
-            {/* 4 全球槓桿觀察（資料化：讀 reports.json leverage） */}
-            <div className="card reveal" style={{ padding:"calc(24px*var(--scale))", display:"flex", flexDirection:"column" }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:"calc(14px*var(--scale))" }}>
-                <div style={{ fontWeight:600, fontSize:"calc(15px*var(--scale))" }}>全球槓桿觀察</div>
-                <a href={d.leverage.url} target="_blank" rel="noopener noreferrer"
-                  style={{ fontSize:"calc(12px*var(--scale))", color:"var(--accent)" }}>完整觀察表 →</a>
+            {/* ── 右欄：市場溫度（壓扁）＋ 全球槓桿觀察（四市場） ── */}
+            <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+
+              {/* 市場溫度（compact） */}
+              <div className="card reveal" style={{ padding:"calc(20px*var(--scale))" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:"calc(14px*var(--scale))" }}>
+                  <div style={{ fontWeight:600, fontSize:"calc(15px*var(--scale))" }}>市場溫度</div>
+                  <a href={latest["市場觀察"]?.file ? BASE + "/-/" + latest["市場觀察"].file : BASE + "/-/"}
+                    style={{ fontSize:"calc(12px*var(--scale))", color:"var(--accent)" }}>完整市場觀察 →</a>
+                </div>
+                {d.temp.map(t => <TempBar key={t.name} {...t} />)}
+                <div style={{ fontSize:"calc(11px*var(--scale))", color:"var(--dim)", marginTop:"calc(2px*var(--scale))" }}>{d.updated}</div>
               </div>
-              <p style={{ color:"var(--dim)", fontSize:"calc(13px*var(--scale))", lineHeight:1.7, marginBottom:12 }}>
-                用同一把尺量台／美／韓／日的融資槓桿水位與去槓桿壓力（0–100）。
-              </p>
-              <div style={{ color:"var(--text)", fontSize:"calc(15px*var(--scale))", fontWeight:600, lineHeight:1.7, flex:1 }}>
-                {d.leverage.headline}
+
+              {/* 全球槓桿觀察（四市場去槓桿壓力走勢，讀 reports.json leverage.markets） */}
+              <div className="card reveal" style={{ padding:"calc(24px*var(--scale))" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:"calc(6px*var(--scale))" }}>
+                  <div style={{ fontWeight:600, fontSize:"calc(15px*var(--scale))" }}>全球槓桿觀察</div>
+                  <a href={d.leverage.url} target="_blank" rel="noopener noreferrer"
+                    style={{ fontSize:"calc(12px*var(--scale))", color:"var(--accent)" }}>完整觀察表 →</a>
+                </div>
+                <div style={{ fontSize:"calc(12px*var(--scale))", color:"var(--dim)", marginBottom:"calc(4px*var(--scale))" }}>去槓桿壓力指數（0–100，高＝壓力大）· {d.leverage.updated}</div>
+                {(d.leverage.markets || []).map(m => {
+                  const c = m.pressure >= 70 ? "var(--red)" : m.pressure >= 45 ? "var(--orange)" : "var(--green)";
+                  return (
+                    <div key={m.name} style={{ display:"flex", alignItems:"center", gap:12, paddingTop:"calc(11px*var(--scale))", marginTop:"calc(11px*var(--scale))", borderTop:"1px solid var(--divider)" }}>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontWeight:600, fontSize:"calc(14px*var(--scale))" }}>{m.flag} {m.name} <span style={{ color:"var(--dim)", fontWeight:400, fontSize:"calc(11px*var(--scale))" }}>{m.index}</span></div>
+                        <div style={{ fontSize:"calc(12px*var(--scale))", color:"var(--dim)", marginTop:2 }}>{m.trend}</div>
+                      </div>
+                      <Spark pts={m.history} color={c} />
+                      <div style={{ textAlign:"right", minWidth:"calc(46px*var(--scale))" }}>
+                        <span style={{ fontSize:"calc(22px*var(--scale))", fontWeight:700, color:c }}>{m.pressure}</span>
+                        <span style={{ fontSize:"calc(11px*var(--scale))", color:"var(--dim)" }}>/100</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <div style={{ fontSize:"calc(11px*var(--scale))", color:"var(--dim)", marginTop:12 }}>{d.leverage.updated}</div>
+
             </div>
 
           </div>
