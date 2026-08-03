@@ -565,6 +565,11 @@ export default function Home() {
               <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink:0 }}><path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.235 2.686.235v2.97h-1.513c-1.491 0-1.956.93-1.956 1.874v2.25h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/></svg>
               粉專
             </a>
+            <a href="mailto:iamtwispin@gmail.com"
+               style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"5px 14px", background:"var(--surface2)", border:"1px solid var(--border)", borderRadius:9999, color:"var(--text)", fontWeight:700, textDecoration:"none", fontSize:"calc(13px*var(--scale))", letterSpacing:".02em" }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink:0 }}><rect x="2.5" y="4.5" width="19" height="15" rx="2"/><path d="M3 6l9 6.5L21 6"/></svg>
+              客服信箱
+            </a>
                       </div>
           <div className="disc">
             免責聲明:本站所有內容僅為個人研究記錄與資訊分享,不構成任何投資建議或買賣邀約。投資有風險,任何決策請自行判斷並承擔結果。數據來源力求準確,但不保證即時與完整。<br/>© 2026 Yoda Research
