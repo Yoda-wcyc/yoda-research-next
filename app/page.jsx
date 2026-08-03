@@ -324,10 +324,12 @@ export default function Home() {
           <a className="btn btn-ghost" href="#subscribe" style={{ color:"var(--gold-lg)", borderColor:"var(--gold-lg)", minWidth:220 }}>
             免費訂閱簡報　直送信箱
           </a>
+          {/* 創始會員按鈕：訂閱收款上線前先隱藏（2026-08-03）。綠界審核過、付款連結串好後，把這段註解的頭尾拿掉即可恢復。
           <a className="btn" href="https://yoda-wcyc.github.io/-/subscribe.html"
             style={{ minWidth:220, color:"#fff", background:"linear-gradient(135deg,#8b5cf6,#ec4899)", boxShadow:"0 6px 22px rgba(139,92,246,.38)" }}>
             ✦ 創始會員 · 看方案
           </a>
+          */}
         </div>
       <div style={{ position:"fixed", bottom:"18px", left:0, right:0, textAlign:"center", pointerEvents:"none", zIndex:50 }}>
           <span style={{ fontSize:"calc(24px*var(--scale))", color:"var(--gold-lg)", opacity:.75, display:"block", lineHeight:1, animation:"arrow-bob 2s ease-in-out infinite" }}>⌄</span>
