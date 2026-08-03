@@ -141,6 +141,8 @@ html[data-theme="light"] .btn-gold{color:#fff}
 
 /* ===== 儀表板 ===== */
 .dash{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.dash2{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+@media (max-width:700px){.dash2{grid-template-columns:1fr}}
 .card{
   background:var(--surface);border:1px solid var(--border);
   border-radius:16px;padding:calc(22px*var(--scale));
