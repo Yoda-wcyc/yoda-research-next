@@ -500,7 +500,7 @@ export default function Home() {
               <p>用遊戲體會投資世界裡的道理與心法。</p>
               <span className="go">進遊戲庫 →</span>
             </a>
-            {/* 判斷紀錄卡（緊鄰遊戲庫；點進去才看完整紀錄頁） */}
+            {/* 判斷紀錄卡（暫時隱藏，勿刪；要恢復請把下面整段從註解取出）
             <a className="card cat reveal"
                href="https://yoda-wcyc.github.io/-/track-record.html"
                target="_blank" rel="noopener noreferrer">
@@ -509,6 +509,7 @@ export default function Home() {
               <p>我們下過的判斷，到期就一條條對答案——對的、錯的都攤在同一張表。</p>
               <span className="go">看完整紀錄 →</span>
             </a>
+            */}
           </div>
           <div style={{ textAlign:"center", marginTop:"calc(28px*var(--scale))" }}>
             <a className="btn btn-ghost" href="/archive">瀏覽全部報告 →</a>
