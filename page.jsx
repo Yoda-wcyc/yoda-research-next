@@ -465,7 +465,16 @@ export default function Home() {
         {/* 最新研究 */}
         <section id="research">
           <div className="eyebrow reveal">Research</div>
-          <h2 className="reveal">最新研究</h2>
+          <div style={{ display:"flex", alignItems:"center", gap:"calc(14px*var(--scale))", flexWrap:"wrap", marginBottom:"calc(28px*var(--scale))" }}>
+            <h2 className="reveal" style={{ marginBottom:0 }}>最新研究</h2>
+            {/* 報告導航遊戲（金色呼吸小鈕，貼標題旁；規格參考 manifesto 玩玩看但縮小） */}
+            <a href="https://yoda-wcyc.github.io/game/報告導航.html" target="_blank" rel="noopener noreferrer" className="breathe"
+              style={{ display:"inline-block", margin:"0 auto", padding:"calc(7px*var(--scale)) calc(16px*var(--scale))", borderRadius:9999, background:"#e0a526", color:"#080b10", fontWeight:700, fontSize:"calc(15px*var(--scale))", letterSpacing:".01em", textDecoration:"none", whiteSpace:"nowrap" }}
+              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; }}>
+              🧭 這麼多報告，不知道從何看起？我來幫你導航 →
+            </a>
+          </div>
           <div className="grid3">
             {CATS.map(c => {
               const e = latest[c.key];
@@ -491,7 +500,7 @@ export default function Home() {
               <p>用遊戲體會投資世界裡的道理與心法。</p>
               <span className="go">進遊戲庫 →</span>
             </a>
-            {/* 判斷紀錄卡（緊鄰遊戲庫；點進去才看完整紀錄頁） */}
+            {/* 判斷紀錄卡（暫時隱藏，勿刪；要恢復請把下面整段從註解取出）
             <a className="card cat reveal"
                href="https://yoda-wcyc.github.io/-/track-record.html"
                target="_blank" rel="noopener noreferrer">
@@ -500,6 +509,7 @@ export default function Home() {
               <p>我們下過的判斷，到期就一條條對答案——對的、錯的都攤在同一張表。</p>
               <span className="go">看完整紀錄 →</span>
             </a>
+            */}
           </div>
           <div style={{ textAlign:"center", marginTop:"calc(28px*var(--scale))" }}>
             <a className="btn btn-ghost" href="/archive">瀏覽全部報告 →</a>
@@ -564,6 +574,11 @@ export default function Home() {
                style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"5px 14px", background:"#1a3a5c", border:"1px solid #2a4a6c", borderRadius:9999, color:"#e8f2ff", fontWeight:700, textDecoration:"none", fontSize:"calc(13px*var(--scale))", letterSpacing:".02em" }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink:0 }}><path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.235 2.686.235v2.97h-1.513c-1.491 0-1.956.93-1.956 1.874v2.25h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/></svg>
               粉專
+            </a>
+            <a href="mailto:iamtwispin@gmail.com"
+               style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"5px 14px", background:"var(--surface2)", border:"1px solid var(--border)", borderRadius:9999, color:"var(--text)", fontWeight:700, textDecoration:"none", fontSize:"calc(13px*var(--scale))", letterSpacing:".02em" }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink:0 }}><rect x="2.5" y="4.5" width="19" height="15" rx="2"/><path d="M3 6l9 6.5L21 6"/></svg>
+              客服信箱
             </a>
                       </div>
           <div className="disc">
