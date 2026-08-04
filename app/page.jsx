@@ -12,11 +12,12 @@ const SIG_MAP = {
 };
 
 const CATS = [
-  { key: "簡報",    tag: "每週三次", title: "免費簡報",   desc: "一到兩屏讀完的白話市場摘要,附深讀連結。" },
-  { key: "市場觀察",tag: "每週三次", title: "市場觀察",   desc: "三區塊驅動力矩陣、板塊輪動、主線聚焦與多空劇本。" },
-  { key: "美股",    tag: "每週三次", title: "美股分析",   desc: "REL5 / REL20 / WA 三層篩選,A 級強勢股與輪漲偵測。" },
-  { key: "台股",    tag: "每週三次", title: "台股分析",   desc: "強勢股篩選疊加法人籌碼四型態:吸籌、反轉、換手、警示。" },
-  { key: "AI泡沫",  tag: "不定期",  title: "AI 泡沫評估",desc: "8 維度加權相似度 + ROI 缺口模型,量化這輪牛市的泡沫程度。" },
+  { key: "簡報",    tag: "每週兩次", title: "免費簡報",   desc: "一到兩屏讀完的白話市場摘要,附深讀連結。" },
+  { key: "關鍵報告",tag: "付費報告", title: "關鍵報告",   desc: "把最關鍵的一份判斷寫深寫透——完整推演、結構與風險界線,付費會員專屬。", href: BASE + "/-/關鍵報告_20260804.html", go: "閱讀關鍵報告 →", paid: true },
+  { key: "市場觀察",tag: "每週兩次", title: "市場觀察",   desc: "三區塊驅動力矩陣、板塊輪動、主線聚焦與多空劇本。" },
+  { key: "美股",    tag: "每週兩次", title: "美股分析",   desc: "REL5 / REL20 / WA 三層篩選,A 級強勢股與輪漲偵測。" },
+  { key: "台股",    tag: "每週兩次", title: "台股分析",   desc: "強勢股篩選疊加法人籌碼四型態:吸籌、反轉、換手、警示。" },
+  { key: "AI泡沫",  tag: "月更",    title: "AI 泡沫評估",desc: "8 維度加權相似度 + ROI 缺口模型,量化這輪牛市的泡沫程度。" },
   { key: "總經",    tag: "月更",    title: "總體經濟",   desc: "Fed、通膨、就業與景氣循環的監控儀表板。" },
   { key: "專題",    tag: "不定期",  title: "專題研究",   desc: "單一主題深度分析：動能因子、事件驅動、產業結構與市場機制拆解。" },
 ];
@@ -479,12 +480,13 @@ export default function Home() {
             {CATS.map(c => {
               const e = latest[c.key];
               const has = e && e.file;
-              const href = has ? BASE + "/-/" + e.file : BASE + "/-/";
-              const desc = has && e.summary && e.summary.indexOf("占位") === -1 ? e.summary : c.desc;
-              const go   = has && e.date ? `閱讀最新(${e.date})→` : "閱讀最新 →";
+              const href = c.href ? c.href : (has ? BASE + "/-/" + e.file : BASE + "/-/");
+              const desc = c.href ? c.desc : (has && e.summary && e.summary.indexOf("占位") === -1 ? e.summary : c.desc);
+              const go   = c.go ? c.go : (has && e.date ? `閱讀最新(${e.date})→` : "閱讀最新 →");
+              const extra = c.ext ? { target: "_blank", rel: "noopener noreferrer" } : {};
               return (
-                <a key={c.key} className="card cat reveal" href={href}>
-                  <span className="tag">{c.tag}</span>
+                <a key={c.key} className="card cat reveal" href={href} {...extra}>
+                  <span className={c.paid ? "tag breathe" : "tag"} style={c.paid ? { display:"inline-block", color:"#080b10", padding:"calc(3px*var(--scale)) calc(10px*var(--scale))", borderRadius:9999, letterSpacing:".04em", fontWeight:700 } : undefined}>{c.tag}</span>
                   <h3>{c.title}<span className="ttl-arrow" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span></h3>
                   <p>{desc}</p>
                   <span className="go">{go}</span>
