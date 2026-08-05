@@ -325,6 +325,9 @@ export default function Home() {
           <a className="btn btn-ghost" href="#subscribe" style={{ color:"var(--gold-lg)", borderColor:"var(--gold-lg)", minWidth:220 }}>
             免費訂閱簡報　直送信箱
           </a>
+          <a className="btn btn-ghost" href={BASE + "/-/會員專區.html"} style={{ minWidth:220 }}>
+            會員登入 · 我的訂閱
+          </a>
           {/* 創始會員按鈕：訂閱收款上線前先隱藏（2026-08-03）。綠界審核過、付款連結串好後，把這段註解的頭尾拿掉即可恢復。
           <a className="btn" href="https://yoda-wcyc.github.io/-/subscribe.html"
             style={{ minWidth:220, color:"#fff", background:"linear-gradient(135deg,#8b5cf6,#ec4899)", boxShadow:"0 6px 22px rgba(139,92,246,.38)" }}>
