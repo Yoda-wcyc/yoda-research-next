@@ -325,7 +325,7 @@ export default function Home() {
           <a className="btn btn-ghost" href="#subscribe" style={{ color:"var(--gold-lg)", borderColor:"var(--gold-lg)" }}>
             免費訂閱簡報
           </a>
-          <a className="btn btn-ghost" href={BASE + "/-/會員專區.html"}>
+          <a className="btn btn-gold" href={BASE + "/-/會員專區.html"}>
             會員登入
           </a>
           <a className="btn btn-ghost" href="/archive?tab=付費版" style={{ color:"var(--gold-lg)", borderColor:"var(--gold-lg)" }}>
