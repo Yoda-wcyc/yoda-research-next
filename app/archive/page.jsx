@@ -2,11 +2,19 @@
 import { useEffect, useState } from "react";
 
 const BASE = "https://yoda-wcyc.github.io";
-const TABS = ["全部", "關鍵報告", "市場觀察", "美股", "台股", "AI泡沫", "總經", "簡報", "專題"];
+const TABS = ["全部", "付費版", "關鍵報告", "市場觀察", "美股", "台股", "AI泡沫", "總經", "簡報", "專題"];
+// 付費版判定：該筆明確標 paid，或分類為付費旗艦「關鍵報告」
+const isPaidRow = (x) => x.paid === true || x.cat === "關鍵報告";
 
 export default function Archive() {
   const [all, setAll] = useState(null); // null=載入中, []=空, false=失敗
   const [f, setF] = useState("全部");
+
+  // 支援深連結：首頁「付費報告總覽」帶 ?tab=付費版 進來就預選該頁籤
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t && TABS.includes(t)) setF(t);
+  }, []);
 
   useEffect(() => {
     fetch(BASE + "/-/reports.json", { cache: "no-store" })
@@ -23,8 +31,13 @@ export default function Archive() {
       .catch(() => setAll(false));
   }, []);
 
-  const rows =
-    Array.isArray(all) ? (f === "全部" ? all : all.filter((x) => x.cat === f)) : [];
+  const rows = Array.isArray(all)
+    ? f === "全部"
+      ? all
+      : f === "付費版"
+      ? all.filter(isPaidRow)
+      : all.filter((x) => x.cat === f)
+    : [];
 
   return (
     <>
@@ -57,12 +70,14 @@ export default function Archive() {
             rows.map((x) => {
               const title = x.file.replace(/\.html$/, "").replace(/_/g, " ");
               const showSum = x.summary && x.summary.indexOf("占位") === -1;
+              const isPaid = isPaidRow(x);
               return (
                 <a
                   key={x.file}
                   className="item"
                   href={BASE + "/-/" + encodeURIComponent(x.file)}
                 >
+                  {isPaid && <span className="paid-badge">付費版</span>}
                   <div className="meta">
                     <span className="cat">{x.cat}</span>
                     <span className="date">{x.date}</span>
