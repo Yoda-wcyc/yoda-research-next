@@ -318,17 +318,17 @@ export default function Home() {
   <br />
   解碼美股與台股的真實訊號
 </p>
-        <div className="hero-cta reveal" style={{ flexDirection:"column", gap:"14px" }}>
-          <a className="btn btn-gold" href={d.latestBrief} style={{ minWidth:220 }}>
+        <div className="hero-cta reveal" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"14px", maxWidth:460, margin:"0 auto", textAlign:"center" }}>
+          <a className="btn btn-gold" href={d.latestBrief}>
             今日簡報
           </a>
-          <a className="btn btn-ghost" href="#subscribe" style={{ color:"var(--gold-lg)", borderColor:"var(--gold-lg)", minWidth:220 }}>
-            免費訂閱簡報　直送信箱
+          <a className="btn btn-ghost" href="#subscribe" style={{ color:"var(--gold-lg)", borderColor:"var(--gold-lg)" }}>
+            免費訂閱簡報
           </a>
-          <a className="btn btn-ghost" href={BASE + "/-/會員專區.html"} style={{ minWidth:220 }}>
-            會員登入 · 我的訂閱
+          <a className="btn btn-ghost" href={BASE + "/-/會員專區.html"}>
+            會員登入
           </a>
-          <a className="btn btn-ghost" href="/archive?tab=付費版" style={{ minWidth:220, color:"var(--gold-lg)", borderColor:"var(--gold-lg)" }}>
+          <a className="btn btn-ghost" href="/archive?tab=付費版" style={{ color:"var(--gold-lg)", borderColor:"var(--gold-lg)" }}>
             🔒 付費報告總覽
           </a>
           {/* 創始會員按鈕：訂閱收款上線前先隱藏（2026-08-03）。綠界審核過、付款連結串好後，把這段註解的頭尾拿掉即可恢復。
