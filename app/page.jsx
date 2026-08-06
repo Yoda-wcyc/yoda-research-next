@@ -341,7 +341,7 @@ export default function Home() {
             <a className="btn btn-gold" href={BASE + "/-/會員專區.html"}>
               會員登入
             </a>
-            <a className="btn btn-gold" href={BASE + "/-/subscribe.html"}>
+            <a className="btn" href={BASE + "/-/subscribe.html"} style={{ background:"linear-gradient(135deg,#8b5cf6,#ec4899)", color:"#fff", fontWeight:600 }}>
               付費訂閱
             </a>
             <a className="btn btn-ghost" href="/archive?tab=付費版" style={{ color:"var(--gold-lg)", borderColor:"var(--gold-lg)", whiteSpace:"nowrap", fontSize:"calc(14px*var(--scale))" }}>
