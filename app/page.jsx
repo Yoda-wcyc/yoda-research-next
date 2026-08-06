@@ -328,19 +328,26 @@ export default function Home() {
   <br />
   解碼美股與台股的真實訊號
 </p>
-        <div className="hero-cta reveal" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"14px", maxWidth:460, margin:"0 auto", textAlign:"center" }}>
-          <a className="btn btn-gold" href={d.latestBrief}>
-            今日簡報
-          </a>
-          <a className="btn btn-ghost" href="#subscribe" style={{ color:"var(--gold-lg)", borderColor:"var(--gold-lg)" }}>
-            免費訂閱簡報
-          </a>
-          <a className="btn btn-gold" href={BASE + "/-/會員專區.html"}>
-            會員登入
-          </a>
-          <a className="btn btn-ghost" href="/archive?tab=付費版" style={{ color:"var(--gold-lg)", borderColor:"var(--gold-lg)" }}>
-            🔒 付費報告總覽
-          </a>
+        <div className="hero-cta reveal" style={{ maxWidth:560, margin:"0 auto", textAlign:"center" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"14px", marginBottom:"14px" }}>
+            <a className="btn btn-gold" href={d.latestBrief}>
+              今日簡報
+            </a>
+            <a className="btn btn-ghost" href="#subscribe" style={{ color:"var(--gold-lg)", borderColor:"var(--gold-lg)" }}>
+              免費訂閱簡報
+            </a>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"14px" }}>
+            <a className="btn btn-gold" href={BASE + "/-/會員專區.html"}>
+              會員登入
+            </a>
+            <a className="btn btn-gold" href={BASE + "/-/subscribe.html"}>
+              付費訂閱
+            </a>
+            <a className="btn btn-ghost" href="/archive?tab=付費版" style={{ color:"var(--gold-lg)", borderColor:"var(--gold-lg)" }}>
+              🔒 付費報告總覽
+            </a>
+          </div>
           {/* 創始會員按鈕：訂閱收款上線前先隱藏（2026-08-03）。綠界審核過、付款連結串好後，把這段註解的頭尾拿掉即可恢復。
           <a className="btn" href="https://yoda-wcyc.github.io/-/subscribe.html"
             style={{ minWidth:220, color:"#fff", background:"linear-gradient(135deg,#8b5cf6,#ec4899)", boxShadow:"0 6px 22px rgba(139,92,246,.38)" }}>
