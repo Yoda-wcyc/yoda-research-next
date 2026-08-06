@@ -383,7 +383,7 @@ export default function Home() {
               {/* 總經景氣位階 */}
               <div className="card reveal" style={{ padding:"calc(26px*var(--scale))" }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:"calc(24px*var(--scale))" }}>
-                  <div style={{ fontWeight:600, fontSize:"calc(15px*var(--scale))" }}>總經景氣位階</div>
+                  <div style={{ fontWeight:600, fontSize:"calc(15px*var(--scale))" }}>總經景氣位階 <span style={{ fontWeight:400, fontSize:"calc(11px*var(--scale))", color:"var(--dim)", whiteSpace:"nowrap" }}>{d.cycle.updated}</span></div>
                   <a href={latest["總經"]?.file ? BASE + "/-/" + latest["總經"].file : BASE + "/-/"}
                     style={{ fontSize:"calc(12px*var(--scale))", color:"var(--accent)" }}>完整總經報告 →</a>
                 </div>
@@ -395,7 +395,7 @@ export default function Home() {
               {/* AI 泡沫評估（資料化：讀 reports.json bubble） */}
               <div className="score-bar-section reveal">
                 <div className="score-bar-header">
-                  <div className="score-bar-header-title">AI泡沫評估</div>
+                  <div className="score-bar-header-title">AI泡沫評估 {latest["AI泡沫"]?.date && <span style={{ fontWeight:400, fontSize:"calc(11px*var(--scale))", color:"var(--dim)", whiteSpace:"nowrap" }}>{latest["AI泡沫"].date}</span>}</div>
                   <a href={d.bUrl} style={{ fontSize:"calc(12px*var(--scale))", color:"var(--accent)" }}>完整評估 →</a>
                 </div>
                 <div className="score-bar-label-row">
@@ -430,22 +430,21 @@ export default function Home() {
               {/* 市場溫度（compact） */}
               <div className="card reveal" style={{ padding:"calc(20px*var(--scale))" }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:"calc(14px*var(--scale))" }}>
-                  <div style={{ fontWeight:600, fontSize:"calc(15px*var(--scale))" }}>市場溫度</div>
+                  <div style={{ fontWeight:600, fontSize:"calc(15px*var(--scale))" }}>市場溫度 <span style={{ fontWeight:400, fontSize:"calc(11px*var(--scale))", color:"var(--dim)", whiteSpace:"nowrap" }}>{d.updated}</span></div>
                   <a href={latest["市場觀察"]?.file ? BASE + "/-/" + latest["市場觀察"].file : BASE + "/-/"}
                     style={{ fontSize:"calc(12px*var(--scale))", color:"var(--accent)" }}>完整市場觀察 →</a>
                 </div>
                 {d.temp.map(t => <TempBar key={t.name} {...t} />)}
-                <div style={{ fontSize:"calc(11px*var(--scale))", color:"var(--dim)", marginTop:"calc(2px*var(--scale))" }}>{d.updated}</div>
               </div>
 
               {/* 全球槓桿觀察（四市場去槓桿壓力走勢，讀 reports.json leverage.markets） */}
               <div className="card reveal" style={{ padding:"calc(24px*var(--scale))" }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:"calc(6px*var(--scale))" }}>
-                  <div style={{ fontWeight:600, fontSize:"calc(15px*var(--scale))" }}>全球槓桿觀察</div>
+                  <div style={{ fontWeight:600, fontSize:"calc(15px*var(--scale))" }}>全球槓桿觀察 <span style={{ fontWeight:400, fontSize:"calc(11px*var(--scale))", color:"var(--dim)", whiteSpace:"nowrap" }}>{d.leverage.updated}</span></div>
                   <a href={d.leverage.url} target="_blank" rel="noopener noreferrer"
                     style={{ fontSize:"calc(12px*var(--scale))", color:"var(--accent)" }}>完整觀察表 →</a>
                 </div>
-                <div style={{ fontSize:"calc(12px*var(--scale))", color:"var(--dim)", marginBottom:"calc(4px*var(--scale))" }}>去槓桿壓力指數（0–100，高＝壓力大）· {d.leverage.updated}</div>
+                <div style={{ fontSize:"calc(12px*var(--scale))", color:"var(--dim)", marginBottom:"calc(4px*var(--scale))" }}>去槓桿壓力指數（0–100，高＝壓力大）</div>
                 {(d.leverage.markets || []).map(m => {
                   const c = m.pressure >= 70 ? "var(--red)" : m.pressure >= 45 ? "var(--orange)" : "var(--green)";
                   return (
@@ -487,7 +486,8 @@ export default function Home() {
               const e = latest[c.key];
               const has = e && e.file;
               const href = c.href ? c.href : (has ? BASE + "/-/" + e.file : BASE + "/-/");
-              const desc = c.href ? c.desc : (has && e.summary && e.summary.indexOf("占位") === -1 ? e.summary : c.desc);
+              const rawDesc = c.href ? c.desc : (has && e.summary && e.summary.indexOf("占位") === -1 ? e.summary : c.desc);
+              const desc = rawDesc.length > 50 ? rawDesc.slice(0, 50) + "…" : rawDesc;
               const go   = c.go ? c.go : (has && e.date ? `閱讀最新(${e.date})→` : "閱讀最新 →");
               const extra = c.ext ? { target: "_blank", rel: "noopener noreferrer" } : {};
               return (
