@@ -344,7 +344,7 @@ export default function Home() {
             <a className="btn btn-gold" href={BASE + "/-/subscribe.html"}>
               付費訂閱
             </a>
-            <a className="btn btn-ghost" href="/archive?tab=付費版" style={{ color:"var(--gold-lg)", borderColor:"var(--gold-lg)" }}>
+            <a className="btn btn-ghost" href="/archive?tab=付費版" style={{ color:"var(--gold-lg)", borderColor:"var(--gold-lg)", whiteSpace:"nowrap", fontSize:"calc(14px*var(--scale))" }}>
               🔒 付費報告總覽
             </a>
           </div>
