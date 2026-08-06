@@ -255,6 +255,7 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [msg, setMsg] = useState({ text:"", ok:true });
   const [showGuide, setShowGuide] = useState(false);
+  const [showTabletHint, setShowTabletHint] = useState(true);
 
   useEffect(() => {
     fetch(BASE + "/-/reports.json", { cache:"no-store" })
@@ -284,6 +285,10 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    try { if (localStorage.getItem("hideTabletHint") === "1") setShowTabletHint(false); } catch(e) {}
+  }, []);
+
+  useEffect(() => {
     const io = new IntersectionObserver(es => {
       es.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
     }, { threshold:0.12 });
@@ -307,6 +312,11 @@ export default function Home() {
 
   return (
     <>
+      {showTabletHint && (
+        <div className="tablet-hint" onClick={() => { setShowTabletHint(false); try { localStorage.setItem("hideTabletHint", "1"); } catch(e) {} }}>
+          📱 → 💻　使用環境至少在平板以上，才能獲得最佳體驗（點此關閉）
+        </div>
+      )}
       {/* Hero */}
       <header className="hero">
         <h1 className="reveal hero-title"><span className="sr-only">Yoda Research</span></h1>
