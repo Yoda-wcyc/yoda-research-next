@@ -337,7 +337,6 @@ export default function Home() {
               免費訂閱簡報
             </a>
           </div>
-          {/* 會員登入／付費訂閱／付費報告總覽 三鈕暫時隱藏（2026-08-06）；要恢復把本段註解頭尾拿掉即可。
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"14px" }}>
             <a className="btn btn-gold" href={BASE + "/-/會員專區.html"}>
               會員登入
@@ -349,7 +348,6 @@ export default function Home() {
               🔒 付費報告總覽
             </a>
           </div>
-          */}
           {/* 創始會員按鈕：訂閱收款上線前先隱藏（2026-08-03）。綠界審核過、付款連結串好後，把這段註解的頭尾拿掉即可恢復。
           <a className="btn" href="https://yoda-wcyc.github.io/-/subscribe.html"
             style={{ minWidth:220, color:"#fff", background:"linear-gradient(135deg,#8b5cf6,#ec4899)", boxShadow:"0 6px 22px rgba(139,92,246,.38)" }}>
