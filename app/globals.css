@@ -138,6 +138,8 @@ html[data-theme="light"] .hero h1.hero-title{
 .btn-gold{background:var(--gold-sm);color:#000}
 html[data-theme="light"] .btn-gold{color:#fff}
 .btn-ghost{border-color:var(--border);color:var(--text);background:none}
+.hexbtn{transition:transform .12s}
+.hexbtn:hover{transform:translateY(-2px)}
 
 /* ===== 儀表板 ===== */
 .dash{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}

@@ -257,6 +257,7 @@ export default function Home() {
   const [msg, setMsg] = useState({ text:"", ok:true });
   const [showGuide, setShowGuide] = useState(false);
   const [showTabletHint, setShowTabletHint] = useState(true);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     fetch(BASE + "/-/reports.json", { cache:"no-store" })
@@ -284,6 +285,8 @@ export default function Home() {
         } catch(e) {}
       }).catch(() => {});
   }, []);
+
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     try { if (localStorage.getItem("hideTabletHint") === "1") setShowTabletHint(false); } catch(e) {}
@@ -337,32 +340,29 @@ export default function Home() {
   <br />
   解碼美股與台股的真實訊號
 </p>
-        <div className="hero-cta reveal" style={{ maxWidth:560, margin:"0 auto", textAlign:"center" }}>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"14px", marginBottom:"14px" }}>
-            <a className="btn btn-gold" href={d.latestBrief}>
-              今日簡報
-            </a>
-            <a className="btn btn-ghost" href="#subscribe" style={{ color:"var(--gold-lg)", borderColor:"var(--gold-lg)" }}>
-              免費訂閱簡報
-            </a>
-          </div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"14px" }}>
-            <a className="btn btn-gold" href={BASE + "/-/會員專區.html"}>
-              會員登入
-            </a>
-            <a className="btn" href={BASE + "/-/subscribe.html"} style={{ background:"linear-gradient(135deg,#8b5cf6,#ec4899)", color:"#fff", fontWeight:600 }}>
-              付費訂閱
-            </a>
-            <a className="btn btn-ghost" href="/archive?tab=付費版" style={{ color:"var(--gold-lg)", borderColor:"var(--gold-lg)", whiteSpace:"nowrap", fontSize:"calc(14px*var(--scale))" }}>
-              🔒 付費報告總覽
-            </a>
-          </div>
-          {/* 創始會員按鈕：訂閱收款上線前先隱藏（2026-08-03）。綠界審核過、付款連結串好後，把這段註解的頭尾拿掉即可恢復。
-          <a className="btn" href="https://yoda-wcyc.github.io/-/subscribe.html"
-            style={{ minWidth:220, color:"#fff", background:"linear-gradient(135deg,#8b5cf6,#ec4899)", boxShadow:"0 6px 22px rgba(139,92,246,.38)" }}>
-            ✦ 創始會員 · 看方案
-          </a>
-          */}
+        <div className="hero-cta reveal" style={{ position:"relative", width:"min(350px, 92vw)", margin:"0 auto", aspectRatio:"350 / 242.48" }}>
+          {mounted && [
+            { label:"今日簡報",     href:d.latestBrief,             kind:"gold", left:"30%", top:"25%", fs:"clamp(12px,4vw,16px)" },
+            { label:"免費訂閱簡報", href:"#subscribe",               kind:"dark", left:"0%",  top:"0%",  fs:"clamp(8px,3vw,12px)" },
+            { label:"會員登入",     href:BASE + "/-/會員專區.html",   kind:"dark", left:"60%", top:"0%",  fs:"clamp(12px,4vw,15px)" },
+            { label:"付費訂閱",     href:BASE + "/-/subscribe.html", kind:"paid", left:"0%",  top:"50%", fs:"clamp(12px,4vw,15px)" },
+            { label:"付費報告總覽", href:"/archive?tab=付費版",      kind:"dark", left:"60%", top:"50%", fs:"clamp(8px,3vw,12px)" },
+          ].map((h, i) => {
+            const stops = h.kind === "gold" ? ["#ffd54a", "#c8901c"] : h.kind === "paid" ? ["#8b5cf6", "#ec4899"] : ["#252c3a", "#0a0d12"];
+            const stroke = h.kind === "gold" ? "#c8901c" : h.kind === "paid" ? "#c94fbf" : "#e0a526";
+            const color = h.kind === "gold" ? "#000" : h.kind === "paid" ? "#fff" : "#e0a526";
+            const gid = "hx" + i;
+            return (
+              <a key={h.label} href={h.href} className="hexbtn"
+                 style={{ position:"absolute", left:h.left, top:h.top, width:"40%", height:"50%", display:"flex", alignItems:"center", justifyContent:"center", textDecoration:"none" }}>
+                <svg viewBox="0 0 100 86.6" style={{ position:"absolute", inset:0, width:"100%", height:"100%" }} aria-hidden="true">
+                  <defs><linearGradient id={gid} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={stops[0]} /><stop offset="1" stopColor={stops[1]} /></linearGradient></defs>
+                  <polygon points="25,0 75,0 100,43.3 75,86.6 25,86.6 0,43.3" fill={"url(#" + gid + ")"} stroke={stroke} strokeWidth="5" strokeLinejoin="round" />
+                </svg>
+                <span style={{ position:"relative", zIndex:1, fontWeight:700, lineHeight:1.2, textAlign:"center", padding:"0 6px", color:color, fontSize:h.fs }}>{h.label}</span>
+              </a>
+            );
+          })}
         </div>
       <div style={{ position:"fixed", bottom:"18px", left:0, right:0, textAlign:"center", pointerEvents:"none", zIndex:50 }}>
           <span style={{ fontSize:"calc(24px*var(--scale))", color:"var(--gold-lg)", opacity:.75, display:"block", lineHeight:1, animation:"arrow-bob 2s ease-in-out infinite" }}>⌄</span>
