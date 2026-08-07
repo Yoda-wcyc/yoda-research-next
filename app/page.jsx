@@ -4,6 +4,7 @@ import InstallApp from "../components/InstallApp";
 
 const BASE = "https://yoda-wcyc.github.io";
 const SUBSTACK = "https://iamtwispin.substack.com";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbwQQ02EzseXtzvHxH3yegvgvQKncv7ReoGaqqsVxzco6cdagOCW13Tr7KlwX2UJtPc7/exec";
 
 const SIG_MAP = {
   green: ["綠燈", "var(--green)"],
@@ -286,6 +287,14 @@ export default function Home() {
 
   useEffect(() => {
     try { if (localStorage.getItem("hideTabletHint") === "1") setShowTabletHint(false); } catch(e) {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      var K = "yr_vid", v = localStorage.getItem(K);
+      if (!v) { v = Date.now().toString(36) + Math.random().toString(36).slice(2, 8); localStorage.setItem(K, v); }
+      fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "hit", page: "home", path: location.pathname, host: location.hostname, ref: document.referrer, vid: v }) });
+    } catch(e) {}
   }, []);
 
   useEffect(() => {
