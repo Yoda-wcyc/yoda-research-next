@@ -7,8 +7,8 @@
     /* 浮水印（wordmark 圖·大·置中·最上層·幾乎透明·pointer-events:none 不擋不影響·每一幕都在） */
     ".yoda-wm{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:2147483000;width:min(64vw,780px);max-width:84vw;height:auto;opacity:.04;pointer-events:none;user-select:none}"
     /* 結尾安裝鈕 */
-    +".yoda-ginstall{display:flex;align-items:center;justify-content:center;gap:6px;width:-moz-fit-content;width:fit-content;max-width:90%;margin:24px auto 20px;padding:10px 24px;font-family:system-ui,-apple-system,'Noto Sans TC',sans-serif;font-size:14px;font-weight:700;letter-spacing:.02em;color:#fff;background:rgba(255,255,255,.10);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.24);border-radius:9999px;text-decoration:none;box-shadow:0 5px 18px rgba(0,0,0,.22);cursor:pointer;transition:background .15s,transform .15s}"
-    +".yoda-ginstall:hover{background:rgba(255,255,255,.17);transform:translateY(-1px)}"
+    +".yoda-ginstall{display:flex;align-items:center;justify-content:center;gap:6px;width:-moz-fit-content;width:fit-content;max-width:90%;margin:24px auto 20px;padding:10px 24px;font-family:system-ui,-apple-system,'Noto Sans TC',sans-serif;font-size:14px;font-weight:700;letter-spacing:.02em;color:#fff;background:rgba(255,255,255,.18);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.32);border-radius:9999px;text-decoration:none;box-shadow:0 5px 18px rgba(0,0,0,.22);cursor:pointer;transition:background .15s,transform .15s}"
+    +".yoda-ginstall:hover{background:rgba(255,255,255,.26);transform:translateY(-1px)}"
     +".yoda-ginstall .ic{font-weight:800;font-size:1.05em;color:#a5b4fc}";
   document.head.appendChild(st);
   // 浮水印：wordmark 圖·置中·最上層·幾乎透明（每一幕都在）
