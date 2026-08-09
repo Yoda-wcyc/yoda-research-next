@@ -6,6 +6,13 @@ const BASE = "https://yoda-wcyc.github.io";
 const SUBSTACK = "https://iamtwispin.substack.com";
 const GAS_URL = "https://script.google.com/macros/s/AKfycbwQQ02EzseXtzvHxH3yegvgvQKncv7ReoGaqqsVxzco6cdagOCW13Tr7KlwX2UJtPc7/exec";
 
+/* 資料時間正規化：從任意字串抽出 YYYY-MM-DD，統一格式（治「8月更新」「數據更新:…。」等不一致） */
+const isoDate = (raw, fb) => {
+  const pick = s => { const m = String(s ?? "").match(/(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/); return m ? m[1] + "-" + String(m[2]).padStart(2, "0") + "-" + String(m[3]).padStart(2, "0") : ""; };
+  return pick(raw) || pick(fb) || "";
+};
+const fmtWhen = (raw, fb) => { const iso = isoDate(raw, fb); return iso ? "資料截至 " + iso : ""; };
+
 const SIG_MAP = {
   green: ["綠燈", "var(--green)"],
   yellow: ["黃燈", "var(--yellow)"],
@@ -321,6 +328,8 @@ export default function Home() {
 
   const bScore100 = d.bScore <= 10 ? Math.round(d.bScore * 10) : Math.round(d.bScore);
   const bZone = bScore100 >= 75 ? "崩盤風險區" : bScore100 >= 50 ? "泡沫警戒區" : bScore100 >= 25 ? "溫和過熱區" : "理性成長區";
+  const cycWhen = isoDate(d.cycle?.updated, latest["總經"]?.date || d.updated);
+  const cyc = { ...d.cycle, updated: cycWhen };
 
   return (
     <>
@@ -412,19 +421,19 @@ export default function Home() {
               {/* 總經景氣位階 */}
               <div className="card reveal" style={{ padding:"calc(26px*var(--scale))" }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:"calc(24px*var(--scale))" }}>
-                  <div style={{ fontWeight:600, fontSize:"calc(15px*var(--scale))" }}>總經景氣位階 <span style={{ fontWeight:400, fontSize:"calc(11px*var(--scale))", color:"var(--dim)", whiteSpace:"nowrap" }}>{d.cycle.updated}</span></div>
+                  <div style={{ fontWeight:600, fontSize:"calc(15px*var(--scale))" }}>總經景氣位階 <span style={{ fontWeight:400, fontSize:"calc(11px*var(--scale))", color:"var(--dim)", whiteSpace:"nowrap" }}>{fmtWhen(d.cycle?.updated, latest["總經"]?.date || d.updated)}</span></div>
                   <a href={latest["總經"]?.file ? BASE + "/-/" + latest["總經"].file : BASE + "/-/"}
                     style={{ fontSize:"calc(12px*var(--scale))", color:"var(--accent)" }}>完整總經報告 →</a>
                 </div>
-                <CycleTempBar cycle={d.cycle} />
-                <MfgTempBar cycle={d.cycle} />
-                <MarketWaveSvg cycle={d.cycle} />
+                <CycleTempBar cycle={cyc} />
+                <MfgTempBar cycle={cyc} />
+                <MarketWaveSvg cycle={cyc} />
               </div>
 
               {/* AI 泡沫評估（資料化：讀 reports.json bubble） */}
               <div className="score-bar-section reveal">
                 <div className="score-bar-header">
-                  <div className="score-bar-header-title">AI泡沫評估 {latest["AI泡沫"]?.date && <span style={{ fontWeight:400, fontSize:"calc(11px*var(--scale))", color:"var(--dim)", whiteSpace:"nowrap" }}>{latest["AI泡沫"].date}</span>}</div>
+                  <div className="score-bar-header-title">AI泡沫評估 {isoDate(latest["AI泡沫"]?.date) && <span style={{ fontWeight:400, fontSize:"calc(11px*var(--scale))", color:"var(--dim)", whiteSpace:"nowrap" }}>{fmtWhen(latest["AI泡沫"]?.date)}</span>}</div>
                   <a href={d.bUrl} style={{ fontSize:"calc(12px*var(--scale))", color:"var(--accent)" }}>完整評估 →</a>
                 </div>
                 <div className="score-bar-label-row">
@@ -459,7 +468,7 @@ export default function Home() {
               {/* 市場溫度（compact） */}
               <div className="card reveal" style={{ padding:"calc(20px*var(--scale))" }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:"calc(14px*var(--scale))" }}>
-                  <div style={{ fontWeight:600, fontSize:"calc(15px*var(--scale))" }}>市場溫度 <span style={{ fontWeight:400, fontSize:"calc(11px*var(--scale))", color:"var(--dim)", whiteSpace:"nowrap" }}>{d.updated}</span></div>
+                  <div style={{ fontWeight:600, fontSize:"calc(15px*var(--scale))" }}>市場溫度 <span style={{ fontWeight:400, fontSize:"calc(11px*var(--scale))", color:"var(--dim)", whiteSpace:"nowrap" }}>{fmtWhen(d.updated)}</span></div>
                   <a href={latest["市場觀察"]?.file ? BASE + "/-/" + latest["市場觀察"].file : BASE + "/-/"}
                     style={{ fontSize:"calc(12px*var(--scale))", color:"var(--accent)" }}>完整市場觀察 →</a>
                 </div>
@@ -469,7 +478,7 @@ export default function Home() {
               {/* 全球槓桿觀察（四市場去槓桿壓力走勢，讀 reports.json leverage.markets） */}
               <div className="card reveal" style={{ padding:"calc(24px*var(--scale))" }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:"calc(6px*var(--scale))" }}>
-                  <div style={{ fontWeight:600, fontSize:"calc(15px*var(--scale))" }}>全球槓桿觀察 <span style={{ fontWeight:400, fontSize:"calc(11px*var(--scale))", color:"var(--dim)", whiteSpace:"nowrap" }}>{d.leverage.updated}</span></div>
+                  <div style={{ fontWeight:600, fontSize:"calc(15px*var(--scale))" }}>全球槓桿觀察 <span style={{ fontWeight:400, fontSize:"calc(11px*var(--scale))", color:"var(--dim)", whiteSpace:"nowrap" }}>{fmtWhen(d.leverage?.updated)}</span></div>
                   <a href={d.leverage.url} target="_blank" rel="noopener noreferrer"
                     style={{ fontSize:"calc(12px*var(--scale))", color:"var(--accent)" }}>完整觀察表 →</a>
                 </div>
