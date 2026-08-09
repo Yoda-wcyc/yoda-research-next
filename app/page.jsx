@@ -331,7 +331,10 @@ export default function Home() {
       )}
       {/* Hero */}
       <header className="hero">
-        <h1 className="reveal hero-title"><span className="sr-only">Yoda Research</span></h1>
+        <div className="reveal" style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:"calc(16px*var(--scale))" }}>
+          <h1 className="hero-title" style={{ margin:0 }}><span className="sr-only">Yoda Research</span></h1>
+          <img src="/yoda-logo.png" alt="" aria-hidden="true" style={{ height:"calc(58px*var(--scale))", width:"auto", opacity:.92, flexShrink:0 }} />
+        </div>
         {d.heroNote ? (
           <p className="reveal" style={{ fontSize:"calc(17px*var(--scale))", color:"var(--gold-lg)", marginBottom:4 }}>{d.heroNote}</p>
         ) : null}

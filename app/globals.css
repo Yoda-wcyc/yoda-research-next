@@ -1,6 +1,6 @@
 :root{
   --scale:1;
-  --bg:#000000; --surface:#1d1d1f; --surface2:#272729;
+  --bg:#0b0c10; --surface:#1d1d1f; --surface2:#272729;
   --border:rgba(255,255,255,.14); --divider:rgba(255,255,255,.08);
   --text:#f5f5f7; --dim:#a1a1a6;
   --accent:#2997ff;
@@ -19,6 +19,7 @@ html[data-theme="light"]{
 html[data-size="sm"]{ --scale:.875 }
 html[data-size="md"]{ --scale:1 }
 html[data-size="lg"]{ --scale:1.125 }
+:root:not([data-theme="light"]) body{ background:radial-gradient(120% 90% at 62% 24%,#171a22 0%,#0f1218 42%,#0b0c10 100%) fixed; }
 
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
