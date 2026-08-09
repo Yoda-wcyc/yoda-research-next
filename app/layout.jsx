@@ -33,6 +33,8 @@ export default function RootLayout({ children }) {
   return (
     <html lang="zh-Hant" data-theme="dark" data-size="md" suppressHydrationWarning>
       <head>
+        {/* 安裝鈕共用樣式(首頁/報告/遊戲同一支 → 改 yoda-btn.css 全同步) */}
+        <link rel="stylesheet" href="/yoda-btn.css" />
         {/* Google tag (gtag.js) — GA4 */}
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-DFFP3JL6EY"></script>
         <script

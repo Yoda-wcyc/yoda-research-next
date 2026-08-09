@@ -39,7 +39,7 @@ export default function InstallApp() {
 
   return (
     <>
-      <button className="install-btn" onClick={click}>
+      <button className="yoda-btn" onClick={click}>
         <span className="ic">⊕</span> 安裝 Yoda Research 到桌面
       </button>
       {showGuide && (

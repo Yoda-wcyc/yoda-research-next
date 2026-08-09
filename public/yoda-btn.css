@@ -1,0 +1,10 @@
+/* Yoda Research 安裝按鈕 · 共用唯一樣式(首頁/報告/遊戲三邊都載入這一支·改這裡全同步) · 2026-08-08
+   半透明霧面玻璃 · ⊕ 淡靛藍 · 無動畫 */
+.yoda-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 22px;font-family:inherit;font-size:14px;font-weight:700;letter-spacing:.02em;line-height:1.2;color:#fff;background:rgba(255,255,255,.18);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.32);border-radius:9999px;text-decoration:none;box-shadow:0 4px 16px rgba(0,0,0,.20);white-space:nowrap;cursor:pointer;transition:background .15s,transform .15s}
+.yoda-btn:hover{background:rgba(255,255,255,.26);transform:translateY(-1px)}
+.yoda-btn:active{transform:translateY(0)}
+.yoda-btn .ic{font-weight:800;font-size:1.08em;color:#a5b4fc}
+.yoda-btn-row{margin:12px 0 6px}                       /* 報告：獨立一行 */
+.yoda-btn-center{display:flex;justify-content:center;margin:24px auto 20px}  /* 遊戲：置中 */
+.yoda-btn-fix{position:fixed;bottom:14px;left:14px;z-index:60}
+@media(max-width:700px){.yoda-btn{font-size:13px;padding:8px 18px}.yoda-btn-fix{bottom:10px;left:10px}}
