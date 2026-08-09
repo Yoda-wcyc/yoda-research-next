@@ -5,7 +5,7 @@
   var st=document.createElement('style');st.id='yoda-gb-style';
   st.textContent=
     /* 浮水印（wordmark 圖·大·置中·最上層·幾乎透明·pointer-events:none 不擋不影響·每一幕都在） */
-    ".yoda-wm{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:2147483000;width:min(64vw,780px);max-width:84vw;height:auto;opacity:.06;pointer-events:none;user-select:none}"
+    ".yoda-wm{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:2147483000;width:min(64vw,780px);max-width:84vw;height:auto;opacity:.04;pointer-events:none;user-select:none}"
     /* 結尾安裝鈕 */
     +".yoda-ginstall{display:flex;align-items:center;justify-content:center;gap:6px;width:-moz-fit-content;width:fit-content;max-width:90%;margin:24px auto 20px;padding:10px 24px;font-family:system-ui,-apple-system,'Noto Sans TC',sans-serif;font-size:14px;font-weight:700;letter-spacing:.02em;color:#fff;background:#6366f1;border:none;border-radius:9999px;text-decoration:none;box-shadow:0 5px 18px rgba(99,102,241,.45);cursor:pointer;transition:filter .15s,transform .15s}"
     +".yoda-ginstall:hover{filter:brightness(1.1);transform:translateY(-1px)}"
