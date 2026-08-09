@@ -19,7 +19,7 @@ html[data-theme="light"]{
 html[data-size="sm"]{ --scale:.875 }
 html[data-size="md"]{ --scale:1 }
 html[data-size="lg"]{ --scale:1.125 }
-:root:not([data-theme="light"]) body{ background:radial-gradient(120% 90% at 62% 24%,#171a22 0%,#0f1218 42%,#0b0c10 100%) fixed; }
+:root:not([data-theme="light"]) body{ background:radial-gradient(48% 40% at 20% 16%,rgba(72,108,170,.18),transparent 62%),radial-gradient(46% 38% at 82% 26%,rgba(48,82,145,.15),transparent 60%),radial-gradient(70% 55% at 52% 84%,rgba(34,60,110,.13),transparent 66%),radial-gradient(120% 90% at 62% 24%,#171a22 0%,#0f1218 42%,#0b0c10 100%); background-attachment:fixed; }
 
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
