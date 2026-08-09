@@ -292,7 +292,9 @@ footer .disc{line-height:1.8;max-width:820px}
 }
 
 /* ===== 安裝 App ===== */
-.install-btn{margin-top:16px;background:var(--gold-dim)}
+.install-btn{display:inline-flex;align-items:center;gap:6px;margin-top:16px;padding:10px 22px;font-size:14px;font-weight:700;font-family:inherit;color:#fff;background:#6366f1;border:none;border-radius:9999px;cursor:pointer;box-shadow:0 4px 16px rgba(99,102,241,.4);transition:filter .15s,transform .15s}
+.install-btn:hover{filter:brightness(1.1);transform:translateY(-1px)}
+.install-btn .ic{font-weight:800;font-size:1.05em}
 .ios-guide{
   position:fixed;inset:0;z-index:200;
   background:rgba(0,0,0,.6);backdrop-filter:blur(4px);
