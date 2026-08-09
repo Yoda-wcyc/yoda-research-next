@@ -104,21 +104,21 @@ function MfgTempBar({ cycle }) {
       <div style={{ fontSize:"calc(13px*var(--scale))", fontWeight:700, color:"var(--dim)",
         letterSpacing:".08em", textTransform:"uppercase", marginBottom:8 }}>製造業循環溫度條</div>
       <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
-        {[["⬇ 衰退（去庫存）","#ff4d6d"],["↑ 復甦（補庫存）","#00c8a0"],["↑↑ 擴張（擴產）","#4d9fff"],["△ 過熱（錯配）","#f0a500"]].map(([l,c])=>
+        {[["⬇ 衰退（去庫存）","#00c8a0"],["↑ 復甦（補庫存）","#4d9fff"],["↑↑ 擴張（擴產）","#f0a500"],["△ 過熱（錯配）","#ff4d6d"]].map(([l,c])=>
           <span key={l} style={{ fontSize:"calc(11px*var(--scale))", fontWeight:600, color:c }}>{l}</span>)}
       </div>
       <div style={{ position:"relative", height:14, borderRadius:8, overflow:"visible",
-        background:"linear-gradient(90deg,#ff4d6d 0%,#00c8a0 25%,#4d9fff 50%,#f0a500 100%)",
+        background:"linear-gradient(90deg,#00c8a0 0%,#1ac8b0 10%,#35b8c8 20%,#4da8e0 28%,#4d9fff 38%,#78a8f0 48%,#c0a040 58%,#f0a500 65%,#f07828 72%,#e84060 82%,#ff4d6d 100%)",
         boxShadow:"0 2px 12px rgba(0,0,0,.25)" }}>
         {[25,50,75].map(p=><div key={p} style={{ position:"absolute",top:0,bottom:0,left:`${p}%`,width:1,background:"rgba(255,255,255,.18)" }}/>)}
         <div style={{ position:"absolute",left:`${cycle.mfg_pct}%`,top:"50%",transform:"translate(-50%,-50%)",zIndex:10 }}>
           <div style={{ position:"absolute",bottom:"calc(100% + 7px)",left:"50%",transform:"translateX(-50%)",
-            background:"#4d9fff",color:"#080b10",fontWeight:700,fontSize:"calc(11px*var(--scale))",
+            background:"#f0a500",color:"#080b10",fontWeight:700,fontSize:"calc(11px*var(--scale))",
             padding:"2px 8px",borderRadius:3,whiteSpace:"nowrap" }}>當前位置（{cycle.updated}）</div>
           <div style={{ position:"absolute",bottom:"calc(100% + 1px)",left:"50%",transform:"translateX(-50%)",
-            border:"4px solid transparent",borderTopColor:"#4d9fff" }}/>
+            border:"4px solid transparent",borderTopColor:"#f0a500" }}/>
           <div style={{ width:22,height:22,borderRadius:"50%",background:"#fff",
-            border:"3px solid #4d9fff",boxShadow:"0 0 4px 2px rgba(77,159,255,.2)",
+            border:"3px solid #f0a500",boxShadow:"0 0 4px 2px rgba(240,165,0,.2)",
             animation:"sig-pulse 2s ease-in-out infinite" }}/>
         </div>
       </div>
