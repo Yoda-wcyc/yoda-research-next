@@ -4,19 +4,17 @@
   if(document.getElementById('yoda-gb-style'))return;
   var st=document.createElement('style');st.id='yoda-gb-style';
   st.textContent=
-    /* 商標（fixed·每畫面·低調） */
-    ".yoda-wm{position:fixed;left:11px;top:11px;z-index:9998;display:inline-flex;align-items:center;gap:5px;font-family:system-ui,-apple-system,'Noto Sans TC',sans-serif;font-size:11px;font-weight:700;letter-spacing:.03em;color:rgba(255,255,255,.4);text-decoration:none;text-shadow:0 1px 3px rgba(0,0,0,.45);transition:color .15s;pointer-events:auto}"
-    +".yoda-wm:hover{color:rgba(255,255,255,.78)}"
-    +".yoda-wm .dot{width:6px;height:6px;border-radius:50%;background:#6366f1;box-shadow:0 0 6px rgba(99,102,241,.7);flex:0 0 auto}"
+    /* 浮水印（大字·置中·在內容背後 z-index:-1·pointer-events:none 不擋不影響互動·每畫面都在） */
+    ".yoda-wm{position:fixed;inset:0;z-index:-1;display:flex;align-items:center;justify-content:center;pointer-events:none;user-select:none;font-family:'Poppins',system-ui,-apple-system,'Noto Sans TC',sans-serif;font-size:min(13vw,160px);font-weight:900;letter-spacing:.01em;line-height:1;white-space:nowrap;color:rgba(255,255,255,.07);mix-blend-mode:overlay;text-align:center}"
     /* 結尾安裝鈕 */
     +".yoda-ginstall{display:flex;align-items:center;justify-content:center;gap:6px;width:-moz-fit-content;width:fit-content;max-width:90%;margin:24px auto 20px;padding:10px 24px;font-family:system-ui,-apple-system,'Noto Sans TC',sans-serif;font-size:14px;font-weight:700;letter-spacing:.02em;color:#fff;background:#6366f1;border:none;border-radius:9999px;text-decoration:none;box-shadow:0 5px 18px rgba(99,102,241,.45);cursor:pointer;transition:filter .15s,transform .15s}"
     +".yoda-ginstall:hover{filter:brightness(1.1);transform:translateY(-1px)}"
     +".yoda-ginstall .ic{font-weight:800;font-size:1.05em}";
   document.head.appendChild(st);
-  // 商標：每一個畫面都在（fixed）
+  // 浮水印：大字置中·在內容背後·每一個畫面都在（放 body 最前，z-index:-1 才在內容下、body 底色之上）
   if(!document.querySelector('.yoda-wm')){
-    var wm=document.createElement('a');wm.className='yoda-wm';wm.href='https://yoda-research-next.vercel.app/';wm.target='_blank';wm.rel='noopener';
-    wm.innerHTML='<span class="dot"></span>Yoda Research';document.body.appendChild(wm);
+    var wm=document.createElement('div');wm.className='yoda-wm';wm.textContent='Yoda Research';
+    document.body.insertBefore(wm,document.body.firstChild);
   }
   // 安裝鈕：放遊戲最後（append 到 body 末端，內容流的最下方）
   if(!document.querySelector('.yoda-ginstall')){
