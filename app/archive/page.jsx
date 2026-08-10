@@ -19,6 +19,7 @@ export default function Archive() {
   }, []);
 
   useEffect(() => {
+    const norm = (f) => String(f || "").replace(/\.html?$/i, "").replace(/^付費[_-]?/, ""); // 正規化檔名(去 .html／去付費_ 前綴)供去重
     Promise.all([
       fetch(BASE + "/-/reports.json", { cache: "no-store" }).then((r) => {
         if (!r.ok) throw 0;
@@ -28,16 +29,27 @@ export default function Archive() {
       fetch(GAS, { method: "POST", body: JSON.stringify({ action: "reportOverrides" }) })
         .then((r) => r.json())
         .catch(() => ({ overrides: {} })),
+      // Drive 付費檔清單：報告做好直接上傳 Drive 的付費報告，免手動改 reports.json 就會出現在這裡
+      fetch(GAS, { method: "POST", body: JSON.stringify({ action: "publicPaidList" }) })
+        .then((r) => r.json())
+        .catch(() => ({ reports: [] })),
     ])
-      .then(([d, ov]) => {
+      .then(([d, ov, pd]) => {
         const over = (ov && ov.overrides) || {};
-        const rows = (d.history || [])
+        const pub = (d.history || [])
           .filter((x) => !(over[x.file] && over[x.file].hidden)) // 軟下架：隱藏的不進清單
           .map((x) => {
             const o = over[x.file];
             return o && o.title ? { ...x, _title: o.title } : x; // 改標題：覆蓋顯示標題
-          })
-          .sort((a, b) => b.date.localeCompare(a.date));
+          });
+        // 合併 Drive 付費檔：依正規化檔名去重(reports.json 已有的公開版優先，不重覆列)
+        const have = new Set(pub.map((x) => norm(x.file)));
+        const drive = ((pd && pd.reports) || [])
+          .filter((x) => !(over[x.file] && over[x.file].hidden))
+          .filter((x) => !have.has(norm(x.file)));
+        const rows = pub
+          .concat(drive)
+          .sort((a, b) => String(b.date).localeCompare(String(a.date)));
         setAll(rows);
       })
       .catch(() => setAll(false));
@@ -87,7 +99,11 @@ export default function Archive() {
                 <a
                   key={x.file}
                   className="item"
-                  href={BASE + "/-/" + encodeURIComponent(x.file)}
+                  href={
+                    x.drive
+                      ? BASE + "/-/report-shell.html?id=" + encodeURIComponent(x.reportId) // Drive 付費檔：導去報告頁(輸一次密碼即讀)
+                      : BASE + "/-/" + encodeURIComponent(x.file)
+                  }
                 >
                   {isPaid && <span className="paid-badge">付費版</span>}
                   <div className="meta">
