@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 
 const BASE = "https://yoda-wcyc.github.io";
+// 會員系統 GAS：讀報告覆蓋（軟下架 / 改標題）供前端合併
+const GAS = "https://script.google.com/macros/s/AKfycbwQQ02EzseXtzvHxH3yegvgvQKncv7ReoGaqqsVxzco6cdagOCW13Tr7KlwX2UJtPc7/exec";
 const TABS = ["全部", "付費版", "關鍵報告", "市場觀察", "美股", "台股", "AI泡沫", "總經", "簡報", "專題"];
 // 付費版判定：該筆明確標 paid，或分類為付費旗艦「關鍵報告」
 const isPaidRow = (x) => x.paid === true || x.cat === "關鍵報告";
@@ -17,14 +19,24 @@ export default function Archive() {
   }, []);
 
   useEffect(() => {
-    fetch(BASE + "/-/reports.json", { cache: "no-store" })
-      .then((r) => {
+    Promise.all([
+      fetch(BASE + "/-/reports.json", { cache: "no-store" }).then((r) => {
         if (!r.ok) throw 0;
         return r.json();
-      })
-      .then((d) => {
+      }),
+      // 覆蓋讀取失敗不擋清單：退回空覆蓋
+      fetch(GAS, { method: "POST", body: JSON.stringify({ action: "reportOverrides" }) })
+        .then((r) => r.json())
+        .catch(() => ({ overrides: {} })),
+    ])
+      .then(([d, ov]) => {
+        const over = (ov && ov.overrides) || {};
         const rows = (d.history || [])
-          .slice()
+          .filter((x) => !(over[x.file] && over[x.file].hidden)) // 軟下架：隱藏的不進清單
+          .map((x) => {
+            const o = over[x.file];
+            return o && o.title ? { ...x, _title: o.title } : x; // 改標題：覆蓋顯示標題
+          })
           .sort((a, b) => b.date.localeCompare(a.date));
         setAll(rows);
       })
@@ -68,7 +80,7 @@ export default function Archive() {
             <div className="empty">這個分類還沒有報告</div>
           ) : (
             rows.map((x) => {
-              const title = x.file.replace(/\.html$/, "").replace(/_/g, " ");
+              const title = x._title || x.file.replace(/\.html$/, "").replace(/_/g, " ");
               const showSum = x.summary && x.summary.indexOf("占位") === -1;
               const isPaid = isPaidRow(x);
               return (
