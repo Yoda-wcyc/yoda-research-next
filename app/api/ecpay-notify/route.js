@@ -22,14 +22,15 @@ export async function POST(req) {
   }
 
   // RtnCode=1 才是付款/授權成功（定期定額首期與每期成功都會回 1）
-  if (String(params.RtnCode) === '1' && process.env.GAS_URL) {
+  const gasUrl = (process.env.GAS_URL || '').trim();
+  if (String(params.RtnCode) === '1' && gasUrl) {
     try {
-      await fetch(process.env.GAS_URL, {
+      await fetch(gasUrl, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           action: 'markPaid',
-          secret: process.env.GAS_SHARED_SECRET || '',
+          secret: (process.env.GAS_SHARED_SECRET || '').trim(),
           email: params.CustomField1 || '',
           amount: params.TradeAmt || params.PeriodAmount || '',
           tradeNo: params.MerchantTradeNo || '',

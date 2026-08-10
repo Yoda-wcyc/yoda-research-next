@@ -29,8 +29,8 @@ export async function POST(req) {
   }
 
   const origin = new URL(req.url).origin;
-  const returnURL = process.env.ECPAY_RETURN_URL || origin + '/api/ecpay-notify';
-  const clientBack = process.env.ECPAY_CLIENT_BACK_URL || 'https://yoda-wcyc.github.io/-/subscribe.html?paid=1';
+  const returnURL = (process.env.ECPAY_RETURN_URL || origin + '/api/ecpay-notify').trim();
+  const clientBack = (process.env.ECPAY_CLIENT_BACK_URL || 'https://yoda-wcyc.github.io/-/subscribe.html?paid=1').trim();
 
   const params = {
     MerchantID: cfg.MerchantID,
