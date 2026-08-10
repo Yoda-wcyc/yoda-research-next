@@ -4,6 +4,11 @@
    跨網域無法直接觸發安裝→本鈕連到官網PWA,由官網 InstallApp 一鍵裝。
    放置優先：分享列(.share-bar)內→與「分享這份報告給朋友」並排(安裝在左);否則控制列下獨立一行;最後 fixed。 */
 (function(){
+  // 商標浮水印:注入全站共用正本(濃淡/大小改 yoda-wm.js 一處即同步報告+遊戲)
+  if(!document.querySelector('script[data-yoda-wm]')){
+    var wj=document.createElement('script');wj.src='https://yoda-research-next.vercel.app/yoda-wm.js';wj.defer=true;wj.setAttribute('data-yoda-wm','1');
+    document.head.appendChild(wj);
+  }
   var CSS='https://yoda-research-next.vercel.app/yoda-btn.css';
   if(!document.querySelector('link[data-yoda-btn]')){
     var l=document.createElement('link');l.rel='stylesheet';l.href=CSS;l.setAttribute('data-yoda-btn','1');
