@@ -356,7 +356,7 @@ export default function Home() {
           {mounted && [
             { label:"簡報",         href:d.latestBrief,             kind:"gold", left:"30%", top:"25%", fs:"clamp(12px,4vw,16px)" },
             { label:"免費訂閱簡報", href:"#subscribe",               kind:"dark", left:"0%",  top:"0%",  fs:"clamp(8px,3vw,12px)" },
-            { label:"會員登入",     href:BASE + "/-/會員專區.html",   kind:"dark", left:"60%", top:"0%",  fs:"clamp(12px,4vw,15px)" },
+            { label:"會員專區",     href:BASE + "/-/會員專區.html",   kind:"dark", left:"60%", top:"0%",  fs:"clamp(12px,4vw,15px)" },
             { label:"付費訂閱",     href:BASE + "/-/subscribe.html", kind:"paid", left:"0%",  top:"50%", fs:"clamp(12px,4vw,15px)" },
             { label:"付費報告總覽", href:"/archive?tab=付費版",      kind:"dark", left:"60%", top:"50%", fs:"clamp(8px,3vw,12px)" },
           ].map((h, i) => {
