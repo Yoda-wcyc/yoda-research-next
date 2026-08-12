@@ -1,0 +1,60 @@
+import { sql } from '../../../lib/db';
+import { J, preflight } from '../../../lib/cors';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
+
+export function OPTIONS() { return preflight(); }
+
+const GAS = 'https://script.google.com/macros/s/AKfycbwQQ02EzseXtzvHxH3yegvgvQKncv7ReoGaqqsVxzco6cdagOCW13Tr7KlwX2UJtPc7/exec';
+const MCOLS = ['member_id', 'pub_id', 'email', 'password_hash', 'ref_code', 'referred_by', 'status', 'start_date', 'paid_periods', 'referred_paid_count', 'earned_free_months', 'next_charge_date', 'notes', 'cert_mw', 'cert_tw', 'cert_us', 'cert_key', 'cert_macro', 'cert_flag', 'plan', 'fb_name', 'notify_off'];
+
+async function ensureTables() {
+  await sql`CREATE TABLE IF NOT EXISTS members (
+    member_id text PRIMARY KEY, pub_id text, email text, password_hash text, ref_code text, referred_by text,
+    status text, start_date text, paid_periods text, referred_paid_count text, earned_free_months text,
+    next_charge_date text, notes text, cert_mw text, cert_tw text, cert_us text, cert_key text, cert_macro text,
+    cert_flag text, plan text, fb_name text, notify_off text, mirrored_at timestamptz DEFAULT now()
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS payments (
+    id bigserial PRIMARY KEY, ts text, email text, amount text, trade_no text, note text, status text
+  )`;
+}
+
+// 唯讀鏡像：從 GAS(正本)匯出 → 快照式寫入 Neon（清空後全量插入·冪等）。正本完全不動。
+export async function POST(req) {
+  let body = {};
+  try { body = await req.json(); } catch (e) {}
+  if (!process.env.ADMIN_KEY || body.key !== process.env.ADMIN_KEY) return J({ ok: false, error: '管理密碼錯誤' }, 403);
+  if (!process.env.DATABASE_URL) return J({ ok: false, error: 'DATABASE_URL 未設定（Neon 沒連上專案或未 redeploy）' });
+
+  let data;
+  try {
+    const r = await fetch(GAS, { method: 'POST', body: JSON.stringify({ action: 'adminExportAll', key: body.key }) });
+    data = await r.json();
+  } catch (e) { return J({ ok: false, error: '讀 GAS 匯出失敗：' + String((e && e.message) || e) }); }
+  if (!data || !data.ok) return J({ ok: false, error: 'GAS 匯出回應異常：' + ((data && data.error) || 'unknown') });
+
+  const members = (data.members && data.members.rows) || [];
+  const payments = (data.payments && data.payments.rows) || [];
+
+  try {
+    await ensureTables();
+    await sql`TRUNCATE members`;
+    for (const m of members) {
+      const vals = MCOLS.map((c) => (m[c] === undefined || m[c] === null) ? '' : String(m[c]));
+      const ph = MCOLS.map((_, i) => '$' + (i + 1)).join(',');
+      await sql.query(`INSERT INTO members (${MCOLS.join(',')}) VALUES (${ph})`, vals);
+    }
+    await sql`TRUNCATE payments`;
+    for (const p of payments) {
+      await sql.query('INSERT INTO payments (ts,email,amount,trade_no,note,status) VALUES ($1,$2,$3,$4,$5,$6)',
+        [String(p.timestamp || p.ts || ''), String(p.email || ''), String(p.amount || ''), String(p.trade_no || ''), String(p.note || ''), String(p.status || '')]);
+    }
+  } catch (e) { return J({ ok: false, error: '寫入 DB 失敗：' + String((e && e.message) || e) }); }
+
+  let mc = null, pc = null;
+  try { mc = (await sql`SELECT count(*)::int AS n FROM members`)[0].n; pc = (await sql`SELECT count(*)::int AS n FROM payments`)[0].n; } catch (e) {}
+  return J({ ok: true, source: { members: members.length, payments: payments.length }, db: { members: mc, payments: pc } });
+}
