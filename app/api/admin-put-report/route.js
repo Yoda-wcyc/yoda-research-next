@@ -20,7 +20,7 @@ export async function POST(req) {
 
   try {
     const res = await put(blobPath(name), html, {
-      access: 'public',
+      access: 'private',
       token: process.env.BLOB_READ_WRITE_TOKEN,
       contentType: 'text/html; charset=utf-8',
       addRandomSuffix: false,
