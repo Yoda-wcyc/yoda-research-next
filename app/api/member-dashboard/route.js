@@ -40,6 +40,7 @@ export async function POST(req) {
   try { m = await memberByEmail(email); } catch (e) { m = null; }
   if (!m) return J(await gasFallback(email, password));
   if (String(m.password_hash) !== hashPw(password)) return J(await gasFallback(email, password));
+  if (!isPaidActive(m)) return J(await gasFallback(email, password)); // Neon 顯示未付費→可能剛付款/剛異動鏡像未更新→GAS 拿正本最新狀態
 
   let referredTotal = 0, referredPaid = 0;
   if (m.ref_code) {

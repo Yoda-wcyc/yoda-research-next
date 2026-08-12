@@ -30,7 +30,7 @@ export async function POST(req) {
     if (String(m.password_hash) !== hashPw(password)) {
       return J(await gasFallback(email, password)); // Neon 密碼不符 → 可能鏡像過舊 → GAS 確認
     }
-    if (!isPaidActive(m)) return J({ ok: true, allow: false, reason: 'inactive', error: '訂閱未生效或已失效' });
+    if (!isPaidActive(m)) return J(await gasFallback(email, password)); // Neon 顯示未付費→可能剛付款鏡像未更新→GAS 複查(正本)
     const wm = watermarkOf(m);
     const now = Math.floor(Date.now() / 1000);
     const token = signJwt({ sub: m.pub_id || m.member_id, wm, iat: now, exp: now + 12 * 3600 }, process.env.JWT_SECRET || '');
