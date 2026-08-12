@@ -43,14 +43,14 @@ export async function POST(req) {
     await ensureTables();
     await sql`TRUNCATE members`;
     for (const m of members) {
-      const vals = MCOLS.map((c) => (m[c] === undefined || m[c] === null) ? '' : String(m[c]));
-      const ph = MCOLS.map((_, i) => '$' + (i + 1)).join(',');
-      await sql.query(`INSERT INTO members (${MCOLS.join(',')}) VALUES (${ph})`, vals);
+      const g = (c) => (m[c] === undefined || m[c] === null) ? '' : String(m[c]);
+      await sql`INSERT INTO members (member_id,pub_id,email,password_hash,ref_code,referred_by,status,start_date,paid_periods,referred_paid_count,earned_free_months,next_charge_date,notes,cert_mw,cert_tw,cert_us,cert_key,cert_macro,cert_flag,plan,fb_name,notify_off)
+        VALUES (${g('member_id')},${g('pub_id')},${g('email')},${g('password_hash')},${g('ref_code')},${g('referred_by')},${g('status')},${g('start_date')},${g('paid_periods')},${g('referred_paid_count')},${g('earned_free_months')},${g('next_charge_date')},${g('notes')},${g('cert_mw')},${g('cert_tw')},${g('cert_us')},${g('cert_key')},${g('cert_macro')},${g('cert_flag')},${g('plan')},${g('fb_name')},${g('notify_off')})`;
     }
     await sql`TRUNCATE payments`;
     for (const p of payments) {
-      await sql.query('INSERT INTO payments (ts,email,amount,trade_no,note,status) VALUES ($1,$2,$3,$4,$5,$6)',
-        [String(p.timestamp || p.ts || ''), String(p.email || ''), String(p.amount || ''), String(p.trade_no || ''), String(p.note || ''), String(p.status || '')]);
+      await sql`INSERT INTO payments (ts,email,amount,trade_no,note,status)
+        VALUES (${String(p.timestamp || p.ts || '')},${String(p.email || '')},${String(p.amount || '')},${String(p.trade_no || '')},${String(p.note || '')},${String(p.status || '')})`;
     }
   } catch (e) { return J({ ok: false, error: '寫入 DB 失敗：' + String((e && e.message) || e) }); }
 
