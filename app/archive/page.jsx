@@ -19,40 +19,33 @@ export default function Archive() {
   }, []);
 
   useEffect(() => {
-    const norm = (f) => String(f || "").replace(/\.html?$/i, "").replace(/^付費[_-]?/, ""); // 正規化檔名(去 .html／去付費_ 前綴)供去重
+    const norm = (f) => String(f || "").replace(/\.html?$/i, "").replace(/^付費[_-]?/, ""); // 正規化檔名供去重
+    // 由三份資料組出清單(over=隱藏/改標題覆蓋)
+    const build = (d, pd, over) => {
+      const pub = (d.history || [])
+        .filter((x) => !(over[x.file] && over[x.file].hidden))
+        .map((x) => { const o = over[x.file]; return o && o.title ? { ...x, _title: o.title } : x; });
+      const have = new Set(pub.map((x) => norm(x.file)));
+      const paid = ((pd && pd.reports) || [])
+        .filter((x) => !(over[x.file] && over[x.file].hidden))
+        .filter((x) => !have.has(norm(x.file)));
+      return pub.concat(paid).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    };
+
+    let dRef = null, pdRef = null;
+    // 快路徑：reports.json(靜態) + 付費清單(Vercel Blob) → 立即顯示，完全不等 Google
     Promise.all([
-      fetch(BASE + "/-/reports.json", { cache: "no-store" }).then((r) => {
-        if (!r.ok) throw 0;
-        return r.json();
-      }),
-      // 覆蓋讀取失敗不擋清單：退回空覆蓋
-      fetch(GAS, { method: "POST", body: JSON.stringify({ action: "reportOverrides" }) })
-        .then((r) => r.json())
-        .catch(() => ({ overrides: {} })),
-      // 付費檔清單改讀 Vercel Blob（同源·公開·只回檔名/日期/分類）：上傳到 Blob 的付費報告免改 reports.json 就出現
-      fetch("/api/public-paid-list", { cache: "no-store" })
-        .then((r) => r.json())
-        .catch(() => ({ reports: [] })),
+      fetch(BASE + "/-/reports.json", { cache: "no-store" }).then((r) => { if (!r.ok) throw 0; return r.json(); }),
+      fetch("/api/public-paid-list", { cache: "no-store" }).then((r) => r.json()).catch(() => ({ reports: [] })),
     ])
-      .then(([d, ov, pd]) => {
-        const over = (ov && ov.overrides) || {};
-        const pub = (d.history || [])
-          .filter((x) => !(over[x.file] && over[x.file].hidden)) // 軟下架：隱藏的不進清單
-          .map((x) => {
-            const o = over[x.file];
-            return o && o.title ? { ...x, _title: o.title } : x; // 改標題：覆蓋顯示標題
-          });
-        // 合併 Drive 付費檔：依正規化檔名去重(reports.json 已有的公開版優先，不重覆列)
-        const have = new Set(pub.map((x) => norm(x.file)));
-        const drive = ((pd && pd.reports) || [])
-          .filter((x) => !(over[x.file] && over[x.file].hidden))
-          .filter((x) => !have.has(norm(x.file)));
-        const rows = pub
-          .concat(drive)
-          .sort((a, b) => String(b.date).localeCompare(String(a.date)));
-        setAll(rows);
-      })
+      .then(([d, pd]) => { dRef = d; pdRef = pd; setAll(build(d, pd, {})); })
       .catch(() => setAll(false));
+
+    // 慢路徑(非阻塞)：GAS 覆蓋(隱藏/改標題)——來了才重套一次，拖不到主要清單的顯示
+    fetch(GAS, { method: "POST", body: JSON.stringify({ action: "reportOverrides" }), signal: AbortSignal.timeout(8000) })
+      .then((r) => r.json())
+      .then((ov) => { const over = (ov && ov.overrides) || {}; if (dRef && Object.keys(over).length) setAll(build(dRef, pdRef, over)); })
+      .catch(() => {});
   }, []);
 
   const rows = Array.isArray(all)

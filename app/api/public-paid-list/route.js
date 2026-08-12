@@ -31,7 +31,7 @@ async function handle() {
       const id = reportIdFromPath(b.pathname);
       if (!id || seen[id]) continue;
       seen[id] = 1;
-      reports.push({ file: id + '.html', reportId: id, date: dateOf(id), cat: catOf(id), paid: true, summary: '' });
+      reports.push({ file: id + '.html', reportId: id, date: dateOf(id), cat: catOf(id), paid: true, drive: true, summary: '' });
     }
     reports.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.reportId).localeCompare(String(a.reportId)));
   } catch (e) {}
