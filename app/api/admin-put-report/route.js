@@ -21,11 +21,10 @@ export async function POST(req) {
   try {
     const res = await put(blobPath(name), html, {
       access: 'private',
-      token: process.env.BLOB_READ_WRITE_TOKEN,
       contentType: 'text/html; charset=utf-8',
       addRandomSuffix: false,
       allowOverwrite: true,
-    });
+    }); // 憑證由 SDK 自動偵測
     return Response.json({ ok: true, reportId: name, url: res.url });
   } catch (e) {
     return Response.json({ ok: false, error: 'Blob 上傳失敗：' + String((e && e.message) || e) });

@@ -15,7 +15,7 @@ export async function POST(req) {
 
   let reports = [];
   try {
-    const { blobs } = await list({ prefix: 'reports/', token: process.env.BLOB_READ_WRITE_TOKEN });
+    const { blobs } = await list({ prefix: 'reports/' }); // 憑證由 SDK 自動偵測
     const seen = {};
     for (const b of (blobs || [])) {
       const id = reportIdFromPath(b.pathname);

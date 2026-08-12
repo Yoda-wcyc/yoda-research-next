@@ -19,7 +19,7 @@ export async function POST(req) {
 
   let html;
   try {
-    const result = await get(blobPath(reportId), { access: 'private', token: process.env.BLOB_READ_WRITE_TOKEN });
+    const result = await get(blobPath(reportId), { access: 'private' }); // 憑證由 SDK 自動偵測(BLOB_READ_WRITE_TOKEN 或 Vercel OIDC)
     if (result === null) return Response.json({ ok: true, allow: true, error: '找不到這份報告：' + reportId });
     html = await new Response(result.stream).text();
   } catch (e) {
