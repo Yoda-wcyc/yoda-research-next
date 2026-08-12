@@ -1,4 +1,5 @@
 import { ecpayConfig, checkMacValue } from '../../../lib/ecpay';
+import { upsertMember } from '../../../lib/db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -41,6 +42,16 @@ export async function POST(req) {
     } catch (e) {
       // 即使通知 GAS 失敗，仍回 1|OK 給綠界避免重試風暴；未入帳的可從綠界後台/Payments 對帳補。
     }
+    // markPaid 完 → 從 GAS(正本)重抓該會員最新狀態 → 同步進 Neon（付費者立刻走快路徑·不自己算不分歧）
+    try {
+      const gr = await fetch(gasUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'exportMemberRow', secret: (process.env.GAS_SHARED_SECRET || '').trim(), email: params.CustomField1 || '' }),
+      });
+      const gj = await gr.json();
+      if (gj && gj.ok && gj.member) await upsertMember(gj.member);
+    } catch (e) { /* 同步失敗不影響回綠界；下次全量鏡像/登入 fallback 會補正 */ }
   }
 
   return new Response('1|OK', { headers: { 'content-type': 'text/plain' } });
