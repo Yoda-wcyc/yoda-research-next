@@ -29,8 +29,8 @@ export default function Archive() {
       fetch(GAS, { method: "POST", body: JSON.stringify({ action: "reportOverrides" }) })
         .then((r) => r.json())
         .catch(() => ({ overrides: {} })),
-      // Drive 付費檔清單：報告做好直接上傳 Drive 的付費報告，免手動改 reports.json 就會出現在這裡
-      fetch(GAS, { method: "POST", body: JSON.stringify({ action: "publicPaidList" }) })
+      // 付費檔清單改讀 Vercel Blob（同源·公開·只回檔名/日期/分類）：上傳到 Blob 的付費報告免改 reports.json 就出現
+      fetch("/api/public-paid-list", { cache: "no-store" })
         .then((r) => r.json())
         .catch(() => ({ reports: [] })),
     ])
