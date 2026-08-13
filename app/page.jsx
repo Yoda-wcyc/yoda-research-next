@@ -352,7 +352,7 @@ export default function Home() {
   <br />
   解碼美股與台股的真實訊號
 </p>
-        <div className="hero-cta reveal" style={{ position:"relative", width:"min(360px, 92vw)", ["--cw"]:"min(360px, 92vw)", ["--R"]:"calc(var(--cw) * 0.36)", aspectRatio:"1 / 1", margin:"6px auto", overflow:"visible" }}>
+        <div className="hero-cta reveal" style={{ position:"relative", width:"min(360px, 92vw)", ["--cw"]:"min(360px, 92vw)", ["--R0"]:"calc(var(--cw) * 0.37)", aspectRatio:"1 / 1", margin:"6px auto", overflow:"visible" }}>
           {mounted && (() => {
             const KIND = {
               gold:    { stops:["#ffd54a","#c8901c"], stroke:"#c8901c", color:"#000" },
@@ -388,7 +388,7 @@ export default function Home() {
                 {hex(center, "hxC")}
               </a>
               {orbiters.map((h, i) => (
-                <div key={h.label} className="hexorbit" style={{ ["--start"]: (i * 90) + "deg" }}>
+                <div key={h.label} className="hexorbit" style={{ ["--start"]: (i * 90) + "deg", ["--delay"]: (-i * 30) + "s" }}>
                   <div className="hexarm">
                     <div className="hexcenter">
                       <a href={h.href} className="orbiter"

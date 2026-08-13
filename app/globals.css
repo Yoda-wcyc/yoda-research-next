@@ -143,18 +143,57 @@ html[data-theme="light"] .btn-gold{color:#fff}
 .hexbtn:hover{transform:translateY(-2px)}
 
 /* ── 首頁六角按鈕：中心「簡報」固定，四顆繞行（30s/圈）＋ 微幅飄浮；hover 全部暫停好點擊 ── */
-.hexorbit{position:absolute;left:50%;top:50%;width:0;height:0;animation:orbSpin 120s linear infinite}
-@keyframes orbSpin{from{transform:rotate(var(--start))}to{transform:rotate(calc(var(--start) + 360deg))}}
-.hexarm{position:absolute;left:0;top:0;width:0;height:0;animation:orbArm 120s linear infinite}
-@keyframes orbArm{from{transform:translateY(calc(-1*var(--R))) rotate(calc(-1*var(--start)))}to{transform:translateY(calc(-1*var(--R))) rotate(calc(-1*var(--start) - 360deg))}}
+.hexorbit{position:absolute;left:50%;top:50%;width:0;height:0;transform:rotate(var(--start,0deg));animation:orbSpin 120s var(--delay,0s) linear infinite}
+@keyframes orbSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.hexarm{position:absolute;left:0;top:0;width:0;height:0;transform:translateY(calc(-1*var(--R0))) rotate(calc(-1*var(--start,0deg)));animation:orbArm 120s var(--delay,0s) linear infinite}
+/* 不規則軌道(手繪感)：半徑隨角度小幅起伏,烘焙成步階;四顆共用、靠 --delay 差 ¼ 週期＝相位差90° */
+@keyframes orbArm{
+  0.0000%{transform:translateY(calc(var(--cw) * -0.3877)) rotate(-0.000deg)}
+  2.7778%{transform:translateY(calc(var(--cw) * -0.3874)) rotate(-10.000deg)}
+  5.5556%{transform:translateY(calc(var(--cw) * -0.3878)) rotate(-20.000deg)}
+  8.3333%{transform:translateY(calc(var(--cw) * -0.3861)) rotate(-30.000deg)}
+  11.1111%{transform:translateY(calc(var(--cw) * -0.3804)) rotate(-40.000deg)}
+  13.8889%{transform:translateY(calc(var(--cw) * -0.3741)) rotate(-50.000deg)}
+  16.6667%{transform:translateY(calc(var(--cw) * -0.3718)) rotate(-60.000deg)}
+  19.4444%{transform:translateY(calc(var(--cw) * -0.3724)) rotate(-70.000deg)}
+  22.2222%{transform:translateY(calc(var(--cw) * -0.3694)) rotate(-80.000deg)}
+  25.0000%{transform:translateY(calc(var(--cw) * -0.3608)) rotate(-90.000deg)}
+  27.7778%{transform:translateY(calc(var(--cw) * -0.3540)) rotate(-100.000deg)}
+  30.5556%{transform:translateY(calc(var(--cw) * -0.3591)) rotate(-110.000deg)}
+  33.3333%{transform:translateY(calc(var(--cw) * -0.3762)) rotate(-120.000deg)}
+  36.1111%{transform:translateY(calc(var(--cw) * -0.3934)) rotate(-130.000deg)}
+  38.8889%{transform:translateY(calc(var(--cw) * -0.3977)) rotate(-140.000deg)}
+  41.6667%{transform:translateY(calc(var(--cw) * -0.3883)) rotate(-150.000deg)}
+  44.4444%{transform:translateY(calc(var(--cw) * -0.3754)) rotate(-160.000deg)}
+  47.2222%{transform:translateY(calc(var(--cw) * -0.3690)) rotate(-170.000deg)}
+  50.0000%{transform:translateY(calc(var(--cw) * -0.3695)) rotate(-180.000deg)}
+  52.7778%{transform:translateY(calc(var(--cw) * -0.3709)) rotate(-190.000deg)}
+  55.5556%{transform:translateY(calc(var(--cw) * -0.3706)) rotate(-200.000deg)}
+  58.3333%{transform:translateY(calc(var(--cw) * -0.3715)) rotate(-210.000deg)}
+  61.1111%{transform:translateY(calc(var(--cw) * -0.3755)) rotate(-220.000deg)}
+  63.8889%{transform:translateY(calc(var(--cw) * -0.3795)) rotate(-230.000deg)}
+  66.6667%{transform:translateY(calc(var(--cw) * -0.3791)) rotate(-240.000deg)}
+  69.4444%{transform:translateY(calc(var(--cw) * -0.3757)) rotate(-250.000deg)}
+  72.2222%{transform:translateY(calc(var(--cw) * -0.3762)) rotate(-260.000deg)}
+  75.0000%{transform:translateY(calc(var(--cw) * -0.3829)) rotate(-270.000deg)}
+  77.7778%{transform:translateY(calc(var(--cw) * -0.3887)) rotate(-280.000deg)}
+  80.5556%{transform:translateY(calc(var(--cw) * -0.3835)) rotate(-290.000deg)}
+  83.3333%{transform:translateY(calc(var(--cw) * -0.3672)) rotate(-300.000deg)}
+  86.1111%{transform:translateY(calc(var(--cw) * -0.3517)) rotate(-310.000deg)}
+  88.8889%{transform:translateY(calc(var(--cw) * -0.3496)) rotate(-320.000deg)}
+  91.6667%{transform:translateY(calc(var(--cw) * -0.3618)) rotate(-330.000deg)}
+  94.4444%{transform:translateY(calc(var(--cw) * -0.3775)) rotate(-340.000deg)}
+  97.2222%{transform:translateY(calc(var(--cw) * -0.3863)) rotate(-350.000deg)}
+  100.0000%{transform:translateY(calc(var(--cw) * -0.3877)) rotate(-360.000deg)}
+}
 .hexcenter{position:absolute;left:0;top:0;transform:translate(-50%,-50%)}
 .orbiter{display:flex;align-items:center;justify-content:center;text-decoration:none;animation:hexFloat var(--fdur,6s) ease-in-out var(--fdelay,0s) infinite;will-change:transform;transition:filter .15s}
 .orbiter:hover{filter:brightness(1.15)}
 @keyframes hexFloat{0%,100%{transform:translate(0,0)}50%{transform:translate(var(--fx,0px),var(--fy,0px))}}
 .hero-cta:hover .hexorbit,.hero-cta:hover .hexarm,.hero-cta:hover .orbiter{animation-play-state:paused}
 @media (prefers-reduced-motion:reduce){
-  .hexorbit{animation:none;transform:rotate(var(--start))}
-  .hexarm{animation:none;transform:translateY(calc(-1*var(--R))) rotate(calc(-1*var(--start)))}
+  .hexorbit{animation:none}
+  .hexarm{animation:none}
   .orbiter{animation:none}
 }
 
