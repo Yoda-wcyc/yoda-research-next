@@ -352,29 +352,57 @@ export default function Home() {
   <br />
   解碼美股與台股的真實訊號
 </p>
-        <div className="hero-cta reveal" style={{ position:"relative", width:"min(350px, 92vw)", margin:"0 auto", aspectRatio:"350 / 242.48" }}>
-          {mounted && [
-            { label:"簡報",         href:d.latestBrief,             kind:"gold", left:"30%", top:"25%", fs:"clamp(12px,4vw,16px)" },
-            { label:"免費訂閱簡報", href:"#subscribe",               kind:"dark", left:"0%",  top:"0%",  fs:"clamp(8px,3vw,12px)" },
-            { label:"會員專區",     href:BASE + "/-/會員專區.html",   kind:"dark", left:"60%", top:"0%",  fs:"clamp(12px,4vw,15px)" },
-            { label:"付費訂閱",     href:BASE + "/-/subscribe.html", kind:"paid", left:"0%",  top:"50%", fs:"clamp(12px,4vw,15px)" },
-            { label:"付費報告總覽", href:"/archive?tab=付費版",      kind:"dark", left:"60%", top:"50%", fs:"clamp(8px,3vw,12px)" },
-          ].map((h, i) => {
-            const stops = h.kind === "gold" ? ["#ffd54a", "#c8901c"] : h.kind === "paid" ? ["#8b5cf6", "#ec4899"] : ["#252c3a", "#0a0d12"];
-            const stroke = h.kind === "gold" ? "#c8901c" : h.kind === "paid" ? "#c94fbf" : "#e0a526";
-            const color = h.kind === "gold" ? "#000" : h.kind === "paid" ? "#fff" : "#e0a526";
-            const gid = "hx" + i;
-            return (
-              <a key={h.label} href={h.href} className="hexbtn"
-                 style={{ position:"absolute", left:h.left, top:h.top, width:"40%", height:"50%", display:"flex", alignItems:"center", justifyContent:"center", textDecoration:"none" }}>
+        <div className="hero-cta reveal" style={{ position:"relative", width:"min(360px, 92vw)", ["--cw"]:"min(360px, 92vw)", ["--R"]:"calc(var(--cw) * 0.36)", aspectRatio:"1 / 1", margin:"6px auto", overflow:"visible" }}>
+          {mounted && (() => {
+            const KIND = {
+              gold:    { stops:["#ffd54a","#c8901c"], stroke:"#c8901c", color:"#000" },
+              dark:    { stops:["#252c3a","#0a0d12"], stroke:"#e0a526", color:"#e0a526" },
+              paid:    { stops:["#8b5cf6","#ec4899"], stroke:"#c94fbf", color:"#fff" },
+              member:  { stops:["#22d3ee","#38bdf8"], stroke:"#0ea5e9", color:"#052436" },
+              archive: { stops:["#34d399","#22c55e"], stroke:"#16a34a", color:"#052312" },
+              blue:    { stops:["#3b82f6","#1d4ed8"], stroke:"#60a5fa", color:"#fff" },
+            };
+            const hex = (h, gid) => {
+              const k = KIND[h.kind] || KIND.dark;
+              const stops = k.stops, stroke = k.stroke, color = k.color;
+              return (<>
                 <svg viewBox="0 0 100 86.6" style={{ position:"absolute", inset:0, width:"100%", height:"100%" }} aria-hidden="true">
                   <defs><linearGradient id={gid} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={stops[0]} /><stop offset="1" stopColor={stops[1]} /></linearGradient></defs>
                   <polygon points="25,0 75,0 100,43.3 75,86.6 25,86.6 0,43.3" fill={"url(#" + gid + ")"} stroke={stroke} strokeWidth="5" strokeLinejoin="round" />
                 </svg>
                 <span style={{ position:"relative", zIndex:1, fontWeight:700, lineHeight:1.2, textAlign:"center", padding:"0 6px", color:color, fontSize:h.fs }}>{h.label}</span>
+              </>);
+            };
+            const center = { label:"會員專區", href:BASE + "/-/會員專區.html", kind:"gold", fs:"clamp(12px,4vw,15px)" };
+            const orbiters = [
+              { label:"免費訂閱簡報", href:"#subscribe",               kind:"dark",    fs:"clamp(8px,3vw,12px)" },
+              { label:"簡報",         href:d.latestBrief,             kind:"blue",    fs:"clamp(12px,4vw,16px)" },
+              { label:"付費訂閱",     href:BASE + "/-/subscribe.html", kind:"paid",    fs:"clamp(12px,4vw,15px)" },
+              { label:"付費報告總覽", href:"/archive?tab=付費版",      kind:"archive", fs:"clamp(8px,3vw,12px)" },
+            ];
+            const CW = "calc(var(--cw) * 0.38)", CH = "calc(var(--cw) * 0.38 / 1.1547)";
+            const OW = "calc(var(--cw) * 0.30)", OH = "calc(var(--cw) * 0.30 / 1.1547)";
+            return (<>
+              <a href={center.href} className="hexbtn"
+                 style={{ position:"absolute", left:"50%", top:"50%", transform:"translate(-50%,-50%)", width:CW, height:CH, display:"flex", alignItems:"center", justifyContent:"center", textDecoration:"none", zIndex:2 }}>
+                {hex(center, "hxC")}
               </a>
-            );
-          })}
+              {orbiters.map((h, i) => (
+                <div key={h.label} className="hexorbit" style={{ ["--start"]: (i * 90) + "deg" }}>
+                  <div className="hexarm">
+                    <div className="hexcenter">
+                      <a href={h.href} className="orbiter"
+                         style={{ position:"relative", width:OW, height:OH,
+                                  ["--fdur"]: (5.5 + i * 0.8) + "s", ["--fdelay"]: (-i * 1.3) + "s",
+                                  ["--fx"]: ((i % 2 ? 1 : -1) * 3) + "px", ["--fy"]: ((i < 2 ? -1 : 1) * 4) + "px" }}>
+                        {hex(h, "hx" + i)}
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </>);
+          })()}
         </div>
       <div style={{ position:"fixed", bottom:"18px", left:0, right:0, textAlign:"center", pointerEvents:"none", zIndex:50 }}>
           <span style={{ fontSize:"calc(24px*var(--scale))", color:"var(--gold-lg)", opacity:.75, display:"block", lineHeight:1, animation:"arrow-bob 2s ease-in-out infinite" }}>⌄</span>

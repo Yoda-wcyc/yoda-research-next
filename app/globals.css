@@ -142,6 +142,22 @@ html[data-theme="light"] .btn-gold{color:#fff}
 .hexbtn{transition:transform .12s}
 .hexbtn:hover{transform:translateY(-2px)}
 
+/* ── 首頁六角按鈕：中心「簡報」固定，四顆繞行（30s/圈）＋ 微幅飄浮；hover 全部暫停好點擊 ── */
+.hexorbit{position:absolute;left:50%;top:50%;width:0;height:0;animation:orbSpin 120s linear infinite}
+@keyframes orbSpin{from{transform:rotate(var(--start))}to{transform:rotate(calc(var(--start) + 360deg))}}
+.hexarm{position:absolute;left:0;top:0;width:0;height:0;animation:orbArm 120s linear infinite}
+@keyframes orbArm{from{transform:translateY(calc(-1*var(--R))) rotate(calc(-1*var(--start)))}to{transform:translateY(calc(-1*var(--R))) rotate(calc(-1*var(--start) - 360deg))}}
+.hexcenter{position:absolute;left:0;top:0;transform:translate(-50%,-50%)}
+.orbiter{display:flex;align-items:center;justify-content:center;text-decoration:none;animation:hexFloat var(--fdur,6s) ease-in-out var(--fdelay,0s) infinite;will-change:transform;transition:filter .15s}
+.orbiter:hover{filter:brightness(1.15)}
+@keyframes hexFloat{0%,100%{transform:translate(0,0)}50%{transform:translate(var(--fx,0px),var(--fy,0px))}}
+.hero-cta:hover .hexorbit,.hero-cta:hover .hexarm,.hero-cta:hover .orbiter{animation-play-state:paused}
+@media (prefers-reduced-motion:reduce){
+  .hexorbit{animation:none;transform:rotate(var(--start))}
+  .hexarm{animation:none;transform:translateY(calc(-1*var(--R))) rotate(calc(-1*var(--start)))}
+  .orbiter{animation:none}
+}
+
 /* ===== 儀表板 ===== */
 .dash{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
 .dash2{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
