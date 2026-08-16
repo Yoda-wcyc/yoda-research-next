@@ -37,6 +37,7 @@ export async function POST(req) {
         paid_periods: m.paid_periods, referred_paid_count: m.referred_paid_count,
         earned_months: computeEarnedMonths(pp, rpc), granted: Number(m.earned_free_months) || 0,
         next_charge_date: fmtDate(m.next_charge_date),
+        ex_founding: m.ex_founding || '',
         certs: { mw: fmtDate(m.cert_mw), tw: fmtDate(m.cert_tw), us: fmtDate(m.cert_us), key: fmtDate(m.cert_key), macro: fmtDate(m.cert_macro) },
       };
     });
