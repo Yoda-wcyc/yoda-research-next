@@ -1046,6 +1046,19 @@ function renderEcpaySync(r,applied){
       }).join('')+'</div>';
     if(!applied) h+='<div style="margin:10px 0"><button class="mini-act" style="color:var(--red,#ff453a);border-color:var(--red,#ff453a)" onclick="applyEcpaySync()">套用：把上列 '+r.goneCount+' 位標為已取消</button></div>';
   }
+  // ★正面回報：直接告訴你「已向綠界核對 N 位的實際每期扣款金額，各是多少」。
+  //   「沒有警告」不等於「已確認」——這一段才是你要的那個確認。
+  if(r.priceCheckedCount){
+    var bd=r.priceBreakdown||{};
+    var rows=Object.keys(bd).sort().map(function(k){return '　　'+escH(k)+' × <b>'+bd[k]+'</b> 位';});
+    h+='<div class="hintbox" style="border-color:'+(r.priceMismatchCount?'var(--red,#ff453a)':'var(--green,#30d158)')+'">'
+      +(r.priceMismatchCount
+        ? ('⚠ 已向綠界核對 <b>'+r.priceCheckedCount+'</b> 位的實際每期扣款金額：<b>'+r.priceOkCount+'</b> 位相符、<b style="color:var(--red,#ff453a)">'+r.priceMismatchCount+'</b> 位不符')
+        : ('✓ 已向綠界核對 <b>'+r.priceCheckedCount+'</b> 位的實際每期扣款金額，<b>全部相符</b>'))
+      +'<br>'+rows.join('<br>')
+      +'<br><span style="color:var(--dim)">這是綠界回報的「那張訂單每期實際扣多少」，不是我們自己的紀錄——'
+      +'所以看到創始 NT$459 就是真的還在扣 459。</span></div>';
+  }
   if(r.priceMismatchCount){
     // 綠界那張訂單每期實際扣多少 vs 這位會員的方案應該扣多少。
     // 這是「創始會員是不是還在 459」唯一能自動核對的地方——程式端不會改金額，
