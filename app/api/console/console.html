@@ -1009,6 +1009,23 @@ function renderEcpaySync(r,applied){
       }).join('')+'</div>';
     if(!applied) h+='<div style="margin:10px 0"><button class="mini-act" style="color:var(--red,#ff453a);border-color:var(--red,#ff453a)" onclick="applyEcpaySync()">套用：把上列 '+r.goneCount+' 位標為已取消</button></div>';
   }
+  if(r.mismatchCount){
+    // 綠界說扣成功幾期 vs 我們帳面幾期。對不上＝有某一期通知沒送達，那期就靜靜地不見了。
+    h+='<div class="hintbox" style="border-color:var(--red,#ff453a)">⚠ <b>'+r.mismatchCount+'</b> 位的期數與綠界對不上'
+      +'——代表有某一期的扣款通知沒送達我們這邊：<div class="recon-card" style="margin-top:8px">'
+      +r.mismatched.map(function(m){
+        var diff=(m.totalSuccessTimes||0)-(m.paidPeriods||0);
+        return '<div class="recon-row"><div class="recon-info">'
+          +'<div class="n">'+escH(m.email)+' <span class="id">'+escH(m.memberId)+'</span> '
+          +'<span class="pill late">綠界 '+(m.totalSuccessTimes||0)+' 期／我們 '+(m.paidPeriods||0)+' 期</span></div>'
+          +'<div class="m">'+(diff>0?('會員已被多扣 '+diff+' 期但我們沒記到，到期日少推了 '+diff+' 個月——他可能已被鎖在門外')
+                                     :('我們比綠界多記 '+(-diff)+' 期，權益給多了'))
+          +' · 權益到 '+escH(m.nextChargeDate||'—')+'</div>'
+          +'</div><div class="recon-btns">'
+          +(diff>0?('<button class="rb ok" onclick=\'giftMonth("'+escJs(m.memberId)+'")\'>補推 1 個月</button>'):'')
+          +'</div></div>';
+      }).join('')+'</div></div>';
+  }
   if(r.failedCount) h+='<div class="hintbox">查詢失敗 '+r.failedCount+' 筆（'+r.failed.map(function(m){return escH(m.memberId);}).join('、')+'）——沒查到就<b>不會</b>被動到，請稍後再跑一次。</div>';
   if(r.noTradeCount){
     // 查無單號＝Payments 沒有綠界扣款紀錄。這批不會被動到，但要盯「有沒有已經被寬限規則擋住」

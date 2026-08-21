@@ -43,7 +43,10 @@ export async function POST(req) {
     ReturnURL: returnURL,
     ChoosePayment: 'Credit',
     ClientBackURL: clientBack,
-    CustomField1: email, // 用來對應會員
+    // 用來對應會員。CustomField 每欄上限 50 字，超長 email 會被綠界默默截斷 →
+    // 回拋時對不到會員，錢就變成「孤兒付款」。所以超過 50 字就拆兩欄，收通知時再接回來。
+    CustomField1: email.slice(0, 50),
+    CustomField2: email.length > 50 ? email.slice(50, 100) : '',
     EncryptType: 1,
     // ── 信用卡定期定額 ──
     PeriodAmount: 459,

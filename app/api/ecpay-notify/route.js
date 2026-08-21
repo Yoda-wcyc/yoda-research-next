@@ -32,11 +32,16 @@ export async function POST(req) {
         body: JSON.stringify({
           action: 'markPaid',
           secret: (process.env.GAS_SHARED_SECRET || '').trim(),
-          email: params.CustomField1 || '',
-          amount: params.TradeAmt || params.PeriodAmount || '',
+          // email 拆兩段送：CustomField 單欄上限 50 字，超長 email 會被綠界截斷而對不到會員
+          email: ((params.CustomField1 || '') + (params.CustomField2 || '')).trim(),
+          // ★每期扣款的金額欄位叫 Amount（本次授權金額），不是 TradeAmt——
+          //   只讀 TradeAmt 的話，續扣那幾筆會記成 0 元，累計入帳就會低報
+          amount: params.TradeAmt || params.Amount || params.PeriodAmount || '',
           tradeNo: params.MerchantTradeNo || '',
-          gwsr: params.Gwsr || '',
-          payDate: params.PaymentDate || '',
+          gwsr: params.Gwsr || params.gwsr || '',   // 定期定額通知是小寫 gwsr
+          payDate: params.PaymentDate || params.ProcessDate || '',
+          // 首期＝1；續扣時綠界會帶累計成功次數，交給 GAS 判斷這是第幾期
+          totalSuccessTimes: params.TotalSuccessTimes || '',
         }),
       });
     } catch (e) {
