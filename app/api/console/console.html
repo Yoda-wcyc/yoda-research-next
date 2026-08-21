@@ -378,11 +378,11 @@ tr:hover td{background:var(--surface2)}
     <div class="tbl-wrap">
       <table>
         <thead><tr>
-          <th>編號</th><th>會員</th><th>方案</th><th>狀態</th>
-          <th>首次付款</th><th>最近付款</th><th>已扣款</th>
+          <th>編號</th><th>會員</th><th>方案</th><th>狀態</th><th>訂閱起始</th>
+          <th>首次付款</th><th>最近付款</th><th title="帳面記的期數 vs 綠界實際扣款筆數，對不上就要查">期數<br><span style="font-weight:400;color:var(--dim)">帳面／綠界</span></th>
           <th>權益到期日</th><th>剩餘</th><th>通知信</th>
         </tr></thead>
-        <tbody id="subBody"><tr><td colspan="10"><div class="empty">按「↻ 重新整理」載入</div></td></tr></tbody>
+        <tbody id="subBody"><tr><td colspan="11"><div class="empty">按「↻ 重新整理」載入</div></td></tr></tbody>
       </table>
     </div>
   </div>
@@ -1098,11 +1098,11 @@ function saveAdd(){
    狀態全部在 GAS 端算好（adminSubscriptionTable），前端只負責顯示與篩選。 */
 var subsData=null;
 function loadSubs(){
-  var box=$('subBody'); if(box) box.innerHTML='<tr><td colspan="10"><div class="empty">載入中…</div></td></tr>';
+  var box=$('subBody'); if(box) box.innerHTML='<tr><td colspan="11"><div class="empty">載入中…</div></td></tr>';
   post({action:'adminSubscriptionTable',key:KEY}).then(function(r){
-    if(!r||!r.ok){ box.innerHTML='<tr><td colspan="10"><div class="empty">讀取失敗：'+escH((r&&r.error)||'unknown action（GAS 可能尚未部署新版本）')+'</div></td></tr>'; return; }
+    if(!r||!r.ok){ box.innerHTML='<tr><td colspan="11"><div class="empty">讀取失敗：'+escH((r&&r.error)||'unknown action（GAS 可能尚未部署新版本）')+'</div></td></tr>'; return; }
     subsData=r; renderSubs();
-  }).catch(function(){ box.innerHTML='<tr><td colspan="10"><div class="empty">連線失敗</div></td></tr>'; });
+  }).catch(function(){ box.innerHTML='<tr><td colspan="11"><div class="empty">連線失敗</div></td></tr>'; });
 }
 function subsFiltered(){
   if(!subsData)return[];
@@ -1138,7 +1138,7 @@ function renderSubs(){
        +'</b> 人在 Payments 裡查無綠界扣款紀錄。若你沒有人工收款，這代表這些人的綠界扣款成功通知沒進到系統'
        +'（通知漏送，或付款填的 email 與帳號不同）——請用篩選「查無綠界扣款紀錄」看是誰，再去綠界後台對帳。</div>'):'');
 
-  if(!list.length){ box.innerHTML='<tr><td colspan="10"><div class="empty">沒有符合的會員</div></td></tr>'; return; }
+  if(!list.length){ box.innerHTML='<tr><td colspan="11"><div class="empty">沒有符合的會員</div></td></tr>'; return; }
   var COL={active:'var(--green,#30d158)',cancelledInGrace:'var(--gold,#e0a526)',lapsed:'var(--amber,#ff9f0a)',expired:'var(--dim,#a1a1a6)',pending:'var(--dim,#a1a1a6)'};
   box.innerHTML=list.map(function(m){
     var col=COL[m.state]||'var(--dim,#a1a1a6)';
@@ -1149,9 +1149,13 @@ function renderSubs(){
       +'<td><div>'+escH(m.name||'—')+'</div><div class="email">'+escH(m.email)+'</div></td>'
       +'<td>'+escH(m.plan||'—')+'</td>'
       +'<td><span class="pill" style="border-color:'+col+';color:'+col+'">'+escH(m.stateLabel)+'</span></td>'
+      +'<td>'+escH(m.startDate||'—')+'</td>'
       +'<td>'+(m.firstPaidAt?escH(m.firstPaidAt):'<span style="color:var(--amber,#ff9f0a)">查無</span>')+'</td>'
       +'<td>'+(m.lastPaidAt?escH(m.lastPaidAt):'—')+'</td>'
-      +'<td>'+m.payCount+' 次'+(m.paidAmount?('<div class="email">NT$'+Number(m.paidAmount).toLocaleString()+'</div>'):'')+'</td>'
+      // 帳面期數 vs 綠界實際扣款筆數：對不上就是「後台手動建檔」或「綠界通知沒送達」
+      +'<td>'+(m.paidPeriods===m.payCount?(m.paidPeriods+' ／ '+m.payCount)
+              :('<span style="color:var(--amber,#ff9f0a)">'+m.paidPeriods+' ／ '+m.payCount+'</span>'))
+        +(m.paidAmount?('<div class="email">NT$'+Number(m.paidAmount).toLocaleString()+'</div>'):'')+'</td>'
       +'<td>'+escH(m.accessUntil||'（空白）')+'</td>'
       +'<td>'+left+'</td>'
       +'<td>'+(m.willNotify?'<span style="color:var(--green,#30d158)">會寄</span>'
