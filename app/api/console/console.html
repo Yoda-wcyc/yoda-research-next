@@ -898,7 +898,26 @@ function renderEcpaySync(r,applied){
     if(!applied) h+='<div style="margin:10px 0"><button class="mini-act" style="color:var(--red,#ff453a);border-color:var(--red,#ff453a)" onclick="applyEcpaySync()">套用：把上列 '+r.goneCount+' 位標為已取消</button></div>';
   }
   if(r.failedCount) h+='<div class="hintbox">查詢失敗 '+r.failedCount+' 筆（'+r.failed.map(function(m){return escH(m.memberId);}).join('、')+'）——沒查到就<b>不會</b>被動到，請稍後再跑一次。</div>';
-  if(r.noTradeCount) h+='<div class="hintbox">查無綠界單號 '+r.noTradeCount+' 筆（'+r.noTrade.map(function(m){return escH(m.memberId);}).join('、')+'）——多半是離線／創始付費者，本來就沒走綠界，不會被動到。</div>';
+  if(r.noTradeCount){
+    // 查無單號＝Payments 沒有綠界扣款紀錄。這批不會被動到，但要盯「有沒有已經被寬限規則擋住」
+    var blocked=r.noTrade.filter(function(m){return m.blocked;});
+    h+='<div class="hintbox">查無綠界單號 <b>'+r.noTradeCount+'</b> 筆——Payments 裡沒有這些人的綠界扣款紀錄，'
+      +'可能是人工／離線收款、系統上線前的老會員，也可能是綠界通知沒送達或付款 email 與帳號不同。'
+      +'<b>這批不會被動到</b>。</div>'
+      +'<div class="recon-card">'+r.noTrade.map(function(m){
+        return '<div class="recon-row"><div class="recon-info">'
+          +'<div class="n">'+escH(m.email)+' <span class="id">'+escH(m.memberId)+'</span> '
+          +(m.blocked?'<span class="pill late">已被擋住·讀不到報告</span>':'<span class="pill">權益有效</span>')+'</div>'
+          +'<div class="m">'+escH(m.plan||'—')+' · 連續 '+(m.paidPeriods||0)+' 期 · 權益到 '+escH(m.nextChargeDate||'（空白）')
+          +(m.overdueDays>0?('　逾期 '+m.overdueDays+' 天'):'')+'</div>'
+          +'</div><div class="recon-btns">'
+          +(m.blocked?'<button class="rb ok" onclick=\'giftMonth("'+escJs(m.memberId)+'")\'>贈送 1 月·恢復權益</button>':'')
+          +'</div></div>';
+      }).join('')+'</div>';
+    if(blocked.length) h+='<div class="hintbox" style="border-color:var(--amber,#ff9f0a)">⚠ 其中 <b>'+blocked.length+'</b> 位的扣款日已過寬限，'
+      +'<b>現在讀不到報告、也收不到通知信</b>。如果他們是你人工收款的，請按「贈送 1 月」或直接把 Sheet 的下次扣款日往後改，'
+      +'否則就是我們占了會員便宜。</div>';
+  }
   box.innerHTML=h;
 }
 function loadEcpaySync(){
