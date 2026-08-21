@@ -307,6 +307,7 @@ tr:hover td{background:var(--surface2)}
     <div class="tabrow">
       <button class="tab active" data-v="dash">總覽</button>
       <button class="tab" data-v="members">會員名單</button>
+      <button class="tab" data-v="subs">訂閱總表</button>
       <button class="tab" data-v="recon">本月對帳 <span class="badge" id="reconBadge"></span></button>
       <button class="tab" data-v="rewards">推薦與獎勵 <span class="badge amber" id="rewardBadge"></span></button>
       <button class="tab" data-v="support">客服工單 <span class="badge" id="supBadge"></span></button>
@@ -351,6 +352,37 @@ tr:hover td{background:var(--surface2)}
           <th>下次扣款</th><th>推薦人</th><th>帶進付費</th><th>應送月</th><th></th>
         </tr></thead>
         <tbody id="memBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 訂閱總表：每人的付款日 / 權益到期日 / 還會不會收到通知信 -->
+  <div class="view" id="v-subs">
+    <div class="toolbar">
+      <input class="search" id="subSearch" placeholder="搜尋暱稱 / Email / 會員編號…" oninput="renderSubs()">
+      <select class="filter" id="subFilter" onchange="renderSubs()">
+        <option value="all" selected>全部</option>
+        <option value="active">訂閱中</option>
+        <option value="cancelledInGrace">已取消·權益到期末</option>
+        <option value="expired">已結束</option>
+        <option value="lapsed">逾期未對帳</option>
+        <option value="pending">待開通</option>
+        <option value="notify">會收到通知信</option>
+        <option value="nopay">查無綠界扣款紀錄</option>
+      </select>
+      <span id="subCount" style="font-size:13px;color:var(--dim);font-weight:600;white-space:nowrap"></span>
+      <button class="btn-done" onclick="copySubsCsv()">📋 複製為 CSV</button>
+      <button class="btn-done" onclick="loadSubs()">↻ 重新整理</button>
+    </div>
+    <div id="subSummary"></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>編號</th><th>會員</th><th>方案</th><th>狀態</th>
+          <th>首次付款</th><th>最近付款</th><th>已扣款</th>
+          <th>權益到期日</th><th>剩餘</th><th>通知信</th>
+        </tr></thead>
+        <tbody id="subBody"><tr><td colspan="10"><div class="empty">按「↻ 重新整理」載入</div></td></tr></tbody>
       </table>
     </div>
   </div>
@@ -1061,6 +1093,88 @@ function saveAdd(){
   }).catch(()=>toast('連線失敗'));
 }
 
+/* ===== 訂閱總表 =====
+   每個人的付款日、權益到期日、剩餘天數、還會不會收到通知信。
+   狀態全部在 GAS 端算好（adminSubscriptionTable），前端只負責顯示與篩選。 */
+var subsData=null;
+function loadSubs(){
+  var box=$('subBody'); if(box) box.innerHTML='<tr><td colspan="10"><div class="empty">載入中…</div></td></tr>';
+  post({action:'adminSubscriptionTable',key:KEY}).then(function(r){
+    if(!r||!r.ok){ box.innerHTML='<tr><td colspan="10"><div class="empty">讀取失敗：'+escH((r&&r.error)||'unknown action（GAS 可能尚未部署新版本）')+'</div></td></tr>'; return; }
+    subsData=r; renderSubs();
+  }).catch(function(){ box.innerHTML='<tr><td colspan="10"><div class="empty">連線失敗</div></td></tr>'; });
+}
+function subsFiltered(){
+  if(!subsData)return[];
+  var q=(($('subSearch')||{}).value||'').trim().toLowerCase(), f=(($('subFilter')||{}).value||'all');
+  return subsData.members.filter(function(m){
+    if(q && (m.email+' '+m.name+' '+m.memberId).toLowerCase().indexOf(q)<0) return false;
+    if(f==='all') return true;
+    if(f==='notify') return m.willNotify;
+    if(f==='nopay') return !m.hasEcpayRecord;
+    return m.state===f;
+  });
+}
+function renderSubs(){
+  var box=$('subBody'); if(!box||!subsData)return;
+  var s=subsData.summary, list=subsFiltered();
+  var cnt=$('subCount'); if(cnt) cnt.textContent='顯示 '+list.length+' / 共 '+s.total+' 人';
+
+  var pill=function(txt,col){return '<span class="pill" style="border-color:'+col+';color:'+col+'">'+txt+'</span>';};
+  var sm=$('subSummary');
+  if(sm) sm.innerHTML='<div class="hintbox" style="line-height:2">'
+    +'<b style="font-size:14px">共 '+s.total+' 人</b>　'
+    +pill('訂閱中 '+s.active,'var(--green,#30d158)')+' '
+    +pill('已取消·權益到期末 '+s.cancelledInGrace,'var(--gold,#e0a526)')+' '
+    +pill('已結束 '+s.expired,'var(--dim,#a1a1a6)')+' '
+    +(s.lapsed?pill('逾期未對帳 '+s.lapsed,'var(--amber,#ff9f0a)')+' ':'')
+    +(s.pending?pill('待開通 '+s.pending,'var(--dim,#a1a1a6)')+' ':'')
+    +'<br><b style="color:var(--green,#30d158)">'+s.willNotify+'</b> 人下一封通知信會收到'
+    +(s.optedOut?('（另有 '+s.optedOut+' 人自行關閉通知）'):'')
+    +'　·　Payments 累計入帳 <b>NT$'+Number(s.revenue||0).toLocaleString()+'</b>'
+    +'　·　基準日 '+escH(subsData.today)+'（寬限 '+subsData.graceDays+' 天）'
+    +'</div>'
+    +(s.noPayRecord?('<div class="hintbox" style="border-color:var(--amber,#ff9f0a)">⚠ <b>'+s.noPayRecord
+       +'</b> 人在 Payments 裡查無綠界扣款紀錄。若你沒有人工收款，這代表這些人的綠界扣款成功通知沒進到系統'
+       +'（通知漏送，或付款填的 email 與帳號不同）——請用篩選「查無綠界扣款紀錄」看是誰，再去綠界後台對帳。</div>'):'');
+
+  if(!list.length){ box.innerHTML='<tr><td colspan="10"><div class="empty">沒有符合的會員</div></td></tr>'; return; }
+  var COL={active:'var(--green,#30d158)',cancelledInGrace:'var(--gold,#e0a526)',lapsed:'var(--amber,#ff9f0a)',expired:'var(--dim,#a1a1a6)',pending:'var(--dim,#a1a1a6)'};
+  box.innerHTML=list.map(function(m){
+    var col=COL[m.state]||'var(--dim,#a1a1a6)';
+    var left=(m.daysLeft===null)?'—':(m.daysLeft<0?('<span style="color:var(--red,#ff453a)">已過 '+(-m.daysLeft)+' 天</span>')
+              :(m.daysLeft<=7?('<span style="color:var(--amber,#ff9f0a)">'+m.daysLeft+' 天</span>'):(m.daysLeft+' 天')));
+    return '<tr>'
+      +'<td>'+escH(m.memberId)+(m.exFounding?' <span title="曾取消訂閱·已排除創始">🌱</span>':'')+'</td>'
+      +'<td><div>'+escH(m.name||'—')+'</div><div class="email">'+escH(m.email)+'</div></td>'
+      +'<td>'+escH(m.plan||'—')+'</td>'
+      +'<td><span class="pill" style="border-color:'+col+';color:'+col+'">'+escH(m.stateLabel)+'</span></td>'
+      +'<td>'+(m.firstPaidAt?escH(m.firstPaidAt):'<span style="color:var(--amber,#ff9f0a)">查無</span>')+'</td>'
+      +'<td>'+(m.lastPaidAt?escH(m.lastPaidAt):'—')+'</td>'
+      +'<td>'+m.payCount+' 次'+(m.paidAmount?('<div class="email">NT$'+Number(m.paidAmount).toLocaleString()+'</div>'):'')+'</td>'
+      +'<td>'+escH(m.accessUntil||'（空白）')+'</td>'
+      +'<td>'+left+'</td>'
+      +'<td>'+(m.willNotify?'<span style="color:var(--green,#30d158)">會寄</span>'
+              :(m.notifyOff?'<span style="color:var(--dim)">已退訂</span>':'<span style="color:var(--dim)">不寄</span>'))+'</td>'
+      +'</tr>';
+  }).join('');
+}
+function copySubsCsv(){
+  if(!subsData){toast('請先載入');return;}
+  var head=['會員編號','暱稱','Email','方案','狀態','訂閱起始日','首次付款','最近付款','扣款次數','累計金額','已付期數','權益到期日','剩餘天數','會收通知信','曾取消','綠界單號'];
+  var q=function(v){ v=(v===null||v===undefined)?'':String(v); return '"'+v.split('"').join('""')+'"'; };
+  var lines=[head.map(q).join(',')].concat(subsFiltered().map(function(m){
+    return [m.memberId,m.name,m.email,m.plan,m.stateLabel,m.startDate,m.firstPaidAt,m.lastPaidAt,
+            m.payCount,m.paidAmount,m.paidPeriods,m.accessUntil,m.daysLeft,(m.willNotify?'是':'否'),
+            (m.exFounding?'是':'否'),m.tradeNo].map(q).join(',');
+  }));
+  var csv='﻿'+lines.join('\n');   // BOM：Excel 開啟才不會中文亂碼
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(csv).then(function(){toast('已複製 '+(lines.length-1)+' 列，貼進 Excel / Google 試算表即可');},
+      function(){toast('複製失敗，請改用瀏覽器選取表格');});
+  } else toast('這個瀏覽器不支援直接複製');
+}
+
 /* ===== 導覽 / 通用 ===== */
 function switchView(v){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.v===v));
@@ -1071,6 +1185,7 @@ function switchView(v){
   if(v==='waitlist')loadWaitlist();
   if(v==='reports')loadReports();
   if(v==='paidreports')loadPaidReports();
+  if(v==='subs'&&!subsData)loadSubs();   // 第一次切進來自動載入，之後用「↻ 重新整理」
 }
 
 /* ===== 創始搶先名單 ===== */
