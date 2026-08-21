@@ -1043,6 +1043,22 @@ function renderEcpaySync(r,applied){
       }).join('')+'</div>';
     if(!applied) h+='<div style="margin:10px 0"><button class="mini-act" style="color:var(--red,#ff453a);border-color:var(--red,#ff453a)" onclick="applyEcpaySync()">套用：把上列 '+r.goneCount+' 位標為已取消</button></div>';
   }
+  if(r.priceMismatchCount){
+    // 綠界那張訂單每期實際扣多少 vs 這位會員的方案應該扣多少。
+    // 這是「創始會員是不是還在 459」唯一能自動核對的地方——程式端不會改金額，
+    // 但綠界後台可以人工改，所以要每天對一次，而不是靠記得。
+    h+='<div class="hintbox" style="border-color:var(--red,#ff453a)">💰 <b>'+r.priceMismatchCount+'</b> 位的每期扣款金額與方案不符'
+      +'<div class="recon-card" style="margin-top:8px">'
+      +r.priceMismatched.map(function(m){
+        var diff=(m.periodAmount||0)-(m.expectedAmount||0);
+        return '<div class="recon-row"><div class="recon-info">'
+          +'<div class="n">'+escH(m.email)+' <span class="id">'+escH(m.memberId)+'</span> '
+          +'<span class="pill late">'+escH(m.plan||'—')+' 應扣 '+(m.expectedAmount||0)+'，綠界實扣 '+(m.periodAmount||0)+'</span></div>'
+          +'<div class="m">'+(diff>0?('會員每月被多扣 '+diff+' 元'):('每月少收 '+(-diff)+' 元'))
+          +' · 訂單 '+escH(m.tradeNo||'—')+' · 要改請到綠界後台「信用卡定期定額管理 → 檢視/編輯」</div>'
+          +'</div></div>';
+      }).join('')+'</div></div>';
+  }
   if(r.mismatchCount){
     // 綠界說扣成功幾期 vs 我們帳面幾期。對不上＝有某一期通知沒送達，那期就靜靜地不見了。
     h+='<div class="hintbox" style="border-color:var(--red,#ff453a)">⚠ <b>'+r.mismatchCount+'</b> 位的期數與綠界對不上'
