@@ -859,7 +859,8 @@ function renderMemSummary(){
     +(s.pending?pill('待開通 '+s.pending,'var(--dim,#a1a1a6)')+' ':'')
     +'<br><b style="color:var(--green,#30d158)">'+s.willNotify+'</b> 人下一封通知信會收到'
     +(s.optedOut?('（另有 '+s.optedOut+' 人自行關閉通知）'):'')
-    +'　·　Payments 累計入帳 <b>NT$'+Number(s.revenue||0).toLocaleString()+'</b>'
+    +'　·　Payments 累計入帳 <b>NT$'+Number(s.revenueAll!==undefined?s.revenueAll:s.revenue||0).toLocaleString()+'</b>'
+    +(s.orphanAmount?('<span style="color:var(--dim)">（其中 NT$'+Number(s.orphanAmount).toLocaleString()+' 對不到會員）</span>'):'')
     +'　·　基準日 '+escH(subsInfo.today)+'（寬限 '+subsInfo.graceDays+' 天）</div>';
 
   // 對不上帳的兩側：會員查無付款 / 付款對不到會員。兩者筆數接近時多半就是 email 不一致。
