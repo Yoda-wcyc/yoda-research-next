@@ -1,4 +1,4 @@
-import { memberByEmail, hashPw, isPaidActive, watermarkOf } from '../../../lib/auth';
+import { memberByEmail, hashPw, isPaidActive, watermarkOf, tokenExp } from '../../../lib/auth';
 import { signJwt } from '../../../lib/jwt';
 import { J, preflight } from '../../../lib/cors';
 
@@ -33,7 +33,7 @@ export async function POST(req) {
     if (!isPaidActive(m)) return J(await gasFallback(email, password)); // Neon 顯示未付費→可能剛付款鏡像未更新→GAS 複查(正本)
     const wm = watermarkOf(m);
     const now = Math.floor(Date.now() / 1000);
-    const token = signJwt({ sub: m.pub_id || m.member_id, wm, iat: now, exp: now + 12 * 3600 }, process.env.JWT_SECRET || '');
+    const token = signJwt({ sub: m.pub_id || m.member_id, wm, iat: now, exp: tokenExp(m, now) }, process.env.JWT_SECRET || '');
     return J({ ok: true, allow: true, token, watermark: wm, memberId: m.pub_id || m.member_id, via: 'vercel' });
   }
 

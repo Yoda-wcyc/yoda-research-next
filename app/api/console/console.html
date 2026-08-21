@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- 這一頁的「網址本身就是憑證」（?k=CONSOLE_TOKEN）。頁面會載入 Google Fonts、也有連到
+     GA 的按鈕，任何一個外連都可能把完整網址放進 Referer 標頭送出去。現代瀏覽器預設只送 origin，
+     但這裡明確關掉，才不必依賴瀏覽器的預設值。 -->
+<meta name="referrer" content="no-referrer">
 <title>主控台 · Yoda Research</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -705,7 +709,18 @@ function loadFromGAS(){
     subsInfo=(sub&&sub.ok)?sub:null;
     if(subsInfo){
       var by={}; subsInfo.members.forEach(function(x){by[x.memberId]=x;});
-      members.forEach(function(m){ if(by[m.id]) m.sub=by[m.id]; });
+      members.forEach(function(m){ if(by[m.id]){ m.sub=by[m.id]; delete by[m.id]; } });
+      // 正本(GAS/Sheet)有、鏡像(Neon)還沒有的人——剛註冊或剛異動、鏡像來不及同步時會這樣。
+      // 不補的話會變成「摘要說 44 人、表格只列 43 列」，看起來像資料掉了。以正本為準補上。
+      Object.keys(by).forEach(function(id){
+        var s=by[id];
+        members.push({ id:s.memberId, pub:'', name:(String(s.email||'').split('@')[0]||s.memberId),
+          email:s.email, plan:s.plan||'', fb:s.name||'', start:s.startDate||'', next:s.accessUntil||'',
+          status:(s.status==='active'?'有效':(s.status==='cancelled'?'已取消':(s.status||''))),
+          streak:s.paidPeriods||0, ref:'', refCode:'', comp:0, paidRefs:0, refTotal:0,
+          exFounding:!!s.exFounding, inPayments:!!s.hasEcpayRecord, paid:!!s.inAccess,
+          sub:s, mirrorMissing:true });
+      });
     }
     renderAll(); return true;
   }).catch(function(){return false;});
@@ -729,13 +744,13 @@ function todos(){
   members.forEach(m=>{
     if(c7Eligible(m)&&!granted[m.id+':c7']){
       const owe=earnedMonths(m.streak,m.paidRefs)-m.comp;
-      out.push({kind:'c7',id:m.id,title:`${m.name}（${m.id}）達加碼標準`,
+      out.push({kind:'c7',id:m.id,title:`${escH(m.name)}（${escH(m.id)}）達加碼標準`,
         desc:`連續 <b>${m.streak}</b> 期 ＋ 帶進 <b>${m.paidRefs}</b> 位付費 → 應送 <b>${earnedMonths(m.streak,m.paidRefs)}</b> 月（已送 ${m.comp}）→ 去綠界<b>退 ${owe} 期款</b>`,key:'c7'});
     }
   });
   members.filter(m=>m.status==='逾期').forEach(m=>{
-    out.push({kind:'late',id:m.id,title:`${m.name}（${m.id}）扣款逾期`,
-      desc:`原定 <b>${m.next}</b> 扣款失敗 → 私訊/來信提醒補款,或改標已取消`,key:'late'});
+    out.push({kind:'late',id:m.id,title:`${escH(m.name)}（${escH(m.id)}）扣款逾期`,
+      desc:`原定 <b>${escH(m.next)}</b> 扣款失敗 → 私訊/來信提醒補款,或改標已取消`,key:'late'});
   });
   return out;
 }
@@ -826,12 +841,12 @@ function renderMembers(){
       +'<div class="email">帶進 '+m.paidRefs+(m.refTotal>m.paidRefs?('/'+m.refTotal):'')
       +(m.comp?('　應送 <span style="color:var(--gold,#e0a526)">'+m.comp+'</span>'):'')+'</div>';
     return `<tr>
-      <td><span class="id">${m.id}</span>${m.pub?`<div class="email" style="color:var(--gold)" title="會員端看到的公開亂碼編號">${m.pub}</div>`:''}</td>
-      <td><div>${m.name}${m.exFounding?' <span title="🌱 回頭草·曾取消訂閱又回來（已排除創始）" style="cursor:help">🌱</span>':''}</div><div class="email">${m.email}</div></td>
+      <td><span class="id">${escH(m.id)}</span>${m.pub?`<div class="email" style="color:var(--gold)" title="會員端看到的公開亂碼編號">${escH(m.pub)}</div>`:''}</td>
+      <td><div>${escH(m.name)}${m.exFounding?' <span title="🌱 回頭草·曾取消訂閱又回來（已排除創始）" style="cursor:help">🌱</span>':''}</div><div class="email">${escH(m.email)}</div></td>
       <td>${fbCell(m)}</td>
       <td>${planBadge(m)}</td>
       <td><span class="pill" style="border-color:${col};color:${col}">${escH(st)}</span></td>
-      <td>${m.start?'<span class="id">'+m.start+'</span>':'<span class="email">—</span>'}</td>
+      <td>${m.start?'<span class="id">'+escH(m.start)+'</span>':'<span class="email">—</span>'}</td>
       <td>${pay}</td>
       <td>${per}</td>
       <td>${until?'<span class="id">'+escH(until)+'</span>':'<span class="email">—</span>'}</td>
@@ -862,6 +877,12 @@ function renderMemSummary(){
     +'　·　Payments 累計入帳 <b>NT$'+Number(s.revenueAll!==undefined?s.revenueAll:s.revenue||0).toLocaleString()+'</b>'
     +(s.orphanAmount?('<span style="color:var(--dim)">（其中 NT$'+Number(s.orphanAmount).toLocaleString()+' 對不到會員）</span>'):'')
     +'　·　基準日 '+escH(subsInfo.today)+'（寬限 '+subsInfo.graceDays+' 天）</div>';
+
+  // 鏡像落後時說清楚，不要讓人以為資料掉了
+  var miss=members.filter(function(m){return m.mirrorMissing;});
+  if(miss.length) h+='<div class="hintbox">ℹ️ 其中 <b>'+miss.length+'</b> 位在 Neon 鏡像裡還沒有（剛註冊或剛異動），'
+    +'已直接用 Google Sheet 正本的資料列出：'+miss.map(function(m){return escH(m.id);}).join('、')
+    +'。推薦人與帶進付費等欄位要等鏡像同步後才會顯示。</div>';
 
   // 對不上帳的兩側：會員查無付款 / 付款對不到會員。兩者筆數接近時多半就是 email 不一致。
   if(s.noPayRecord){
@@ -955,8 +976,8 @@ function renderRecon(){
     const overdue=monthOf(m.next)<CUR_MONTH;
     return `<div class="recon-row">
       <div class="recon-info">
-        <div class="n">${m.name} <span class="id">${m.id}</span> ${overdue?'<span class="pill late">逾期</span>':''}</div>
-        <div class="m">預定扣款 ${m.next} · ${m.plan} ${money(PRICE[m.plan])} · 連續 ${m.streak} 期</div>
+        <div class="n">${escH(m.name)} <span class="id">${escH(m.id)}</span> ${overdue?'<span class="pill late">逾期</span>':''}</div>
+        <div class="m">預定扣款 ${escH(m.next)} · ${escH(m.plan)} ${money(PRICE[m.plan])} · 連續 ${m.streak} 期</div>
       </div>
       <div class="recon-btns">
         <button class="rb ok" onclick="recon('${m.id}','ok')">✓ 成功</button>
@@ -1162,7 +1183,7 @@ function renderRewards(){
     const paid=m.paidRefs,owe=earnedMonths(m.streak,paid),done=granted[m.id+':c7'];
     const nextTier=Math.min(5,Math.floor(m.streak/2));   // 粗略：下一階需求
     return `<div class="reward-row">
-      <div class="who">${m.name} <span class="id">${m.id}</span> ${owe>m.comp?`<span class="pill plan-f">應送 ${owe-m.comp} 月</span>`:''}</div>
+      <div class="who">${escH(m.name)} <span class="id">${escH(m.id)}</span> ${owe>m.comp?`<span class="pill plan-f">應送 ${owe-m.comp} 月</span>`:''}</div>
       <div class="progbar"><i style="width:${Math.min(100,m.streak/12*100)}%"></i></div>
       <div class="meta">連續期數 ${m.streak} ・ 帶進付費 ${paid} ・ 應送 ${owe} 月（已送 ${m.comp}）</div>
     </div>`;}).join('')||`<div class="empty">尚無會員</div>`;

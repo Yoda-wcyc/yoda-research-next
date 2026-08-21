@@ -1,4 +1,4 @@
-import { memberByEmail, hashPw, isPaidActive, watermarkOf } from '../../../lib/auth';
+import { memberByEmail, hashPw, isPaidActive, watermarkOf, tokenExp } from '../../../lib/auth';
 import { sql } from '../../../lib/db';
 import { signJwt } from '../../../lib/jwt';
 import { J, preflight } from '../../../lib/cors';
@@ -55,7 +55,7 @@ export async function POST(req) {
   let token = '';
   if (isPaidActive(m)) {
     const wm = watermarkOf(m), now = Math.floor(Date.now() / 1000);
-    token = signJwt({ sub: m.pub_id || m.member_id, wm, iat: now, exp: now + 12 * 3600 }, process.env.JWT_SECRET || '');
+    token = signJwt({ sub: m.pub_id || m.member_id, wm, iat: now, exp: tokenExp(m, now) }, process.env.JWT_SECRET || '');
   }
   return J({
     ok: true, auth: true, token,
