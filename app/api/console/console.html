@@ -635,7 +635,7 @@ document.getElementById('uiModal').addEventListener('click',function(e){if(e.tar
 var GAS_URL='https://script.google.com/macros/s/AKfycbwQQ02EzseXtzvHxH3yegvgvQKncv7ReoGaqqsVxzco6cdagOCW13Tr7KlwX2UJtPc7/exec';
 var KEY='';
 const TODAY='2026-08-03', CUR_MONTH='2026-08', FOUND_CAP=50;
-const PRICE={'創始':459,'一般':589};
+var PRICE={'創始':459,'一般':589};   /* 內建預設值＝退路；登入後由 /api/pricing 覆蓋（見 loadPricing）。用 var 不用 const，因為要被覆寫 */
 
 let members=[];            // 真資料：由 GAS adminData 載入後 map
 let referrals=[];          // GAS 尚未提供個別免費推薦紀錄 → 保持空
@@ -663,7 +663,7 @@ function login(){
   $('loginBtn').disabled=true; $('loginMsg').style.color='var(--dim)'; $('loginMsg').textContent='登入中…';
   fetch('https://yoda-research-next.vercel.app/api/admin-data',{method:'POST',body:JSON.stringify({key:KEY})}).then(function(r){return r.json();}).then(res=>{
     $('loginBtn').disabled=false;
-    if(res&&res.ok){try{localStorage.setItem('yoda_admin_key',KEY);}catch(e){}members=computeRefCounts((res.members||[]).map(mapMember));renderAll();$('login').style.display='none';$('app').style.display='block';}
+    if(res&&res.ok){try{localStorage.setItem('yoda_admin_key',KEY);}catch(e){}members=computeRefCounts((res.members||[]).map(mapMember));loadPricing().then(renderAll);renderAll();$('login').style.display='none';$('app').style.display='block';}
     else if(res&&res.error){$('loginMsg').style.color='var(--red)';$('loginMsg').textContent='後端回覆：'+res.error;}
     else{$('loginMsg').style.color='var(--red)';$('loginMsg').textContent='連線失敗或回應異常';}
   }).catch(function(){$('loginBtn').disabled=false;$('loginMsg').style.color='var(--red)';$('loginMsg').textContent='連線失敗（可能是本機 file:// CORS）';});
@@ -1254,6 +1254,15 @@ function saveAdd(){
     if(res.ok){closeAdd();['f-email','f-pw','f-ref','f-first','f-fbname'].forEach(i=>$(i).value='');toast(`已加入 ${res.memberId}`);loadFromGAS();}
     else{toast(res.error||'失敗');}
   }).catch(()=>toast('連線失敗'));
+}
+
+/* 價目表唯一來源在 lib/pricing.js，這裡呼叫 /api/pricing 取。
+   取不到就沿用上面內建的預設值——寧可顯示舊價，也不要整頁壞掉。 */
+function loadPricing(){
+  return fetch('https://yoda-research-next.vercel.app/api/pricing',{cache:'no-store'})
+    .then(function(r){return r.json();})
+    .then(function(d){ if(d&&d.ok&&d.prices){ PRICE=d.prices; } })
+    .catch(function(){});
 }
 
 /* ===== 導覽 / 通用 ===== */
