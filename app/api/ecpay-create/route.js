@@ -32,14 +32,20 @@ export async function POST(req) {
   const returnURL = (process.env.ECPAY_RETURN_URL || origin + '/api/ecpay-notify').trim();
   const clientBack = (process.env.ECPAY_CLIENT_BACK_URL || 'https://yoda-wcyc.github.io/-/subscribe.html?paid=1').trim();
 
+  // 目前販售的月費。★這個數字要跟三個地方一致：訂閱頁文案、直接訂閱頁、GAS 的 PLAN_PRICE。
+  //   不一致時，主控台「綠界狀態比對」的金額核對會叫出來——那正是它存在的目的。
+  //   ★注意：改這裡只影響【之後新建立的訂單】。已經在跑的定期定額，金額鎖在建單當下，
+  //     不會、也無法由這裡改動（創始會員因此永遠維持 459）。
+  const MONTHLY_PRICE = 589;
+
   const params = {
     MerchantID: cfg.MerchantID,
     MerchantTradeNo: makeTradeNo(),
     MerchantTradeDate: tradeDate(),
     PaymentType: 'aio',
-    TotalAmount: 459,
-    TradeDesc: 'Yoda Research 創始會員月費',
-    ItemName: 'Yoda Research 創始會員(每月自動續扣)',
+    TotalAmount: MONTHLY_PRICE,
+    TradeDesc: 'Yoda Research 會員月費',
+    ItemName: 'Yoda Research 會員(每月自動續扣)',
     ReturnURL: returnURL,
     ChoosePayment: 'Credit',
     ClientBackURL: clientBack,
@@ -49,7 +55,7 @@ export async function POST(req) {
     CustomField2: email.length > 50 ? email.slice(50, 100) : '',
     EncryptType: 1,
     // ── 信用卡定期定額 ──
-    PeriodAmount: 459,
+    PeriodAmount: MONTHLY_PRICE,
     PeriodType: 'M',   // 每月
     Frequency: 1,      // 每 1 個月
     ExecTimes: 99,     // 最多 99 期（到期或取消為止）

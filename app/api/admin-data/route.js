@@ -5,7 +5,10 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export function OPTIONS() { return preflight(); }
 
-function computeEarnedMonths(paidPeriods, referredPaidCount) {
+function computeEarnedMonths(paidPeriods, referredPaidCount, plan) {
+  // 推薦加碼階梯【只有創始會員適用】——與 GAS computeEarnedMonths 同規則，
+  // plan 漏傳會回 0，所以每個呼叫點都必須把方案帶進來。
+  if (String(plan == null ? '' : plan).trim() !== '創始') return 0;
   const P = Number(paidPeriods) || 0, R = Number(referredPaidCount) || 0; let best = 0;
   for (let N = 1; N <= 5; N++) { if (R >= N && P >= (2 * N + 1)) best = Math.max(best, N); }
   if (R >= 5 && P >= 12) best = 6;
@@ -35,7 +38,7 @@ export async function POST(req) {
         in_payments: inPay, paid: active && (inPay || hasNext),
         plan: m.plan || '創始', fb_name: m.fb_name || '', start_date: fmtDate(m.start_date),
         paid_periods: m.paid_periods, referred_paid_count: m.referred_paid_count,
-        earned_months: computeEarnedMonths(pp, rpc), granted: Number(m.earned_free_months) || 0,
+        earned_months: computeEarnedMonths(pp, rpc, m.plan || ''), granted: Number(m.earned_free_months) || 0,
         next_charge_date: fmtDate(m.next_charge_date),
         ex_founding: m.ex_founding || '',
         certs: { mw: fmtDate(m.cert_mw), tw: fmtDate(m.cert_tw), us: fmtDate(m.cert_us), key: fmtDate(m.cert_key), macro: fmtDate(m.cert_macro) },

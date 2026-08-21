@@ -734,18 +734,21 @@ const dueThisMonth=m=>m.status!=='已取消'&&m.next&&monthOf(m.next)<=CUR_MONTH
 const mById=id=>members.find(x=>x.id===id);
 function validRefs(id,type){ if(type==='付費'){const m=mById(id);return m?m.paidRefs:0;} return referrals.filter(r=>r.ref===id&&r.type===type&&r.valid).length; }
 
-/* 應送月數（§7-C 2N+1、一年封頂 6 月），與 GAS computeEarnedMonths 同邏輯 */
-function earnedMonths(P,R){var best=0;for(var N=1;N<=5;N++){if(R>=N&&P>=(2*N+1))best=Math.max(best,N);}if(R>=5&&P>=12)best=6;return best;}
+/* 應送月數（§7-C 2N+1、一年封頂 6 月），與 GAS computeEarnedMonths 同邏輯。
+   ★推薦加碼階梯是【創始限定】：一般會員一律 0，不然後台會叫你送月給沒這個資格的人。 */
+function earnedMonths(P,R,plan){
+  if(String(plan==null?'':plan).trim()!=='創始')return 0;
+  var best=0;for(var N=1;N<=5;N++){if(R>=N&&P>=(2*N+1))best=Math.max(best,N);}if(R>=5&&P>=12)best=6;return best;}
 
 /* ===== 待辦 ===== */
-function c7Eligible(m){return m.status==='有效'&&earnedMonths(m.streak,m.paidRefs)>m.comp;}
+function c7Eligible(m){return m.status==='有效'&&earnedMonths(m.streak,m.paidRefs,m.plan)>m.comp;}
 function todos(){
   const out=[];
   members.forEach(m=>{
     if(c7Eligible(m)&&!granted[m.id+':c7']){
-      const owe=earnedMonths(m.streak,m.paidRefs)-m.comp;
+      const owe=earnedMonths(m.streak,m.paidRefs,m.plan)-m.comp;
       out.push({kind:'c7',id:m.id,title:`${escH(m.name)}（${escH(m.id)}）達加碼標準`,
-        desc:`連續 <b>${m.streak}</b> 期 ＋ 帶進 <b>${m.paidRefs}</b> 位付費 → 應送 <b>${earnedMonths(m.streak,m.paidRefs)}</b> 月（已送 ${m.comp}）→ 去綠界<b>退 ${owe} 期款</b>`,key:'c7'});
+        desc:`連續 <b>${m.streak}</b> 期 ＋ 帶進 <b>${m.paidRefs}</b> 位付費 → 應送 <b>${earnedMonths(m.streak,m.paidRefs,m.plan)}</b> 月（已送 ${m.comp}）→ 去綠界<b>退 ${owe} 期款</b>`,key:'c7'});
     }
   });
   members.filter(m=>m.status==='逾期').forEach(m=>{
@@ -784,7 +787,7 @@ function renderDash(){
 }
 function markDone(id){
   const m=mById(id); if(!m)return;
-  const owe=earnedMonths(m.streak,m.paidRefs)-m.comp;
+  const owe=earnedMonths(m.streak,m.paidRefs,m.plan)-m.comp;
   if(owe<=0){toast('沒有待發月數');return;}
   toast('寫入中…');
   post({action:'adminGrant',key:KEY,memberId:id,months:owe}).then(res=>{
@@ -1209,7 +1212,7 @@ async function bcSend(){
 /* ===== 渲染：推薦與獎勵 ===== */
 function renderRewards(){
   $('c7List').innerHTML=members.map(m=>{
-    const paid=m.paidRefs,owe=earnedMonths(m.streak,paid),done=granted[m.id+':c7'];
+    const paid=m.paidRefs,owe=earnedMonths(m.streak,paid,m.plan),done=granted[m.id+':c7'];
     const nextTier=Math.min(5,Math.floor(m.streak/2));   // 粗略：下一階需求
     return `<div class="reward-row">
       <div class="who">${escH(m.name)} <span class="id">${escH(m.id)}</span> ${owe>m.comp?`<span class="pill plan-f">應送 ${owe-m.comp} 月</span>`:''}</div>

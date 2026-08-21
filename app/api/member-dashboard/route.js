@@ -9,14 +9,18 @@ export function OPTIONS() { return preflight(); }
 
 const GAS = 'https://script.google.com/macros/s/AKfycbwQQ02EzseXtzvHxH3yegvgvQKncv7ReoGaqqsVxzco6cdagOCW13Tr7KlwX2UJtPc7/exec';
 
-function computeEarnedMonths(paidPeriods, referredPaidCount) {
+function computeEarnedMonths(paidPeriods, referredPaidCount, plan) {
+  // 推薦加碼階梯【只有創始會員適用】——與 GAS computeEarnedMonths 同規則，
+  // plan 漏傳會回 0，所以每個呼叫點都必須把方案帶進來。
+  if (String(plan == null ? '' : plan).trim() !== '創始') return 0;
   const P = Number(paidPeriods) || 0, R = Number(referredPaidCount) || 0; let best = 0;
   for (let N = 1; N <= 5; N++) { if (R >= N && P >= (2 * N + 1)) best = Math.max(best, N); }
   if (R >= 5 && P >= 12) best = 6;
   return best;
 }
-function nextLadderStep(P, R) {
-  const cur = computeEarnedMonths(P, R);
+function nextLadderStep(P, R, plan) {
+  if (String(plan == null ? '' : plan).trim() !== '創始') return null;   // 一般會員沒有階梯
+  const cur = computeEarnedMonths(P, R, plan);
   if (cur >= 6) return null;
   const target = cur + 1; let needR, needP;
   if (target <= 5) { needR = target; needP = 2 * target + 1; } else { needR = 5; needP = 12; }
@@ -63,9 +67,9 @@ export async function POST(req) {
     startDate: fmtDate(m.start_date), paidPeriods, nextChargeDate: fmtDate(m.next_charge_date),
     refCode: m.ref_code, shareLink: 'https://yoda-wcyc.github.io/-/subscribe.html?ref=' + m.ref_code,
     referredTotal, referredPaid,
-    earnedMonths: computeEarnedMonths(paidPeriods, referredPaid),
+    earnedMonths: computeEarnedMonths(paidPeriods, referredPaid, m.plan),
     grantedMonths: Number(m.earned_free_months) || 0,
-    nextStep: nextLadderStep(paidPeriods, referredPaid),
+    nextStep: nextLadderStep(paidPeriods, referredPaid, m.plan),
     certified, notifyOff: isTrue(m.notify_off), via: 'vercel',
   });
 }
