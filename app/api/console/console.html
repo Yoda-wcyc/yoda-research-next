@@ -1,0 +1,1827 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>主控台 · Yoda Research</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#000; --surface:#1d1d1f; --surface2:#272729;
+  --border:rgba(255,255,255,.14); --divider:rgba(255,255,255,.08);
+  --text:#f5f5f7; --dim:#a1a1a6; --accent:#2997ff;
+  --green:#30d158; --red:#ff453a; --amber:#ff9f0a; --gold:#e0a526; --gold2:#b8960a;
+  --fan:#1a3a5c;
+  --sans:-apple-system,BlinkMacSystemFont,'SF Pro Text','PingFang TC','Noto Sans TC','Microsoft JhengHei','Segoe UI',sans-serif;
+  --mono:'SF Mono','Consolas',monospace;
+}
+html[data-theme="light"]{
+  --bg:#f5f5f7; --surface:#fff; --surface2:#eceef2;
+  --border:#e0e0e0; --divider:#eee; --text:#1d1d1f; --dim:#7a7a7a;
+  --accent:#0066cc; --green:#248a3d; --red:#d70015; --amber:#c25e00; --gold:#b8860b; --gold2:#8a6508;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;line-height:1.5;padding-bottom:60px}
+
+/* 控制列 */
+.controls-bar{position:fixed;top:14px;right:20px;z-index:9999;display:flex;align-items:center;gap:6px;background:rgba(13,17,24,.72);border:1px solid var(--border);border-radius:8px;padding:5px 8px;backdrop-filter:blur(12px)}
+html[data-theme="light"] .controls-bar{background:rgba(255,255,255,.82)}
+.ctrl-fan{display:inline-flex;align-items:center;padding:4px 12px;font-size:11px;font-family:var(--mono);color:#e8f2ff;background:var(--fan);border:1px solid #2a4a6c;border-radius:9999px;font-weight:700}
+.ctrl-sep{width:1px;height:18px;background:var(--border);margin:0 2px}
+.ctrl-btn{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--dim);background:transparent;border:none;border-radius:5px;padding:4px 9px;cursor:pointer}
+.ctrl-btn:hover{background:var(--surface2);color:var(--text)}.ctrl-btn.active{background:#0071e3;color:#fff}
+
+.wrap{max-width:1080px;margin:0 auto;padding:26px 22px 0}
+.head{display:flex;align-items:baseline;gap:12px;margin-bottom:4px}
+.head h1{font-size:24px;font-weight:700;letter-spacing:-.02em}
+.head .sub{font-size:12px;color:var(--dim);font-family:var(--mono)}
+.head .build{font-size:10.5px;color:var(--dim);font-family:var(--mono);opacity:.65;border:1px solid var(--border);border-radius:6px;padding:2px 7px;margin-left:8px}
+.proto-note{display:inline-block;font-size:11px;color:var(--green);border:1px solid var(--green);border-radius:6px;padding:2px 8px;margin:8px 0 2px}
+
+/* 登入 */
+#login{max-width:420px;margin:90px auto 0;padding:0 22px}
+.login-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px}
+.login-card h2{font-size:18px;margin-bottom:6px}
+.login-card p{font-size:13px;color:var(--dim);margin-bottom:16px;line-height:1.6}
+.login-card input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:11px;color:var(--text);font-size:14px;margin-bottom:12px;outline:none}
+.login-card input:focus{border-color:var(--accent)}
+.login-card button{width:100%;padding:11px;font-weight:700;color:#fff;background:var(--accent);border:none;border-radius:9px;cursor:pointer}
+.login-card button:disabled{opacity:.5}
+.login-msg{font-size:12.5px;color:var(--red);margin-top:10px;min-height:16px}
+
+.livebar{background:rgba(255,159,10,.12);border:1px solid var(--amber);border-radius:10px;padding:10px 14px;font-size:12.5px;color:var(--amber);margin-bottom:16px;line-height:1.6}
+
+/* 分頁 */
+.tabs{display:flex;flex-direction:column;gap:6px;margin:18px 0 20px;border-bottom:1px solid var(--divider);padding-bottom:2px}
+.tabrow{display:flex;gap:4px;flex-wrap:wrap;align-items:flex-end}
+.tabrow+.tabrow{border-top:1px dashed var(--divider);padding-top:6px}
+.tab{font-size:14px;font-weight:600;color:var(--dim);background:none;border:none;padding:10px 14px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--text);border-bottom-color:var(--accent)}
+.tab .badge{display:inline-block;min-width:18px;padding:0 5px;margin-left:6px;font-size:11px;font-family:var(--mono);background:var(--red);color:#fff;border-radius:9999px;text-align:center}
+.tab .badge.amber{background:var(--amber)}
+
+.view{display:none}.view.show{display:block;animation:fade .25s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:22px}
+@media(max-width:900px){.kpis{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:560px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 15px}
+.kpi .l{font-size:11px;color:var(--dim);letter-spacing:.04em;margin-bottom:7px}
+.kpi .v{font-size:26px;font-weight:700;letter-spacing:-.02em;line-height:1}
+.kpi .v small{font-size:14px;color:var(--dim);font-weight:600}
+.kpi .v.g{color:var(--green)}.kpi .v.r{color:var(--red)}.kpi .v.gold{color:var(--gold)}
+
+.section-h{font-size:15px;font-weight:700;margin:6px 0 12px;display:flex;align-items:center;gap:8px}
+.section-h .hint{font-size:12px;color:var(--dim);font-weight:400}
+
+/* 待辦 */
+.todo{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.todo-row{display:flex;align-items:center;gap:14px;padding:14px 16px;border-top:1px solid var(--divider)}
+.todo-row:first-child{border-top:none}
+.todo-ico{flex:0 0 34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:16px}
+.todo-ico.c7{background:rgba(224,165,38,.16)}.todo-ico.tier{background:rgba(41,151,255,.16)}.todo-ico.late{background:rgba(255,69,58,.16)}
+.todo-main{flex:1;min-width:0}
+.todo-main .t{font-size:14px;font-weight:600}
+.todo-main .d{font-size:12.5px;color:var(--dim);margin-top:2px}
+.todo-main .d b{color:var(--text);font-weight:600}
+.chip{display:inline-block;font-size:11px;font-family:var(--mono);padding:1px 7px;border-radius:6px;background:var(--surface2);color:var(--dim);margin-right:5px}
+.btn-done{font-size:12.5px;font-weight:600;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 13px;cursor:pointer;white-space:nowrap}
+.btn-done:hover{border-color:var(--green);color:var(--green)}
+.empty{padding:26px;text-align:center;color:var(--dim);font-size:13px}
+
+/* 表格 */
+.toolbar{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.search{flex:1;min-width:180px;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:9px 12px;color:var(--text);font-size:13px;font-family:var(--sans)}
+.search::placeholder{color:var(--dim)}
+.filter{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:9px 10px;color:var(--text);font-size:13px}
+.paytag{font-size:10px;padding:1px 7px;border-radius:8px;white-space:nowrap;margin-left:3px;font-weight:600}
+.paytag.paid{background:rgba(240,165,0,.15);color:var(--gold,#f0a500);border:1px solid rgba(240,165,0,.42)}
+.paytag.gen{background:rgba(148,163,184,.14);color:var(--dim,#94a3b8);border:1px solid rgba(148,163,184,.34)}
+.btn-primary{font-size:13px;font-weight:700;color:#fff;background:var(--accent);border:none;border-radius:9px;padding:9px 15px;cursor:pointer}
+.btn-primary:hover{filter:brightness(1.1)}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:14px;background:var(--surface)}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:820px}
+th{text-align:left;font-size:11px;color:var(--dim);font-weight:600;letter-spacing:.03em;padding:11px 12px;border-bottom:1px solid var(--divider);white-space:nowrap;position:sticky;top:0;background:var(--surface)}
+td{padding:11px 12px;border-top:1px solid var(--divider);white-space:nowrap}
+td .id{font-family:var(--mono);color:var(--dim);font-size:12px}
+td .email{color:var(--dim);font-size:12px}
+tr:hover td{background:var(--surface2)}
+.pill{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:9999px}
+.pill.ok{background:rgba(48,209,88,.16);color:var(--green)}
+.pill.late{background:rgba(255,69,58,.16);color:var(--red)}
+.pill.cancel{background:var(--surface2);color:var(--dim)}
+.pill.plan-f{background:linear-gradient(90deg,rgba(224,165,38,.18),rgba(184,150,10,.18));color:var(--gold)}
+.pill.plan-n{background:rgba(41,151,255,.14);color:var(--accent)}
+.mini-act{font-size:12px;color:var(--accent);background:none;border:none;cursor:pointer;padding:2px 4px}
+.mini-act:hover{text-decoration:underline}
+.audit-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px}
+.audit-btn{font-size:13px;font-weight:600;background:none;cursor:pointer;padding:7px 14px;border-radius:9999px;border:1px solid currentColor;line-height:1.2}
+.audit-btn:hover{filter:brightness(1.25)}
+.audit-btn.amber{color:var(--amber,#ff9f0a)}
+.audit-btn.blue{color:var(--accent,#2997ff)}
+.audit-note{font-size:12px;color:var(--dim)}
+.streak-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:2px}
+.streak-dot.off{background:var(--surface2)}
+
+/* 對帳 */
+.recon-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px}
+.recon-head .month{font-size:15px;font-weight:700}
+.recon-head .prog{font-size:12.5px;color:var(--dim);font-family:var(--mono)}
+.recon-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.recon-row{display:flex;align-items:center;gap:14px;padding:13px 16px;border-top:1px solid var(--divider)}
+.recon-row:first-child{border-top:none}
+.recon-row.done{opacity:.5}
+.recon-info{flex:1;min-width:0}
+.recon-info .n{font-size:14px;font-weight:600}
+.recon-info .m{font-size:12px;color:var(--dim);margin-top:2px}
+.recon-btns{display:flex;gap:8px}
+.rb{font-size:13px;font-weight:700;border-radius:8px;padding:8px 14px;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text)}
+.rb.ok:hover,.rb.ok.on{background:var(--green);border-color:var(--green);color:#04210f}
+.rb.no:hover,.rb.no.on{background:var(--red);border-color:var(--red);color:#fff}
+.recon-done-tag{font-size:12px;font-weight:700;font-family:var(--mono)}
+.recon-done-tag.ok{color:var(--green)}.recon-done-tag.no{color:var(--red)}
+
+/* 推薦 */
+.ref-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:800px){.ref-grid{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:4px 0}
+.panel-h{font-size:13px;font-weight:700;padding:12px 16px;border-bottom:1px solid var(--divider)}
+.reward-row{padding:12px 16px;border-top:1px solid var(--divider)}
+.reward-row:first-child{border-top:none}
+.reward-row .who{font-size:13.5px;font-weight:600}
+.progbar{height:6px;background:var(--surface2);border-radius:3px;margin:8px 0 6px;overflow:hidden}
+.progbar i{display:block;height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2))}
+.progbar.blue i{background:var(--accent)}
+.reward-row .meta{font-size:12px;color:var(--dim)}
+
+/* modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;place-items:center;z-index:10000;padding:20px}
+.modal-bg.show{display:grid}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;width:100%;max-width:440px;max-height:88vh;overflow:auto}
+.modal h3{font-size:17px;font-weight:700;margin-bottom:16px}
+.fld{margin-bottom:13px}
+.fld label{display:block;font-size:12px;color:var(--dim);margin-bottom:5px}
+.fld input,.fld select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:9px 11px;color:var(--text);font-size:13px;font-family:var(--sans)}
+.pw-wrap{position:relative}
+.pw-wrap input{padding-right:42px}
+.pw-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;line-height:1;opacity:.55;padding:4px}
+.pw-eye:hover{opacity:1}
+.modal-btns{display:flex;gap:10px;margin-top:20px}
+.modal-btns .btn-primary{flex:1;padding:11px}
+.btn-ghost{flex:1;font-size:13px;font-weight:600;color:var(--text);background:none;border:1px solid var(--border);border-radius:9px;padding:11px;cursor:pointer}
+.hintbox{font-size:11.5px;color:var(--dim);background:var(--surface2);border-radius:9px;padding:9px 11px;margin-bottom:14px;line-height:1.6}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--green);color:#04210f;font-size:13px;font-weight:700;padding:10px 20px;border-radius:9999px;opacity:0;transition:opacity .3s;z-index:10001}
+.toast.show{opacity:1}
+
+/* ===== 付費牆斷點編輯器（全部 scope 在 #v-paywall,不污染主控台）===== */
+#v-paywall{
+  --serif:'Noto Serif TC',serif;--mono:'IBM Plex Mono',monospace;--sans:'Noto Sans TC',sans-serif;
+  --bg:#09090b;--bg2:#0f0f12;--bg3:#151519;--bg4:#1d1d24;--border:#26262e;--border2:#34343f;
+  --accent:#f0a500;--accent-dim:#b8860b;--accent3:#4d9fff;
+  --text:#d8d2c4;--text2:#9a927f;--text3:#6a6457;--header:#f5efe2;
+  --gold:#f0a500;--pos:#00c8a0;--danger:#ff4d6d;
+  --free:#00c8a0;--paid:#f0a500;--protect:#4d9fff;
+  font-family:var(--sans);line-height:1.6;color:var(--text);padding:2px 0 24px
+}
+#v-paywall .head{margin:0 0 16px}
+#v-paywall .head .tag{font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--accent);margin-bottom:7px}
+#v-paywall .head h1{font-family:var(--serif);font-weight:700;font-size:20px;color:var(--header);margin-bottom:8px;letter-spacing:normal}
+#v-paywall .head p{font-size:13px;color:var(--text2);line-height:1.75;max-width:920px}
+#v-paywall .head code{font-family:var(--mono);background:var(--bg3);padding:1px 6px;border-radius:4px;color:var(--accent);font-size:12px}
+#v-paywall .toolbar{margin:0 0 12px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;background:var(--bg2);border:1px solid var(--border2);border-radius:14px;padding:16px 18px}
+#v-paywall .bigbtn{display:inline-flex;align-items:center;gap:10px;padding:14px 24px;border-radius:10px;font-family:var(--sans);font-weight:700;font-size:15.5px;cursor:pointer;border:none;transition:.15s;white-space:nowrap;letter-spacing:.02em}
+#v-paywall .bigbtn .ic{font-size:18px}
+#v-paywall .bigbtn:disabled{opacity:.4;cursor:not-allowed}
+#v-paywall .bigbtn.primary{background:var(--gold);color:#1a1200;box-shadow:0 3px 14px rgba(240,165,0,.35)}
+#v-paywall .bigbtn.primary:hover:not(:disabled){background:#ffcb2e;box-shadow:0 4px 20px rgba(240,165,0,.55);transform:translateY(-1px)}
+#v-paywall .bigbtn.free{background:transparent;color:var(--free);border:2px solid var(--free)}
+#v-paywall .bigbtn.free:hover:not(:disabled){background:rgba(0,200,160,.12);box-shadow:0 3px 14px rgba(0,200,160,.25)}
+#v-paywall .bigbtn.paid{background:transparent;color:var(--paid);border:2px solid var(--accent-dim)}
+#v-paywall .bigbtn.paid:hover:not(:disabled){background:rgba(240,165,0,.12);border-color:var(--accent)}
+#v-paywall .tb-status{font-family:var(--mono);font-size:12px;color:var(--text3);margin-left:auto;text-align:right;line-height:1.5}
+#v-paywall .tb-status b{color:var(--header)}
+#v-paywall .ctrls{margin:0 0 12px;display:flex;flex-wrap:wrap;gap:18px;align-items:center;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:12px 18px}
+#v-paywall .ctrls label{display:inline-flex;align-items:center;gap:10px;font-size:13px;color:var(--text2);font-weight:600}
+#v-paywall .ctrls input[type=range]{width:200px;accent-color:var(--gold)}
+#v-paywall .ctrls input[type=text]{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:12px;padding:6px 9px}
+#v-paywall #blur-val{font-family:var(--mono);font-size:12px;color:var(--gold);min-width:38px}
+#v-paywall .ctrls .demo{display:inline-flex;align-items:center;gap:8px;font-size:11px;color:var(--text3);margin-left:auto}
+#v-paywall .frost-sample{font-family:var(--mono);letter-spacing:.1em;color:var(--text2);background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:3px 10px}
+#v-paywall .empty{margin:40px 0;text-align:center;padding:60px 20px;border:2px dashed var(--border2);border-radius:16px;color:var(--text3)}
+#v-paywall .empty .big{font-size:46px;margin-bottom:16px;opacity:.6}
+#v-paywall .empty h2{font-family:var(--serif);font-size:20px;color:var(--text2);font-weight:700;margin-bottom:10px}
+#v-paywall .empty p{font-size:13px;line-height:1.9;max-width:580px;margin:0 auto}
+#v-paywall .empty code{font-family:var(--mono);background:var(--bg3);padding:1px 6px;border-radius:4px;color:var(--accent);font-size:12px}
+#v-paywall .legend{margin:8px 0 6px;display:flex;flex-wrap:wrap;gap:18px;font-size:12px;color:var(--text2)}
+#v-paywall .legend span{display:inline-flex;align-items:center;gap:7px}
+#v-paywall .dot{width:11px;height:11px;border-radius:3px;display:inline-block}
+#v-paywall .dot.f{background:var(--free)}#v-paywall .dot.p{background:var(--paid)}#v-paywall .dot.pr{background:var(--protect)}
+#v-paywall .stage{margin:0;display:grid;grid-template-columns:1.05fr .95fr;gap:20px;align-items:start}
+#v-paywall .panel{background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden;padding:0}
+#v-paywall .panel-head{padding:13px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px}
+#v-paywall .panel-head .name{font-family:var(--serif);font-weight:700;font-size:15px;color:var(--header)}
+#v-paywall .panel-head .hint{font-family:var(--mono);font-size:10.5px;color:var(--text3);font-weight:400}
+#v-paywall #editor{position:relative;padding:14px 16px}
+#v-paywall .blk{position:relative;border:1px solid var(--border);border-radius:9px;padding:11px 14px 11px 16px;margin-bottom:9px;transition:background .12s,border-color .12s,opacity .12s}
+#v-paywall .blk .cat{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;margin-bottom:5px;display:inline-flex;align-items:center;gap:6px}
+#v-paywall .blk .t{font-size:13px;font-weight:700;color:var(--header);margin-bottom:4px}
+#v-paywall .blk .b{font-size:11.5px;color:var(--text2);line-height:1.7;max-height:44px;overflow:hidden}
+#v-paywall .blk::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:9px 0 0 9px}
+#v-paywall .blk.free{background:rgba(0,200,160,.05);border-color:rgba(0,200,160,.22)}#v-paywall .blk.free::before{background:var(--free)}#v-paywall .blk.free .cat{color:var(--free)}
+#v-paywall .blk.protect{background:rgba(77,159,255,.06);border-color:rgba(77,159,255,.28)}#v-paywall .blk.protect::before{background:var(--protect)}#v-paywall .blk.protect .cat{color:var(--protect)}
+#v-paywall .blk.masked{background:rgba(240,165,0,.05);border-color:rgba(240,165,0,.3)}#v-paywall .blk.masked::before{background:var(--paid)}#v-paywall .blk.masked .cat{color:var(--paid)}
+#v-paywall .blk-toggles{display:flex;gap:7px;margin-top:8px}
+#v-paywall .tg{font-family:var(--mono);font-size:10.5px;font-weight:600;padding:4px 12px;border-radius:999px;border:1px solid var(--border2);background:var(--bg3);color:var(--text3);cursor:pointer;transition:.12s;user-select:none}
+#v-paywall .tg:hover{border-color:var(--accent-dim);color:var(--text2)}
+#v-paywall .tg.on{background:var(--paid);color:#1a1200;border-color:var(--paid)}
+#v-paywall .tg:disabled{opacity:.35;cursor:not-allowed}
+#v-paywall #divider{position:absolute;left:8px;right:8px;height:0;z-index:20;pointer-events:none}
+#v-paywall #divider .line{position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold) 12%,var(--gold) 88%,transparent);box-shadow:0 0 8px rgba(240,165,0,.6)}
+#v-paywall #divider .handle{position:absolute;left:50%;top:0;transform:translate(-50%,-50%);background:var(--gold);color:#1a1200;font-family:var(--mono);font-size:11px;font-weight:700;padding:5px 14px;border-radius:999px;cursor:grab;pointer-events:auto;white-space:nowrap;box-shadow:0 2px 10px rgba(240,165,0,.5);user-select:none;touch-action:none;display:flex;align-items:center;gap:7px}
+#v-paywall #divider .handle:active{cursor:grabbing}
+#v-paywall #divider .handle .grip{letter-spacing:2px;opacity:.7}
+#v-paywall #divider.dragging .handle{transform:translate(-50%,-50%) scale(1.05)}
+#v-paywall #preview{padding:16px;font-size:12.5px;line-height:1.8}
+#v-paywall .pv-sec{margin-bottom:12px}
+#v-paywall .pv-sec .ph{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;color:var(--free);margin-bottom:4px}
+#v-paywall .pv-sec .pt{font-size:13px;font-weight:700;color:var(--header);margin-bottom:3px}
+#v-paywall .pv-sec .pb{font-size:12px;color:var(--text2);line-height:1.7}
+#v-paywall .pv-frost{font-family:var(--mono);letter-spacing:.12em;line-height:1.9;color:var(--text2);word-break:break-all;user-select:none}
+#v-paywall .pv-lock{display:inline-block;margin-top:6px;font-size:11px;color:var(--gold);font-weight:700}
+#v-paywall .summary{margin:16px 0 0;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:15px 18px}
+#v-paywall .summary .sh{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--text3);margin-bottom:11px}
+#v-paywall .sbars{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+#v-paywall .sbar{flex:1 1 200px}#v-paywall .sbar .lab{font-size:11px;color:var(--text2);margin-bottom:4px;display:flex;justify-content:space-between}#v-paywall .sbar .lab b{font-family:var(--mono)}
+#v-paywall .sbar .track{height:8px;border-radius:5px;background:var(--bg4);overflow:hidden}#v-paywall .sbar .fill.f{height:100%;background:var(--free)}#v-paywall .sbar .fill.p{height:100%;background:var(--paid)}
+#v-paywall .slist{font-size:11.5px;color:var(--text3);line-height:1.9}#v-paywall .slist b{color:var(--text2)}#v-paywall .slist .fg{color:var(--free)}#v-paywall .slist .pg{color:var(--paid)}
+#v-paywall #verify-out{font-size:12px;line-height:1.9;color:var(--text2);margin-top:8px}
+#v-paywall .hint2{font-size:11.5px;color:var(--text3);line-height:1.8;margin-top:10px;border-top:1px solid var(--border);padding-top:10px}
+#v-paywall .hint2 code{font-family:var(--mono);background:var(--bg3);padding:1px 5px;border-radius:4px;color:var(--accent);font-size:11px}
+#v-paywall .hidden{display:none!important}
+@media(max-width:900px){#v-paywall .stage{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="controls-bar">
+  <span class="ctrl-fan">內部工具</span>
+  <div class="ctrl-sep"></div>
+  <a class="ctrl-btn" href="https://analytics.google.com/" target="_blank" rel="noopener" style="text-decoration:none" title="每個遊戲/報告的流量都在 GA">📊 流量分析</a>
+  <div class="ctrl-sep"></div>
+  <button class="ctrl-btn active" onclick="setTheme('dark')">深</button>
+  <button class="ctrl-btn" onclick="setTheme('light')">淺</button>
+</div>
+
+<!-- 登入 -->
+<div id="login">
+  <div class="login-card">
+    <h2>主控台</h2>
+    <p>輸入後台管理密碼（Code.gs 裡的 <b>ADMIN_KEY</b>）。資料即時來自你的 Google Sheet。</p>
+    <div style="position:relative"><input id="adminKey" type="password" placeholder="管理密碼" autocomplete="off" style="padding-right:40px"><button type="button" aria-label="顯示或隱藏密碼" onclick="(function(b){var p=document.getElementById('adminKey');if(p.type==='password'){p.type='text';b.textContent='🙈';}else{p.type='password';b.textContent='👁';}})(this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);width:auto;background:none;border:none;cursor:pointer;font-size:18px;line-height:1;opacity:.6;padding:4px;color:var(--text)">👁</button></div>
+    <button id="loginBtn">登入</button>
+    <div class="login-msg" id="loginMsg"></div>
+  </div>
+</div>
+
+<!-- 主畫面 -->
+<div class="wrap" id="app" style="display:none">
+  <div class="head">
+    <h1>主控台</h1>
+    <span class="sub">Yoda Research · 對帳月 2026-08</span>
+    <!-- 版本戳：由 build-console.js 自動填寫。用來一眼看出「我現在開的是哪一版」，
+         避免 GAS 那份與 Vercel 那份不同步時，改了卻看不到而找不到原因。 -->
+    <span class="build" id="buildStamp" title="這份主控台的建置版本">build —</span>
+    <button onclick="logout()" style="margin-left:auto;font-size:12px;color:var(--dim);background:none;border:1px solid var(--border);border-radius:8px;padding:5px 12px;cursor:pointer">登出</button>
+  </div>
+  <div class="proto-note">已接 Google Sheet · 即時資料</div>
+
+  <div class="livebar" style="color:var(--green);border-color:var(--green);background:rgba(48,209,88,.1)">
+    ✅ 全部即時：名單、KPI、新增會員、<b>對帳 ✓/✗、贈送月、標記已發放</b>——都會直接寫回你的 Google Sheet。
+  </div>
+
+  <div class="tabs" id="tabs">
+    <div class="tabrow">
+      <button class="tab active" data-v="dash">總覽</button>
+      <button class="tab" data-v="members">會員名單</button>
+      <button class="tab" data-v="recon">本月對帳 <span class="badge" id="reconBadge"></span></button>
+      <button class="tab" data-v="rewards">推薦與獎勵 <span class="badge amber" id="rewardBadge"></span></button>
+      <button class="tab" data-v="support">客服工單 <span class="badge" id="supBadge"></span></button>
+    </div>
+    <div class="tabrow">
+      <button class="tab" data-v="reports">一般報告管理</button>
+      <button class="tab" data-v="paidreports">付費報告管理</button>
+      <button class="tab" data-v="paywall">斷點編輯器</button>
+      <button class="tab" data-v="traffic">流量</button>
+    </div>
+  </div>
+
+  <!-- 總覽 -->
+  <div class="view show" id="v-dash">
+    <div class="kpis" id="kpis"></div>
+    <div class="section-h">待辦 <span class="hint">系統幫你算好、你照著去綠界做,做完打勾</span></div>
+    <div class="todo" id="todoList"></div>
+  </div>
+
+  <!-- 會員名單 -->
+  <div class="view" id="v-members">
+    <div class="toolbar">
+      <input class="search" id="memSearch" placeholder="搜尋暱稱 / Email / 會員編號…" oninput="renderMembers()">
+      <select class="filter" id="memFilter" onchange="renderMembers()">
+        <option value="paid" selected>💰 付費（真付費）</option>
+        <option value="all">全部</option>
+        <option value="unpaid">○ 一般（只註冊·未付費）</option>
+        <option value="有效">狀態：有效</option>
+        <option value="逾期">狀態：逾期</option>
+        <option value="已取消">狀態：已取消</option>
+      </select>
+      <span id="memCount" style="font-size:13px;color:var(--dim);font-weight:600;white-space:nowrap"></span>
+      <button class="btn-primary" onclick="openAdd()">＋ 新增會員</button>
+      <button class="btn-done" onclick="openBroadcast()">📢 群發信</button>
+      <button class="btn-done" onclick="openStuckTool()">🔑 登入排查</button>
+      <button class="btn-done" onclick="loadFromGAS()">↻ 重新整理</button>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>編號</th><th>會員</th><th>臉書名稱</th><th>方案</th><th>狀態</th><th>訂閱起始日</th><th>連續期數</th>
+          <th>下次扣款</th><th>推薦人</th><th>帶進付費</th><th>應送月</th><th></th>
+        </tr></thead>
+        <tbody id="memBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 本月對帳 -->
+  <div class="view" id="v-recon">
+    <div class="recon-head">
+      <div>
+        <div class="month">2026 年 8 月對帳</div>
+        <div class="prog" id="reconProg"></div>
+      </div>
+    </div>
+    <!-- 稽核工具：獨立一列、靠左，寬螢幕才不會被推到看不見的地方 -->
+    <div class="audit-bar">
+      <button class="audit-btn amber" onclick="loadLapsed()">⚠ 逾期未對帳稽核</button>
+      <button class="audit-btn blue" onclick="loadEcpaySync()">🔍 綠界狀態比對</button>
+      <span class="audit-note">綠界不會通知我們會員自己取消，要靠這兩顆主動抓</span>
+    </div>
+    <div id="lapsedBox"></div>
+    <div id="ecpaySyncBox"></div>
+    <div class="hintbox">打開綠界後台,對照這個月該扣款的人：成功打 <b style="color:var(--green)">✓</b>、失敗打 <b style="color:var(--red)">✗</b>。（目前只在畫面暫存,尚未寫回 Sheet。）</div>
+    <div class="recon-card" id="reconList"></div>
+  </div>
+
+  <!-- 推薦與獎勵 -->
+  <div class="view" id="v-rewards">
+    <div class="ref-grid">
+      <div class="panel">
+        <div class="panel-h">§7-C 創始加碼進度 <span style="color:var(--dim);font-weight:400">（2N+1 階梯、一年封頂 6 月）</span></div>
+        <div id="c7List"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h">§7 免費推薦階梯 <span style="color:var(--dim);font-weight:400">（GAS 尚未追蹤免費推薦）</span></div>
+        <div id="tierList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 客服工單 -->
+  <div class="view" id="v-support">
+    <div class="toolbar">
+      <select class="filter" id="supFilter" onchange="renderSupport()">
+        <option value="all">全部狀態</option>
+        <option value="new">新進</option>
+        <option value="處理中">處理中</option>
+        <option value="已回覆">已回覆</option>
+        <option value="已解決">已解決</option>
+      </select>
+      <button class="btn-done" onclick="loadSupport()">↻ 重新整理</button>
+    </div>
+    <div id="supList"></div>
+    <!-- 常用回覆面板（放清單下方，不佔頁面最上面）：新增/複製/刪除；工單回覆框也可下拉選用 -->
+    <div class="panel" style="margin-top:18px;padding:14px 16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+        <b>📌 常用回覆</b>
+        <button class="btn-done" onclick="addCannedDirect()">＋ 新增常用回覆</button>
+      </div>
+      <div id="cannedList"></div>
+    </div>
+  </div>
+
+  <!-- 創始搶先名單 -->
+  <div class="view" id="v-waitlist">
+    <div class="toolbar">
+      <input class="search" id="wlSearch" placeholder="搜尋 Email…" oninput="renderWaitlist()">
+      <button class="btn-done" onclick="loadWaitlist()">↻ 重新整理</button>
+      <button class="btn-done" style="color:#ff6b6b" onclick="deleteSelectedWaitlist()">🗑 刪除勾選</button>
+      <span id="wlStat" style="margin-left:auto;color:var(--dim);font-size:13px"></span>
+    </div>
+    <div class="hintbox">創始搶先頁登記者（email＋公開分享貼文連結）。點「連結 ↗」核對他真的公開分享後，按「✓ 確認送進創始名單」——<b>此確認不可撤銷</b>。要移除的登記，勾右側方塊後按「刪除勾選」。</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>登記時間</th><th>Email（會員帳號）</th><th>臉書名稱</th><th>貼文</th><th>已通知</th><th style="white-space:nowrap">創始確認<br><button class="mini-act" style="color:var(--gold);border:1px solid var(--gold);border-radius:6px;padding:2px 6px;margin-top:3px" onclick="confirmAllWaitlist()">全部確認</button></th><th style="width:1%;text-align:center;white-space:nowrap"><input type="checkbox" id="wlChkAll" onclick="toggleAllWaitlist(this)" title="全部選取"> 全選</th></tr></thead>
+        <tbody id="wlBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 流量 -->
+  <div class="view" id="v-traffic">
+    <div class="toolbar">
+      <select class="filter" id="trfDays" onchange="loadTraffic()">
+        <option value="7">近 7 天</option>
+        <option value="30" selected>近 30 天</option>
+        <option value="90">近 90 天</option>
+        <option value="0">全部</option>
+      </select>
+      <button class="btn-done" onclick="loadTraffic()">↻ 重新整理</button>
+    </div>
+    <div id="trfKpis" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:6px"></div>
+    <div class="section-h">每日瀏覽</div>
+    <div id="trfDaily" style="display:flex;align-items:flex-end;gap:3px;height:120px;padding:8px 0"></div>
+    <div class="section-h">各頁流量 <span class="hint">依瀏覽數排序</span></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>頁面</th><th>瀏覽</th><th>訪客</th><th>最近</th></tr></thead>
+        <tbody id="trfBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 報告管理 -->
+  <div class="view" id="v-reports">
+    <div class="livebar" style="color:var(--accent);border-color:var(--accent);background:rgba(41,151,255,.1)">
+      軟下架 / 改標題即時寫回 Sheet「<b>ReportOverrides</b>」,報告站前端載入時合併——<b>不動實體檔</b>。免費報告要真的刪檔請找助理 git;付費報告改 Drive。
+    </div>
+    <div class="toolbar">
+      <input class="search" id="repSearch" placeholder="搜尋檔名 / 標題…" oninput="renderReports()">
+      <select class="filter" id="repFilter" onchange="renderReports()"><option value="all">全部類型</option></select>
+      <select class="filter" id="repVis" onchange="renderReports()">
+        <option value="all">全部狀態</option><option value="shown">顯示中</option><option value="hidden">已下架</option>
+      </select>
+      <button class="btn-done" onclick="loadReports()">↻ 重新整理</button>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>類型</th><th>日期</th><th>檔名</th><th>顯示標題（空＝用檔名）</th><th>狀態</th><th>付費檔</th><th></th></tr></thead>
+        <tbody id="repBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 付費報告管理（Drive 付費檔 · 寄發布通知）-->
+  <div class="view" id="v-paidreports">
+    <div class="livebar" style="color:var(--gold);border-color:var(--gold);background:rgba(240,165,0,.1)">
+      勾選要一起寄的報告（例：早上美股＋市場觀察）→ 按「<b>彙整通知所選</b>」對還沒收到的會員<b>各寄一封</b>（一封列出這批）。<b>退訂者自動跳過、每份逐人去重</b>（已收的不再列、不重寄）。單獨補一份用每列的「補寄未收到」。
+    </div>
+    <div class="toolbar" style="align-items:center">
+      <button class="btn-done" onclick="loadPaidReports()">↻ 重新整理</button>
+      <button class="btn-done" style="color:var(--gold,#e0a526);font-weight:800" onclick="notifyBatchSelected()">📨 彙整通知所選（一封）</button>
+      <button class="btn-done" style="color:#ff6b6b" onclick="deleteSelectedPaid()">🗑 刪除勾選</button>
+      <span id="mailQuota" style="margin-left:auto;font-size:12.5px;color:var(--dim)">今日剩餘寄信額度：<b style="color:var(--text)">—</b></span>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>reportId（付費檔）</th><th>最後更新（台北）</th><th>已寄出通知</th><th>寄通知</th><th style="width:1%;text-align:center;white-space:nowrap"><input type="checkbox" id="paidChkAll" onclick="toggleAllPaid(this)"> 全選</th></tr></thead>
+        <tbody id="paidBody"><tr><td colspan="5"><div class="empty">按「↻ 重新整理」載入</div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 付費牆斷點編輯器 -->
+  <div class="view" id="v-paywall">
+    <div class="head">
+      <div class="tag">YODA · 付費牆斷點編輯器 v3</div>
+      <h1>匯入報告 → 逐段遮標題/遮內容 + 調模糊 → 匯出兩份檔</h1>
+      <p>遮＝真內容<b>實體刪除</b>換成<b style="color:var(--gold)">馬賽克填充塊</b>再套模糊，模糊底下是假填充、不是真字（View Source 也沒真內容，符合 §9-4/§9-5）。關鍵報告 <code>.paywall</code> 前為 §9-5 保護區不可遮；其餘報告無保護區，分界全由你拖斷點決定。</p>
+    </div>
+
+    <div class="toolbar">
+      <input type="file" id="file-input" accept=".html,.htm,text/html" class="hidden">
+      <button class="bigbtn primary" id="btn-import"><span class="ic">📥</span>匯入要編輯的檔案</button>
+      <button class="bigbtn free" id="btn-free" disabled><span class="ic">⬇</span>匯出免費檔</button>
+      <button class="bigbtn paid" id="btn-paid" disabled><span class="ic">🔒</span>匯出付費檔</button>
+      <button class="bigbtn" id="btn-upload" disabled style="background:transparent;color:var(--accent3);border:2px solid var(--accent3)"><span class="ic">☁</span>上傳付費檔到 Vercel</button>
+      <div class="tb-status" id="tb-status">尚未匯入檔案</div>
+    </div>
+
+    <div class="ctrls hidden" id="ctrls">
+      <label>模糊程度 <input type="range" id="blur-range" min="0" max="14" value="6"><span id="blur-val">6px</span></label>
+      <span class="demo">預覽：<span class="frost-sample" id="frost-sample">░▒▓█░▒▓█░▒</span></span>
+      <label style="flex:1 1 100%;margin-top:2px">🔓 頂端解鎖鈕連結 <input type="text" id="cta-url" value="https://yoda-wcyc.github.io/-/subscribe.html" style="flex:1;min-width:220px"></label>
+      <label>按鈕文字 <input type="text" id="cta-label" value="🔓 解鎖完整版" style="width:150px"></label>
+      <span class="demo" style="color:var(--pos)">✔ 匯出免費檔時自動強制注入文章頂端</span>
+      <label style="flex:1 1 100%;margin-top:2px"><input type="checkbox" id="wm-bake" checked style="width:16px;height:16px;accent-color:var(--gold)"> 付費檔烤入浮水印底層（每頁重複 <code style="font-family:var(--mono);color:var(--accent)">{{WATERMARK}}</code>，由會員系統 GAS 逐會員填入「編號 · mail」）</label>
+    </div>
+
+    <div class="empty" id="empty">
+      <div class="big">📄</div>
+      <h2>請先「匯入要編輯的檔案」</h2>
+      <p>選任一份報告 HTML：<b>關鍵報告 / 簡報 / 市場觀察 / 美股 / 台股 / AI泡沫 / 總經</b> 都支援，匯入時自動判母板類型並切段。<br>拖金軸＝粗調（線以下整批遮內容）；每段下方 <b>［標題］［內容］</b> 鈕＝逐段自由開關；上方滑桿調馬賽克模糊強弱。<br>付費報告免費分享時,自由拖斷點決定放行到哪。</p>
+    </div>
+
+    <div id="workspace" class="hidden">
+      <div class="legend">
+        <span><i class="dot f"></i>免費照給</span>
+        <span><i class="dot pr"></i>§9-5 保護·不可遮</span>
+        <span><i class="dot p"></i>已遮（馬賽克模糊）</span>
+      </div>
+      <div class="stage">
+        <div class="panel">
+          <div class="panel-head"><span class="name">📄 報告段落</span><span class="hint">拖金軸粗調 · 每段鈕細調</span></div>
+          <div id="editor"><div id="divider"><div class="line"></div><div class="handle"><span class="grip">⣿</span><span id="handle-label">斷點</span></div></div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><span class="name">👁 免費版讀者看到</span><span class="hint">即時預覽</span></div>
+          <div id="preview"></div>
+        </div>
+      </div>
+      <div class="summary">
+        <div class="sh">分版摘要＋安全驗證</div>
+        <div class="sbars">
+          <div class="sbar"><div class="lab"><span>免費全開</span><b id="free-count" style="color:var(--free)">–</b></div><div class="track"><div class="fill f" id="free-bar" style="width:0"></div></div></div>
+          <div class="sbar"><div class="lab"><span>已遮（進牆）</span><b id="paid-count" style="color:var(--paid)">–</b></div><div class="track"><div class="fill p" id="paid-bar" style="width:0"></div></div></div>
+        </div>
+        <div class="slist" id="split-list"></div>
+        <div id="verify-out"></div>
+        <div class="hint2">匯出前自動驗：被遮段的<b>真內容 0 字進免費檔</b>（模糊底下是馬賽克填充）。<code>免費檔</code>保留報告完整 CSS／外觀；<code>付費檔</code>是被遮段內容包，給 <code>會員系統\report-shell.html</code>。標題敏感度低、可能出現在 §01 導讀大綱，故驗證以「內容」為準。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 新增會員 -->
+<div class="modal-bg" id="addModal">
+  <div class="modal">
+    <h3>新增會員</h3>
+    <div class="hintbox">會即時寫入 Sheet。目前 GAS 只存 Email／密碼／推薦人（暱稱、方案是下一步再加的欄位）。</div>
+    <div class="fld"><label>Email（唯一識別）</label><input id="f-email" placeholder="name@example.com"></div>
+    <div class="fld"><label>臉書名稱（可留空）</label><input id="f-fbname" placeholder="他在臉書顯示的名字"></div>
+    <div class="fld"><label>會員密碼（≥6 字，需含英文與數字）</label><div class="pw-wrap"><input id="f-pw" type="password" placeholder="yoda123456"><button type="button" class="pw-eye" id="fpwEye" aria-label="顯示或隱藏密碼">👁</button></div></div>
+    <div class="fld"><label>推薦人代碼（可留空,例 R7K3P）</label><input id="f-ref" placeholder="R7K3P"></div>
+    <div class="fld"><label>首次扣款日（預設今天;留空＝待綠界）</label><input id="f-first" type="date"></div>
+    <div class="fld"><label>方案</label><select id="f-plan"><option value="創始">創始（早鳥 459）</option><option value="一般">一般（589）</option></select></div>
+    <div class="modal-btns">
+      <button class="btn-ghost" onclick="closeAdd()">取消</button>
+      <button class="btn-primary" onclick="saveAdd()">加入名單</button>
+    </div>
+  </div>
+</div>
+
+<!-- 通用彈窗（名單檢視等）-->
+<div class="modal-bg" id="genModal">
+  <div class="modal" style="max-width:640px">
+    <h3 id="genModalTitle"></h3>
+    <div id="genModalBody"></div>
+    <div class="modal-btns" id="genModalFoot"><button class="btn-ghost" onclick="closeModal()" style="flex:1;padding:11px">關閉</button></div>
+  </div>
+</div>
+
+<!-- 置中確認/提示/輸入彈窗（取代原生 confirm/alert/prompt，一律畫面正中間）-->
+<div class="modal-bg" id="uiModal">
+  <div class="modal" style="max-width:420px">
+    <div id="uiModalMsg" style="white-space:pre-wrap;line-height:1.7;font-size:14px"></div>
+    <input id="uiModalInput" style="display:none;width:100%;margin-top:12px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);font-family:inherit;font-size:14px">
+    <div class="modal-btns">
+      <button class="btn-ghost" id="uiModalCancel" style="flex:1;padding:11px">取消</button>
+      <button class="btn-primary" id="uiModalOk" style="flex:1;padding:11px">確定</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===== 置中彈窗：uiConfirm / uiAlert / uiPrompt（皆回傳 Promise，畫面正中間）===== */
+var _uiResolve=null, _uiMode='confirm';
+function _uiOpen(msg,mode,def){
+  return new Promise(function(resolve){
+    _uiResolve=resolve; _uiMode=mode;
+    document.getElementById('uiModalMsg').textContent=msg;
+    var inp=document.getElementById('uiModalInput');
+    if(mode==='prompt'){inp.style.display='block';inp.value=def==null?'':def;}else{inp.style.display='none';}
+    document.getElementById('uiModalCancel').style.display=(mode==='alert')?'none':'';
+    document.getElementById('uiModalOk').textContent=(mode==='alert')?'知道了':'確定';
+    document.getElementById('uiModal').classList.add('show');
+    if(mode==='prompt')setTimeout(function(){inp.focus();inp.select();},30);
+  });
+}
+function uiConfirm(msg){return _uiOpen(String(msg),'confirm');}
+function uiAlert(msg){return _uiOpen(String(msg),'alert');}
+function uiPrompt(msg,def){return _uiOpen(String(msg),'prompt',def);}
+function _uiClose(val){document.getElementById('uiModal').classList.remove('show');if(_uiResolve){var r=_uiResolve;_uiResolve=null;r(val);}}
+document.getElementById('uiModalOk').addEventListener('click',function(){_uiClose(_uiMode==='prompt'?document.getElementById('uiModalInput').value:true);});
+document.getElementById('uiModalCancel').addEventListener('click',function(){_uiClose(_uiMode==='prompt'?null:false);});
+document.getElementById('uiModalInput').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();document.getElementById('uiModalOk').click();}});
+document.getElementById('uiModal').addEventListener('click',function(e){if(e.target===this)_uiClose(_uiMode==='prompt'?null:false);});
+
+/* ===== 後端 ===== */
+var GAS_URL='https://script.google.com/macros/s/AKfycbwQQ02EzseXtzvHxH3yegvgvQKncv7ReoGaqqsVxzco6cdagOCW13Tr7KlwX2UJtPc7/exec';
+var KEY='';
+const TODAY='2026-08-03', CUR_MONTH='2026-08', FOUND_CAP=50;
+const PRICE={'創始':459,'一般':589};
+
+let members=[];            // 真資料：由 GAS adminData 載入後 map
+let referrals=[];          // GAS 尚未提供個別免費推薦紀錄 → 保持空
+let granted={};            // 本機暫存：已發放獎勵
+let reconDone={};          // 本機暫存：本月對帳結果
+
+/* ===== 登入 → 載入 ===== */
+const $=id=>document.getElementById(id);
+// 由 GAS(HtmlService)供頁時走 google.script.run（同源、免 CORS、免 exec 網址）；本機開啟則退回 fetch。
+function post(payload){
+  if(typeof google!=='undefined'&&google.script&&google.script.run){
+    return new Promise(function(resolve,reject){
+      google.script.run.withSuccessHandler(function(s){
+        try{ resolve(typeof s==='string'?JSON.parse(s):s); }catch(e){ reject(e); } // apiRouter 回 JSON 字串→parse
+      }).withFailureHandler(reject).apiRouter(payload);
+    });
+  }
+  return fetch(GAS_URL,{method:'POST',body:JSON.stringify(payload)}).then(r=>r.json());
+}
+$('loginBtn').onclick=login;
+$('adminKey').addEventListener('keydown',e=>{if(e.key==='Enter')login();});
+document.getElementById('fpwEye').addEventListener('click',function(){var i=$('f-pw');if(i.type==='password'){i.type='text';this.textContent='🙈';}else{i.type='password';this.textContent='👁';}});
+function login(){
+  KEY=$('adminKey').value.trim(); if(!KEY)return;
+  $('loginBtn').disabled=true; $('loginMsg').style.color='var(--dim)'; $('loginMsg').textContent='登入中…';
+  fetch('https://yoda-research-next.vercel.app/api/admin-data',{method:'POST',body:JSON.stringify({key:KEY})}).then(function(r){return r.json();}).then(res=>{
+    $('loginBtn').disabled=false;
+    if(res&&res.ok){try{localStorage.setItem('yoda_admin_key',KEY);}catch(e){}members=computeRefCounts((res.members||[]).map(mapMember));renderAll();$('login').style.display='none';$('app').style.display='block';}
+    else if(res&&res.error){$('loginMsg').style.color='var(--red)';$('loginMsg').textContent='後端回覆：'+res.error;}
+    else{$('loginMsg').style.color='var(--red)';$('loginMsg').textContent='連線失敗或回應異常';}
+  }).catch(function(){$('loginBtn').disabled=false;$('loginMsg').style.color='var(--red)';$('loginMsg').textContent='連線失敗（可能是本機 file:// CORS）';});
+}
+function mapMember(g){
+  const st=g.status==='active'?'有效':g.status==='cancelled'?'已取消':(g.status==='expired'||g.status==='late')?'逾期':(g.status||'有效');
+  return {id:g.member_id, pub:g.pub_id||'', name:(String(g.email||'').split('@')[0]||g.member_id), email:g.email||'',
+    plan:(g.plan==='一般'?'一般':'創始'), fb:g.fb_name||'', start:g.start_date||'', next:g.next_charge_date||'', status:st,
+    streak:Number(g.paid_periods)||0, ref:g.referred_by||'', refCode:g.ref_code||'',
+    comp:Number(g.granted)||0, paidRefs:Number(g.referred_paid_count)||0,
+    exFounding:/^(y|yes|true|1)$/i.test(String(g.ex_founding||'').trim()), // 曾取消·排除創始·回頭客
+    inPayments:g.in_payments===true,
+    paid:(typeof g.paid==='boolean')?g.paid:(g.status==='active'&&String(g.next_charge_date||'').trim()!=='')}; // 付費真偽：優先用後端算好的(Payments為主·扣款日為輔)，沒帶時退回扣款日proxy
+}
+/* 即時計算每位會員「帶進的推薦成效」：數 referred_by 指向此人 ref_code 的會員為 total，
+   其中有效且期數≥1 者為已付費 paidRefs——取代永遠為 0 的 referred_paid_count 欄。
+   同時把「推薦人」欄的 ref_code 解析成推薦人的會員編號，方便閱讀。與會員專區儀表板同邏輯。*/
+function computeRefCounts(list){
+  var byCode={};
+  list.forEach(function(m){ if(m.refCode) byCode[String(m.refCode).toUpperCase()]=m.id; });
+  list.forEach(function(ref){
+    var total=0, paid=0, rc=String(ref.refCode||'').toUpperCase();
+    if(rc){ list.forEach(function(x){
+      if(x.ref && String(x.ref).toUpperCase()===rc){ total++; if(x.status==='有效'&&(Number(x.streak)||0)>=1) paid++; }
+    }); }
+    ref.refTotal=total; ref.paidRefs=paid;
+    ref.refName = ref.ref ? (byCode[String(ref.ref).toUpperCase()]||ref.ref) : '';
+  });
+  return list;
+}
+function loadFromGAS(){
+  return fetch('https://yoda-research-next.vercel.app/api/admin-data',{method:'POST',body:JSON.stringify({key:KEY})}).then(function(r){return r.json();}).then(res=>{
+    if(!res||!res.ok)return false;
+    members=computeRefCounts((res.members||[]).map(mapMember));
+    renderAll(); return true;
+  }).catch(()=>false);
+}
+
+/* ===== 工具 ===== */
+const money=n=>'NT$'+n.toLocaleString();
+function addMonths(str,n){if(!str)return '';const d=new Date(str+'T00:00:00');if(isNaN(d))return str;const day=d.getDate();d.setMonth(d.getMonth()+n);if(d.getDate()<day)d.setDate(0);return d.toISOString().slice(0,10);}
+const monthOf=str=>String(str||'').slice(0,7);
+const dueThisMonth=m=>m.status!=='已取消'&&m.next&&monthOf(m.next)<=CUR_MONTH;
+const mById=id=>members.find(x=>x.id===id);
+function validRefs(id,type){ if(type==='付費'){const m=mById(id);return m?m.paidRefs:0;} return referrals.filter(r=>r.ref===id&&r.type===type&&r.valid).length; }
+
+/* 應送月數（§7-C 2N+1、一年封頂 6 月），與 GAS computeEarnedMonths 同邏輯 */
+function earnedMonths(P,R){var best=0;for(var N=1;N<=5;N++){if(R>=N&&P>=(2*N+1))best=Math.max(best,N);}if(R>=5&&P>=12)best=6;return best;}
+
+/* ===== 待辦 ===== */
+function c7Eligible(m){return m.status==='有效'&&earnedMonths(m.streak,m.paidRefs)>m.comp;}
+function todos(){
+  const out=[];
+  members.forEach(m=>{
+    if(c7Eligible(m)&&!granted[m.id+':c7']){
+      const owe=earnedMonths(m.streak,m.paidRefs)-m.comp;
+      out.push({kind:'c7',id:m.id,title:`${m.name}（${m.id}）達加碼標準`,
+        desc:`連續 <b>${m.streak}</b> 期 ＋ 帶進 <b>${m.paidRefs}</b> 位付費 → 應送 <b>${earnedMonths(m.streak,m.paidRefs)}</b> 月（已送 ${m.comp}）→ 去綠界<b>退 ${owe} 期款</b>`,key:'c7'});
+    }
+  });
+  members.filter(m=>m.status==='逾期').forEach(m=>{
+    out.push({kind:'late',id:m.id,title:`${m.name}（${m.id}）扣款逾期`,
+      desc:`原定 <b>${m.next}</b> 扣款失敗 → 私訊/來信提醒補款,或改標已取消`,key:'late'});
+  });
+  return out;
+}
+
+/* ===== 渲染：總覽 ===== */
+function renderDash(){
+  const foundUsed=members.length;
+  const paidM=members.filter(m=>m.paid);   // 只算真付費(Payments為主·扣款日為輔)，非只看 active
+  const late=members.filter(m=>m.status==='逾期').length;
+  const mrr=paidM.reduce((s,m)=>s+PRICE[m.plan],0);   // 月營收只計真付費者
+  const dueLeft=members.filter(m=>dueThisMonth(m)).length;
+  const td=todos();
+  $('kpis').innerHTML=`
+    <div class="kpi"><div class="l">付費會員</div><div class="v g">${paidM.length}</div></div>
+    <div class="kpi"><div class="l">本月待對帳</div><div class="v">${dueLeft}</div></div>
+    <div class="kpi"><div class="l">逾期</div><div class="v ${late?'r':''}">${late}</div></div>
+    <div class="kpi"><div class="l">預估月營收</div><div class="v">${money(mrr)}</div></div>
+    <div class="kpi"><div class="l">待發獎勵</div><div class="v ${td.filter(t=>t.kind!=='late').length?'gold':''}">${td.filter(t=>t.kind!=='late').length}</div></div>`;
+  const icoMap={c7:['c7','🎁'],late:['late','⚠️']};
+  $('todoList').innerHTML = td.length ? td.map(t=>{
+    const[cls,ico]=icoMap[t.kind];
+    return `<div class="todo-row">
+      <div class="todo-ico ${cls}">${ico}</div>
+      <div class="todo-main"><div class="t">${t.title}</div><div class="d">${t.desc}</div></div>
+      ${t.kind==='late'?`<button class="btn-done" onclick="gotoRecon()">前往處理</button>`
+        :`<button class="btn-done" onclick="markDone('${t.id}','${t.key}')">標記已發放</button>`}
+    </div>`;}).join('') : `<div class="empty">目前沒有待辦 🎉</div>`;
+  $('reconBadge').textContent=dueLeft||'';$('reconBadge').style.display=dueLeft?'inline-block':'none';
+  const rewardN=td.filter(t=>t.kind!=='late').length;
+  $('rewardBadge').textContent=rewardN||'';$('rewardBadge').style.display=rewardN?'inline-block':'none';
+}
+function markDone(id){
+  const m=mById(id); if(!m)return;
+  const owe=earnedMonths(m.streak,m.paidRefs)-m.comp;
+  if(owe<=0){toast('沒有待發月數');return;}
+  toast('寫入中…');
+  post({action:'adminGrant',key:KEY,memberId:id,months:owe}).then(res=>{
+    if(res&&res.ok){toast(`已標記發放 ${owe} 個月`);loadFromGAS();}else{toast((res&&res.error)||'失敗');}
+  }).catch(()=>toast('連線失敗'));
+}
+
+/* ===== 渲染：會員名單 ===== */
+function renderMembers(){
+  const q=$('memSearch').value.trim().toLowerCase();
+  const sf=$('memFilter').value;
+  const rows=members.filter(m=>{
+    if(sf==='paid'){if(!m.paid)return false;}
+    else if(sf==='unpaid'){if(m.paid)return false;}
+    else if(sf!=='all'&&m.status!==sf)return false;
+    if(q&&!(m.name.toLowerCase().includes(q)||m.email.toLowerCase().includes(q)||m.id.toLowerCase().includes(q)||(m.pub||'').toLowerCase().includes(q)))return false;
+    return true;
+  });
+  const cntEl=$('memCount');
+  if(cntEl){const lbl={paid:'真付費',unpaid:'一般',all:'全部',有效:'有效',逾期:'逾期',已取消:'已取消'}[sf]||sf; cntEl.textContent=lbl+'　共 '+rows.length+' 位';}
+  const dots=n=>Array.from({length:Math.max(3,n)},(_,i)=>`<span class="streak-dot ${i<n?'':'off'}"></span>`).join('');
+  $('memBody').innerHTML=rows.map(m=>{
+    const stCls=m.status==='有效'?'ok':m.status==='逾期'?'late':'cancel';
+    return `<tr>
+      <td><span class="id">${m.id}</span>${m.pub?`<div class="email" style="color:var(--gold)" title="會員端看到的公開亂碼編號">${m.pub}</div>`:''}</td>
+      <td><div>${m.name}${m.exFounding?' <span title="🌱 回頭草·曾取消訂閱又回來（已排除創始）" style="cursor:help">🌱</span>':''}</div><div class="email">${m.email}</div></td>
+      <td>${fbCell(m)}</td>
+      <td>${planBadge(m)}</td>
+      <td><span class="pill ${stCls}">${m.status}</span> ${m.paid?'<span class="paytag paid">付費</span>':'<span class="paytag gen">一般</span>'}</td>
+      <td>${m.start?'<span class="id">'+m.start+'</span>':'<span class="email">—</span>'}</td>
+      <td>${m.status==='已取消'?'—':dots(m.streak)+' <span class="id">'+m.streak+'</span>'}</td>
+      <td>${m.status==='已取消'?(m.next?'<span class="email" title="權益到期日·綠界已停止扣款">權益到 '+m.next+'</span>':'—'):(m.next||'—')}</td>
+      <td>${m.ref?'<span class="id" title="'+m.ref+'">'+(m.refName||m.ref)+'</span>':'<span class="email">—</span>'}</td>
+      <td><span class="id">${m.paidRefs}</span>${m.refTotal>m.paidRefs?'<span class="email" style="font-size:11px"> /'+m.refTotal+'</span>':''}</td>
+      <td>${m.comp?'<span class="id" style="color:var(--gold)">'+m.comp+'</span>':'<span class="email">0</span>'}</td>
+      <td>${m.status==='已取消'?'':`<button class="mini-act" onclick="giftMonth('${m.id}')">贈送月</button> <button class="mini-act" style="color:var(--gold,#e0a526);border-color:var(--gold,#e0a526)" onclick="cancelSub('${m.id}')">取消訂閱</button> `}<button class="mini-act" style="color:#ff6b6b;border-color:#ff6b6b" onclick="deleteMember('${m.id}')">刪除</button></td>
+    </tr>`;}).join('') || `<tr><td colspan="12"><div class="empty">沒有符合的會員</div></td></tr>`;
+}
+function fbCell(m){
+  const v=m.fb?escH(m.fb):'<span style="color:var(--dim)">—</span>';
+  return `<span style="cursor:pointer;border-bottom:1px dotted var(--border)" title="點擊編輯臉書名稱" onclick="editFb('${m.id}')">${v}</span>`;
+}
+async function editFb(id){
+  const m=mById(id);if(!m)return;
+  const v=await uiPrompt('會員 '+id+' 的臉書名稱：',m.fb||'');
+  if(v===null)return;
+  toast('寫入中…');
+  post({action:'adminSetMemberFb',key:KEY,memberId:id,fbName:v.trim()}).then(res=>{
+    if(res&&res.ok){toast('已更新臉書名稱');loadFromGAS();}else{toast((res&&res.error)||'失敗');}
+  }).catch(()=>toast('連線失敗'));
+}
+function planBadge(m){
+  const isF=m.plan!=='一般';
+  return `<span class="pill ${isF?'plan-f':'plan-n'}" style="cursor:pointer" title="點擊切換方案（會再確認）" onclick="askSetPlan('${m.id}','${isF?'創始':'一般'}')">${isF?'創始':'一般'}</span>`;
+}
+async function askSetPlan(id,cur){
+  const to=cur==='創始'?'一般':'創始';
+  if(!await uiConfirm('把會員 '+id+' 的方案從「'+cur+'」改成「'+to+'」？'))return;
+  toast('寫入中…');
+  post({action:'adminSetPlan',key:KEY,memberId:id,plan:to}).then(res=>{
+    if(res&&res.ok){toast('已改為 '+to);loadFromGAS();}else{toast((res&&res.error)||'失敗');}
+  }).catch(()=>toast('連線失敗'));
+}
+function giftMonth(id){
+  toast('寫入中…');
+  post({action:'adminGift',key:KEY,memberId:id}).then(res=>{
+    if(res&&res.ok){toast('已贈送 1 個月並推進扣款日');loadFromGAS();}else{toast((res&&res.error)||'失敗');}
+  }).catch(()=>toast('連線失敗'));
+}
+async function cancelSub(id){
+  const m=mById(id); if(!m)return;
+  if(!await uiConfirm('確定終止這位的訂閱扣款？\n\n會員：'+m.email+'（'+id+'）\n\n動作（不可逆）：\n· 綠界停用後續扣款\n· 標記為「已取消」\n· 永久排除創始優惠（她以後回來只給一般價）'))return;
+  toast('終止中…（打綠界需幾秒）');
+  post({action:'adminCancelMember',key:KEY,memberId:id}).then(res=>{
+    if(res&&res.ok){toast('已終止：綠界「'+(res.ecpayMsg||'停用成功')+'」·已標取消+排除創始');loadFromGAS();}
+    else toast((res&&res.error)||'終止失敗');
+  }).catch(()=>toast('連線失敗'));
+}
+async function deleteMember(id){
+  if(!await uiConfirm('確定刪除會員 '+id+'？\n此動作會從 Google Sheet 永久移除該列，無法復原。'))return;
+  toast('刪除中…');
+  post({action:'adminDelete',key:KEY,memberId:id}).then(res=>{
+    if(res&&res.ok){toast('已刪除 '+id);loadFromGAS();}else{toast((res&&res.error)||'刪除失敗');}
+  }).catch(()=>toast('連線失敗'));
+}
+
+/* ===== 渲染：本月對帳 ===== */
+function renderRecon(){
+  const due=members.filter(dueThisMonth).sort((a,b)=>String(a.next).localeCompare(String(b.next)));
+  $('reconProg').textContent=`共 ${due.length} 位待對帳（本月或更早）`;
+  $('reconList').innerHTML=due.map(m=>{
+    const overdue=monthOf(m.next)<CUR_MONTH;
+    return `<div class="recon-row">
+      <div class="recon-info">
+        <div class="n">${m.name} <span class="id">${m.id}</span> ${overdue?'<span class="pill late">逾期</span>':''}</div>
+        <div class="m">預定扣款 ${m.next} · ${m.plan} ${money(PRICE[m.plan])} · 連續 ${m.streak} 期</div>
+      </div>
+      <div class="recon-btns">
+        <button class="rb ok" onclick="recon('${m.id}','ok')">✓ 成功</button>
+        <button class="rb no" onclick="recon('${m.id}','no')">✗ 失敗</button></div>
+    </div>`;}).join('') || `<div class="empty">這個月沒有待對帳的會員</div>`;
+}
+/* 稽核：status 還是「訂閱中」但下次扣款日已逾期超過寬限天數。
+   多半是會員在綠界那邊自己取消、或卡片失效扣款失敗，而這裡沒對帳。只列不改。*/
+function loadLapsed(){
+  var box=$('lapsedBox'); if(!box)return;
+  box.innerHTML='<div class="hintbox">稽核中…</div>';
+  post({action:'adminLapsedActive',key:KEY}).then(function(r){
+    if(!r||!r.ok){ box.innerHTML='<div class="hintbox">讀取失敗：'+escH((r&&r.error)||'unknown action（GAS 可能尚未部署新版本）')+'</div>'; return; }
+    if(!r.count){ box.innerHTML='<div class="hintbox">✓ 沒有逾期未對帳的會員（寬限 '+r.graceDays+' 天，基準日 '+escH(r.today)+'）</div>'; return; }
+    box.innerHTML='<div class="hintbox">以下 <b>'+r.count+'</b> 位狀態還是「訂閱中」，但應扣款日已逾期超過 <b>'+r.graceDays+'</b> 天'
+      +'——多半是<b>在綠界那邊自己取消</b>或<b>卡片失效扣款失敗</b>。他們現在已被系統擋住（讀不到報告、不寄通知），請逐一確認。</div>'
+      +'<div class="recon-card">'+r.members.map(function(m){
+        return '<div class="recon-row"><div class="recon-info">'
+          +'<div class="n">'+escH(m.name||m.email)+' <span class="id">'+escH(m.memberId)+'</span> <span class="pill late">逾期 '+m.overdueDays+' 天</span></div>'
+          +'<div class="m">'+escH(m.email)+' · 應扣款日 '+escH(m.nextChargeDate)+' · '+escH(m.plan)+' · 連續 '+m.paidPeriods+' 期</div>'
+          +'</div><div class="recon-btns">'
+          +'<button class="rb ok" onclick=\'recon("'+escJs(m.memberId)+'","ok")\'>✓ 補記一期</button> '
+          +'<button class="rb no" onclick=\'cancelSub("'+escJs(m.memberId)+'")\'>終止訂閱</button>'
+          +'</div></div>';
+      }).join('')+'</div>';
+  }).catch(function(){ box.innerHTML='<div class="hintbox">連線失敗</div>'; });
+}
+/* 綠界狀態比對：綠界不會通知我們「會員自己取消了」，只會停止每期回拋。
+   這裡主動去查每張訂閱在綠界的 ExecStatus（0=已終止 1=執行中 2=期數跑完），
+   先試跑出報告，確認後才按「套用」把已停的標成取消（含永久排除創始）。*/
+function renderEcpaySync(r,applied){
+  var box=$('ecpaySyncBox'); if(!box)return;
+  var la=r.lastAuto;
+  var h=la?('<div class="hintbox" style="opacity:.8">上次自動比對：'+escH(la.at||'—')
+      +(la.ok?('　已查 '+(la.checked||0)+' 筆・綠界已停 '+(la.goneCount||0)+'・查詢失敗 '+(la.failedCount||0)
+              +(la.applied?'・已自動套用':'・僅報告未套用'))
+             :('　執行失敗：'+escH(la.error||'unknown')))
+      +'</div>'):'<div class="hintbox" style="opacity:.8">每日自動比對尚未跑過（要啟用請在 GAS 編輯器執行一次 installDailyEcpaySync）。</div>';
+  h+='<div class="hintbox">已查 <b>'+r.checked+'</b> 筆（單次上限 '+r.limit+'）：綠界仍在扣款 <b>'+r.liveCount+'</b> ・ '
+    +'綠界已停 <b style="color:var(--amber,#ff9f0a)">'+r.goneCount+'</b> ・ 查無單號 '+r.noTradeCount+' ・ 查詢失敗 '+r.failedCount+'</div>';
+  if(r.goneCount){
+    h+='<div class="hintbox">下列會員<b>在綠界那邊已經停止扣款</b>，但我們這裡還記成訂閱中。'
+      +(applied?'<b style="color:var(--green,#30d158)">（已套用：標為已取消＋永久排除創始，權益保留到原到期日）</b>'
+               :'<b>目前只是試跑，尚未改任何資料。</b>')+'</div>'
+      +'<div class="recon-card">'+r.gone.map(function(m){
+        return '<div class="recon-row"><div class="recon-info">'
+          +'<div class="n">'+escH(m.email)+' <span class="id">'+escH(m.memberId)+'</span> <span class="pill late">ExecStatus '+escH(m.execStatus)+'</span></div>'
+          +'<div class="m">'+escH(m.reason||'')+' · 綠界成功扣款 '+(m.totalSuccessTimes||0)+' 期 · 權益到 '+escH(m.nextChargeDate||'—')+'</div>'
+          +'</div></div>';
+      }).join('')+'</div>';
+    if(!applied) h+='<div style="margin:10px 0"><button class="mini-act" style="color:var(--red,#ff453a);border-color:var(--red,#ff453a)" onclick="applyEcpaySync()">套用：把上列 '+r.goneCount+' 位標為已取消</button></div>';
+  }
+  if(r.failedCount) h+='<div class="hintbox">查詢失敗 '+r.failedCount+' 筆（'+r.failed.map(function(m){return escH(m.memberId);}).join('、')+'）——沒查到就<b>不會</b>被動到，請稍後再跑一次。</div>';
+  if(r.noTradeCount) h+='<div class="hintbox">查無綠界單號 '+r.noTradeCount+' 筆（'+r.noTrade.map(function(m){return escH(m.memberId);}).join('、')+'）——多半是離線／創始付費者，本來就沒走綠界，不會被動到。</div>';
+  box.innerHTML=h;
+}
+function loadEcpaySync(){
+  var box=$('ecpaySyncBox'); if(!box)return;
+  box.innerHTML='<div class="hintbox">向綠界逐筆查詢中…（每筆約 1 秒，請稍候）</div>';
+  post({action:'adminSyncEcpayStatus',key:KEY}).then(function(r){
+    if(!r||!r.ok){ box.innerHTML='<div class="hintbox">讀取失敗：'+escH((r&&r.error)||'unknown action（GAS 可能尚未部署新版本）')+'</div>'; return; }
+    renderEcpaySync(r,false);
+  }).catch(function(){ box.innerHTML='<div class="hintbox">連線失敗</div>'; });
+}
+async function applyEcpaySync(){
+  if(!await uiConfirm('確定把「綠界已停止扣款」的會員標為已取消？\n\n動作（不可逆）：\n· 標記為「已取消」\n· 永久排除創始優惠\n· 權益保留到原到期日（不會提前斷）\n\n查詢失敗或查無單號的人不會被動到。'))return;
+  var box=$('ecpaySyncBox'); if(box) box.innerHTML='<div class="hintbox">套用中…</div>';
+  post({action:'adminSyncEcpayStatus',key:KEY,apply:true}).then(function(r){
+    if(!r||!r.ok){ box.innerHTML='<div class="hintbox">套用失敗：'+escH((r&&r.error)||'unknown')+'</div>'; return; }
+    renderEcpaySync(r,true); toast('已套用 '+(r.appliedIds||[]).length+' 位'); loadFromGAS();
+  }).catch(function(){ box.innerHTML='<div class="hintbox">連線失敗</div>'; });
+}
+function recon(id,r){
+  toast('寫入中…');
+  post({action:'adminRecon',key:KEY,memberId:id,result:r}).then(res=>{
+    if(res&&res.ok){toast(r==='ok'?'✓ 已記成功並推進期數':'✗ 已記失敗（標逾期）');loadFromGAS();}
+    else{toast((res&&res.error)||'失敗');}
+  }).catch(()=>toast('連線失敗'));
+}
+
+/* ===== 登入排查 · 選擇性補寄新密碼 ===== */
+function openStuckTool(){
+  toast('讀取中…');
+  post({action:'adminStuckCandidates',key:KEY}).then(res=>{
+    if(!res||!res.ok){toast((res&&res.error)||'讀取失敗（GAS 可能尚未部署新版本）');return;}
+    renderStuckModal(res.members||[]);
+  }).catch(()=>toast('連線失敗'));
+}
+function renderStuckModal(list){
+  const never=list.filter(m=>m.neverOpened), rest=list.filter(m=>!m.neverOpened);
+  const row=m=>'<div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--divider)">'
+    +'<input type="checkbox" class="stuck-chk" data-email="'+escH(m.email)+'"'+(m.neverOpened?' checked':'')+'>'
+    +'<div style="flex:1;min-width:0"><div style="font-size:13px;word-break:break-all">'+escH(m.email)+' <span style="color:var(--dim)">'+escH(m.pub_id)+'</span></div>'
+    +'<div style="font-size:11px;color:var(--dim)">訂閱起 '+escH(m.start_date||'—')+' · '+(m.neverOpened?'<b style="color:#ff6b6b">從未開啟報告</b>':('已開 '+m.opens+' 次·最近 '+escH(m.lastOpen)))+'</div></div>'
+    +'<button class="mini-act" onclick="sendResetTo(\''+escJs(m.email)+'\')">寄新密碼</button></div>';
+  let body='<div style="font-size:12px;color:var(--dim);line-height:1.6;margin-bottom:10px">「從未開啟報告」的付費會員最可能是登入卡住（已預設勾選）。勾選要補寄的人，強制寄一組新密碼到他 email。<br><b style="color:#e0a526">會覆蓋他現在的密碼——能正常使用的人不要勾。</b></div>';
+  body+='<div style="font-weight:700;margin:6px 0 2px;color:#ff6b6b">從未開啟報告（'+never.length+'）</div>'+(never.length?never.map(row).join(''):'<div style="color:var(--dim);font-size:12px;padding:6px 0">（無）</div>');
+  if(rest.length){ body+='<div style="font-weight:700;margin:14px 0 2px">已開過報告（'+rest.length+'·通常正常）</div>'+rest.map(row).join(''); }
+  openModal('登入排查 · 補寄新密碼',body,'<button class="btn-primary" onclick="sendResetBulk()" style="flex:1;padding:11px">強制寄新密碼給勾選的人</button>');
+}
+function sendResetTo(email){
+  uiConfirm('強制重設並寄新密碼給：\n'+email+'\n\n（會覆蓋他現在的密碼）').then(ok=>{ if(!ok)return;
+    toast('寄送中…');
+    post({action:'adminResetAndNotify',key:KEY,email:email}).then(res=>{
+      toast(res&&res.ok&&res.sent ? ('已寄新密碼 → '+email) : ((res&&res.error)||'寄送失敗'));
+    }).catch(()=>toast('連線失敗'));
+  });
+}
+async function sendResetBulk(){
+  const emails=Array.from(document.querySelectorAll('#genModal .stuck-chk:checked')).map(c=>c.dataset.email).filter(Boolean);
+  if(!emails.length){toast('先勾選要補寄的人');return;}
+  if(!await uiConfirm('強制重設並寄新密碼給勾選的 '+emails.length+' 位？\n\n會覆蓋他們現在的密碼，請確認只勾了「真的登不進去」的人。'))return;
+  toast('寄送中…');
+  let ok=0;
+  for(const em of emails){ try{ const r=await post({action:'adminResetAndNotify',key:KEY,email:em}); if(r&&r.ok&&r.sent)ok++; }catch(e){} }
+  toast('已補寄 '+ok+' / '+emails.length+' 位');
+}
+
+/* ===== 群發信給會員 ===== */
+function openBroadcast(){
+  const ist='width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);font-family:inherit;font-size:14px;box-sizing:border-box';
+  const body='<label style="font-size:12px;color:var(--dim)">主旨</label>'
+    +'<input id="bcSubj" placeholder="例：本週報告時程調整通知" style="'+ist+';margin:4px 0 10px">'
+    +'<label style="font-size:12px;color:var(--dim)">收件對象</label>'
+    +'<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:4px 0 10px">'
+      +'<select id="bcPlan" onchange="bcCount()" style="'+ist+';width:auto"><option value="all">全部有效會員</option><option value="__never__">只寄給「從未開啟報告」的人</option><option value="創始">創始</option><option value="一般">一般</option></select>'
+      +'<label style="font-size:12px;color:var(--dim);display:flex;align-items:center;gap:5px"><input type="checkbox" id="bcOptOut"> 排除已關閉通知的人</label>'
+    +'</div>'
+    +'<label style="font-size:12px;color:var(--dim)">內容（純文字即可，換行會保留；系統自動套品牌信頭信尾）</label>'
+    +'<textarea id="bcBody" placeholder="在這裡寫信給會員…" style="'+ist+';min-height:180px;margin:4px 0 8px;resize:vertical"></textarea>'
+    +'<div style="font-size:13px;color:var(--dim);margin-bottom:10px">預估收件：<b id="bcCount" style="color:var(--gold,#e0a526)">—</b> 位　<span style="font-size:11px">（Gmail 每日約 100 封上限，超過會自動明天補）</span></div>'
+    +'<div style="border-top:1px solid var(--divider);padding-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="font-size:12px;color:var(--dim)">先測試寄到：</span><input id="bcTest" placeholder="你的 email" style="'+ist+';width:auto;flex:1;min-width:150px"><button class="mini-act" onclick="bcSendTest()">寄測試</button></div>';
+  openModal('群發信給會員',body,'<button class="btn-primary" onclick="bcSend()" style="flex:1;padding:11px">確認寄出</button>');
+  bcCount();
+}
+function bcCount(){
+  const plan=($('bcPlan')||{}).value||'all', el=$('bcCount'); if(!el)return;
+  if(plan==='__never__'){ el.textContent='計算中…'; post({action:'adminStuckCandidates',key:KEY}).then(res=>{ el.textContent=(res&&res.ok)?(res.members||[]).filter(m=>m.neverOpened).length:'?'; }).catch(()=>{el.textContent='?';}); return; }
+  el.textContent=members.filter(m=>m.status==='有效'&&(plan==='all'||m.plan===plan)).length;
+}
+function bcSendTest(){
+  const to=($('bcTest').value||'').trim(), subj=($('bcSubj').value||'').trim(), body=$('bcBody').value||'';
+  if(!subj||!body.trim()){toast('先填主旨與內容');return;}
+  if(!to){toast('填一個測試 email');return;}
+  toast('寄測試中…');
+  post({action:'adminBroadcast',key:KEY,subject:subj,body:body,opts:{testTo:to}}).then(res=>{
+    toast(res&&res.ok?('測試已寄 → '+to+'（去收信確認版面）'):((res&&res.error)||'測試寄失敗'));
+  }).catch(()=>toast('連線失敗'));
+}
+async function bcSend(){
+  const subj=($('bcSubj').value||'').trim(), body=$('bcBody').value||'', plan=$('bcPlan').value, optOut=$('bcOptOut').checked;
+  if(!subj||!body.trim()){toast('主旨與內容都要填');return;}
+  const n=($('bcCount')||{}).textContent||'?';
+  const label=plan==='__never__'?'從未開啟報告的人':(plan==='all'?'全部有效會員':plan);
+  if(!await uiConfirm('確認群發這封信？\n\n主旨：'+subj+'\n對象：'+label+(optOut?'（排除已關閉通知）':'')+'\n預估 '+n+' 位\n\n寄出後無法收回。'))return;
+  toast('寄送中…（人多需要一點時間，請勿關閉）');
+  const opts=plan==='__never__'?{segment:'neverOpened'}:{plan:plan,respectOptOut:optOut};
+  post({action:'adminBroadcast',key:KEY,subject:subj,body:body,opts:opts}).then(res=>{
+    if(res&&res.ok){ closeModal(); toast('已寄 '+res.sent+' / '+res.total+(res.failed?'（失敗 '+res.failed+'）':'')+(res.skippedQuota?'｜配額略過 '+res.skippedQuota+'，明天再寄一次補完':'')); }
+    else toast((res&&res.error)||'寄送失敗');
+  }).catch(()=>toast('連線失敗'));
+}
+
+/* ===== 渲染：推薦與獎勵 ===== */
+function renderRewards(){
+  $('c7List').innerHTML=members.map(m=>{
+    const paid=m.paidRefs,owe=earnedMonths(m.streak,paid),done=granted[m.id+':c7'];
+    const nextTier=Math.min(5,Math.floor(m.streak/2));   // 粗略：下一階需求
+    return `<div class="reward-row">
+      <div class="who">${m.name} <span class="id">${m.id}</span> ${owe>m.comp?`<span class="pill plan-f">應送 ${owe-m.comp} 月</span>`:''}</div>
+      <div class="progbar"><i style="width:${Math.min(100,m.streak/12*100)}%"></i></div>
+      <div class="meta">連續期數 ${m.streak} ・ 帶進付費 ${paid} ・ 應送 ${owe} 月（已送 ${m.comp}）</div>
+    </div>`;}).join('')||`<div class="empty">尚無會員</div>`;
+  $('tierList').innerHTML=`<div class="empty">GAS 尚未追蹤「免費電子報推薦」<br>要開這欄位是下一步</div>`;
+}
+
+/* ===== 新增會員（寫入 GAS）===== */
+function openAdd(){$('f-first').value=new Date().toISOString().slice(0,10);if($('f-plan'))$('f-plan').value='創始';$('addModal').classList.add('show');}
+function closeAdd(){$('addModal').classList.remove('show');}
+/* 通用彈窗：title 標題、bodyHtml 內容、footHtml 額外按鈕（會附「關閉」）*/
+function openModal(title,bodyHtml,footHtml){
+  $('genModalTitle').innerHTML=title||'';
+  $('genModalBody').innerHTML=bodyHtml||'';
+  $('genModalFoot').innerHTML=(footHtml||'')+'<button class="btn-ghost" onclick="closeModal()" style="flex:1;padding:11px">關閉</button>';
+  $('genModal').classList.add('show');
+}
+function closeModal(){$('genModal').classList.remove('show');}
+function saveAdd(){
+  const email=$('f-email').value.trim(),pw=$('f-pw').value.trim(),ref=$('f-ref').value.trim(),first=$('f-first').value,plan=($('f-plan')&&$('f-plan').value)||'創始',fbname=($('f-fbname')&&$('f-fbname').value.trim())||'';
+  if(!email||!pw){toast('請填 Email 與密碼');return;}
+  toast('寫入中…');
+  post({action:'adminAdd',key:KEY,email:email,password:pw,referredBy:ref,firstCharge:first,plan:plan,fbName:fbname}).then(res=>{
+    if(res.ok){closeAdd();['f-email','f-pw','f-ref','f-first','f-fbname'].forEach(i=>$(i).value='');toast(`已加入 ${res.memberId}`);loadFromGAS();}
+    else{toast(res.error||'失敗');}
+  }).catch(()=>toast('連線失敗'));
+}
+
+/* ===== 導覽 / 通用 ===== */
+function switchView(v){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.v===v));
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('show'));
+  $('v-'+v).classList.add('show');
+  if(v==='support'){renderCannedList();loadSupport();}
+  if(v==='traffic')loadTraffic();
+  if(v==='waitlist')loadWaitlist();
+  if(v==='reports')loadReports();
+  if(v==='paidreports')loadPaidReports();
+}
+
+/* ===== 創始搶先名單 ===== */
+let waitlist=[];
+function loadWaitlist(){
+  return post({action:'adminWaitlist',key:KEY}).then(res=>{
+    if(res&&res.ok){waitlist=res.rows||[];renderWaitlist();updateVipBadge();return true;}
+    const b=$('wlBody');if(b)b.innerHTML='<tr><td colspan="7" style="color:var(--amber)">讀取失敗：'+escH((res&&res.error)||'後端尚未支援 adminWaitlist，請重新部署 Code.gs')+'</td></tr>';
+    return false;
+  }).catch(()=>{const b=$('wlBody');if(b)b.innerHTML='<tr><td colspan="7" style="color:var(--red)">連線失敗</td></tr>';return false;});
+}
+function updateVipBadge(){const b=$('vipBadge');if(b){b.textContent=waitlist.length||'';b.style.display=waitlist.length?'inline-block':'none';}}
+function renderWaitlist(){
+  const body=$('wlBody');if(!body)return;
+  const q=(($('wlSearch')&&$('wlSearch').value)||'').trim().toLowerCase();
+  const confN=waitlist.filter(r=>r.confirmed).length;
+  const stat=$('wlStat');if(stat)stat.textContent=waitlist.length?('已確認創始 '+confN+' / 登記 '+waitlist.length):'';
+  const list=waitlist.filter(r=>!q||String(r.email||'').toLowerCase().includes(q));
+  const chkAll=$('wlChkAll');if(chkAll)chkAll.checked=false;
+  if(!list.length){body.innerHTML='<tr><td colspan="7" style="color:var(--dim)">'+(q?'查無符合的 Email。':'目前還沒有人登記創始搶先。')+'</td></tr>';return;}
+  body.innerHTML=list.map(r=>{
+    const isUrl=/^https?:\/\//i.test(r.post||'');
+    const link=r.post?(isUrl?('<a href="'+escH(r.post)+'" target="_blank" rel="noopener" style="color:var(--accent);white-space:nowrap">連結 ↗</a>'):('<span title="'+escH(r.post)+'" style="color:var(--dim)">'+escH(String(r.post).slice(0,16))+'</span>')):'<span style="color:var(--dim)">—</span>';
+    const notified=r.notified?('<span style="color:var(--green)">✓ '+escH(r.notified)+'</span>'):'<span style="color:var(--dim)">未</span>';
+    const eArg=String(r.email||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const confirm=r.confirmed
+      ?('<span class="pill plan-f">✓ 已確認 '+escH(r.confirmed)+'</span>')
+      :(r.email?('<button class="mini-act" style="color:var(--gold);border:1px solid var(--gold);border-radius:8px;padding:4px 8px" onclick="confirmFounding(\''+eArg+'\')">✓ 確認送進創始名單</button>'):'<span style="color:var(--dim)">—</span>');
+    const fb=r.fbName?escH(r.fbName):'<span style="color:var(--dim)">—</span>';
+    const chk=r.email?('<input type="checkbox" class="wl-chk" data-email="'+escH(r.email)+'">'):'';
+    return '<tr><td style="color:var(--dim);white-space:nowrap">'+fmtTs(r.ts)+'</td><td>'+escH(r.email)+'</td><td>'+fb+'</td><td>'+link+'</td><td>'+notified+'</td><td>'+confirm+'</td><td style="text-align:center">'+chk+'</td></tr>';
+  }).join('');
+}
+function toggleAllWaitlist(cb){document.querySelectorAll('#wlBody .wl-chk').forEach(c=>{c.checked=cb.checked;});}
+async function confirmAllWaitlist(){
+  const emails=waitlist.filter(r=>r.email&&!r.confirmed).map(r=>r.email);
+  if(!emails.length){toast('沒有待確認的登記');return;}
+  if(!await uiConfirm('把全部 '+emails.length+' 筆未確認的登記送進創始名單？\n\n⚠️ 此確認不可撤銷。'))return;
+  toast('確認中…');
+  (async()=>{
+    let ok=0;
+    for(const email of emails){try{const res=await post({action:'adminConfirmFounding',key:KEY,email:email});if(res&&res.ok)ok++;}catch(e){}}
+    toast('已確認 '+ok+' / '+emails.length+' 筆');loadWaitlist();
+  })();
+}
+async function deleteSelectedWaitlist(){
+  const emails=Array.from(document.querySelectorAll('#wlBody .wl-chk:checked')).map(c=>c.dataset.email).filter(Boolean);
+  if(!emails.length){toast('先勾選要刪除的登記');return;}
+  if(!await uiConfirm('確定刪除勾選的 '+emails.length+' 筆登記？\n此動作會從 Waitlist 永久移除，無法復原。'))return;
+  toast('刪除中…');
+  (async()=>{
+    let ok=0;
+    for(const email of emails){try{const res=await post({action:'adminDeleteWaitlist',key:KEY,email:email});if(res&&res.ok)ok++;}catch(e){}}
+    toast('已刪除 '+ok+' / '+emails.length+' 筆');loadWaitlist();
+  })();
+}
+async function confirmFounding(email){
+  if(!await uiConfirm('確認「'+email+'」已公開分享，送進創始名單？\n\n⚠️ 此動作不可撤銷。'))return;
+  toast('寫入中…');
+  post({action:'adminConfirmFounding',key:KEY,email:email}).then(res=>{
+    if(res&&res.ok){toast(res.already?'先前已確認過':'已確認創始 '+email);loadWaitlist();}
+    else{toast((res&&res.error)||'失敗');}
+  }).catch(()=>toast('連線失敗'));
+}
+
+/* ===== 流量 ===== */
+function loadTraffic(){
+  const days=($('trfDays')&&$('trfDays').value)||'0';
+  return post({action:'adminTraffic',key:KEY,days:Number(days)||0}).then(res=>{
+    if(!res||!res.ok)return false; renderTraffic(res); return true;
+  }).catch(()=>false);
+}
+function trfKpi(label,val){return '<div class="panel" style="flex:1;min-width:120px;padding:14px 16px"><div style="font-size:12px;color:var(--dim)">'+label+'</div><div style="font-size:26px;font-weight:800;margin-top:4px">'+val+'</div></div>';}
+function pageLabel(p){if(p==='home')return '🏠 首頁';return String(p).replace(/\.html$/,'');}
+function renderTraffic(d){
+  $('trfKpis').innerHTML=trfKpi('總瀏覽',d.total||0)+trfKpi('不重複訪客',d.uniq||0)+trfKpi('有流量頁數',(d.pages||[]).length);
+  const daily=d.daily||[],max=Math.max.apply(null,[1].concat(daily.map(x=>x.views)));
+  $('trfDaily').innerHTML=daily.length?daily.map(x=>'<div title="'+x.date+'：'+x.views+' 次" style="flex:1;min-width:4px;background:var(--accent);border-radius:2px 2px 0 0;height:'+Math.max(2,Math.round(x.views/max*100))+'%"></div>').join(''):'<div style="color:var(--dim)">尚無資料</div>';
+  $('trfBody').innerHTML=(d.pages||[]).map(p=>'<tr><td>'+escH(pageLabel(p.page))+'</td><td>'+p.views+'</td><td>'+p.uniq+'</td><td style="color:var(--dim)">'+fmtTs(p.last)+'</td></tr>').join('')||'<tr><td colspan="4" style="color:var(--dim)">尚無資料</td></tr>';
+}
+
+/* ===== 客服工單 ===== */
+let tickets=[];
+function escH(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function loadSupport(){
+  return post({action:'adminSupportList',key:KEY}).then(res=>{
+    if(res&&res.ok){tickets=res.tickets||[];renderSupport();updateSupBadge();return true;}
+    return false;
+  }).catch(()=>false);
+}
+function updateSupBadge(){
+  const n=tickets.filter(t=>t.status==='new').length, b=$('supBadge');
+  if(b){b.textContent=n||'';b.style.display=n?'inline-block':'none';}
+}
+function fmtTs(v){if(!v)return '';const d=new Date(v);return isNaN(d)?String(v):d.toLocaleString('sv-SE',{timeZone:'Asia/Taipei'}).slice(0,16);}
+function renderSupport(){
+  const box=$('supList');if(!box)return;
+  const f=($('supFilter')&&$('supFilter').value)||'all';
+  const list=tickets.filter(t=>f==='all'||t.status===f);
+  if(!list.length){box.innerHTML='<div style="color:var(--dim);padding:20px 4px">目前沒有'+(f==='all'?'':('「'+f+'」的'))+'工單。</div>';return;}
+  const stColor={'new':'var(--red)','處理中':'var(--amber)','已回覆':'#2997ff','已解決':'var(--green)'};
+  const inSt='background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 10px;font-family:inherit;font-size:13px;width:100%';
+  box.innerHTML=list.map(t=>{
+    const c=stColor[t.status]||'var(--dim)';
+    const mid=t.member_id?(' · 會員 '+escH(t.member_id)):' · 非會員';
+    const opt=s=>'<option'+(t.status===s?' selected':'')+'>'+s+'</option>';
+    return '<div class="panel" style="margin-bottom:12px">'
+      +'<div class="panel-h" style="display:flex;justify-content:space-between;align-items:center;gap:8px">'
+      +'<span><span style="display:inline-block;min-width:8px;height:8px;border-radius:50%;background:'+c+';margin-right:8px"></span>'
+      +escH(t.category||'未分類')+(t.subject?(' · '+escH(t.subject)):'')+'</span>'
+      +'<span style="color:var(--dim);font-weight:400;font-size:12px">'+escH(t.ticket_id)+' · '+fmtTs(t.ts)+'</span></div>'
+      +'<div style="padding:12px 16px">'
+      +'<div style="font-size:13px;color:var(--dim);margin-bottom:8px">寄件：'+escH(t.email)+mid+'</div>'
+      +'<div style="white-space:pre-wrap;font-size:14px;background:var(--surface);border:1px solid var(--divider);border-radius:8px;padding:10px 12px;margin-bottom:12px">'+escH(t.message)+'</div>'
+      +'<label style="font-size:12px;color:var(--dim)">狀態</label>'
+      +'<select id="st_'+t.ticket_id+'" style="'+inSt+';margin:4px 0 10px">'+opt('new')+opt('處理中')+opt('已回覆')+opt('已解決')+'</select>'
+      +'<label style="font-size:12px;color:var(--dim)">解決方案</label>'
+      +'<textarea id="sol_'+t.ticket_id+'" style="'+inSt+';min-height:60px;margin:4px 0 10px;resize:vertical">'+escH(t.solution)+'</textarea>'
+      +'<label style="font-size:12px;color:var(--dim)">修正計畫</label>'
+      +'<textarea id="fix_'+t.ticket_id+'" style="'+inSt+';min-height:60px;margin:4px 0 10px;resize:vertical">'+escH(t.fix_plan)+'</textarea>'
+      +'<button class="btn-primary" onclick="saveSupport(\''+t.ticket_id+'\')">儲存狀態/方案</button>'
+      +(t.handled_at?('<span style="color:var(--dim);font-size:12px;margin-left:10px">上次處理：'+fmtTs(t.handled_at)+'</span>'):'')
+      +'<div style="border-top:1px solid var(--divider);margin:14px 0 10px"></div>'
+      +(t.email
+        ? '<label style="font-size:12px;color:var(--dim)">回覆讀者（會 email 寄到 '+escH(t.email)+'）</label>'
+          +'<div style="display:flex;gap:6px;align-items:center;margin:4px 0 6px;flex-wrap:wrap">'
+            +'<select onchange="applyCanned(\''+t.ticket_id+'\',this.value);this.selectedIndex=0" style="'+inSt+';flex:1;min-width:150px;max-width:300px">'
+              +'<option value="">常用回覆…（點選填入）</option>'+cannedOptionsHtml()
+            +'</select>'
+            +'<button class="mini-act" onclick="addCanned(\''+t.ticket_id+'\')">＋存為常用</button>'
+            +'<button class="mini-act" onclick="manageCanned()">管理</button>'
+          +'</div>'
+          +'<textarea id="rep_'+t.ticket_id+'" placeholder="輸入要寄給讀者的回覆內容…" style="'+inSt+';min-height:72px;margin:4px 0 10px;resize:vertical"></textarea>'
+          +'<button class="btn-primary" style="background:linear-gradient(135deg,#2997ff,#5f8bff)" onclick="replySupport(\''+t.ticket_id+'\')">✉ 回覆並寄出</button>'
+        : '<div style="font-size:12px;color:var(--amber)">此工單沒有留 email，無法直接回覆（請改用其他管道）。</div>')
+      +'</div></div>';
+  }).join('');
+}
+async function replySupport(id){
+  const ta=$('rep_'+id), txt=((ta&&ta.value)||'').trim();
+  if(!txt){toast('請先輸入回覆內容');return;}
+  const t=tickets.find(x=>x.ticket_id===id);
+  if(!await uiConfirm('寄出這則回覆到 '+((t&&t.email)||'讀者')+'？\n\n'+txt.slice(0,140)+(txt.length>140?'…':'')))return;
+  toast('寄送中…');
+  post({action:'adminSupportReply',key:KEY,ticketId:id,reply:txt}).then(res=>{
+    if(res&&res.ok){toast('已回覆並寄出 → '+(res.to||''));loadSupport();}
+    else{toast((res&&res.error)||'回覆失敗（GAS 可能尚未部署新版本）');}
+  }).catch(()=>toast('連線失敗'));
+}
+/* ===== 常用回覆（罐頭回覆）· 存在本機瀏覽器 localStorage ===== */
+function getCanned(){ try{return JSON.parse(localStorage.getItem('yoda_canned')||'[]');}catch(e){return [];} }
+function setCanned(a){ try{localStorage.setItem('yoda_canned',JSON.stringify(a));}catch(e){} }
+function cannedOptionsHtml(){ return getCanned().map(function(c,i){return '<option value="'+i+'">'+escH(c.name)+'</option>';}).join(''); }
+function applyCanned(id,idx){ if(idx===''||idx==null)return; const c=getCanned()[Number(idx)]; if(!c)return; const ta=$('rep_'+id); if(ta){ ta.value = ta.value.trim() ? (ta.value.replace(/\s+$/,'')+'\n'+c.text) : c.text; ta.focus(); } }
+async function addCanned(id){ const ta=$('rep_'+id); const txt=((ta&&ta.value)||'').trim(); if(!txt){toast('先在回覆框輸入內容，再存為常用');return;} let name=await uiPrompt('這則常用回覆取個名稱（方便之後選）：', txt.slice(0,16)); if(name===null)return; name=(name.trim())||txt.slice(0,16); const a=getCanned(); a.push({name:name,text:txt}); setCanned(a); toast('已存為常用：'+name); renderSupport(); }
+function manageCanned(){ const a=getCanned(); if(!a.length){ openModal('常用回覆','<div style="color:var(--dim);line-height:1.7">還沒有常用回覆。<br>在任一工單的回覆框輸入內容後，按「＋存為常用」就能新增；之後從「常用回覆…」下拉直接選用。</div>',''); return; } const html=a.map(function(c,i){return '<div style="display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--border)"><div style="flex:1;min-width:0"><div style="font-weight:700;margin-bottom:2px">'+escH(c.name)+'</div><div style="font-size:12px;color:var(--dim);white-space:pre-wrap;word-break:break-word">'+escH(c.text)+'</div></div><button class="mini-act" style="color:#ff6b6b;border-color:#ff6b6b;flex:0 0 auto" onclick="delCanned('+i+')">刪除</button></div>';}).join(''); openModal('常用回覆（'+a.length+' 則）',html,''); }
+function delCanned(i){ const a=getCanned(); a.splice(i,1); setCanned(a); toast('已刪除'); renderSupport(); renderCannedList(); if(document.getElementById('genModal').classList.contains('show'))manageCanned(); }
+/* 常駐面板：列出所有常用回覆，可複製/刪除 */
+function renderCannedList(){
+  const box=$('cannedList'); if(!box)return;
+  const a=getCanned();
+  if(!a.length){ box.innerHTML='<div style="color:var(--dim);font-size:13px;line-height:1.7">還沒有常用回覆。按右上「＋ 新增常用回覆」建立；建立後這裡可一鍵複製，工單回覆框也能直接下拉選用。</div>'; return; }
+  box.innerHTML=a.map(function(c,i){return '<div style="display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--divider)">'
+    +'<div style="flex:1;min-width:0"><div style="font-weight:700;margin-bottom:2px">'+escH(c.name)+'</div><div style="font-size:12px;color:var(--dim);white-space:pre-wrap;word-break:break-word">'+escH(c.text)+'</div></div>'
+    +'<button class="mini-act" onclick="copyCanned('+i+')">複製</button>'
+    +'<button class="mini-act" style="color:#ff6b6b;border-color:#ff6b6b" onclick="delCanned('+i+')">刪除</button>'
+    +'</div>';}).join('');
+}
+function copyCanned(i){ const c=getCanned()[i]; if(!c)return; const done=function(){toast('已複製：'+(c.name||''));}; if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(c.text).then(done,function(){fallbackCopy(c.text,done);}); } else fallbackCopy(c.text,done); }
+function fallbackCopy(text,cb){ try{ const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); cb&&cb(); }catch(e){ toast('複製失敗，請手動選取'); } }
+function addCannedDirect(){
+  const body='<label style="font-size:12px;color:var(--dim)">名稱（方便辨識，可留空）</label>'
+    +'<input id="ncName" placeholder="例：退費說明" style="width:100%;margin:4px 0 10px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);font-family:inherit;font-size:14px">'
+    +'<label style="font-size:12px;color:var(--dim)">回覆內容</label>'
+    +'<textarea id="ncText" placeholder="輸入常用回覆內容…" style="width:100%;margin:4px 0 0;min-height:120px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);font-family:inherit;font-size:14px;resize:vertical"></textarea>';
+  const foot='<button class="btn-primary" onclick="saveCannedDirect()" style="flex:1;padding:11px">儲存</button>';
+  openModal('新增常用回覆',body,foot);
+  setTimeout(function(){const e=$('ncName');if(e)e.focus();},30);
+}
+function saveCannedDirect(){
+  const name=($('ncName')?$('ncName').value:'').trim(), text=($('ncText')?$('ncText').value:'').trim();
+  if(!text){toast('請輸入回覆內容');return;}
+  const a=getCanned(); a.push({name:name||text.slice(0,16),text:text}); setCanned(a);
+  closeModal(); toast('已新增常用回覆'); renderCannedList(); renderSupport();
+}
+function saveSupport(id){
+  const st=$('st_'+id).value, sol=$('sol_'+id).value, fix=$('fix_'+id).value;
+  post({action:'adminSupportUpdate',key:KEY,ticketId:id,fields:{status:st,solution:sol,fix_plan:fix}}).then(res=>{
+    if(res&&res.ok){toast('已儲存 '+id);loadSupport();}else{toast((res&&res.error)||'儲存失敗');}
+  }).catch(()=>toast('連線失敗'));
+}
+function gotoRecon(){switchView('recon');}
+$('tabs').addEventListener('click',e=>{const t=e.target.closest('.tab');if(t)switchView(t.dataset.v);});
+function setTheme(t){document.documentElement.setAttribute('data-theme',t);document.querySelectorAll('[onclick*="setTheme"]').forEach(b=>b.classList.toggle('active',b.textContent===({dark:'深',light:'淺'})[t]));}
+let toastTimer;
+function toast(msg){const el=$('toast');el.textContent=msg;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2200);}
+function renderAll(){renderDash();renderMembers();renderRecon();renderRewards();loadSupport();loadWaitlist();}
+function logout(){try{localStorage.removeItem('yoda_admin_key');}catch(e){}location.reload();}
+// 記住密碼：開頁時若已存過就自動登入
+(function(){try{var s=localStorage.getItem('yoda_admin_key');if(s){$('adminKey').value=s;login();}}catch(e){}})();
+
+/* ============================================================
+   報告管理分頁:讀 reports.json(全清單)+ GAS overrides,軟下架/改標題
+   ============================================================ */
+var reportRows=[], reportOv={}, paidSet={}, paidFiles=[];
+function loadReports(){
+  var box=$('repBody'); if(box) box.innerHTML='<tr><td colspan="7"><div class="empty">載入中…</div></td></tr>';
+  Promise.all([
+    fetch('https://yoda-wcyc.github.io/-/reports.json',{cache:'no-store'}).then(function(r){return r.json();}).catch(function(){return null;}),
+    post({action:'adminReportOverrides',key:KEY}).catch(function(){return null;}),
+    post({action:'adminListPaid',key:KEY}).catch(function(){return null;})
+  ]).then(function(res){
+    var rj=res[0], ov=res[1], pd=res[2];
+    reportOv=(ov&&ov.ok&&ov.overrides)||{};
+    paidSet={}; paidFiles=((pd&&pd.ok&&pd.reports)||[]); paidFiles.forEach(function(x){ paidSet[x.reportId]=true; });
+    var hist=(rj&&rj.history)||[];
+    reportRows=hist.slice().sort(function(a,b){return String(b.date).localeCompare(String(a.date));});
+    var cats=[]; reportRows.forEach(function(r){ if(cats.indexOf(r.cat)<0)cats.push(r.cat); }); cats.sort();
+    var sel=$('repFilter'), cur=sel?sel.value:'all';
+    if(sel){ sel.innerHTML='<option value="all">全部類型</option>'+cats.map(function(c){return '<option value="'+escH(c)+'">'+escH(c)+'</option>';}).join(''); sel.value=cur||'all'; }
+    renderReports();
+  });
+}
+function derivedTitle(file){ return String(file).replace(/\.html$/,'').replace(/_/g,' '); }
+function renderReports(){
+  if(!$('repBody'))return;
+  var q=($('repSearch').value||'').trim().toLowerCase(), cf=$('repFilter').value, vf=$('repVis').value;
+  var rows=reportRows.filter(function(r){
+    var ov=reportOv[r.file]||{}, hidden=!!ov.hidden;
+    if(cf!=='all'&&r.cat!==cf)return false;
+    if(vf==='shown'&&hidden)return false;
+    if(vf==='hidden'&&!hidden)return false;
+    if(q){ var t=(ov.title||derivedTitle(r.file)).toLowerCase(); if(t.indexOf(q)<0&&String(r.file).toLowerCase().indexOf(q)<0)return false; }
+    return true;
+  });
+  $('repBody').innerHTML=rows.map(function(r){
+    var i=reportRows.indexOf(r), ov=reportOv[r.file]||{}, hidden=!!ov.hidden, title=ov.title||'';
+    var paidId='付費_'+String(r.file).replace(/\.html?$/i,''), hasPaid=!!paidSet[paidId];
+    return '<tr>'
+      +'<td><span class="pill '+(r.cat==='關鍵報告'?'plan-f':'plan-n')+'">'+escH(r.cat)+'</span></td>'
+      +'<td>'+escH(r.date)+'</td>'
+      +'<td><span class="email">'+escH(r.file)+'</span></td>'
+      +'<td><input class="search" style="min-width:200px;padding:6px 9px" id="rept_'+i+'" value="'+escH(title)+'" placeholder="'+escH(derivedTitle(r.file))+'"></td>'
+      +'<td>'+(hidden?'<span class="pill late">已下架</span>':'<span class="pill ok">顯示中</span>')+'</td>'
+      +'<td>'+(hasPaid?'<span class="pill ok">有</span>':'<span class="email">無</span>')+'</td>'
+      +'<td style="white-space:nowrap">'
+        +'<button class="mini-act" onclick="saveReport('+i+')">存標題</button> '
+        +'<button class="mini-act" onclick="toggleHide('+i+')" style="color:'+(hidden?'var(--green)':'#ff6b6b')+'">'+(hidden?'上架':'下架')+'</button>'
+        +(hasPaid?' <button class="mini-act" onclick="deletePaid('+i+')" style="color:#ff6b6b">刪付費檔</button>':'')
+      +'</td></tr>';
+  }).join('')||'<tr><td colspan="7"><div class="empty">沒有符合的報告</div></td></tr>';
+}
+function saveReport(i){
+  var r=reportRows[i]; if(!r)return; var title=$('rept_'+i).value.trim();
+  toast('寫入中…');
+  post({action:'adminSetReportOverride',key:KEY,file:r.file,fields:{title:title}}).then(function(res){
+    if(res&&res.ok){ reportOv[r.file]=reportOv[r.file]||{}; reportOv[r.file].title=title; toast('已更新標題'); }
+    else toast((res&&res.error)||'失敗');
+  }).catch(function(){toast('連線失敗');});
+}
+function toggleHide(i){
+  var r=reportRows[i]; if(!r)return; var ov=reportOv[r.file]||{}, next=!ov.hidden;
+  toast('寫入中…');
+  post({action:'adminSetReportOverride',key:KEY,file:r.file,fields:{hidden:next}}).then(function(res){
+    if(res&&res.ok){ reportOv[r.file]=reportOv[r.file]||{}; reportOv[r.file].hidden=next; renderReports(); toast(next?'已下架':'已上架'); }
+    else toast((res&&res.error)||'失敗');
+  }).catch(function(){toast('連線失敗');});
+}
+async function deletePaid(i){
+  var r=reportRows[i]; if(!r)return;
+  var paidId='付費_'+String(r.file).replace(/\.html?$/i,'');
+  if(!await uiConfirm('刪除付費檔?\n'+paidId+'.html\n(丟進 Drive 垃圾桶,可救回;會員將讀不到這篇完整版)'))return;
+  toast('刪除中…');
+  post({action:'adminDeleteReport',key:KEY,reportId:paidId}).then(function(res){
+    if(res&&res.ok){ delete paidSet[paidId]; renderReports(); toast('已刪付費檔(垃圾桶可救回)'); }
+    else toast((res&&res.error)||'失敗');
+  }).catch(function(){toast('連線失敗');});
+}
+/* 付費報告管理分頁：獨立載入 Drive 付費檔清單 */
+function loadPaidReports(){
+  var box=$('paidBody'); if(box) box.innerHTML='<tr><td colspan="5"><div class="empty">載入中…</div></td></tr>';
+  loadMailQuota();
+  post({action:'adminListPaid',key:KEY}).then(function(pd){
+    paidFiles=((pd&&pd.ok&&pd.reports)||[]); paidSet={}; paidFiles.forEach(function(x){ paidSet[x.reportId]=true; });
+    renderPaidFiles(pd);
+  }).catch(function(){ renderPaidFiles({ok:false,error:'連線失敗'}); });
+}
+/* 今日剩餘寄信額度（Gmail 每日約 100 封，過午夜太平洋時間重置）*/
+function loadMailQuota(){
+  var el=$('mailQuota'); if(!el)return;
+  post({action:'adminMailQuota',key:KEY}).then(function(r){
+    if(!r||!r.ok)return;
+    var n=r.remaining, col=(n<=0?'#ff6b6b':(n<20?'var(--gold,#e0a526)':'var(--green,#30d158)'));
+    if(r.resend){
+      var rl=(r.resendLeft!=null?r.resendLeft:'—'), rc=(r.resendCap||100), rcol=(rl<=0?'#ff6b6b':(rl<20?'var(--gold,#e0a526)':'var(--green,#30d158)'));
+      el.innerHTML='<b style="color:var(--green,#30d158)">Resend 主寄</b> 今日剩 <b style="color:'+rcol+'">'+rl+'</b> / '+rc+' 封 ・ Gmail 備援剩 <b style="color:'+col+'">'+n+'</b>';
+    }else{
+      el.innerHTML='寄信：Gmail 今日剩 <b style="color:'+col+'">'+n+'</b> 封'+(n<=0?'（已用光，明天重置）':'')+' ・ <span style="color:var(--gold,#e0a526)">尚未接 Resend</span>';
+    }
+  }).catch(function(){});
+}
+/* Vercel Blob 的 uploadedAt 是 UTC ISO 字串（例 2026-08-21T22:14:33.000Z）。
+   直接 slice(0,10) 會拿到 UTC 日期——台灣早上 8 點前上傳的檔案會少一天。一律轉成台北時間顯示。*/
+function twTime(v){
+  if(!v) return '';
+  var d=new Date(v);
+  if(isNaN(d.getTime())) return String(v).slice(0,16).replace('T',' ');
+  var t=new Date(d.getTime()+8*3600*1000), p=function(n){return ('0'+n).slice(-2);};
+  return t.getUTCFullYear()+'-'+p(t.getUTCMonth()+1)+'-'+p(t.getUTCDate())+' '+p(t.getUTCHours())+':'+p(t.getUTCMinutes());
+}
+/* 排序用的時間戳；沒有或解析不了回 0（排到最後）*/
+function upTs(v){ if(!v) return 0; var d=new Date(v); return isNaN(d.getTime())?0:d.getTime(); }
+/* reportId → 好讀短標題（去付費_前綴、底線轉空白）*/
+function prettyPaidTitle(id){ return String(id).replace(/\.html?$/i,'').replace(/^付費[_-]?/,'').replace(/_/g,' '); }
+/* Drive 付費檔清單：直接列出所有付費檔，每筆自帶【寄通知】（不靠 reports.json 比對）*/
+function renderPaidFiles(pd){
+  var box=$('paidBody'); if(!box)return;
+  var ca=$('paidChkAll'); if(ca)ca.checked=false;
+  if(pd&&pd.ok===false){ box.innerHTML='<tr><td colspan="5"><div class="empty">讀取失敗：'+escH(pd.error||'unknown action（GAS 可能尚未部署新版本）')+'</div></td></tr>'; return; }
+  if(!paidFiles.length){ box.innerHTML='<tr><td colspan="5"><div class="empty">Drive 目前沒有付費檔</div></td></tr>'; return; }
+  box.innerHTML=paidFiles.slice().sort(function(a,b){
+    var ta=upTs(a.updated), tb=upTs(b.updated);
+    if(ta!==tb) return tb-ta;                                      // 最後更新（實際上傳時間）降序：新→舊
+    return String(b.reportId).localeCompare(String(a.reportId));   // 沒有時間戳才退回 reportId 降序
+  }).map(function(x){
+    var up=twTime(x.updated);
+    var sc=x.sentCount||0, at=(x.activeTotal!=null?x.activeTotal:0), un=(x.unsentCount!=null?x.unsentCount:Math.max(0,at-sc));
+    var notified = at===0
+      ? '<span style="color:var(--dim)">目前無付費會員</span>'
+      : (sc===0
+          ? '<span style="color:var(--dim)">未寄</span>'
+          : '<span class="pill '+(un===0?'plan-f':'')+'">已寄 '+sc+' · 未寄 '+un+'</span>'
+            + (x.notifiedAt?' <span style="color:var(--dim);font-size:11px">'+escH(x.notifiedAt)+'</span>':''));
+    var notifyBtn = un>0
+      ? '<button class="mini-act" onclick="doNotify(\''+escJs(x.reportId)+'\')" style="color:var(--gold)">補寄未收到（'+un+'）</button>'
+      : '<span style="color:var(--dim);font-size:12px">全員已收</span>';
+    return '<tr>'
+      +'<td><span class="email">'+escH(x.reportId)+'</span></td>'
+      +'<td>'+escH(up)+'</td>'
+      +'<td>'+notified+'</td>'
+      +'<td style="white-space:nowrap">'+notifyBtn+' <button class="mini-act" onclick="viewRecipients(\''+escJs(x.reportId)+'\')" style="color:var(--dim)">名單</button></td>'
+      +'<td style="text-align:center"><input type="checkbox" class="paid-chk" data-id="'+escH(x.reportId)+'"></td>'
+      +'</tr>';
+  }).join('');
+}
+function escJs(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+function toggleAllPaid(cb){document.querySelectorAll('#paidBody .paid-chk').forEach(function(c){c.checked=cb.checked;});}
+async function deleteSelectedPaid(){
+  var ids=Array.prototype.slice.call(document.querySelectorAll('#paidBody .paid-chk:checked')).map(function(c){return c.dataset.id;}).filter(Boolean);
+  if(!ids.length){toast('先勾選要刪除的付費檔');return;}
+  if(!await uiConfirm('確定刪除勾選的 '+ids.length+' 個付費檔？\n（丟進 Drive 垃圾桶，可救回，不是永久刪除）'))return;
+  toast('刪除中…');
+  (async function(){
+    var ok=0;
+    for(var i=0;i<ids.length;i++){ try{ var res=await post({action:'adminDeleteReport',key:KEY,reportId:ids[i]}); if(res&&res.ok)ok++; }catch(e){} }
+    toast('已刪除 '+ok+' / '+ids.length+' 個');loadPaidReports();
+  })();
+}
+/* 彙整通知：勾選的多份報告，對「還沒收齊的會員」各寄一封（只列每人缺的那幾份）*/
+async function notifyBatchSelected(){
+  var ids=Array.prototype.slice.call(document.querySelectorAll('#paidBody .paid-chk:checked')).map(function(c){return c.dataset.id;}).filter(Boolean);
+  if(!ids.length){toast('先勾選這批要一起寄的報告');return;}
+  var list=ids.map(function(id){return '　· '+prettyPaidTitle(id);}).join('\n');
+  if(!await uiConfirm('這封彙整信包含以下 '+ids.length+' 份報告：\n\n'+list+'\n\n寄給「還沒收到的付費會員」，每人一封、只列他缺的那幾份。\n（已收過的不再列、不重寄；退訂者不寄）\n\n確定寄出？'))return;
+  toast('彙整寄送中…');
+  post({action:'adminNotifyBatchDigest',key:KEY,reportIds:ids,force:false}).then(function(r){
+    if(!r||!r.ok){ toast((r&&r.error)||'寄送失敗'); return; }
+    var msg='彙整寄出 '+(r.sent||0)+' 位會員';
+    if(r.viaResend!=null||r.viaGmail!=null)msg+='（Resend '+(r.viaResend||0)+'＋Gmail '+(r.viaGmail||0)+'）';
+    if(r.alreadyHad)msg+='｜已收齊略過 '+r.alreadyHad;
+    if(r.skippedQuota)msg+='｜⚠配額不足略過 '+r.skippedQuota+'（明天再按補寄）';
+    if(r.failed)msg+='｜失敗 '+r.failed;
+    if(r.optedOut)msg+='｜退訂 '+r.optedOut;
+    toast(msg);
+    loadPaidReports();
+  }).catch(function(){ toast('連線失敗'); });
+}
+
+/* 逐會員去重：只補寄給「還沒收過這份」的 active 會員。之後有新會員加入，再按一次只補寄他們 */
+async function doNotify(paidId){
+  if(!await uiConfirm('補寄「新付費報告上線」email 給【還沒收過這份】的 active 會員?\n\n報告：'+paidId+'\n(已收過的人不會再收到；已在會員專區關閉通知的人不寄)'))return;
+  toast('寄送中…');
+  post({action:'adminNotifyReport',key:KEY,reportId:paidId}).then(async function(res){
+    if(!res||!res.ok){ toast((res&&res.error)||'寄送失敗'); return; }
+    if((res.sent||0)===0 && (res.alreadySent||0)>0){
+      if(await uiConfirm('所有付費會員都已收過這份（'+res.alreadySent+' 位）。\n要「強制重寄」給全部人嗎?（含已收過的人）')) forceNotify(paidId);
+      else toast('沒有需要補寄的人');
+    }else{
+      toast('已補寄 '+res.sent+' 位新會員｜先前已寄 '+(res.alreadySent||0)+(res.failed?'（失敗 '+res.failed+'）':'')+(res.skippedQuota?'｜配額略過 '+res.skippedQuota:''));
+    }
+    loadPaidReports();
+  }).catch(function(){toast('連線失敗');});
+}
+function forceNotify(paidId){
+  toast('重寄中…');
+  post({action:'adminNotifyReport',key:KEY,reportId:paidId,force:true}).then(function(res){
+    if(res&&res.ok){ toast('已重寄：成功 '+res.sent+' / 共 '+res.total); loadPaidReports(); }
+    else toast((res&&res.error)||'重寄失敗');
+  }).catch(function(){toast('連線失敗');});
+}
+/* 查這份報告的已寄/未寄名單，並可對未寄的人一鍵補寄 */
+function viewRecipients(paidId){
+  toast('讀取名單…');
+  post({action:'adminReportRecipients',key:KEY,reportId:paidId}).then(function(res){
+    if(!res||!res.ok){ toast((res&&res.error)||'讀取失敗（GAS 可能尚未部署新版本）'); return; }
+    var sent=res.sent||[], unsent=res.unsent||[];
+    var fmt=function(a){ return a.length? a.map(function(m){ var n=(m.name?(' <span style="color:var(--dim)">('+escH(m.name)+')</span>'):''); return '<div style="padding:3px 0;border-bottom:1px solid var(--border)">'+escH(m.email)+n+'</div>'; }).join('') : '<div style="color:var(--dim);padding:6px 0">（無）</div>'; };
+    var html='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'
+      +'<div><div style="font-weight:700;margin-bottom:6px;color:#e08">🔴 還沒寄（'+unsent.length+'）</div>'+fmt(unsent)+'</div>'
+      +'<div><div style="font-weight:700;margin-bottom:6px;color:#4c9">🟢 已經寄（'+sent.length+'）</div>'+fmt(sent)+'</div>'
+      +'</div>';
+    var foot = unsent.length? '<button class="btn-primary" onclick="closeModal();doNotify(\''+escJs(paidId)+'\')">只補寄給還沒寄的 '+unsent.length+' 位</button>' : '';
+    openModal('已寄／未寄名單 · '+escH(paidId), html, foot);
+  }).catch(function(){toast('連線失敗');});
+}
+
+/* ============================================================
+   付費牆斷點編輯器（v3）— 併入主控台「付費牆」分頁
+   全部作用在 #v-paywall 內的元素；純前端，不呼叫 GAS。
+   ============================================================ */
+var doc=null, BLOCKS=[], PROFILE=null;
+var N=0, minCut=0, cut=0, srcName='報告', blurPx=6, blockEls=[], dragging=false;
+var SUBSCRIBE_URL='https://yoda-wcyc.github.io/-/subscribe.html', CTA_LABEL='🔓 解鎖完整版', WM_BAKE=true;
+var editor=document.getElementById('editor'), divider=document.getElementById('divider');
+var handle=divider.querySelector('.handle'), handleLabel=document.getElementById('handle-label');
+
+/* ── 母板 profile 表:支援全報告類型 ──
+   三種切段模式:
+   • element  一段=一個容器元素(遮＝清容器內容、留表頭、塞馬賽克)
+   • delimited 一段=分隔標記 + 其後兄弟節點直到下一個標記(us/tw 扁平結構)  */
+var PROFILES={
+  key:{ label:'關鍵報告 / 簡報', mode:'element',
+    blockSel:'.track-box, .conclusion-box, .section',
+    titleSel:'.sec-title, .track-label, .conclusion-box-title',
+    bodySel:'.sec-body, .conclusion-box-text',
+    headKeepSel:'.sec-head', paywallSel:'.paywall',
+    protectKW:['導讀','發生什麼','為什麼','所以我該怎麼想','成績單','track'] },
+  wrapped:{ label:'市場觀察 / AI泡沫 / 總經', mode:'element',
+    blockSel:'.content-section',
+    titleSel:'.section-title', bodySel:'.section-desc',
+    headKeepSel:'.section-header', paywallSel:null, protectKW:[] },
+  flat:{ label:'美股 / 台股', mode:'delimited',
+    headerSel:'.section-header',
+    titleSel:'.section-title', bodySel:'.section-desc',
+    paywallSel:null, protectKW:[] }
+};
+function detectProfile(d){
+  var main=d.querySelector('main')||d.body;
+  if(main.querySelector('.content-section')) return PROFILES.wrapped; // mw/ai/總經(有容器,內含 section-header)
+  if(main.querySelector('.section-header'))   return PROFILES.flat;   // us/tw(扁平,無容器)
+  return PROFILES.key;                                                 // 關鍵報告/簡報(.sec-*)
+}
+// 收集切段「把手」:import 在 doc 上跑、export 在 clone 上跑,索引與 BLOCKS 平行對齊
+function collectHandles(d, prof){
+  var main=d.querySelector('main')||d.body, handles=[];
+  if(prof.mode==='element'){
+    Array.from(main.querySelectorAll(prof.blockSel)).forEach(function(el){ handles.push({el:el}); });
+  } else { // delimited:每個 header 起一段,吃到下一個 header 前
+    Array.from(main.querySelectorAll(prof.headerSel)).forEach(function(h){
+      var nodes=[], n=h.nextSibling;
+      while(n){ if(n.nodeType===1 && n.matches && n.matches(prof.headerSel)) break; nodes.push(n); n=n.nextSibling; }
+      handles.push({header:h, nodes:nodes});
+    });
+  }
+  return handles;
+}
+function handleMeta(hnd, prof){
+  var titScope=hnd.el||hnd.header;
+  var titEl=titScope.querySelector(prof.titleSel);
+  var title=titEl?titEl.textContent.trim():'(未命名段)';
+  var text;
+  if(hnd.el){ // element:正文＝容器全文扣掉「保留表頭」的文字(section-desc 副標在表頭內,不算正文)
+    var full=(hnd.el.textContent||'').replace(/\s+/g,' ').trim();
+    var keep=prof.headKeepSel?hnd.el.querySelector(prof.headKeepSel):null;
+    var headText=keep?(keep.textContent||'').replace(/\s+/g,' ').trim():'';
+    if(headText && full.indexOf(headText)===0) text=full.slice(headText.length).trim();
+    else if(title && full.indexOf(title)===0) text=full.slice(title.length).trim();
+    else text=full;
+  } else { // delimited:正文＝header 後的兄弟節點(header 本身不算)
+    text=hnd.nodes.map(function(n){return n.textContent||'';}).join(' ').replace(/\s+/g,' ').trim();
+    if(title && text.indexOf(title)===0) text=text.slice(title.length).trim();
+  }
+  return {title:title, text:text};
+}
+
+// ── 匯入 ──
+document.getElementById('btn-import').onclick=function(){document.getElementById('file-input').click();};
+document.getElementById('file-input').onchange=function(e){
+  var f=e.target.files[0]; if(!f) return;
+  srcName=f.name.replace(/\.html?$/i,'');
+  var rd=new FileReader(); rd.onload=function(){ importHTML(rd.result); }; rd.readAsText(f,'utf-8');
+};
+async function importHTML(html){
+  doc=new DOMParser().parseFromString(html,'text/html');
+  PROFILE=detectProfile(doc);
+  var handles=collectHandles(doc,PROFILE);
+  if(!handles.length){ await uiAlert('找不到可切的段落。支援母板:關鍵報告/簡報(.section)、市場觀察/AI/總經(.content-section)、美股/台股(.section-header)。'); return; }
+  var paywall=PROFILE.paywallSel?doc.querySelector(PROFILE.paywallSel):null;
+  BLOCKS=handles.map(function(hnd){
+    var m=handleMeta(hnd,PROFILE);
+    var ref=hnd.el||hnd.header;
+    var before = paywall ? (ref.compareDocumentPosition(paywall) & Node.DOCUMENT_POSITION_FOLLOWING) : false;
+    var kw = PROFILE.protectKW.some(function(k){return m.title.indexOf(k)>=0;});
+    return {title:m.title, text:m.text, protect:!!(before||kw), maskTitle:false, maskContent:false};
+  });
+  N=BLOCKS.length;
+  minCut=0; BLOCKS.forEach(function(b,i){ if(b.protect) minCut=i+1; });
+  applyCut(minCut); // 預設:保護區外全遮內容(無保護區的母板＝全遮,由你拖金軸放行)
+  buildEditor();
+  document.getElementById('empty').classList.add('hidden');
+  document.getElementById('workspace').classList.remove('hidden');
+  document.getElementById('ctrls').classList.remove('hidden');
+  document.getElementById('btn-free').disabled=false;
+  document.getElementById('btn-paid').disabled=false;
+  document.getElementById('btn-upload').disabled=false;
+  document.getElementById('tb-status').innerHTML='已匯入 <b>'+srcName+'</b> · 判定為 <b>'+PROFILE.label+'</b>　共 <b>'+N+'</b> 段'+(minCut?'（保護 '+minCut+'）':'（無保護區·全交你設斷點）');
+}
+
+// ── 拖曳粗調：線以下整批遮內容，線以上全開 ──
+function applyCut(k){
+  cut=Math.max(minCut,Math.min(N,k));
+  BLOCKS.forEach(function(b,i){
+    if(b.protect){ b.maskTitle=false; b.maskContent=false; return; }
+    if(i<cut){ b.maskTitle=false; b.maskContent=false; }
+    else { b.maskContent=true; b.maskTitle=false; }
+  });
+}
+function setCut(k){ k=Math.max(minCut,Math.min(N,k)); if(k!==cut){ applyCut(k); render(); } }
+
+// ── 逐段細調 ──
+function toggleMask(i,part){
+  var b=BLOCKS[i]; if(!b||b.protect) return;
+  if(part==='title') b.maskTitle=!b.maskTitle; else b.maskContent=!b.maskContent;
+  render();
+}
+
+function buildEditor(){
+  blockEls.forEach(function(el){el.remove();}); blockEls=[];
+  BLOCKS.forEach(function(b,i){
+    var d=document.createElement('div'); d.className='blk'; d.dataset.i=i;
+    var toggles=b.protect?'' :
+      '<div class="blk-toggles">'
+      +'<button class="tg" data-part="title">標題</button>'
+      +'<button class="tg" data-part="content">內容</button></div>';
+    d.innerHTML='<span class="cat">'+(b.protect?'🔵 §9-5 保護':'段 '+(i+1))+'</span>'
+      +'<div class="t">'+esc(b.title)+'</div><div class="b">'+esc(b.text.slice(0,80))+'</div>'+toggles;
+    if(!b.protect){
+      d.querySelectorAll('.tg').forEach(function(btn){
+        btn.addEventListener('click',function(ev){ ev.stopPropagation(); toggleMask(i, btn.dataset.part); });
+      });
+    }
+    editor.appendChild(d); blockEls.push(d);
+  });
+  render();
+}
+function isMasked(b){ return b.maskTitle||b.maskContent; }
+function classFor(i){ var b=BLOCKS[i]; if(b.protect) return 'protect'; return isMasked(b)?'masked':'free'; }
+function positionDivider(){
+  var top; if(cut>=N){ top=editor.scrollHeight-14; } else { top=blockEls[cut].offsetTop; }
+  divider.style.top=top+'px';
+  handleLabel.textContent='斷點（粗調）';
+}
+function render(){
+  blockEls.forEach(function(el,i){
+    el.className='blk '+classFor(i);
+    el.querySelectorAll('.tg').forEach(function(btn){
+      var on = btn.dataset.part==='title' ? BLOCKS[i].maskTitle : BLOCKS[i].maskContent;
+      btn.classList.toggle('on', on);
+    });
+  });
+  positionDivider(); renderPreview(); renderSummary();
+}
+function renderPreview(){
+  var pv=document.getElementById('preview');
+  var h='';
+  BLOCKS.forEach(function(b){
+    if(b.protect || !isMasked(b)){
+      h+='<div class="pv-sec"><div class="ph">'+(b.protect?'免費·保護':'免費')+'</div><div class="pt">'+esc(b.title)+'</div><div class="pb">'+esc(b.text.slice(0,110))+(b.text.length>110?'…':'')+'</div></div>';
+    } else {
+      var titHTML = b.maskTitle ? '<span class="pv-frost" style="filter:blur('+Math.max(2,blurPx-2)+'px)">'+frostFiller(Math.min(b.title.length,10))+'</span>' : esc(b.title);
+      var conHTML = b.maskContent ? '<div class="pv-frost" style="filter:blur('+blurPx+'px)">'+frostFiller(Math.min(b.text.length,120))+'</div>' : '<div class="pb">'+esc(b.text.slice(0,110))+'…</div>';
+      h+='<div class="pv-sec"><div class="ph" style="color:var(--paid)">已遮</div><div class="pt">'+titHTML+'</div>'+conHTML+'<span class="pv-lock">🔒 完整內容為付費版</span></div>';
+    }
+  });
+  // 免費檔那顆【解鎖完整版】＝固定畫面最下方、寬約 1/3；預覽用 sticky 底部示意
+  h+='<div style="position:sticky;bottom:0;margin-top:16px;padding:10px 0 4px;text-align:center;background:linear-gradient(180deg,transparent,var(--bg2) 45%)">'
+    +'<a style="display:inline-block;width:60%;max-width:210px;text-align:center;background:var(--gold);color:#1a1200;font-weight:700;font-size:12.5px;padding:11px;border-radius:9999px;text-decoration:none;box-shadow:0 3px 12px rgba(240,165,0,.5)" href="'+esc(SUBSCRIBE_URL||'#')+'" target="_blank" rel="noopener">'+esc(CTA_LABEL||'🔓 解鎖完整版')+'</a>'
+    +'<div style="font-size:9.5px;color:var(--text3);margin-top:5px">↑ 免費檔實際會固定畫面最下方、寬約 1/3、捲到哪都在</div></div>';
+  pv.innerHTML=h;
+}
+function renderSummary(){
+  var freeN=0, paidN=0;
+  BLOCKS.forEach(function(b){ if(b.protect|| !isMasked(b)) freeN++; else paidN++; });
+  document.getElementById('free-count').textContent=freeN+' 段';
+  document.getElementById('paid-count').textContent=paidN+' 段';
+  document.getElementById('free-bar').style.width=(N?freeN/N*100:0)+'%';
+  document.getElementById('paid-bar').style.width=(N?paidN/N*100:0)+'%';
+  document.getElementById('split-list').innerHTML=
+    '<b class="fg">免費全開（'+freeN+'）：</b>'+(BLOCKS.filter(function(b){return b.protect||!isMasked(b);}).map(function(b){return esc(b.title);}).join('、')||'（無）')
+    +'<br><b class="pg">已遮（'+paidN+'）：</b>'+(BLOCKS.filter(function(b){return !b.protect&&isMasked(b);}).map(function(b){return esc(b.title)+(b.maskTitle&&b.maskContent?'(標題+內容)':b.maskTitle?'(標題)':'(內容)');}).join('、')||'（無）');
+  var leaks=verifyFree(), out=document.getElementById('verify-out');
+  if(paidN===0){ out.innerHTML='<span style="color:var(--text3)">（沒有已遮的段）</span>'; }
+  else if(leaks.length===0){ out.innerHTML='<span style="color:var(--pos);font-weight:700">✅ 安全</span>：被遮段真內容 0 字進免費檔（模糊底下是馬賽克填充）。'; }
+  else{ out.innerHTML='<span style="color:var(--danger);font-weight:700">⚠ 洩漏</span>：'+leaks.map(esc).join('、'); }
+}
+
+// 拖曳
+handle.addEventListener('pointerdown',function(e){dragging=true;divider.classList.add('dragging');handle.setPointerCapture(e.pointerId);e.preventDefault();});
+handle.addEventListener('pointermove',function(e){ if(!dragging) return;
+  var rect=editor.getBoundingClientRect(), y=e.clientY-rect.top+editor.scrollTop, best=cut, bestd=Infinity;
+  for(var k=minCut;k<=N;k++){ var by=k>=N?(editor.scrollHeight-14):blockEls[k].offsetTop, d=Math.abs(by-y); if(d<bestd){bestd=d;best=k;} }
+  setCut(best);
+});
+handle.addEventListener('pointerup',function(){dragging=false;divider.classList.remove('dragging');});
+handle.addEventListener('pointercancel',function(){dragging=false;divider.classList.remove('dragging');});
+window.addEventListener('resize',function(){ if(blockEls.length) positionDivider(); });
+
+// 模糊滑桿
+document.getElementById('blur-range').oninput=function(){
+  blurPx=+this.value; document.getElementById('blur-val').textContent=blurPx+'px';
+  document.getElementById('frost-sample').style.filter='blur('+Math.min(blurPx,8)+'px)';
+  if(doc) render();
+};
+document.getElementById('cta-url').oninput=function(){ SUBSCRIBE_URL=this.value.trim(); };
+document.getElementById('cta-label').oninput=function(){ CTA_LABEL=this.value; if(doc) renderPreview(); };
+document.getElementById('wm-bake').onchange=function(){ WM_BAKE=this.checked; };
+
+// ── 工具 ──
+function esc(s){return String(s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+function frostFiller(len){
+  var pool='░▒▓█', n=Math.max(10,Math.min(len||40,240)), s='';
+  for(var i=0;i<n;i++){ s+= (Math.random()<0.14?' ':pool[Math.floor(Math.random()*pool.length)]); }
+  return s;
+}
+
+// ── 匯出：就地 DOM 手術（遮＝刪真內容＋馬賽克填充＋模糊）──
+function frostBody(clone,text){
+  var d=clone.createElement('div');
+  d.setAttribute('class','sec-body paywall-frost'); d.setAttribute('aria-hidden','true');
+  d.setAttribute('style','filter:blur('+blurPx+'px);-webkit-filter:blur('+blurPx+'px);user-select:none;color:var(--text3,#888);letter-spacing:.12em;line-height:2;word-break:break-all;font-family:monospace;margin-top:8px');
+  d.textContent=frostFiller(text.length); return d;
+}
+function lockNote(clone){
+  var lk=clone.createElement('p'); lk.setAttribute('class','paywall-lock');
+  lk.setAttribute('style','margin-top:10px;font-size:.85em;color:var(--accent,#f0a500);font-weight:700');
+  lk.textContent='🔒 完整內容為付費版 → 解鎖完整版'; return lk;
+}
+function buildFreeDoc(){
+  var clone=doc.cloneNode(true);
+  var handles=collectHandles(clone,PROFILE);              // 在 clone 上重收把手,索引與 BLOCKS 對齊
+  for(var i=0;i<handles.length;i++){
+    var b=BLOCKS[i]; if(!b||b.protect||!isMasked(b)) continue;
+    var hnd=handles[i];
+    if(b.maskContent){
+      if(hnd.el){ // element:留表頭、清其餘子節點(連文字節點 {{...}} 一併刪)、塞馬賽克
+        var keep=PROFILE.headKeepSel?hnd.el.querySelector(PROFILE.headKeepSel):null;
+        Array.from(hnd.el.childNodes).forEach(function(ch){ if(ch!==keep) hnd.el.removeChild(ch); });
+        hnd.el.appendChild(frostBody(clone,b.text)); hnd.el.appendChild(lockNote(clone));
+      } else {    // delimited:刪 header 後所有兄弟、在 header 後插馬賽克
+        hnd.nodes.forEach(function(n){ if(n.parentNode) n.parentNode.removeChild(n); });
+        var anchor=hnd.header.nextSibling, par=hnd.header.parentNode;
+        par.insertBefore(frostBody(clone,b.text), anchor); par.insertBefore(lockNote(clone), anchor);
+      }
+    }
+    if(b.maskTitle){
+      var titScope=hnd.el||hnd.header, t=titScope.querySelector(PROFILE.titleSel);
+      if(t){ t.setAttribute('style','filter:blur('+Math.max(3,blurPx)+'px);user-select:none;color:var(--text3,#888);font-family:monospace'); t.textContent=frostFiller(Math.min(b.title.length,12)); }
+    }
+  }
+  // ── 強制注入【解鎖完整版】CTA → subscribe（固定畫面最下方、寬約 1/3、捲動恆顯示）──
+  var head=clone.querySelector('head');
+  if(head){
+    var st=clone.createElement('style');
+    st.textContent='@keyframes yodaUnlockPulse{0%,100%{box-shadow:0 4px 14px rgba(240,165,0,.4)}50%{box-shadow:0 6px 26px rgba(240,165,0,.8)}}'
+      +'.yoda-unlock-bar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:99999;display:flex;flex-direction:column;align-items:center;gap:7px;width:33%;min-width:190px;max-width:340px}'
+      +'.yoda-unlock-cta{display:block;width:100%;box-sizing:border-box;text-align:center;background:#f0a500;color:#1a1200;font-weight:700;font-size:15px;font-family:"Noto Sans TC",sans-serif;padding:13px 20px;border-radius:9999px;text-decoration:none;letter-spacing:.03em;animation:yodaUnlockPulse 1.8s ease-in-out infinite}'
+      +'.yoda-unlock-cta:hover{background:#ffcb2e}'
+      +'.yoda-member-link{font-size:12.5px;color:#e8dcc0;text-decoration:none;font-family:"Noto Sans TC",sans-serif;background:rgba(0,0,0,.42);padding:6px 14px;border-radius:9999px;backdrop-filter:blur(4px)}'
+      +'.yoda-member-link:hover{color:#fff;text-decoration:underline}'
+      +'@media(max-width:520px){.yoda-unlock-bar{width:72%;max-width:none}}';
+    head.appendChild(st);
+  }
+  var bar=clone.createElement('div'); bar.className='yoda-unlock-bar'; bar.setAttribute('data-unlock-cta','');
+  var cta=clone.createElement('a');
+  cta.className='yoda-unlock-cta';
+  cta.setAttribute('href', SUBSCRIBE_URL||'#');
+  cta.setAttribute('target','_blank'); cta.setAttribute('rel','noopener');
+  cta.textContent=CTA_LABEL||'🔓 解鎖完整版';
+  bar.appendChild(cta);                                                   // 主按鈕：訂閱賣頁(給新客)
+  // 副連結：既有會員直接回「這一篇」的 report-shell(reportId=付費_<檔名>，編輯器自算)
+  var shellUrl=(SUBSCRIBE_URL||'').replace(/[^\/]*$/, 'report-shell.html')+'?id='+encodeURIComponent('付費_'+srcName);
+  var ml=clone.createElement('a');
+  ml.className='yoda-member-link';
+  ml.setAttribute('href', shellUrl);
+  ml.setAttribute('target','_blank'); ml.setAttribute('rel','noopener');
+  ml.textContent='已是會員?讀完整版 →';
+  bar.appendChild(ml);
+  (clone.body||main).appendChild(bar);           // 固定定位，掛在 body 尾端即可
+  return '<!DOCTYPE html>\n'+clone.documentElement.outerHTML;
+}
+// 付費檔＝完整整份報告（含 head/CSS，會員看全文，塞進 report-shell iframe 才不會亂）＋浮水印底層
+function buildPaidDoc(){
+  var clone=doc.cloneNode(true);
+  var pw=clone.querySelector('.paywall'); if(pw) pw.remove();               // 會員已付費，拿掉中段訂閱 CTA
+  var topCta=clone.querySelector('.yoda-unlock-cta'); if(topCta) topCta.remove();
+  if(WM_BAKE && clone.body){
+    // 烤入每頁重複的斜向浮水印層；{{WATERMARK}} 由會員系統 GAS getReport 逐會員置換成「編號 · mail」
+    var wm=clone.createElement('div'); wm.setAttribute('aria-hidden','true');
+    var spans=''; for(var i=0;i<66;i++){ spans+='<span style="margin:0 8px">{{WATERMARK}}</span>'; }
+    wm.setAttribute('style','position:fixed;inset:-25%;z-index:99999;pointer-events:none;display:flex;flex-wrap:wrap;align-content:center;justify-content:center;transform:rotate(-24deg);font-family:sans-serif;font-size:15px;line-height:5;color:rgba(210,190,130,.11);white-space:nowrap;user-select:none;overflow:hidden');
+    wm.innerHTML=spans; clone.body.appendChild(wm);
+  }
+  return '<!DOCTYPE html>\n'+clone.documentElement.outerHTML;
+}
+// 驗證：被遮段的真內容是否出現在免費檔（以內容為準；標題敏感度低、可能在導讀大綱）
+function verifyFree(){
+  if(!doc) return [];
+  var free=buildFreeDoc().replace(/\s+/g,''), leaks=[];
+  for(var i=0;i<N;i++){
+    var b=BLOCKS[i]; if(!b||b.protect||!b.maskContent) continue;
+    var p=b.text.replace(/\s+/g,'').slice(0,24);
+    if(p.length>=6 && free.indexOf(p)>=0) leaks.push(b.title+'(內容)');
+  }
+  return leaks;
+}
+function download(name,txt){var bl=new Blob([txt],{type:'text/html;charset=utf-8'});var a=document.createElement('a');a.href=URL.createObjectURL(bl);a.download=name;a.click();setTimeout(function(){URL.revokeObjectURL(a.href);},2000);}
+document.getElementById('btn-free').onclick=async function(){
+  if(!doc) return;
+  var leaks=verifyFree();
+  if(leaks.length){ if(!await uiConfirm('⚠ 偵測到被遮內容可能外露：'+leaks.join('、')+'\n仍要匯出嗎？')) return; }
+  download(srcName+'_免費精簡版.html', buildFreeDoc());
+};
+document.getElementById('btn-paid').onclick=function(){ if(!doc) return; download(srcName+'_付費內容.html', buildPaidDoc()); };
+// ── 上傳付費檔到 Vercel Blob（選項②·私有；會員以 reportId=付費_<檔名> 經 /api/report 讀回）──
+document.getElementById('btn-upload').onclick=async function(){
+  if(!doc) return;
+  if(typeof KEY==='undefined'||!KEY){ await uiAlert('請先登入主控台(需要管理密碼才能上傳)'); return; }
+  var name='付費_'+srcName;
+  if(!await uiConfirm('上傳付費檔到 Vercel（快速供報告）?\nreportId＝'+name+'\n(同名會覆蓋舊檔)')) return;
+  var b=this; b.disabled=true; var old=b.innerHTML; b.innerHTML='<span class="ic">⏳</span>上傳中…';
+  try{
+    var r=await fetch('https://yoda-research-next.vercel.app/api/admin-put-report',{method:'POST',body:JSON.stringify({key:KEY,name:name,html:buildPaidDoc()})});
+    var res=await r.json();
+    b.disabled=false; b.innerHTML=old;
+    if(res&&res.ok){ await uiAlert('✅ 已上傳到 Vercel：'+res.reportId+'\n\n會員 reportId＝'+res.reportId+'\n(report-shell 用這個 id 讀回·約1秒開啟)'); }
+    else await uiAlert('上傳失敗：'+((res&&res.error)||'未知錯誤'));
+  }catch(e){ b.disabled=false; b.innerHTML=old; await uiAlert('連線失敗：'+((e&&e.message)||e)); }
+};
+</script>
+<!-- 平板以上提示（手機置中·點擊關閉·記憶）自包含注入片段 -->
+<script>
+(function(){
+  try{if(localStorage.getItem('hideTabletHint')==='1')return;}catch(e){}
+  if(document.querySelector('.tablet-hint'))return;
+  var css='@media(min-width:768px){.tablet-hint{display:none!important}}'
+    +'.tablet-hint{position:fixed;inset:0;z-index:99998;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(4,6,10,.72);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}'
+    +'.tablet-hint .th-card{max-width:320px;width:100%;background:#12100a;border:1px solid #3a3320;border-radius:16px;padding:26px 24px;text-align:center;box-shadow:0 14px 44px rgba(0,0,0,.55)}'
+    +'.tablet-hint .th-ico{font-size:34px;margin-bottom:12px}'
+    +'.tablet-hint .th-t{font-size:17px;font-weight:700;color:#e8c877;margin-bottom:8px;line-height:1.5}'
+    +'.tablet-hint .th-s{font-size:13px;color:#b8b09a;line-height:1.7;margin-bottom:16px}'
+    +'.tablet-hint .th-x-btn{margin-top:8px;font-family:inherit;font-size:13px;font-weight:700;color:#1a1200;background:#e8c877;border:none;border-radius:10px;padding:10px 22px;cursor:pointer}.tablet-hint .th-x-btn:active{opacity:.85}';
+  var st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
+  var ov=document.createElement('div');ov.className='tablet-hint';
+  ov.innerHTML='<div class="th-card"><div class="th-ico">📱 → 💻</div><div class="th-t">建議使用平板以上</div><div class="th-s">這份報告資訊密度高，用平板或電腦看，版面才展得開、體驗最佳。手機也能看，只是較擠。</div><button class="th-x-btn" type="button">知道了，繼續看</button></div>';
+  function close(){try{localStorage.setItem('hideTabletHint','1');}catch(e){}if(ov.parentNode)ov.parentNode.removeChild(ov);}
+  var _thb=ov.querySelector('.th-x-btn');if(_thb)_thb.addEventListener('click',close);
+  if(document.body)document.body.appendChild(ov);else document.addEventListener('DOMContentLoaded',function(){document.body.appendChild(ov);});
+})();
+</script>
+<script>/* 密碼欄預設顯示（管理密碼、新增會員密碼） */
+document.addEventListener('DOMContentLoaded',function(){['f-pw'].forEach(function(id){var p=document.getElementById(id);if(p&&p.type==='password'){p.type='text';var b=p.parentNode&&p.parentNode.querySelector('button');if(b)b.textContent='🙈';}});});</script>
+</body>
+</html>
