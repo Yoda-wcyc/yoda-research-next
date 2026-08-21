@@ -1016,6 +1016,19 @@ function renderEcpaySync(r,applied){
               +(la.applied?'・已自動套用':'・僅報告未套用'))
              :('　執行失敗：'+escH(la.error||'unknown')))
       +'</div>'):'<div class="hintbox" style="opacity:.8">每日自動比對尚未跑過（要啟用請在 GAS 編輯器執行一次 installDailyEcpaySync）。</div>';
+  // 覆蓋率：這是最容易被忽略的數字——「有沒有人一直沒被查到」比「這次查了幾筆」重要
+  if(r.candidateCount!==undefined){
+    var cov = r.coveredAll
+      ? '<span style="color:var(--green,#30d158)">這輪把 '+r.candidateCount+' 位全部查完</span>'
+      : '<span style="color:var(--amber,#ff9f0a)">這輪查了 '+r.checked+' / '+r.candidateCount+' 位，其餘下一輪接續</span>';
+    h+='<div class="hintbox">'+cov
+      +'　·　耗時 '+Math.round((r.elapsedMs||0)/1000)+' 秒'
+      +'　·　'+(r.oldestCheckedAt
+          ? ('最久沒更新的一位是 <b>'+escH(r.oldestCheckedAt)+'</b> 查的')
+          : '<b style="color:var(--amber,#ff9f0a)">還有人從來沒被查過</b>（再跑幾輪就會蓋完一圈）')
+      +'<br><span style="color:var(--dim)">排序是「最久沒查的先查」，所以不會有人被永久跳過；'
+      +'每天自動跑的話，人數再多也會在幾天內輪完一圈。</span></div>';
+  }
   h+='<div class="hintbox">已查 <b>'+r.checked+'</b> 筆（單次上限 '+r.limit+'）：綠界仍在扣款 <b>'+r.liveCount+'</b> ・ '
     +'綠界已停 <b style="color:var(--amber,#ff9f0a)">'+r.goneCount+'</b> ・ 查無單號 '+r.noTradeCount+' ・ 查詢失敗 '+r.failedCount+'</div>';
   if(r.goneCount){
