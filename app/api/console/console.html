@@ -667,6 +667,8 @@ function post(payload){
   }
   return fetch(GAS_URL,{method:'POST',body:JSON.stringify(payload)}).then(r=>r.json());
 }
+// 一載入就先寫上狀態，讓這一行永遠看得見（空白會被誤以為「沒做這功能」）
+try{ var _gv=$('gasVer'); if(_gv) _gv.innerHTML='<span style="color:var(--dim)">GAS 檢查中…</span>'; }catch(e){}
 $('loginBtn').onclick=login;
 $('adminKey').addEventListener('keydown',e=>{if(e.key==='Enter')login();});
 document.getElementById('fpwEye').addEventListener('click',function(){var i=$('f-pw');if(i.type==='password'){i.type='text';this.textContent='🙈';}else{i.type='password';this.textContent='👁';}});
@@ -729,10 +731,18 @@ function loadFromGAS(){
       .catch(function(e){ return { ok:false, __netErr:String((e&&e.message)||e) }; })
   ]).then(function(res){
     var ad=res[0], sub=res[1];
-    if(!ad||!ad.ok)return false;
-    members=computeRefCounts((ad.members||[]).map(mapMember));
+    // ★版本資訊要在【任何】提前 return 之前就先抓、先畫。
+    //   否則 admin-data 那半邊一失敗就整個 return，版本那一行永遠是空白——
+    //   而空白看起來像「這功能沒做」，其實是「還沒跑到」。
     subsInfo=(sub&&sub.ok)?sub:null;
     subsErr=subsInfo?'':((sub&&(sub.__netErr||sub.error))||'GAS 沒有回應或回傳了非預期的內容');
+    gasVersion=(subsInfo&&subsInfo.codeVersion)||'';
+    renderGasVersion();
+    if(!ad||!ad.ok){
+      toast('讀取會員資料失敗（Neon/Vercel 那一邊）');
+      return false;
+    }
+    members=computeRefCounts((ad.members||[]).map(mapMember));
     if(subsInfo){
       var by={}; subsInfo.members.forEach(function(x){by[x.memberId]=x;});
       members.forEach(function(m){ if(by[m.id]){ m.sub=by[m.id]; delete by[m.id]; } });
