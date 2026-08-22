@@ -379,10 +379,12 @@ tr:hover td{background:var(--surface2)}
     <div class="audit-bar">
       <button class="audit-btn amber" onclick="loadLapsed()">⚠ 逾期未對帳稽核</button>
       <button class="audit-btn blue" onclick="loadEcpaySync()">🔍 綠界狀態比對</button>
-      <span class="audit-note">綠界不會通知我們會員自己取消，要靠這兩顆主動抓</span>
+      <button class="audit-btn amber" onclick="loadReconcile()">💳 沒有綠界付款紀錄的人</button>
+      <span class="audit-note">綠界不會通知我們會員自己取消，要靠這幾顆主動抓</span>
     </div>
     <div id="lapsedBox"></div>
     <div id="ecpaySyncBox"></div>
+    <div id="reconcileBox"></div>
     <div class="hintbox">打開綠界後台,對照這個月該扣款的人：成功打 <b style="color:var(--green)">✓</b>、失敗打 <b style="color:var(--red)">✗</b>。（目前只在畫面暫存,尚未寫回 Sheet。）</div>
     <div class="recon-card" id="reconList"></div>
   </div>
@@ -1130,6 +1132,61 @@ async function applyEcpaySync(){
     if(!r||!r.ok){ box.innerHTML='<div class="hintbox">套用失敗：'+escH((r&&r.error)||'unknown')+'</div>'; return; }
     renderEcpaySync(r,true); toast('已套用 '+(r.appliedIds||[]).length+' 位'); loadFromGAS();
   }).catch(function(){ box.innerHTML='<div class="hintbox">連線失敗</div>'; });
+}
+/* 沒有綠界付款紀錄的人。
+   2026-08-22 起判定付費的唯一憑據就是 Payments 有綠界扣款留痕——
+   沒有留痕的人不該收到付費報告，也不該收到通知信。
+   這顆先「只看不改」，名單確認無誤才按套用。有留痕的人永遠不會被動到。 */
+function loadReconcile(){
+  var box=$('reconcileBox'); if(!box)return;
+  box.innerHTML='<div class="hintbox">比對 Members 與 Payments 中…</div>';
+  post({action:'adminReconcilePaid',key:KEY}).then(function(r){
+    if(!r||!r.ok){ box.innerHTML='<div class="hintbox">讀取失敗：'+escH((r&&r.error)||'unknown action（GAS 可能尚未部署新版本）')+'</div>'; return; }
+    renderReconcile(r,false);
+  }).catch(function(){ box.innerHTML='<div class="hintbox">連線失敗</div>'; });
+}
+async function applyReconcile(n){
+  if(!await uiConfirm('確定把這 '+n+' 位歸回「待開通」？\n\n動作：\n· status 改為 pending\n· 開不了付費報告、也不會再收到通知信\n\nPayments 裡有任何一筆綠界留痕的人，一律不會被動到。\n他們日後真的完成扣款，會自動恢復。'))return;
+  var box=$('reconcileBox'); if(box) box.innerHTML='<div class="hintbox">套用中…</div>';
+  post({action:'adminReconcilePaid',key:KEY,apply:true}).then(function(r){
+    if(!r||!r.ok){ box.innerHTML='<div class="hintbox">套用失敗：'+escH((r&&r.error)||'unknown')+'</div>'; return; }
+    renderReconcile(r,true); toast('已歸回待開通 '+((r.summary&&r.summary.changed)||0)+' 位'); loadFromGAS();
+  }).catch(function(){ box.innerHTML='<div class="hintbox">連線失敗</div>'; });
+}
+function renderReconcile(r,applied){
+  var box=$('reconcileBox'); if(!box)return;
+  var sm=r.summary||{}, B=r.pending_review||[], C=r.unpaid||[];
+  var n=B.length+C.length;
+  var h='<div class="hintbox">比對 <b>Members</b> 與 <b>Payments</b>：'
+       +'有綠界留痕 <b style="color:var(--green,#30d158)">'+(sm.paid||0)+'</b> 位'
+       +' ・ 查無留痕 <b style="color:var(--amber,#ff9f0a)">'+n+'</b> 位'
+       +(applied?' ・ 本次已歸回待開通 <b>'+(sm.changed||0)+'</b> 位':'')+'</div>';
+  if(!n){
+    h+='<div class="empty">每一位會員都有綠界扣款留痕，沒有人需要處理。</div>';
+    box.innerHTML=h; return;
+  }
+  var rowHtml=function(m,why){
+    return '<div class="recon-card"><b>'+escH(String(m.member_id||''))+'</b> '+escH(String(m.email||''))
+      +'<div style="color:var(--dim,#a1a1a6);font-size:12px">目前狀態 '+escH(String(m.status||''))
+      +' ・ 下次扣款日 '+escH(String(m.next_charge_date||'（空白）'))
+      +' ・ 帳面期數 '+escH(String(m.paid_periods||0))+'<br>'+why+'</div></div>';
+  };
+  if(B.length){
+    h+='<div class="hintbox" style="border-color:var(--amber,#ff9f0a)">⚠ <b>'+B.length+'</b> 位<b>最需要注意</b>：'
+      +'查無綠界留痕，但扣款日還沒過 → 🔍 綠界狀態比對<b>不會</b>把他們標出來，'
+      +'畫面上看起來一切正常，但他們從沒付過一毛錢。</div>'
+      +B.map(function(m){return rowHtml(m,'查無綠界留痕，但扣款日未到期 → 目前仍讀得到付費報告');}).join('');
+  }
+  if(C.length){
+    h+='<div class="hintbox">'+C.length+' 位查無綠界留痕、也沒有扣款日（一望即知未付費）。</div>'
+      +C.map(function(m){return rowHtml(m,'查無綠界留痕，也沒有扣款日');}).join('');
+  }
+  if(!applied){
+    h+='<div style="margin-top:10px"><button class="audit-btn amber" onclick="applyReconcile('+n+')">'
+      +'把這 '+n+' 位歸回「待開通」</button>'
+      +'<span class="audit-note">有綠界留痕的 '+(sm.paid||0)+' 位一律不會被動到</span></div>';
+  }
+  box.innerHTML=h;
 }
 function recon(id,r){
   toast('寫入中…');
