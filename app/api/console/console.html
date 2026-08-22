@@ -677,7 +677,18 @@ function login(){
   $('loginBtn').disabled=true; $('loginMsg').style.color='var(--dim)'; $('loginMsg').textContent='登入中…';
   fetch('https://yoda-research-next.vercel.app/api/admin-data',{method:'POST',body:JSON.stringify({key:KEY})}).then(function(r){return r.json();}).then(res=>{
     $('loginBtn').disabled=false;
-    if(res&&res.ok){try{localStorage.setItem('yoda_admin_key',KEY);}catch(e){}members=computeRefCounts((res.members||[]).map(mapMember));loadPricing().then(renderAll);renderAll();$('login').style.display='none';$('app').style.display='block';}
+    if(res&&res.ok){
+      try{localStorage.setItem('yoda_admin_key',KEY);}catch(e){}
+      members=computeRefCounts((res.members||[]).map(mapMember));
+      $('login').style.display='none';$('app').style.display='block';
+      renderAll();                    // 先用 Neon 鏡像把畫面撐起來（快）
+      loadPricing().then(renderAll);
+      // ★★登入後必須去拿 GAS 的訂閱總表，否則「綠界付款 首次／最近」「剩餘」「通知信」
+      //   三欄永遠是 —，而狀態欄會退回只看 status。
+      //   2026-08-22：登入流程漏了這一步，只有按「↻ 重新整理」或做完異動才會補上，
+      //   於是看起來像「付款日期怎麼改都不出來」，其實是根本沒去拿。
+      loadFromGAS();
+    }
     else if(res&&res.error){$('loginMsg').style.color='var(--red)';$('loginMsg').textContent='後端回覆：'+res.error;}
     else{$('loginMsg').style.color='var(--red)';$('loginMsg').textContent='連線失敗或回應異常';}
   }).catch(function(){$('loginBtn').disabled=false;$('loginMsg').style.color='var(--red)';$('loginMsg').textContent='連線失敗（可能是本機 file:// CORS）';});
