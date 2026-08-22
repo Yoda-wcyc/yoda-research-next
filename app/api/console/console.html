@@ -386,11 +386,13 @@ tr:hover td{background:var(--surface2)}
       <button class="audit-btn amber" onclick="loadLapsed()">⚠ 逾期未對帳稽核</button>
       <button class="audit-btn blue" onclick="loadEcpaySync()">🔍 綠界狀態比對</button>
       <button class="audit-btn amber" onclick="loadReconcile()">💳 沒有綠界付款紀錄的人</button>
+      <button class="audit-btn gold" onclick="loadBackfill()">🏷 補上創始方案</button>
       <span class="audit-note">綠界不會通知我們會員自己取消，要靠這幾顆主動抓</span>
     </div>
     <div id="lapsedBox"></div>
     <div id="ecpaySyncBox"></div>
     <div id="reconcileBox"></div>
+    <div id="backfillBox"></div>
     <div class="hintbox">打開綠界後台,對照這個月該扣款的人：成功打 <b style="color:var(--green)">✓</b>、失敗打 <b style="color:var(--red)">✗</b>。（目前只在畫面暫存,尚未寫回 Sheet。）</div>
     <div class="recon-card" id="reconList"></div>
   </div>
@@ -584,7 +586,8 @@ tr:hover td{background:var(--surface2)}
     <div class="fld"><label>會員密碼（≥6 字，需含英文與數字）</label><div class="pw-wrap"><input id="f-pw" type="password" placeholder="yoda123456"><button type="button" class="pw-eye" id="fpwEye" aria-label="顯示或隱藏密碼">👁</button></div></div>
     <div class="fld"><label>推薦人代碼（可留空,例 R7K3P）</label><input id="f-ref" placeholder="R7K3P"></div>
     <div class="fld"><label>首次扣款日（預設今天;留空＝待綠界）</label><input id="f-first" type="date"></div>
-    <div class="fld"><label>方案</label><select id="f-plan"><option value="創始">創始（早鳥 459）</option><option value="一般">一般（589）</option></select></div>
+    <div class="fld"><label>方案</label><select id="f-plan"><option value="一般">一般（589）</option></select>
+      <div style="font-size:12px;color:var(--dim);margin-top:4px">創始已於 2026-08-22 額滿停售，新加入的人只能是一般。</div></div>
     <div class="modal-btns">
       <button class="btn-ghost" onclick="closeAdd()">取消</button>
       <button class="btn-primary" onclick="saveAdd()">加入名單</button>
@@ -958,7 +961,7 @@ function planBadge(m){
     return '<span class="pill" style="border-color:var(--gold,#e0a526);color:var(--gold,#e0a526)" '
       +'title="站方內部帳號：永久權益，不計入付費會員數與月營收">內部</span>';
   if(m.planBlank)
-    return `<span class="pill" style="border-color:var(--amber,#ff9f0a);color:var(--amber,#ff9f0a);cursor:pointer" title="方案欄是空的：算不出應收金額，推薦加碼階梯也不會生效。點擊設定為「創始」" onclick="askSetPlan('${m.id}','')">未設定</span>`;
+    return `<span class="pill" style="border-color:var(--amber,#ff9f0a);color:var(--amber,#ff9f0a);cursor:pointer" title="方案欄是空的：算不出應收金額，推薦加碼階梯也不會生效。點擊逐一設定；要一次補完請用上方的「補上創始方案」" onclick="askSetPlan('${m.id}','')">未設定</span>`;
   const isF=m.plan!=='一般';
   return `<span class="pill ${isF?'plan-f':'plan-n'}" style="cursor:pointer" title="點擊切換方案（會再確認）" onclick="askSetPlan('${m.id}','${isF?'創始':'一般'}')">${isF?'創始':'一般'}</span>`;
 }
@@ -1240,6 +1243,63 @@ function renderReconcile(r,applied){
   }
   box.innerHTML=h;
 }
+/* 補上創始方案。
+   方案欄空白的人，computeEarnedMonths 一律回 0 → 你答應創始會員的推薦加碼階梯
+   對他們完全失效，而畫面上看起來卻很正常。這顆把他們補回「創始」。
+   只補三個條件都成立的人：方案真的是空的、有綠界留痕、訂閱起始日在停售日之前。
+   預設只看不改。 */
+function loadBackfill(){
+  var box=$('backfillBox'); if(!box)return;
+  box.innerHTML='<div class="hintbox">比對中…</div>';
+  post({action:'adminBackfillFoundingPlan',key:KEY}).then(function(r){
+    if(r&&r.blocked){ box.innerHTML='<div class="hintbox" style="border-color:var(--red,#ff453a)">'+escH(String(r.error||''))+'</div>'; return; }
+    if(!r||!r.ok){ box.innerHTML='<div class="hintbox">讀取失敗：'+escH((r&&r.error)||'unknown action（GAS 可能尚未部署新版本）')+'</div>'; return; }
+    renderBackfill(r,false);
+  }).catch(function(){ box.innerHTML='<div class="hintbox">連線失敗</div>'; });
+}
+async function applyBackfill(n){
+  if(!await uiConfirm('把這 '+n+' 位的方案補成「創始」？\n\n只會動方案欄是空的人。\n· 已經填好方案的：不動\n· 查無綠界留痕的：不動（沒付過錢不該拿創始）\n· 停售日之後才加入的：不動（永遠不能是創始）'))return;
+  var box=$('backfillBox'); if(box) box.innerHTML='<div class="hintbox">寫入中…</div>';
+  post({action:'adminBackfillFoundingPlan',key:KEY,apply:true}).then(function(r){
+    if(!r||!r.ok){ box.innerHTML='<div class="hintbox">寫入失敗：'+escH((r&&r.error)||'unknown')+'</div>'; return; }
+    renderBackfill(r,true); toast('已補 '+(r.changed||[]).length+' 位為創始'); loadFromGAS();
+  }).catch(function(){ box.innerHTML='<div class="hintbox">連線失敗</div>'; });
+}
+function renderBackfill(r,applied){
+  var box=$('backfillBox'); if(!box)return;
+  var gold='var(--gold,#e0a526)', dim='var(--dim,#a1a1a6)';
+  var n=r.willChange||0;
+  var h='<div class="recon-sum">'
+    +'<div class="rs"><div class="l">'+(applied?'已補成創始':'可補成創始')+'</div>'
+      +'<div class="v" style="color:'+gold+'">'+(applied?((r.changed||[]).length):n)+'</div></div>'
+    +'<div class="rs"><div class="l">不補・維持原樣</div>'
+      +'<div class="v" style="color:'+dim+'">'+(r.skipped||0)+'</div></div>'
+    +'</div>'
+    +'<div class="hintbox">只補「方案空白 ＋ 有綠界留痕 ＋ 訂閱起始日早於 '
+    +escH(String(r.closedAt||''))+'」的人。方案已經填好的一律不動。</div>';
+  if(!n && !applied){
+    h+='<div class="empty">沒有需要補的人。</div>';
+  } else if(n){
+    h+=(r.will||[]).map(function(m){
+      return '<div class="recon-card"><b>'+escH(String(m.memberId||''))+'</b> '+escH(String(m.email||''))
+        +'<div style="color:'+dim+';font-size:12px">訂閱起始 '+escH(String(m.startDate||'—'))
+        +' ・ 狀態 '+escH(String(m.status||''))+' ・ 帳面期數 '+escH(String(m.paidPeriods||0))+'</div></div>';
+    }).join('');
+  }
+  if(r.skipped){
+    h+='<div class="hintbox">以下 '+r.skipped+' 位不補：</div>'
+      +(r.skippedList||[]).map(function(m){
+        return '<div class="recon-card"><b>'+escH(String(m.memberId||''))+'</b> '+escH(String(m.email||''))
+          +'<div style="color:'+dim+';font-size:12px">'+escH(String(m.reason||''))+'</div></div>';
+      }).join('');
+  }
+  if(!applied && n){
+    h+='<div style="margin-top:10px"><button class="audit-btn gold" onclick="applyBackfill('+n+')">'
+      +'把這 '+n+' 位補成創始</button>'
+      +'<span class="audit-note">方案已填好的人一律不會被動到</span></div>';
+  }
+  box.innerHTML=h;
+}
 function recon(id,r){
   toast('寫入中…');
   post({action:'adminRecon',key:KEY,memberId:id,result:r}).then(res=>{
@@ -1345,7 +1405,7 @@ function renderRewards(){
 }
 
 /* ===== 新增會員（寫入 GAS）===== */
-function openAdd(){$('f-first').value=new Date().toISOString().slice(0,10);if($('f-plan'))$('f-plan').value='創始';$('addModal').classList.add('show');}
+function openAdd(){$('f-first').value=new Date().toISOString().slice(0,10);if($('f-plan'))$('f-plan').value='一般';$('addModal').classList.add('show');}
 function closeAdd(){$('addModal').classList.remove('show');}
 /* 通用彈窗：title 標題、bodyHtml 內容、footHtml 額外按鈕（會附「關閉」）*/
 function openModal(title,bodyHtml,footHtml){
@@ -1356,7 +1416,7 @@ function openModal(title,bodyHtml,footHtml){
 }
 function closeModal(){$('genModal').classList.remove('show');}
 function saveAdd(){
-  const email=$('f-email').value.trim(),pw=$('f-pw').value.trim(),ref=$('f-ref').value.trim(),first=$('f-first').value,plan=($('f-plan')&&$('f-plan').value)||'創始',fbname=($('f-fbname')&&$('f-fbname').value.trim())||'';
+  const email=$('f-email').value.trim(),pw=$('f-pw').value.trim(),ref=$('f-ref').value.trim(),first=$('f-first').value,plan=($('f-plan')&&$('f-plan').value)||'一般',fbname=($('f-fbname')&&$('f-fbname').value.trim())||'';
   if(!email||!pw){toast('請填 Email 與密碼');return;}
   toast('寫入中…');
   post({action:'adminAdd',key:KEY,email:email,password:pw,referredBy:ref,firstCharge:first,plan:plan,fbName:fbname}).then(res=>{
