@@ -969,10 +969,31 @@ function renderMemSummary(){
 
   // 對不上帳的兩側：會員查無付款 / 付款對不到會員。兩者筆數接近時多半就是 email 不一致。
   if(s.noPayRecord){
-    h+='<div class="hintbox" style="border-color:var(--amber,#ff9f0a)">⚠ <b>'+s.noPayRecord+'</b> 人在 Payments 查無綠界付款紀錄'
-      +'（用篩選「查無綠界付款紀錄」看是誰）。可能是後台手動新增會員時填了首次扣款日、對帳打過✓、'
-      +'或綠界結帳填的 email 與註冊帳號不同。<b>這些人目前仍讀得到付費報告、也會收到通知信</b>——'
-      +'存取權只看狀態與到期日，不看付款紀錄。</div>';
+    // ★別再丟一個數字叫人自己去篩。這 N 人裡絕大多數【本來就進不來】，
+    //   真正要處理的只有「還掛著 active 卻查無留痕」那幾位。分開講。
+    var needFix=(subsInfo.members||[]).filter(function(x){return x.stateLabel==='查無綠界留痕';});
+    var already=s.noPayRecord-needFix.length;
+    h+='<div class="hintbox" style="border-color:'+(needFix.length?'var(--amber,#ff9f0a)':'var(--line,#2c2c2e)')+'">'
+      +'查無綠界付款紀錄共 <b>'+s.noPayRecord+'</b> 人 ＝ '
+      +'<b style="color:var(--amber,#ff9f0a)">'+needFix.length+'</b> 位要處理 ＋ '
+      +'<b style="color:var(--dim,#a1a1a6)">'+already+'</b> 位本來就進不來（待開通／已結束）。';
+    if(needFix.length){
+      h+='<div style="margin-top:8px">下面這 '+needFix.length+' 位還掛著「訂閱中」卻沒有任何綠界扣款紀錄：</div>'
+        +needFix.map(function(x){
+          return '<div style="margin-top:4px">· <span class="id">'+escH(String(x.memberId||''))+'</span> '
+            +escH(String(x.email||''))+'　<span style="color:var(--dim,#a1a1a6);font-size:12px">'
+            +'訂閱起始 '+escH(String(x.startDate||'—'))+' ・ 到期日 '+escH(String(x.accessUntil||'—'))
+            +' ・ 帳面期數 '+escH(String(x.paidPeriods||0))+'</span></div>';
+        }).join('')
+        +'<div style="margin-top:8px;color:var(--dim,#a1a1a6);font-size:12px">'
+        +'他們<b>已經讀不到付費報告、也收不到通知信</b>（付費判定只認綠界留痕）。'
+        +'按下方的 <b>💳 沒有綠界付款紀錄的人</b> 可以把狀態一併歸回「待開通」，畫面才不會一直提醒你。'
+        +'</div>';
+    } else {
+      h+='<div style="margin-top:6px;color:var(--dim,#a1a1a6);font-size:12px">'
+        +'沒有人需要處理——這些人都已經是待開通或已結束，讀不到付費報告，也收不到通知信。</div>';
+    }
+    h+='</div>';
   }
   if(subsInfo.orphanCount){
     h+='<div class="hintbox" style="border-color:var(--red,#ff453a)">🔎 Payments 裡有 <b>'+subsInfo.orphanCount
@@ -1288,9 +1309,10 @@ function renderReconcile(r,applied){
   };
   if(B.length){
     h+='<div class="hintbox" style="border-color:var(--amber,#ff9f0a)">⚠ <b>'+B.length+'</b> 位<b>最需要注意</b>：'
-      +'查無綠界留痕，但扣款日還沒過 → 🔍 綠界狀態比對<b>不會</b>把他們標出來，'
-      +'畫面上看起來一切正常，但他們從沒付過一毛錢。</div>'
-      +B.map(function(m){return rowHtml(m,'查無綠界留痕，但扣款日未到期 → 目前仍讀得到付費報告');}).join('');
+      +'查無綠界留痕，但扣款日還沒過 → 🔍 綠界狀態比對<b>不會</b>把他們標出來。'
+      +'他們<b>已經讀不到付費報告、也收不到通知信</b>，只是狀態還掛著「訂閱中」，'
+      +'會一直出現在提醒裡。按下面那顆把狀態一併歸位。</div>'
+      +B.map(function(m){return rowHtml(m,'查無綠界留痕，但扣款日未到期 → 已經讀不到付費報告，只是狀態還掛著「訂閱中」');}).join('');
   }
   if(C.length){
     h+='<div class="hintbox">'+C.length+' 位查無綠界留痕、也沒有扣款日（一望即知未付費）。</div>'
