@@ -305,6 +305,7 @@ tr:hover td{background:var(--surface2)}
     <!-- 版本戳：由 build-console.js 自動填寫。用來一眼看出「我現在開的是哪一版」，
          避免 GAS 那份與 Vercel 那份不同步時，改了卻看不到而找不到原因。 -->
     <span class="build" id="buildStamp" title="這份主控台的建置版本">build —</span>
+    <span class="build" id="gasVer" title="Google Apps Script 端的版本。舊版會讓付款日期等欄位變空的"></span>
     <button onclick="logout()" style="margin-left:auto;font-size:12px;color:var(--dim);background:none;border:1px solid var(--border);border-radius:8px;padding:5px 12px;cursor:pointer">登出</button>
   </div>
   <div class="proto-note">已接 Google Sheet · 即時資料</div>
@@ -711,6 +712,11 @@ function computeRefCounts(list){
 /* 名冊走 Neon 鏡像（秒出），付款日/權益到期日走 GAS 讀 Sheet 正本（慢一點但是權威）。
    兩邊並行抓，GAS 那半邊失敗或還沒部署新版時只是少了幾欄，名單照常顯示。 */
 var subsInfo=null;
+// ★主控台要求的 GAS 最低版本。GAS 端 CODE_VERSION 比這個舊 → 畫面跳紅字。
+// 為什麼需要：2026-08-22 一整天反覆卡在「畫面不對 → 其實是 GAS 沒貼上／貼到一半斷掉」。
+// 兩邊的版本擺在同一個畫面上，就不用再猜。
+var GAS_MIN_VERSION='2026-08-22-h';
+var gasVersion='';
 function loadFromGAS(){
   return Promise.all([
     fetch('https://yoda-research-next.vercel.app/api/admin-data',{method:'POST',body:JSON.stringify({key:KEY})})
@@ -831,6 +837,20 @@ function membersFiltered(){
     if(q&&!(m.name.toLowerCase().includes(q)||m.email.toLowerCase().includes(q)||m.id.toLowerCase().includes(q)||(m.pub||'').toLowerCase().includes(q)))return false;
     return true;
   });
+}
+/* GAS 版本提示：貼錯版本／貼到一半斷掉，這裡會直接講出來 */
+function renderGasVersion(){
+  var el=$('gasVer'); if(!el)return;
+  if(!gasVersion){
+    el.innerHTML='<span style="color:var(--amber,#ff9f0a)">GAS 版本未知（請部署新版）</span>';
+    return;
+  }
+  if(gasVersion<GAS_MIN_VERSION){
+    el.innerHTML='<span style="color:var(--red,#ff453a)">⚠ GAS 是舊版 '+escH(gasVersion)
+      +'（需要 '+escH(GAS_MIN_VERSION)+'）——付款日期等欄位會是空的，請重貼 Code.gs 並部署新版本</span>';
+  } else {
+    el.innerHTML='<span style="color:var(--dim)">GAS '+escH(gasVersion)+'</span>';
+  }
 }
 function renderMembers(){
   const rows=membersFiltered();
