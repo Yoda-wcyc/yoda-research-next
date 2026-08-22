@@ -717,16 +717,22 @@ var subsInfo=null;
 // 兩邊的版本擺在同一個畫面上，就不用再猜。
 var GAS_MIN_VERSION='2026-08-22-h';
 var gasVersion='';
+var subsErr='';   // 訂閱總表拿不到時的原因，直接顯示在畫面上
 function loadFromGAS(){
   return Promise.all([
     fetch('https://yoda-research-next.vercel.app/api/admin-data',{method:'POST',body:JSON.stringify({key:KEY})})
       .then(function(r){return r.json();}).catch(function(){return null;}),
-    post({action:'adminSubscriptionTable',key:KEY}).catch(function(){return null;})
+    // ★不再吞掉錯誤。這個呼叫一失敗，綠界付款日、剩餘天數、通知信欄會【全部】變成 —，
+    //   而狀態欄會退回只看 status ——看起來像「某幾欄壞了」，其實是整包沒拿到。
+    //   2026-08-22 為此耗掉一整天在猜。錯誤原封不動留著，畫面直接講出來。
+    post({action:'adminSubscriptionTable',key:KEY})
+      .catch(function(e){ return { ok:false, __netErr:String((e&&e.message)||e) }; })
   ]).then(function(res){
     var ad=res[0], sub=res[1];
     if(!ad||!ad.ok)return false;
     members=computeRefCounts((ad.members||[]).map(mapMember));
     subsInfo=(sub&&sub.ok)?sub:null;
+    subsErr=subsInfo?'':((sub&&(sub.__netErr||sub.error))||'GAS 沒有回應或回傳了非預期的內容');
     if(subsInfo){
       var by={}; subsInfo.members.forEach(function(x){by[x.memberId]=x;});
       members.forEach(function(m){ if(by[m.id]){ m.sub=by[m.id]; delete by[m.id]; } });
@@ -899,8 +905,16 @@ function renderMembers(){
 function renderMemSummary(){
   const box=$('memSummary'); if(!box)return;
   if(!subsInfo){
-    box.innerHTML='<div class="hintbox">付款日與權益到期日需要 GAS 新版才有（目前顯示的是名冊資料）。'
-      +'把 Code.gs 貼回 GAS 編輯器並部署新版本後，這裡會出現完整統計。</div>';
+    var box0=$('memSummary');
+    if(box0){
+      box0.innerHTML='<div class="hintbox" style="border-color:var(--red,#ff453a)">'
+        +'<b style="color:var(--red,#ff453a)">⚠ 訂閱總表沒拿到——「綠界付款 首次／最近」「剩餘」「通知信」這幾欄會是空的</b><br>'
+        +'原因：'+escH(subsErr||'未知')
+        +'<div style="margin-top:6px;color:var(--dim,#a1a1a6);font-size:12px">'
+        +'常見原因：GAS 還沒部署新版本（動作＝unknown action）、管理密碼不符、或 GAS 執行時丟出例外。'
+        +'<br>目前 GAS 版本：<b>'+escH(gasVersion||'未知')+'</b>／需要 <b>'+escH(GAS_MIN_VERSION)+'</b>'
+        +'</div></div>';
+    }
     return;
   }
   const s=subsInfo.summary;
