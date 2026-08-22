@@ -361,7 +361,7 @@ tr:hover td{background:var(--surface2)}
     <div class="tbl-wrap">
       <table>
         <thead><tr>
-          <th>編號</th><th>會員</th><th>臉書名稱</th><th>方案</th><th>狀態</th>
+          <th>編號</th><th>會員</th><th>方案</th><th>狀態</th>
           <th>訂閱起始</th>
           <th>綠界付款<br><span style="font-weight:400;color:var(--dim)">首次／最近</span></th>
           <th title="帳面記的期數 vs 綠界實際扣款筆數，對不上就要對帳">期數<br><span style="font-weight:400;color:var(--dim)">帳面／綠界</span></th>
@@ -679,7 +679,10 @@ function login(){
 function mapMember(g){
   const st=g.status==='active'?'有效':g.status==='cancelled'?'已取消':(g.status==='expired'||g.status==='late')?'逾期':(g.status||'有效');
   return {id:g.member_id, pub:g.pub_id||'', name:(String(g.email||'').split('@')[0]||g.member_id), email:g.email||'',
-    plan:(g.plan==='一般'?'一般':'創始'), fb:g.fb_name||'', start:g.start_date||'', next:g.next_charge_date||'', status:st,
+    // ★方案照實帶，不要把空白假造成「創始」——
+    //   假造會讓畫面說創始、而算獎勵與核對金額用的是原始空值，兩邊講的不是同一件事。
+    plan:String(g.plan||'').trim(), planBlank:String(g.plan||'').trim()==='',
+    internal:g.internal===true, fb:g.fb_name||'', start:g.start_date||'', next:g.next_charge_date||'', status:st,
     streak:Number(g.paid_periods)||0, ref:g.referred_by||'', refCode:g.ref_code||'',
     comp:Number(g.granted)||0, paidRefs:Number(g.referred_paid_count)||0,
     exFounding:/^(y|yes|true|1)$/i.test(String(g.ex_founding||'').trim()), // 曾取消·排除創始·回頭客
@@ -771,14 +774,17 @@ function renderDash(){
   const foundUsed=members.length;
   const paidM=members.filter(m=>m.paid);   // 只算真付費(Payments為主·扣款日為輔)，非只看 active
   const late=members.filter(m=>m.status==='逾期').length;
-  const mrr=paidM.reduce((s,m)=>s+PRICE[m.plan],0);   // 月營收只計真付費者
+  // 月營收只計真付費者；方案不明的人金額無從得知 → 不計入，另外提示（不要算成 NaN 或 0）
+  const mrr=paidM.reduce((s,m)=>s+(PRICE[m.plan]||0),0);
+  const noPlan=members.filter(m=>m.planBlank&&!m.internal).length;
+  const internalN=members.filter(m=>m.internal).length;
   const dueLeft=members.filter(m=>dueThisMonth(m)).length;
   const td=todos();
   $('kpis').innerHTML=`
-    <div class="kpi"><div class="l">付費會員</div><div class="v g">${paidM.length}</div></div>
+    <div class="kpi"><div class="l">付費會員<span style="font-weight:400;color:var(--dim)">${internalN?'（不含內部 '+internalN+'）':''}</span></div><div class="v g">${paidM.length}</div></div>
     <div class="kpi"><div class="l">本月待對帳</div><div class="v">${dueLeft}</div></div>
     <div class="kpi"><div class="l">逾期</div><div class="v ${late?'r':''}">${late}</div></div>
-    <div class="kpi"><div class="l">預估月營收</div><div class="v">${money(mrr)}</div></div>
+    <div class="kpi"><div class="l">預估月營收${noPlan?'<span style="font-weight:400;color:var(--amber,#ff9f0a)">（'+noPlan+' 位方案空白，未計入）</span>':''}</div><div class="v">${money(mrr)}</div></div>
     <div class="kpi"><div class="l">待發獎勵</div><div class="v ${td.filter(t=>t.kind!=='late').length?'gold':''}">${td.filter(t=>t.kind!=='late').length}</div></div>`;
   const icoMap={c7:['c7','🎁'],late:['late','⚠️']};
   $('todoList').innerHTML = td.length ? td.map(t=>{
@@ -854,7 +860,6 @@ function renderMembers(){
     return `<tr>
       <td><span class="id">${escH(m.id)}</span>${m.pub?`<div class="email" style="color:var(--gold)" title="會員端看到的公開亂碼編號">${escH(m.pub)}</div>`:''}</td>
       <td><div>${escH(m.name)}${m.exFounding?' <span title="🌱 回頭草·曾取消訂閱又回來（已排除創始）" style="cursor:help">🌱</span>':''}</div><div class="email">${escH(m.email)}</div></td>
-      <td>${fbCell(m)}</td>
       <td>${planBadge(m)}</td>
       <td><span class="pill" style="border-color:${col};color:${col}">${escH(st)}</span></td>
       <td>${m.start?'<span class="id">'+escH(m.start)+'</span>':'<span class="email">—</span>'}</td>
@@ -865,7 +870,7 @@ function renderMembers(){
       <td>${notify}</td>
       <td>${refCell}</td>
       <td>${st==='已結束'||m.status==='已取消'?'':`<button class="mini-act" onclick="giftMonth('${m.id}')">贈送月</button> <button class="mini-act" style="color:var(--gold,#e0a526)" onclick="cancelSub('${m.id}')">取消訂閱</button> `}<button class="mini-act" style="color:#ff6b6b" onclick="deleteMember('${m.id}')">刪除</button></td>
-    </tr>`;}).join('') || `<tr><td colspan="13"><div class="empty">沒有符合的會員</div></td></tr>`;
+    </tr>`;}).join('') || `<tr><td colspan="12"><div class="empty">沒有符合的會員</div></td></tr>`;
 }
 /* 摘要列：一眼看完人數分佈、下一封通知信誰會收到、以及對不上帳的地方 */
 function renderMemSummary(){
@@ -945,12 +950,21 @@ async function editFb(id){
   }).catch(()=>toast('連線失敗'));
 }
 function planBadge(m){
+  // ★空白不能一律顯示成「創始」。方案欄是空的時候：
+  //   · 算不出應收金額（月營收、綠界金額核對都會跳過他）
+  //   · computeEarnedMonths 只認「創始」→ 推薦加碼階梯不會生效
+  //   畫面必須說實話，否則你看到「創始」卻拿不到創始的待遇。
+  if(m.internal)
+    return '<span class="pill" style="border-color:var(--gold,#e0a526);color:var(--gold,#e0a526)" '
+      +'title="站方內部帳號：永久權益，不計入付費會員數與月營收">內部</span>';
+  if(m.planBlank)
+    return `<span class="pill" style="border-color:var(--amber,#ff9f0a);color:var(--amber,#ff9f0a);cursor:pointer" title="方案欄是空的：算不出應收金額，推薦加碼階梯也不會生效。點擊設定為「創始」" onclick="askSetPlan('${m.id}','')">未設定</span>`;
   const isF=m.plan!=='一般';
   return `<span class="pill ${isF?'plan-f':'plan-n'}" style="cursor:pointer" title="點擊切換方案（會再確認）" onclick="askSetPlan('${m.id}','${isF?'創始':'一般'}')">${isF?'創始':'一般'}</span>`;
 }
 async function askSetPlan(id,cur){
-  const to=cur==='創始'?'一般':'創始';
-  if(!await uiConfirm('把會員 '+id+' 的方案從「'+cur+'」改成「'+to+'」？'))return;
+  const to=cur==='創始'?'一般':'創始';   // 空白('')也會落到這裡 → 設成「創始」
+  if(!await uiConfirm('把會員 '+id+' 的方案從「'+(cur||'未設定')+'」改成「'+to+'」？'))return;
   toast('寫入中…');
   post({action:'adminSetPlan',key:KEY,memberId:id,plan:to}).then(res=>{
     if(res&&res.ok){toast('已改為 '+to);loadFromGAS();}else{toast((res&&res.error)||'失敗');}
