@@ -1147,6 +1147,7 @@ function loadReconcile(){
   var box=$('reconcileBox'); if(!box)return;
   box.innerHTML='<div class="hintbox">比對 Members 與 Payments 中…</div>';
   post({action:'adminReconcilePaid',key:KEY}).then(function(r){
+    if(r&&r.blocked){ renderReconcileBlocked(r); return; }
     if(!r||!r.ok){ box.innerHTML='<div class="hintbox">讀取失敗：'+escH((r&&r.error)||'unknown action（GAS 可能尚未部署新版本）')+'</div>'; return; }
     renderReconcile(r,false);
   }).catch(function(){ box.innerHTML='<div class="hintbox">連線失敗</div>'; });
@@ -1155,9 +1156,23 @@ async function applyReconcile(n){
   if(!await uiConfirm('確定把這 '+n+' 位歸回「待開通」？\n\n動作：\n· status 改為 pending\n· 開不了付費報告、也不會再收到通知信\n\nPayments 裡有任何一筆綠界留痕的人，一律不會被動到。\n他們日後真的完成扣款，會自動恢復。'))return;
   var box=$('reconcileBox'); if(box) box.innerHTML='<div class="hintbox">套用中…</div>';
   post({action:'adminReconcilePaid',key:KEY,apply:true}).then(function(r){
+    if(r&&r.blocked){ renderReconcileBlocked(r); return; }
     if(!r||!r.ok){ box.innerHTML='<div class="hintbox">套用失敗：'+escH((r&&r.error)||'unknown')+'</div>'; return; }
     renderReconcile(r,true); toast('已歸回待開通 '+((r.summary&&r.summary.changed)||0)+' 位'); loadFromGAS();
   }).catch(function(){ box.innerHTML='<div class="hintbox">連線失敗</div>'; });
+}
+/* 讀不到 Payments 的 email 欄時的畫面。
+   絕不能顯示成「有綠界留痕 0 位」——那會讓人以為是大家沒付錢，
+   然後按下套用把付費會員全部關在門外。2026-08-22 就是這樣出事的。 */
+function renderReconcileBlocked(r){
+  var box=$('reconcileBox'); if(!box)return;
+  box.innerHTML='<div class="hintbox" style="border-color:var(--red,#ff453a)">'
+    +'<b style="color:var(--red,#ff453a)">暫停對帳——讀不到付款紀錄，不是沒人付錢</b><br>'
+    +escH(String(r.error||''))
+    +'<div style="margin-top:8px;color:var(--dim,#a1a1a6);font-size:12px">'
+    +'Payments 分頁的標題列要有一欄叫 <b>email</b>（大小寫、前後空白都沒關係），'
+    +'或把 email 放回第 2 欄。修好之後再按一次這顆。'
+    +'<br>在確認之前，通知名單會自動退回寬鬆規則，不會有人被漏寄。</div></div>';
 }
 function renderReconcile(r,applied){
   var box=$('reconcileBox'); if(!box)return;
