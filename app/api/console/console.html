@@ -851,11 +851,18 @@ function renderGasVersion(){
     el.innerHTML='<span style="color:var(--amber,#ff9f0a)">GAS 版本未知（請部署新版）</span>';
     return;
   }
+  // 部署代號的尾巴：拿去跟 GAS「管理部署」畫面上的網址對，一眼看出是不是打到舊部署。
+  // ★GAS 用「新增部署」會產生全新網址，舊網址還活著、還在跑舊程式——
+  //   主控台打的是寫死的舊網址，於是「貼了沒反應」。正確做法是【編輯】既有部署。
+  var dep=(String(GAS_URL).match(/\/macros\/s\/([^\/]+)\//)||[])[1]||'';
+  var depTail=dep?('…'+dep.slice(-8)):'（未知）';
   if(gasVersion<GAS_MIN_VERSION){
-    el.innerHTML='<span style="color:var(--red,#ff453a)">⚠ GAS 是舊版 '+escH(gasVersion)
-      +'（需要 '+escH(GAS_MIN_VERSION)+'）——付款日期等欄位會是空的，請重貼 Code.gs 並部署新版本</span>';
+    el.innerHTML='<span style="color:var(--red,#ff453a)" title="主控台打的部署代號 '+escH(dep)+'">'
+      +'⚠ GAS 是舊版 '+escH(gasVersion)+'（需要 '+escH(GAS_MIN_VERSION)+'）'
+      +'——付款日期等欄位會是空的。<br>若你確定已經貼上並部署，請確認是用「管理部署 → 編輯 → 新版本」'
+      +'而不是「新增部署」；主控台目前打的部署代號是 <b>'+escH(depTail)+'</b></span>';
   } else {
-    el.innerHTML='<span style="color:var(--dim)">GAS '+escH(gasVersion)+'</span>';
+    el.innerHTML='<span style="color:var(--dim)" title="部署代號 '+escH(dep)+'">GAS '+escH(gasVersion)+' · '+escH(depTail)+'</span>';
   }
 }
 function renderMembers(){
@@ -913,6 +920,8 @@ function renderMemSummary(){
         +'<div style="margin-top:6px;color:var(--dim,#a1a1a6);font-size:12px">'
         +'常見原因：GAS 還沒部署新版本（動作＝unknown action）、管理密碼不符、或 GAS 執行時丟出例外。'
         +'<br>目前 GAS 版本：<b>'+escH(gasVersion||'未知')+'</b>／需要 <b>'+escH(GAS_MIN_VERSION)+'</b>'
+        +'<br>主控台打的部署代號：<b>'+escH(String(GAS_URL).replace(/^.*\/macros\/s\//,'').replace(/\/exec.*$/,''))+'</b>'
+        +'　←　拿去跟 GAS「部署 → 管理部署」畫面上的網址比對；不一樣就是打到舊部署了'
         +'</div></div>';
     }
     return;
