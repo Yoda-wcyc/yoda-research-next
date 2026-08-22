@@ -131,6 +131,12 @@ tr:hover td{background:var(--surface2)}
 .streak-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:2px}
 .streak-dot.off{background:var(--surface2)}
 
+/* 對帳彙總：三個數字並排，一眼看完 */
+.recon-sum{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+.recon-sum .rs{flex:1 1 150px;background:var(--card,#1c1c1e);border:1px solid var(--line,#2c2c2e);
+  border-radius:10px;padding:10px 12px}
+.recon-sum .rs .l{font-size:12px;color:var(--dim,#a1a1a6);margin-bottom:4px}
+.recon-sum .rs .v{font-size:24px;font-weight:700}
 /* 對帳 */
 .recon-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px}
 .recon-head .month{font-size:15px;font-weight:700}
@@ -1157,16 +1163,29 @@ function renderReconcile(r,applied){
   var box=$('reconcileBox'); if(!box)return;
   var sm=r.summary||{}, B=r.pending_review||[], C=r.unpaid||[];
   var n=B.length+C.length;
-  var h='<div class="hintbox">比對 <b>Members</b> 與 <b>Payments</b>：'
-       +'有綠界留痕 <b style="color:var(--green,#30d158)">'+(sm.paid||0)+'</b> 位'
-       +' ・ 查無留痕 <b style="color:var(--amber,#ff9f0a)">'+n+'</b> 位'
-       +(applied?' ・ 本次已歸回待開通 <b>'+(sm.changed||0)+'</b> 位':'')+'</div>';
+  var willChange=sm.willChange||0, already=sm.alreadyPending||0;
+  var green='var(--green,#30d158)', amber='var(--amber,#ff9f0a)', dim='var(--dim,#a1a1a6)';
+  // 三個數字直接算好給你，不要讓人從名單裡自己數
+  var h='<div class="recon-sum">'
+       +'<div class="rs"><div class="l">有綠界留痕・不會被動到</div>'
+         +'<div class="v" style="color:'+green+'">'+(sm.paid||0)+'</div></div>'
+       +'<div class="rs"><div class="l">'+(applied?'本次已歸回待開通':'按套用會改成待開通')+'</div>'
+         +'<div class="v" style="color:'+amber+'">'+(applied?(sm.changed||0):willChange)+'</div></div>'
+       +'<div class="rs"><div class="l">本來就是待開通・不會被動到</div>'
+         +'<div class="v" style="color:'+dim+'">'+already+'</div></div>'
+       +'</div>'
+       +'<div class="hintbox">查無綠界留痕共 <b>'+n+'</b> 位 ＝ 會被改的 <b>'+(applied?(sm.changed||0):willChange)+'</b> 位'
+       +' ＋ 註冊了沒完成付款、本來就已經是待開通的 <b>'+already+'</b> 位。</div>';
   if(!n){
     h+='<div class="empty">每一位會員都有綠界扣款留痕，沒有人需要處理。</div>';
     box.innerHTML=h; return;
   }
   var rowHtml=function(m,why){
+    var tag=m.willChange
+      ? '<span style="color:'+amber+'">● 會被改</span>'
+      : '<span style="color:'+dim+'">○ 本來就是待開通，不會被改</span>';
     return '<div class="recon-card"><b>'+escH(String(m.member_id||''))+'</b> '+escH(String(m.email||''))
+      +' '+tag
       +'<div style="color:var(--dim,#a1a1a6);font-size:12px">目前狀態 '+escH(String(m.status||''))
       +' ・ 下次扣款日 '+escH(String(m.next_charge_date||'（空白）'))
       +' ・ 帳面期數 '+escH(String(m.paid_periods||0))+'<br>'+why+'</div></div>';
@@ -1182,9 +1201,13 @@ function renderReconcile(r,applied){
       +C.map(function(m){return rowHtml(m,'查無綠界留痕，也沒有扣款日');}).join('');
   }
   if(!applied){
-    h+='<div style="margin-top:10px"><button class="audit-btn amber" onclick="applyReconcile('+n+')">'
-      +'把這 '+n+' 位歸回「待開通」</button>'
-      +'<span class="audit-note">有綠界留痕的 '+(sm.paid||0)+' 位一律不會被動到</span></div>';
+    if(willChange){
+      h+='<div style="margin-top:10px"><button class="audit-btn amber" onclick="applyReconcile('+willChange+')">'
+        +'把這 '+willChange+' 位歸回「待開通」</button>'
+        +'<span class="audit-note">有綠界留痕的 '+(sm.paid||0)+' 位一律不會被動到</span></div>';
+    } else {
+      h+='<div class="hintbox">沒有人需要處理——查無留痕的這 '+n+' 位本來就已經是待開通。</div>';
+    }
   }
   box.innerHTML=h;
 }
