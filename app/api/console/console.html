@@ -350,6 +350,7 @@ tr:hover td{background:var(--surface2)}
         <option value="待開通">待開通（註冊未付款）</option>
         <option value="notify">下一封通知信會收到</option>
         <option value="nopay">查無綠界付款紀錄</option>
+        <option value="internal">內部帳號（站方測試用·不計入統計）</option>
       </select>
       <span id="memCount" style="font-size:13px;color:var(--dim);font-weight:600;white-space:nowrap"></span>
       <button class="btn-primary" onclick="openAdd()">＋ 新增會員</button>
@@ -860,6 +861,11 @@ function membersFiltered(){
   const q=$('memSearch').value.trim().toLowerCase();
   const sf=$('memFilter').value;
   return members.filter(m=>{
+    // ★站方自己的測試帳號預設不出現在名單裡——它不是客戶，出現在這裡只會干擾判讀。
+    //   要看的話用篩選選「內部帳號」。它在所有統計裡本來就已經被排除。
+    const isInt=(m.internal===true)||(m.sub&&m.sub.stateLabel==='內部帳號');
+    if(sf==='internal'){ if(!isInt)return false; }
+    else if(isInt)return false;
     if(sf==='notify'){ if(!(m.sub&&m.sub.willNotify))return false; }
     else if(sf==='nopay'){ if(!m.sub||m.sub.hasEcpayRecord)return false; }
     else if(sf!=='all'&&memState(m)!==sf)return false;
