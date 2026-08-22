@@ -22,6 +22,18 @@ async function ensureTables() {
   )`;
 }
 
+// ★Payments 分頁的欄名與語意不一定對得上：正式站用 member_id 這一欄裝 email、
+//   custom_field 裝 note、neweb_trade_no 裝單號。只找 'email' 會整欄寫成空字串——
+//   那等於鏡像裡沒有任何付款紀錄，而付費判定就是靠它。（2026-08-22 事故的同一個坑）
+function payEmail(p) {
+  const cands = [p.email, p.member_id, p['電子郵件'], p['信箱']];
+  for (const c of cands) {
+    const v = String(c == null ? '' : c).trim();
+    if (v && v.indexOf('@') > 0) return v;
+  }
+  return '';
+}
+
 // 唯讀鏡像：從 GAS(正本)匯出 → 快照式寫入 Neon（清空後全量插入·冪等）。正本完全不動。
 // ★欄位清單漏一欄就是「跑一次鏡像就把那欄清成空值」——ex_founding（永久排除創始）曾經漏掉。
 //   新增 Members 欄位時，這裡的 MCOLS、CREATE TABLE、INSERT 三處都要一起補。
@@ -54,7 +66,7 @@ export async function POST(req) {
     await sql`TRUNCATE payments`;
     for (const p of payments) {
       await sql`INSERT INTO payments (ts,email,amount,trade_no,note,status)
-        VALUES (${String(p.timestamp || p.ts || '')},${String(p.email || '')},${String(p.amount || '')},${String(p.trade_no || '')},${String(p.note || '')},${String(p.status || '')})`;
+        VALUES (${String(p.timestamp || p.ts || '')},${payEmail(p)},${String(p.amount || '')},${String(p.trade_no || p.neweb_trade_no || '')},${String(p.note || p.custom_field || '')},${String(p.status || '')})`;
     }
   } catch (e) { return J({ ok: false, error: '寫入 DB 失敗：' + String((e && e.message) || e) }); }
 

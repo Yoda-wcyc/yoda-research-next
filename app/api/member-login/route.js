@@ -1,4 +1,4 @@
-import { memberByEmail, hashPw, isPaidActive, watermarkOf, tokenExp } from '../../../lib/auth';
+import { memberByEmail, hashPw, isPaidMember, watermarkOf, tokenExp } from '../../../lib/auth';
 import { signJwt } from '../../../lib/jwt';
 import { J, preflight } from '../../../lib/cors';
 
@@ -30,7 +30,10 @@ export async function POST(req) {
     if (String(m.password_hash) !== hashPw(password)) {
       return J(await gasFallback(email, password)); // Neon 密碼不符 → 可能鏡像過舊 → GAS 確認
     }
-    if (!isPaidActive(m)) return J(await gasFallback(email, password)); // Neon 顯示未付費→可能剛付款鏡像未更新→GAS 複查(正本)
+    // ★付費門要跟 GAS 的 isPaidMember_ 同一把尺：狀態＋到期日【＋綠界留痕】。
+    //   只判狀態與到期日的話，沒付過錢的人可以從 Vercel 這條路繞過 GAS 拿到 token。
+    //   判 false 不代表擋人——會退回 GAS 用正本複查（剛付款、鏡像還沒更新的情況）。
+    if (!(await isPaidMember(m))) return J(await gasFallback(email, password));
     const wm = watermarkOf(m);
     const now = Math.floor(Date.now() / 1000);
     const token = signJwt({ sub: m.pub_id || m.member_id, wm, iat: now, exp: tokenExp(m, now) }, process.env.JWT_SECRET || '');

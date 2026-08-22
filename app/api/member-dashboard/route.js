@@ -1,4 +1,4 @@
-import { memberByEmail, hashPw, isPaidActive, watermarkOf, tokenExp } from '../../../lib/auth';
+import { memberByEmail, hashPw, isPaidMember, paidEmailScan, watermarkOf, tokenExp } from '../../../lib/auth';
 import { sql } from '../../../lib/db';
 import { signJwt } from '../../../lib/jwt';
 import { J, preflight } from '../../../lib/cors';
@@ -44,20 +44,28 @@ export async function POST(req) {
   try { m = await memberByEmail(email); } catch (e) { m = null; }
   if (!m) return J(await gasFallback(email, password));
   if (String(m.password_hash) !== hashPw(password)) return J(await gasFallback(email, password));
-  if (!isPaidActive(m)) return J(await gasFallback(email, password)); // Neon 顯示未付費→可能剛付款/剛異動鏡像未更新→GAS 拿正本最新狀態
+  // ★同 member-login：要加上綠界留痕。判 false 會退回 GAS 用正本複查，不會誤擋。
+  if (!(await isPaidMember(m))) return J(await gasFallback(email, password));
 
   let referredTotal = 0, referredPaid = 0;
   if (m.ref_code) {
     try {
-      const rows = await sql`SELECT status, paid_periods FROM members WHERE referred_by = ${m.ref_code}`;
+      const rows = await sql`SELECT email, status, paid_periods FROM members WHERE referred_by = ${m.ref_code}`;
       referredTotal = rows.length;
-      for (const r of rows) { if (String(r.status) === 'active' && (Number(r.paid_periods) || 0) >= 1) referredPaid++; }
+      // ★「帶進付費」會換成推薦人的免費月，是真的錢 → 必須以綠界留痕為準，
+      //   不能只看 status + 期數（沒付過錢的 active 帳號就能替人賺一個月）。
+      const scan = await paidEmailScan();
+      for (const r of rows) {
+        const re = String(r.email || '').trim().toLowerCase();
+        const paid = scan.trusted ? scan.set.has(re) : true;
+        if (String(r.status) === 'active' && (Number(r.paid_periods) || 0) >= 1 && paid) referredPaid++;
+      }
     } catch (e) {}
   }
   const paidPeriods = Number(m.paid_periods) || 0;
   const certified = ['flag', 'mw', 'tw', 'us', 'key', 'macro'].filter((t) => String(m['cert_' + t] || '').trim() !== '');
   let token = '';
-  if (isPaidActive(m)) {
+  if (await isPaidMember(m)) {
     const wm = watermarkOf(m), now = Math.floor(Date.now() / 1000);
     token = signJwt({ sub: m.pub_id || m.member_id, wm, iat: now, exp: tokenExp(m, now) }, process.env.JWT_SECRET || '');
   }
