@@ -730,7 +730,7 @@ var subsInfo=null;
 // ★主控台要求的 GAS 最低版本。GAS 端 CODE_VERSION 比這個舊 → 畫面跳紅字。
 // 為什麼需要：2026-08-22 一整天反覆卡在「畫面不對 → 其實是 GAS 沒貼上／貼到一半斷掉」。
 // 兩邊的版本擺在同一個畫面上，就不用再猜。
-var GAS_MIN_VERSION='2026-08-22-i';
+var GAS_MIN_VERSION='2026-08-22-k';
 var gasVersion='';
 var subsErr='';   // 訂閱總表拿不到時的原因，直接顯示在畫面上
 function loadFromGAS(){
@@ -819,7 +819,7 @@ function renderDash(){
   const dueLeft=members.filter(m=>dueThisMonth(m)).length;
   const td=todos();
   $('kpis').innerHTML=`
-    <div class="kpi"><div class="l">付費會員<span style="font-weight:400;color:var(--dim)">${internalN?'（不含內部 '+internalN+'）':''}</span></div><div class="v g">${paidM.length}</div></div>
+    <div class="kpi"><div class="l" title="active 且 Payments 有綠界留痕（含逾期未對帳）。「現在服務中的人」看名單上方的對帳表">付費會員<span style="font-weight:400;color:var(--dim)">${internalN?'（不含內部 '+internalN+'）':''}</span></div><div class="v g">${paidM.length}</div></div>
     <div class="kpi"><div class="l">本月待對帳</div><div class="v">${dueLeft}</div></div>
     <div class="kpi"><div class="l">逾期</div><div class="v ${late?'r':''}">${late}</div></div>
     <div class="kpi"><div class="l">預估月營收${noPlan?'<span style="font-weight:400;color:var(--amber,#ff9f0a)">（'+noPlan+' 位方案空白，未計入）</span>':''}</div><div class="v">${money(mrr)}</div></div>
@@ -887,6 +887,35 @@ function renderGasVersion(){
   } else {
     el.innerHTML='<span style="color:var(--dim)" title="部署代號 '+escH(dep)+'">GAS '+escH(gasVersion)+' · '+escH(depTail)+'</span>';
   }
+}
+/* 三個數字為什麼不一樣：把差額逐項算出來。
+   訂閱中   ＝ active ＋ 有綠界留痕 ＋ 扣款日還沒過期
+   付費會員 ＝ active ＋ 有綠界留痕（不管扣款日過了沒）
+   累計入帳 ＝ Payments【所有】列的總和（含已取消的人付過的、測試帳號、重複列）
+   三者本來就不該相等，但畫面上擺在一起看起來像該相等 → 差在哪裡要講出來。 */
+function reconcileNumbers(s){
+  var dim='var(--dim,#a1a1a6)';
+  var rows=s.payRowsAll||0;
+  if(!rows)return '';
+  var L=function(t,n,note){
+    return '<div style="display:flex;gap:8px;font-size:12.5px;line-height:1.9">'
+      +'<span style="min-width:15em">'+t+'</span>'
+      +'<b style="min-width:4em;text-align:right">'+n+'</b>'
+      +'<span style="color:'+dim+'">'+(note||'')+'</span></div>';
+  };
+  var real=rows-(s.payRowsDup||0)-(s.payRowsInternal||0);
+  return '<div class="hintbox"><b>這些數字為什麼不一樣</b>'
+    +L('Payments 總列數', rows, '＝「累計入帳」的來源，是歷史總和，不是人數')
+    +L('− 重複的列', (s.payRowsDup||0), (s.payRowsDup?'用「🧾 重複的付款列」刪掉':'沒有重複'))
+    +L('− 測試／內部帳號的列', (s.payRowsInternal||0), '不計入付費統計')
+    +L('＝ 真實扣款列數', real, '每扣一期就一列，所以會大於人數')
+    +'<div style="border-top:1px solid var(--line,#2c2c2e);margin:6px 0"></div>'
+    +L('付費會員（KPI）', (s.active||0)+(s.lapsed||0), 'active ＋ 有綠界留痕，含逾期未對帳')
+    +L('− 逾期未對帳', (s.lapsed||0), (s.lapsed?'該扣沒扣，用「⚠ 逾期未對帳稽核」查':'無'))
+    +L('＝ 訂閱中（名單）', (s.active||0), '真正還在正常扣款的人')
+    +L('＋ 已取消·權益到期末', (s.cancelledInGrace||0), '還讀得到報告，但不會再扣款')
+    +L('＝ 現在服務中的人', (s.active||0)+(s.cancelledInGrace||0), '這個才是你要服務幾個人')
+    +'</div>';
 }
 function renderMembers(){
   const rows=membersFiltered();
@@ -962,6 +991,10 @@ function renderMemSummary(){
     +'　·　Payments 累計入帳 <b>NT$'+Number(s.revenueAll!==undefined?s.revenueAll:s.revenue||0).toLocaleString()+'</b>'
     +(s.orphanAmount?('<span style="color:var(--dim)">（其中 NT$'+Number(s.orphanAmount).toLocaleString()+' 對不到會員）</span>'):'')
     +'　·　基準日 '+escH(subsInfo.today)+'（寬限 '+subsInfo.graceDays+' 天）</div>';
+
+  // ★★三個數字對不起來時，把帳算給人看，不要讓人自己猜。
+  //   「訂閱中」「付費會員」「累計入帳」量的是三件不同的事，長相卻一樣。
+  h+=reconcileNumbers(s);
 
   // 鏡像落後時說清楚，不要讓人以為資料掉了
   var miss=members.filter(function(m){return m.mirrorMissing;});
