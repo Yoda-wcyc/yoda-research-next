@@ -388,12 +388,14 @@ tr:hover td{background:var(--surface2)}
       <button class="audit-btn blue" onclick="loadEcpaySync()">🔍 綠界狀態比對</button>
       <button class="audit-btn amber" onclick="loadReconcile()">💳 沒有綠界付款紀錄的人</button>
       <button class="audit-btn gold" onclick="loadBackfill()">🏷 補上創始方案</button>
+      <button class="audit-btn amber" onclick="loadDup()">🧾 重複的付款列</button>
       <span class="audit-note">綠界不會通知我們會員自己取消，要靠這幾顆主動抓</span>
     </div>
     <div id="lapsedBox"></div>
     <div id="ecpaySyncBox"></div>
     <div id="reconcileBox"></div>
     <div id="backfillBox"></div>
+    <div id="dupBox"></div>
     <div class="hintbox">打開綠界後台,對照這個月該扣款的人：成功打 <b style="color:var(--green)">✓</b>、失敗打 <b style="color:var(--red)">✗</b>。（目前只在畫面暫存,尚未寫回 Sheet。）</div>
     <div class="recon-card" id="reconList"></div>
   </div>
@@ -728,7 +730,7 @@ var subsInfo=null;
 // ★主控台要求的 GAS 最低版本。GAS 端 CODE_VERSION 比這個舊 → 畫面跳紅字。
 // 為什麼需要：2026-08-22 一整天反覆卡在「畫面不對 → 其實是 GAS 沒貼上／貼到一半斷掉」。
 // 兩邊的版本擺在同一個畫面上，就不用再猜。
-var GAS_MIN_VERSION='2026-08-22-h';
+var GAS_MIN_VERSION='2026-08-22-i';
 var gasVersion='';
 var subsErr='';   // 訂閱總表拿不到時的原因，直接顯示在畫面上
 function loadFromGAS(){
@@ -1051,7 +1053,15 @@ function planBadge(m){
   return `<span class="pill ${isF?'plan-f':'plan-n'}" style="cursor:pointer" title="點擊切換方案（會再確認）" onclick="askSetPlan('${m.id}','${isF?'創始':'一般'}')">${isF?'創始':'一般'}</span>`;
 }
 async function askSetPlan(id,cur){
-  const to=cur==='創始'?'一般':'創始';   // 空白('')也會落到這裡 → 設成「創始」
+  // ★三選一：創始／一般／內部。
+  //   內部＝站方自己的測試帳號：永久權益，但不計入付費會員數與月營收，
+  //   對帳不會動它、綠界比對不會把它列成「查無單號」、也不會出現在待處理名單裡。
+  const m=mById(id)||{};
+  const v=await uiPrompt('會員 '+id+'（'+(m.email||'')+'）的方案\n\n請輸入：創始 / 一般 / 內部\n（內部＝站方自己的帳號，永久權益但不計入任何統計）', cur||'一般');
+  if(v===null||v===undefined)return;
+  const to=String(v).trim();
+  if(['創始','一般','內部'].indexOf(to)<0){ toast('只能填 創始 / 一般 / 內部'); return; }
+  if(to===cur){ toast('沒有變更'); return; }
   if(!await uiConfirm('把會員 '+id+' 的方案從「'+(cur||'未設定')+'」改成「'+to+'」？'))return;
   toast('寫入中…');
   post({action:'adminSetPlan',key:KEY,memberId:id,plan:to}).then(res=>{
@@ -1383,6 +1393,60 @@ function renderBackfill(r,applied){
     h+='<div style="margin-top:10px"><button class="audit-btn gold" onclick="applyBackfill('+n+')">'
       +'把這 '+n+' 位補成創始</button>'
       +'<span class="audit-note">方案已填好的人一律不會被動到</span></div>';
+  }
+  box.innerHTML=h;
+}
+/* 重複的付款列。
+   同一筆扣款在 Payments 留下兩列 → 會員名單的「期數 帳面／綠界」會變成 1／2，
+   累計金額也會被算成兩倍。
+   「重複」的定義很嚴：email、單號、金額、日期【四項全同】才算——
+   定期定額每期回拋的是同一張單號，只比單號會把第 2、3 期誤刪成重複。
+   刪除不可逆，所以預設只列出不刪。 */
+function loadDup(){
+  var box=$('dupBox'); if(!box)return;
+  box.innerHTML='<div class="hintbox">比對中…</div>';
+  post({action:'adminFindDuplicatePayments',key:KEY}).then(function(r){
+    if(r&&r.blocked){ box.innerHTML='<div class="hintbox" style="border-color:var(--red,#ff453a)">'+escH(String(r.error||''))+'</div>'; return; }
+    if(!r||!r.ok){ box.innerHTML='<div class="hintbox">讀取失敗：'+escH((r&&r.error)||'unknown action（GAS 可能尚未部署新版本）')+'</div>'; return; }
+    renderDup(r,false);
+  }).catch(function(){ box.innerHTML='<div class="hintbox">連線失敗</div>'; });
+}
+async function applyDup(n){
+  if(!await uiConfirm('確定刪除這 '+n+' 列重複的付款紀錄？\n\n此動作不可逆。\n\n· 只刪 email、單號、金額、日期【四項全同】的重複列\n· 每一組保留最先到的那一列\n· 續扣（同一張單號、不同月份）不會被當成重複\n· 刪列【不會】自動修正會員的期數與到期日'))return;
+  var box=$('dupBox'); if(box) box.innerHTML='<div class="hintbox">刪除中…</div>';
+  post({action:'adminFindDuplicatePayments',key:KEY,apply:true}).then(function(r){
+    if(!r||!r.ok){ box.innerHTML='<div class="hintbox">刪除失敗：'+escH((r&&r.error)||'unknown')+'</div>'; return; }
+    renderDup(r,true); toast('已刪除 '+((r.deletedRows||[]).length)+' 列'); loadFromGAS();
+  }).catch(function(){ box.innerHTML='<div class="hintbox">連線失敗</div>'; });
+}
+function renderDup(r,applied){
+  var box=$('dupBox'); if(!box)return;
+  var amber='var(--amber,#ff9f0a)', dim='var(--dim,#a1a1a6)', green='var(--green,#30d158)';
+  var n=r.dupRows||0;
+  if(!n && !applied){ box.innerHTML='<div class="hintbox">沒有重複的付款列。</div>'; return; }
+  var h='<div class="recon-sum">'
+    +'<div class="rs"><div class="l">'+(applied?'已刪除':'重複的列')+'</div>'
+      +'<div class="v" style="color:'+(applied?green:amber)+'">'+(applied?((r.deletedRows||[]).length):n)+'</div></div>'
+    +'<div class="rs"><div class="l">影響人數</div>'
+      +'<div class="v" style="color:'+dim+'">'+((r.groups||[]).length)+'</div></div>'
+    +'</div>';
+  h+=(r.groups||[]).map(function(g){
+    return '<div class="recon-card"><b>'+escH(String(g.memberId||''))+'</b> '+escH(String(g.email||''))
+      +'<div style="color:'+dim+';font-size:12px">'
+      +'單號 '+escH(String(g.tradeNo||''))+' ・ NT'+'$'+escH(String(g.amount||''))+' ・ '+escH(String(g.date||''))
+      +'<br>保留第 '+escH(String(g.keepRow||''))+' 列，重複在第 '+escH(String((g.dupRows||[]).join('、')))+' 列'
+      +' ・ 帳面期數 '+escH(String(g.paidPeriods))
+      +(g.overCounted?('<br><span style="color:'+amber+'">★ 帳面期數 ≥ 付款列數 → 這筆重複可能已被算進期數。'
+        +'刪列【不會】自動修正到期日（目前 '+escH(String(g.nextCharge||''))+'），要另外處理。</span>'):'')
+      +'</div></div>';
+  }).join('');
+  if(!applied){
+    h+='<div style="margin-top:10px"><button class="audit-btn amber" onclick="applyDup('+n+')">'
+      +'刪除這 '+n+' 列</button>'
+      +'<span class="audit-note">不可逆。續扣（同單號不同月）不會被誤判成重複</span></div>';
+  } else if(r.overCountedCount){
+    h+='<div class="hintbox" style="border-color:'+amber+'">其中 '+r.overCountedCount
+      +' 組可能已被算進期數，刪列不會自動修正會員的到期日，請另外確認。</div>';
   }
   box.innerHTML=h;
 }
