@@ -338,6 +338,14 @@ details.block:not([open]) > .block-body{display:none}
   letter-spacing:.06em;margin-left:10px}
 /* 卡片內的次標題（省錢開關併入方案預設） */
 .optcard > h3.sub{margin-top:6px;padding-top:14px;border-top:1px solid var(--line);border-bottom:0;padding-bottom:0}
+
+.lvstatus{font-size:12.5px;color:var(--ink-2);background:var(--surface-2);
+  border:1px dashed var(--line-strong);border-radius:2px;padding:8px 10px;line-height:1.6}
+.lvstatus b{color:var(--accent)}
+label.lever.excl{opacity:.5}
+label.lever.excl:hover{opacity:.8}
+.lv-excl{font-size:11.5px;color:var(--bad);line-height:1.6;font-weight:700}
+.lv-warn{font-size:11.5px;color:var(--warn);line-height:1.6;font-weight:700}
 </style>
 </head>
 <body>
@@ -441,7 +449,7 @@ details.block:not([open]) > .block-body{display:none}
           <button type="button" data-preset="usedB" class="star"><b>中古B 長都駅前1丁目 ★</b>¥28.4M · 長都駅徒歩7分</button>
           <button type="button" data-preset="newSlim"><b>新築 2階・小車庫</b>450㎡ · 車庫1台 · 2台租月極</button>
           <button type="button" data-preset="newFull"><b>新築 2階・大車庫</b>450㎡ · 車庫2台 · 1台露天</button>
-          <button type="button" data-preset="newLease"><b>新築 2階・借地</b>不買地，事業用定期借地</button>
+          <button type="button" data-preset="newLease"><b>新築 2階・借地</b>已勾：借地＋規格住宅</button>
           <button type="button" data-preset="new3F"><b>新築 3階建て</b>延床258㎡ · 較貴</button>
         </div>
         <h3 class="sub">省錢開關 · 勾了就立刻套用到下面所有計算</h3>
@@ -473,10 +481,7 @@ details.block:not([open]) > .block-body{display:none}
 
       <div class="optcard optnew">
         <h3>土地</h3>
-        <div class="field wide"><label>取得方式</label><select id="s-tenure">
-          <option value="own" selected>購入（自己買下）</option>
-          <option value="lease">事業用定期借地（租地建屋）★省最多</option>
-        </select></div>
+        <div class="lvstatus" id="st-tenure">—</div>
         <div class="field"><label>土地面積 <span class="u">㎡</span></label><input type="number" id="i-landArea" value="450" step="10" min="100"></div>
         <div class="field"><label>間口 <span class="u">m · 臨路寬</span></label><input type="number" id="i-frontage" value="18" step="1" min="6"></div>
         <div class="field"><label>土地單價 <span class="u">¥/㎡</span></label><input type="number" id="i-landUnit" value="52000" step="1000"></div>
@@ -490,10 +495,7 @@ details.block:not([open]) > .block-body{display:none}
           <option value="2" selected>2階建て</option>
           <option value="3">3階建て（footprint 小·住家大·較貴）</option>
         </select></div>
-        <div class="field wide"><label>住宅仕様</label><select id="s-spec">
-          <option value="0.80">規格住宅（工務店既有plan · −20%）★</option>
-          <option value="1.00" selected>注文住宅（完全客製）</option>
-        </select></div>
+        <div class="lvstatus" id="st-spec">—</div>
         <div class="field wide"><label>斷熱等級</label><select id="s-insul">
           <option value="5">等級5（省建設費，暖房費高）</option>
           <option value="6" selected>等級6 HEAT20 G2 相當</option>
@@ -718,13 +720,14 @@ var PRESETS={
   usedB:{mode:"used",propPrice:28400000,propFee:2000000,reno:7900000,kitchen:2100000,working:4500000,
     utilS:130000,utilW:260000,snow:50000,tax:450000,repair:240000},
   newSlim:nb({mode:"new",tax:720000,
-    sel:{tenure:"own",floors:"2",spec:"1.00",garage:"builtin|24|1",rh:"30",insul:"6",priv:"mix"},kitchen:2100000}),
+    sel:{floors:"2",spec:"1.00",garage:"builtin|24|1",rh:"30",insul:"6",priv:"mix"},kitchen:2100000}),
   newFull:nb({mode:"new",tax:750000,
-    sel:{tenure:"own",floors:"2",spec:"1.00",garage:"builtin|45|2",rh:"30",insul:"6",priv:"garage"},kitchen:2100000}),
+    sel:{floors:"2",spec:"1.00",garage:"builtin|45|2",rh:"30",insul:"6",priv:"garage"},kitchen:2100000}),
   newLease:nb({mode:"new",tax:520000,
-    sel:{tenure:"lease",floors:"2",spec:"0.80",garage:"builtin|24|1",rh:"30",insul:"6",priv:"mix"},kitchen:2100000}),
+    sel:{floors:"2",garage:"builtin|24|1",rh:"30",insul:"6",priv:"mix"},
+    levers:{lease:true,kikaku:true},kitchen:2100000}),
   new3F:nb({mode:"new",resArea:153,shopArea:60,extra:11500000,entry1F:14,tax:900000,repair:180000,
-    sel:{tenure:"own",floors:"3",spec:"1.00",garage:"builtin|45|2",rh:"30",insul:"6",priv:"garage"},kitchen:2100000})
+    sel:{floors:"3",spec:"1.00",garage:"builtin|45|2",rh:"30",insul:"6",priv:"garage"},kitchen:2100000})
 };
 
 function $(id){return document.getElementById(id);}
@@ -765,7 +768,7 @@ function applyOptions(){
 
 /* ── 省錢開關 ───────────────────────────────────────── */
 var LEVERS=[
-  {id:"lease",  n:"土地改事業用定期借地", newOnly:true,
+  {id:"lease",  n:"土地改事業用定期借地", newOnly:true, excl:["furuya"],
    cost:"每年地代；期滿有更地返還（拆屋）義務，存續期間要談到 30 年以上",
    note:"租地建屋，建物登記在法人名下——入管的事業所要件照樣滿足"},
   {id:"kikaku", n:"住居改規格住宅（−20%）", newOnly:true,
@@ -774,7 +777,7 @@ var LEVERS=[
   {id:"res90",  n:"住居縮到 90㎡", newOnly:true,
    cost:"居住空間變小；注意居住比例仍須 ≥50%",
    note:"日本都市小宅 90㎡ 很常見"},
-  {id:"furuya", n:"買「古家付き土地」拆掉重建", newOnly:true,
+  {id:"furuya", n:"買「古家付き土地」拆掉重建", newOnly:true, excl:["lease"],
    cost:"多一筆解体費 ¥2,000,000，且要確認無石綿",
    note:"老屋帶大地常比純建地便宜 20–30%，日本很常見的做法"},
   {id:"land6k", n:"土地單價降 ¥6,000/㎡（往外圍找）", newOnly:true,
@@ -799,9 +802,29 @@ var LEVERS=[
    cost:"⚠ 不建議：暖房費差額約 7 年就把省下的建設費吃回去",
    note:"這是唯一一條「省了反而虧」的，門檻箭頭會往上"}
 ];
+var LVSTATE={};
 function lv(id,force){
   if(force && force.hasOwnProperty(id)) return force[id];
-  var e=$("lv-"+id); return !!(e && e.checked);
+  return !!LVSTATE[id];
+}
+function setLever(id,on){
+  LVSTATE[id]=!!on;
+  if(on){
+    var L=LEVERS.filter(function(x){return x.id===id;})[0];
+    if(L && L.excl) L.excl.forEach(function(o){ LVSTATE[o]=false; });
+  }
+}
+function resetLevers(map){
+  LVSTATE={};
+  if(map) Object.keys(map).forEach(function(k){ setLever(k,map[k]); });
+}
+/* 這個開關在目前設定下適不適用 */
+function leverApplies(id){
+  if(mode!=="new") return id==="kitused";
+  if(id==="rhpipe")  return sv("s-rh")!=="0" && !lv("rhpipe");
+  if(id==="gardet")  return garageSpec().type==="builtin";
+  if(id==="insul5")  return sv("s-insul")!=="5";
+  return true;   // 互斥組不在此隱藏：改為顯示為停用並說明原因
 }
 
 /* 把原始輸入 + 省錢開關 → 實際生效的設定 */
@@ -811,7 +834,7 @@ function eff(force){
     landArea:v("i-landArea"), landUnit:v("i-landUnit"), landFeePct:v("i-landFeePct"),
     resArea:v("i-resArea"), shopArea:v("i-shopArea"), entry1F:v("i-entry1F"),
     shopUnit:v("i-shopUnit"), extra:v("i-extra"), kitchen:v("i-kitchen"),
-    working:v("i-working"), tenure:sv("s-tenure"), specMul:parseFloat(sv("s-spec"))||1,
+    working:v("i-working"), tenure:"own", specMul:1,
     insul:sv("s-insul"), floors:parseInt(sv("s-floors"),10)||2,
     garType:gs.type, garArea:gs.area, garCars:gs.cars, garUnit:gs.unit,
     rhArea:rs.area, rhCostMul:rs.costMul, rhRunMul:rs.run, rhPipeOnly:rs.pipeOnly,
@@ -974,25 +997,46 @@ function leverDelta(id,m){
   var onC =core(eff((function(){var o={};o[id]=true; return o;})()));
   var offB=beOf(offC.total,offC.fixedYr,m.fx,m.perD);
   var onB =beOf(onC.total, onC.fixedYr, m.fx,m.perD);
+  var rp=null;
+  if(mode==="new"){
+    var Eon=eff((function(){var o={};o[id]=true;return o;})());
+    var ft=Eon.resArea+Eon.shopArea+Eon.garArea;
+    var num=$("c-garRes").checked?(Eon.resArea+Eon.garArea):Eon.resArea;
+    rp=ft>0?(num/ft*100):null;
+  }
   return {save:offC.total-onC.total, dFixed:onC.fixedYr-offC.fixedYr,
-          dBE:onB.be-offB.be, beOn:onB.be, loanOn:onB.loanTW};
+          dBE:onB.be-offB.be, beOn:onB.be, loanOn:onB.loanTW, resPctOn:rp};
 }
 
 function drawLevers(m){
   var box=$("levers"); if(!box) return;
-  var h="", on=0, saved=0;
+  var h="", on=0;
   LEVERS.forEach(function(L){
     if(L.newOnly && mode!=="new") return;
-    var d=leverDelta(L.id,m);
-    if(Math.abs(d.save)<1000 && Math.abs(d.dFixed)<1000 && Math.abs(d.dBE)<1) return;
     var checked=lv(L.id);
-    if(checked){ on++; saved+=d.save; }
-    h+="<label class='lever"+(L.bad?" bad":"")+(checked?" on":"")+"'>"+
-       "<input type='checkbox' id='lv-"+L.id+"'"+(checked?" checked":"")+">"+
+    if(!checked && !leverApplies(L.id)) return;      // 不適用就不顯示
+    var d=leverDelta(L.id,m);
+    var blk=null; if(L.excl) L.excl.forEach(function(o){ if(lv(o)) blk=o; });
+    if(!checked && !blk && Math.abs(d.save)<1000 && Math.abs(d.dFixed)<1000 && Math.abs(d.dBE)<1) return;
+    if(checked) on++;
+    // 互斥
+    var blocked=blk;
+    var exclName=blocked?LEVERS.filter(function(x){return x.id===blocked;})[0].n:"";
+    // 條件衝突：勾了會讓居住比例跌破 50%
+    var warn="";
+    if(mode==="new" && !checked && d.resPctOn!==null && d.resPctOn<50)
+      warn="⚠ 勾了會讓居住比例掉到 "+d.resPctOn.toFixed(1)+"%，跌破 50%，失去住宅用地特例";
+    else if(mode==="new" && checked && m.resPct<50)
+      warn="⚠ 目前居住比例 "+m.resPct.toFixed(1)+"%，已跌破 50%";
+    h+="<label class='lever"+(L.bad?" bad":"")+(checked?" on":"")+(blocked?" excl":"")+"'>"+
+       "<input type='checkbox' data-lv='"+L.id+"'"+(checked?" checked":"")+(blocked?" disabled":"")+">"+
        "<span class='lv-body'><span class='lv-name'>"+esc(L.n)+"</span>"+
-       "<span class='lv-nums'>省 <b>"+(d.save>=0?yen(d.save):"−"+yen(-d.save))+"</b>"+
-       (Math.abs(d.dFixed)>=1000?("　年固定費 "+(d.dFixed>0?"+":"−")+yen(Math.abs(d.dFixed))):"")+
-       "　門檻 <b class='"+(d.dBE<0?"good":"warnc")+"'>"+(d.dBE<0?"↓":"↑")+Math.abs(Math.round(d.dBE)).toLocaleString("en-US")+"</b></span>"+
+       (blocked ? "<span class='lv-nums'>與其他開關互斥，無法同時套用</span>"
+        : "<span class='lv-nums'>省 <b>"+(d.save>=0?yen(d.save):"−"+yen(-d.save))+"</b>"+
+          (Math.abs(d.dFixed)>=1000?("　年固定費 "+(d.dFixed>0?"+":"−")+yen(Math.abs(d.dFixed))):"")+
+          "　門檻 <b class='"+(d.dBE<0?"good":"warnc")+"'>"+(d.dBE<0?"↓":"↑")+Math.abs(Math.round(d.dBE)).toLocaleString("en-US")+"</b></span>")+
+       (blocked?"<span class='lv-excl'>✕ 與「"+esc(exclName)+"」互斥，兩者不能同時成立</span>":"")+
+       (warn?"<span class='lv-warn'>"+esc(warn)+"</span>":"")+
        "<span class='lv-note'>"+esc(L.note)+"</span>"+
        "<span class='lv-cost'>代價："+esc(L.cost)+"</span></span></label>";
   });
@@ -1004,9 +1048,15 @@ function drawLevers(m){
         :("尚未套用任何一項　總投資 <b>"+yen(m.total)+"</b>　日商門檻 <b>"+yen(m.beYou)+"</b>"))+
      "</div>";
   box.innerHTML=h;
-  box.querySelectorAll("input[type=checkbox]").forEach(function(cb){
-    cb.addEventListener("change",render);
+  box.querySelectorAll("input[data-lv]").forEach(function(cb){
+    cb.addEventListener("change",function(){ setLever(cb.getAttribute("data-lv"),cb.checked); render(); });
   });
+  $("st-tenure").innerHTML = (m.tenure==="lease")
+    ? "土地取得：<b>事業用定期借地</b>（由省錢開關控制）"
+    : "土地取得：<b>購入</b>　勾「土地改事業用定期借地」可改為租地建屋";
+  $("st-spec").innerHTML = (m.E.specMul<1)
+    ? "住宅仕様：<b>規格住宅</b>（−"+Math.round((1-m.E.specMul)*100)+"%，由省錢開關控制）"
+    : "住宅仕様：<b>注文住宅</b>　勾「住居改規格住宅」可降 20%";
 }
 
 /* ── drawing helpers ───────────────────────────────── */
@@ -1536,10 +1586,11 @@ document.querySelectorAll("[data-preset]").forEach(function(b){
       var el=$("i-"+k); if(el)el.value=p[k];
     });
     if(p.sel){
-      ["tenure","floors","spec","garage","rh","insul","priv"].forEach(function(k){
+      ["floors","garage","rh","insul","priv"].forEach(function(k){
         if(p.sel[k]!==undefined && $("s-"+k)) $("s-"+k).value=p.sel[k];
       });
     }
+    resetLevers(p.levers);   // 預設 ＝ 基礎設定 ＋ 一組預先勾好的省錢開關
     $("r-own").value=$("i-own").value;
     $("r-daily").value=$("i-daily").value;
     setMode(p.mode);
