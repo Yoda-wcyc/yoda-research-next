@@ -409,6 +409,60 @@ label.lever.excl:hover{opacity:.8}
 #v-read li.hot::before{background:var(--bad)}
 #v-read li.warm::before{background:var(--warn)}
 #v-read li.good::before{background:var(--ok)}
+
+/* ── 00 這是什麼 ── */
+.introgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.introcard{border:1px solid var(--line-strong);border-left:3px solid var(--muted);
+  border-radius:2px;padding:14px 16px;background:var(--surface-2)}
+.introcard[data-t="warn"]{border-left-color:var(--warn);background:var(--warn-soft)}
+.introcard[data-t="bad"]{border-left-color:var(--bad);background:var(--bad-soft)}
+.introcard[data-t="key"]{border-left-color:var(--accent);background:var(--accent-soft);grid-column:1/-1}
+.introcard h4{margin:0 0 7px;font-size:14px;font-weight:700;line-height:1.55}
+.introcard p{margin:0;font-size:13.5px;line-height:1.85;color:var(--ink-2)}
+.introcard p+p{margin-top:8px}
+.introcard b{color:var(--ink)}
+.introcard ul{margin:8px 0;padding-left:19px;font-size:13.5px;line-height:1.9;color:var(--ink-2)}
+/* ── 01 你的三個數字 ── */
+.bigfields{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin-bottom:18px}
+.bigfield{border:2px solid var(--accent);border-radius:3px;padding:14px 16px;background:var(--surface)}
+.bigfield > label{display:block;font-size:14px;font-weight:700;margin-bottom:10px;line-height:1.5}
+.bigfield > label span{display:block;font-weight:400;font-size:12px;color:var(--muted);margin-top:3px;line-height:1.6}
+.bf-in{display:flex;align-items:baseline;gap:5px}
+.bf-u{font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--muted);flex:none}
+.bf-in input{flex:1;min-width:0;padding:9px 11px;text-align:right;
+  font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;
+  font-size:21px;font-weight:600;background:var(--surface-2);color:var(--ink);
+  border:1px solid var(--line-strong);border-radius:2px}
+.minifields{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px 18px;
+  padding-top:16px;border-top:1px solid var(--line)}
+/* ── sticky 判定條 ── */
+#stickybar{position:fixed;left:0;right:0;bottom:0;z-index:60;
+  display:flex;align-items:center;gap:8px 20px;flex-wrap:wrap;
+  padding:11px 20px;background:var(--surface);border-top:2px solid var(--muted);
+  box-shadow:0 -4px 20px -8px rgba(0,0,0,.35);font-size:13px}
+#stickybar[hidden]{display:none}
+body[data-verdict="ok"]   #stickybar{border-top-color:var(--ok);  background:var(--ok-soft)}
+body[data-verdict="warn"] #stickybar{border-top-color:var(--warn);background:var(--warn-soft)}
+body[data-verdict="bad"]  #stickybar{border-top-color:var(--bad); background:var(--bad-soft)}
+.sb-tag{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;
+  letter-spacing:.1em;padding:4px 11px;border-radius:2px;background:var(--ink);color:var(--bg);flex:none}
+body[data-verdict="ok"]   .sb-tag{background:var(--ok);color:#fff}
+body[data-verdict="warn"] .sb-tag{background:var(--warn);color:#fff}
+body[data-verdict="bad"]  .sb-tag{background:var(--bad);color:#fff}
+.sb-item{color:var(--muted);white-space:nowrap;font-size:12.5px}
+.sb-item b{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;
+  color:var(--ink);font-size:14px;font-weight:600;margin-left:3px}
+.sb-jump{margin-left:auto;font-size:12.5px;color:var(--accent);text-decoration:none;
+  font-weight:700;white-space:nowrap;padding:5px 10px;border:1px solid var(--accent);border-radius:2px}
+.sb-jump:hover{background:var(--accent);color:var(--bg)}
+@media (max-width:700px){
+  #stickybar{gap:5px 14px;padding:9px 13px}
+  .sb-item{font-size:11.5px}.sb-item b{font-size:12.5px}
+  .sb-jump{margin-left:0;width:100%;text-align:center;order:9}
+}
+main.main{padding-bottom:150px}
+nav.sidenav a.off{opacity:.32;pointer-events:none}
+nav.sidenav a.off .nav-dot{background:var(--line)}
 </style>
 </head>
 <body>
@@ -419,21 +473,26 @@ label.lever.excl:hover{opacity:.8}
     <div class="nav-brand-title">千歲開店試算盤</div>
     <div class="nav-brand-sub">▸ Chitose · Osatsu</div>
   </div>
-  <div class="nav-section-label">結論</div>
-  <a href="#sec-hl"><span class="nav-num">00</span><div class="nav-dot"></div>判定摘要</a>
-  <div class="nav-section-label">說明</div>
-  <a href="#sec-guide"><span class="nav-num">01</span><div class="nav-dot"></div>名詞與使用說明</a>
-  <div class="nav-section-label">輸入</div>
-  <a href="#sec-setup"><span class="nav-num">02</span><div class="nav-dot"></div>設定</a>
-  <div class="nav-section-label">設計</div>
-  <a href="#sec-plan"><span class="nav-num">03</span><div class="nav-dot"></div>配置圖與平面圖</a>
-  <a href="#sec-site"><span class="nav-num">04</span><div class="nav-dot"></div>基地檢查</a>
-  <div class="nav-section-label">財務</div>
-  <a href="#sec-fund"><span class="nav-num">05</span><div class="nav-dot"></div>資金結構</a>
-  <a href="#sec-be"><span class="nav-num">06</span><div class="nav-dot"></div>三條損益線</a>
+  <div class="nav-section-label">先讀</div>
+  <a href="#sec-intro"><span class="nav-num">00</span><div class="nav-dot"></div>這是什麼</a>
+  <div class="nav-section-label">你的輸入</div>
+  <a href="#sec-you"><span class="nav-num">01</span><div class="nav-dot"></div>你的三個數字</a>
+  <a href="#sec-pick"><span class="nav-num">02</span><div class="nav-dot"></div>選一個方案</a>
+  <div class="nav-section-label">結果</div>
+  <a href="#sec-hl"><span class="nav-num">03</span><div class="nav-dot"></div>判定</a>
+  <a href="#sec-save"><span class="nav-num">04</span><div class="nav-dot"></div>省錢開關</a>
+  <div class="nav-section-label">財務細節</div>
+  <a href="#sec-be"><span class="nav-num">05</span><div class="nav-dot"></div>三條損益線</a>
+  <a href="#sec-fund"><span class="nav-num">06</span><div class="nav-dot"></div>資金結構</a>
   <a href="#sec-cf"><span class="nav-num">07</span><div class="nav-dot"></div>12個月現金流</a>
   <a href="#sec-y1"><span class="nav-num">08</span><div class="nav-dot"></div>第一年燒錢</a>
-  <a href="#sec-mx"><span class="nav-num">09</span><div class="nav-dot"></div>自有資金矩陣</a>
+  <a href="#sec-mx"><span class="nav-num">09</span><div class="nav-dot"></div>自有資金 × 營收情境</a>
+  <div class="nav-section-label">建物與基地</div>
+  <a href="#sec-plan"><span class="nav-num">10</span><div class="nav-dot"></div>配置圖與平面圖</a>
+  <a href="#sec-site"><span class="nav-num">11</span><div class="nav-dot"></div>基地檢查</a>
+  <div class="nav-section-label">參考</div>
+  <a href="#sec-adv"><span class="nav-num">12</span><div class="nav-dot"></div>進階微調</a>
+  <a href="#sec-guide"><span class="nav-num">13</span><div class="nav-dot"></div>名詞表</a>
   <div class="izy-section">
     <div class="izy-badge">
       <div class="izy-badge-label">Yoda Research</div>
@@ -446,12 +505,107 @@ label.lever.excl:hover{opacity:.8}
 
 <header class="masthead">
   <h1>千歲開店試算盤</h1>
-  <p>北海道千歲市長都・水煎包／牛肉鍋外帶店。改設定，下面所有區塊即時算錢、畫圖，並判斷你活不活得下來。</p>
+  <p>算一件很具體的事：在北海道千歲市長都開一家水煎包／牛肉鍋外帶店，你的錢夠不夠、簽證過不過得了、賺不賺得回來。</p>
 </header>
 
+<section class="block" id="sec-intro">
+  <div class="block-head"><span class="sec-num">00</span><div><h2>這是什麼</h2>
+    <p>三十秒讀完再往下</p></div></div>
+  <div class="block-body">
+    <div class="introgrid">
+      <div class="introcard" data-t="warn">
+        <h4>⚠ 下面的數字都是範例，不是你的</h4>
+        <p>一打開就看到紅字說你錢不夠——那是<b>預設的範例值</b>（現金 NT$500萬、可貸 NT$600萬、日商 ¥70,000）。到下面 <b>01</b> 改成你自己的數字，整頁會即時重算。</p>
+      </div>
+      <div class="introcard">
+        <h4>這個工具只算一種情況</h4>
+        <p>北海道<b>千歲市長都</b>、<b>外帶店</b>、水煎包＋牛肉鍋。暖房費、除雪、雪置場、季節係數全部是照北海道寫死的。<b>換城市或換業種都不適用。</b></p>
+      </div>
+      <div class="introcard">
+        <h4>怎麼用（三步）</h4>
+        <p><b>①</b> 在 <b>01</b> 填你的現金、可貸上限、目標日商<br>
+        <b>②</b> 在 <b>02</b> 按一個方案<br>
+        <b>③</b> 看 <b>03</b> 判定。紅了就到 <b>04</b> 勾省錢開關——畫面底部會一直浮著判定條，你改哪裡都看得到它翻牌</p>
+      </div>
+      <div class="introcard" data-t="key">
+        <h4>★ 先搞懂一件事：経営・管理簽證</h4>
+        <p>這是<b>第一道關，比錢還前面</b>。外國人要在日本自己開店，需要「経営・管理」在留資格。2025年10月起門檻大幅提高：</p>
+        <ul>
+          <li><b>資本金 ¥30,000,000 以上</b> ← 本工具的「總投資」要跨過這條，否則整個方案不成立</li>
+          <li>至少 <b>1 名常勤員工</b></li>
+          <li>事業計畫須 <b>專業士確認</b></li>
+          <li>本人或員工 <b>日語 N2</b></li>
+        </ul>
+        <p>而且<b>更新時會看事業有沒有獲利</b>——這就是為什麼下面有一條「安全線」，它不是貪心，是保簽證。<br>
+        <b>行政書士</b>＝日本處理這類申請的專業代理人。<b>你真正的第一步是找一位做可行性判定</b>，這關沒過，這整頁的數字都不用算。</p>
+      </div>
+      <div class="introcard" data-t="bad">
+        <h4>這張表算不出來的三件事</h4>
+        <p><b>①</b> 你能不能真的每天賣掉那麼多（那是需求問題，不是產能問題）<br>
+        <b>②</b> 建物與土地的實際見積（誤差可達 ±15%）<br>
+        <b>③</b> 簽證會不會過（那是行政書士的事，不是算術）</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="sec-you">
+  <div class="block-head"><span class="sec-num">01</span><div><h2>你的三個數字</h2>
+    <p>整頁只有這三格是「關於你」的，其他都是關於房子的。先填這三格就好</p></div></div>
+  <div class="block-body">
+    <div class="bigfields">
+      <div class="bigfield">
+        <label for="i-own">現金<span>自有，<b>不含貸款</b>。存款＋可變現投資</span></label>
+        <div class="bf-in"><span class="bf-u">NT$</span><input type="number" id="i-own" value="500" step="10" min="0"><span class="bf-u">萬</span></div>
+      </div>
+      <div class="bigfield">
+        <label for="i-loanCap">台灣可貸額度上限<span>銀行<b>願意給</b>多少，不是你想借多少</span></label>
+        <div class="bf-in"><span class="bf-u">NT$</span><input type="number" id="i-loanCap" value="600" step="10" min="0"><span class="bf-u">萬</span></div>
+      </div>
+      <div class="bigfield">
+        <label for="i-daily">目標日商<span>一天的營業額。這是<b>假設，不是產能上限</b></span></label>
+        <div class="bf-in"><span class="bf-u">¥</span><input type="number" id="i-daily" value="70000" step="1000"><span class="bf-u">／日</span></div>
+      </div>
+    </div>
+    <div class="minifields">
+      <div class="field"><label>貸款利率 <span class="u">%</span></label><input type="number" id="i-rate" value="3.0" step="0.1" min="0.5" max="12"></div>
+      <div class="field"><label>貸款年期 <span class="u">年</span></label><input type="number" id="i-term" value="20" step="1" min="3" max="35"></div>
+      <div class="field"><label>匯率 <span class="u">JPY / TWD</span></label><input type="number" id="i-fx" value="4.7" step="0.05" min="2" max="8"></div>
+      <div class="field"><label>日本生活費 <span class="u">¥／月</span></label><input type="number" id="i-living" value="170000" step="10000"></div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="sec-pick">
+  <div class="block-head"><span class="sec-num">02</span><div><h2>選一個方案</h2>
+    <p>按一顆就整組換掉，包含物件、建物、車庫與省錢開關</p></div></div>
+  <div class="block-body">
+    <div class="modeswitch" style="max-width:340px;margin-bottom:16px">
+      <button type="button" id="m-used" aria-pressed="false">中古改裝</button>
+      <button type="button" id="m-new" aria-pressed="true">新築</button>
+    </div>
+    <div id="presetcard">
+<div class="presets">
+          <button type="button" data-preset="usedA"><b>中古A 青葉4丁目</b>¥19.8M · 千歲駅徒歩9分</button>
+          <button type="button" data-preset="usedB" class="star"><b>中古B 長都駅前1丁目 ★</b>¥28.4M · 長都駅徒歩7分</button>
+          <button type="button" data-preset="newSlim"><b>新築 2階・小車庫</b>450㎡ · 車庫1台 · 2台租月極</button>
+          <button type="button" data-preset="newFull"><b>新築 2階・大車庫</b>450㎡ · 車庫2台 · 1台露天</button>
+          <button type="button" data-preset="newLease"><b>新築 2階・借地</b>已勾：借地＋規格住宅</button>
+          <button type="button" data-preset="new3F"><b>新築 3階建て</b>延床258㎡ · 較貴</button>
+        </div>
+
+    </div>
+<div id="grp-used" hidden>
+          <div class="field"><label>物件價格</label><input type="number" id="i-propPrice" value="28400000" step="100000"></div>
+          <div class="field"><label>取得諸費用</label><input type="number" id="i-propFee" value="2000000" step="50000"></div>
+          <div class="field"><label>改裝工事</label><input type="number" id="i-reno" value="7900000" step="100000"></div>
+        </div>
+
+  </div>
+</section>
 <section class="block" id="sec-hl" data-state="warn">
-  <div class="block-head"><span class="sec-num">00</span><div><h2>判定摘要</h2>
-    <p>把你的錢、這個物件方案、和營收假設放在一起，會發生什麼事</p></div></div>
+  <div class="block-head"><span class="sec-num">03</span><div><h2>判定摘要</h2>
+    <p>你的錢、這個方案、這個營收假設放在一起，會發生什麼事</p></div></div>
   <div class="block-body">
     <span class="verdict-tag" id="v-tag">計算中</span>
     <h3 id="v-title">—</h3>
@@ -474,193 +628,45 @@ label.lever.excl:hover{opacity:.8}
     <div id="v-read"></div>
   </div>
 </section>
-
-<details class="block" id="sec-guide">
-  <summary class="block-head"><span class="sec-num">01</span><div><h2>名詞與使用說明</h2>
-    <p>三條損益線是什麼、為什麼要看冬天、以及這張表算不出來的東西<span class="collapse-hint">點此展開</span></p></div></summary>
-  <div class="block-body">
-    <div class="deflist">
-      <div class="row"><div class="t">日商</div><div class="d">一天的營業額。這是<b>假設，不是上限</b>——兩口業務用平底鍋的物理產能超過 ¥180,000／日，所以 ¥70,000 只是保守的規劃起點。拉上面的滑桿看不同假設下的結果。</div></div>
-      <div class="row"><div class="t">店存活線</div><div class="d">只覆蓋店的固定費與變動費。過了這條線店不會倒，<b>但你沒有薪水</b>。</div></div>
-      <div class="row"><div class="t">你也活線</div><div class="d">再加上你的日本生活費、台灣的貸款月付、以及社保稅。<b>低於這條線就是每個月從存款裡拿錢補洞。</b></div></div>
-      <div class="row"><div class="t">安全線</div><div class="d">再加法人年度利益。経営・管理簽證更新時會看事業是否獲利，<b>連續赤字是更新風險</b>——所以這條線不是貪心，是保簽證。</div></div>
-      <div class="row"><div class="t">現金</div><div class="d">你<b>真正拿得出來、不用還的錢</b>——存款、可變現的投資。<b>不含任何貸款。</b>這是分母，決定你要借多少。</div></div>
-      <div class="row"><div class="t">台灣可貸<br>額度上限</div><div class="d">你在台灣<b>實際借得到的天花板</b>（房產增貸＋股票質借＋信貸的合計上限）。這不是「想借多少」，是銀行願意給多少——鑑價、DBR 22倍、收入都會卡。送件前先問銀行試算。</div></div>
-      <div class="row"><div class="t">資金缺口</div><div class="d">總投資 −（現金＋可貸上限）。<b>缺口 &gt; 0 就代表這個方案的錢湊不出來</b>，跟賺不賺得回來無關——連開始都開始不了。這是最優先的否決條件，排在簽證與損益之前。</div></div>
-      <div class="row"><div class="t">年度餘裕</div><div class="d">營業利益減掉「你的薪水＋社保」之後剩下的。負數代表這個組合每年短少多少。</div></div>
-      <div class="row"><div class="t">居住比例</div><div class="d">住居 ÷ 總樓地板。<b>≥50% 才保得住固定資產稅的住宅用地特例</b>（土地稅額降至 1/6）。依你的確認，<b>車庫不計入居住部分</b>，只進分母。建議做到 53% 以上留邊際。</div></div>
-      <div class="row"><div class="t">事業用<br>定期借地</div><div class="d">租土地、自己蓋房子，建物登記在法人名下。<b>入管的「事業所確保」要件照樣滿足。</b>省下整筆土地款，代價是每年地代與期滿的更地返還（拆屋）義務。存續期間要談到 30 年以上。</div></div>
-      <div class="row"><div class="t">ロード<br>ヒーティング</div><div class="d">融雪設備。<b>配管必須在鋪裝前埋</b>，事後補要把停車場打掉重來；機器可以之後再裝。所以「只埋配管」是唯一合理的省法。</div></div>
-      <div class="row"><div class="t">冬季車位</div><div class="d">積雪後實際可用的車位，約為夏季的 72%，另外還要扣掉敷地 15% 的雪置場。<b>北海道的外帶店沒車位就沒生意。</b></div></div>
-      <div class="row"><div class="t">變動費率</div><div class="d">原價＋包材＋刷卡手續。<b>包材是外帶店特有的成本</b>（內用店沒有），約佔營收 4–5%，很多人會漏算。</div></div>
-      <div class="row"><div class="t">季節係數</div><div class="d">千歲的旺淡季擺盪只有 ±15%（2月雪祭、8月盆、12月忘年會為高點）。這正是選千歲不選富良野的量化理由——富良野的擺盪是 ±80%。</div></div>
-      <div class="row"><div class="t">❄ 標記</div><div class="d">冬季高暖房費月份（11–3月）。<b>1–4 月是連續負現金流</b>，這是北海道的結構性成本，不能優化掉，只能先備好現金。</div></div>
-    </div>
-    <div class="flags">
-      <div class="flag" data-t="warn"><b>這張表算不出來的三件事：</b>① 你能不能真的每天賣掉那麼多（需求，不是產能）② 建物單價與土地實勢價的實際見積（誤差可達 ±15%）③ 簽證會不會過（那是行政書士的事，不是算術）。</div>
-      <div class="flag" data-t="ok"><b>怎麼用：</b>先按上面的方案預設載入一組，再拉「日商」和「自有資金」兩個滑桿看它怎麼翻牌。判定變紅時，直接用 <b>02 設定</b> 最上面的「省錢開關」。</div>
-    </div>
-  </div>
-</details>
-
-<section class="block" id="sec-setup">
-  <div class="block-head"><span class="sec-num">02</span><div><h2>設定</h2>
-    <p>全部展開，改哪一項下面所有區塊立刻重算重畫</p></div></div>
-  <div class="block-body">
-    <div class="optgrid">
-
-      <div class="optcard" id="presetcard" style="grid-column:1/-1">
-        <h3>方案預設</h3>
-        <div class="presets">
-          <button type="button" data-preset="usedA"><b>中古A 青葉4丁目</b>¥19.8M · 千歲駅徒歩9分</button>
-          <button type="button" data-preset="usedB" class="star"><b>中古B 長都駅前1丁目 ★</b>¥28.4M · 長都駅徒歩7分</button>
-          <button type="button" data-preset="newSlim"><b>新築 2階・小車庫</b>450㎡ · 車庫1台 · 2台租月極</button>
-          <button type="button" data-preset="newFull"><b>新築 2階・大車庫</b>450㎡ · 車庫2台 · 1台露天</button>
-          <button type="button" data-preset="newLease"><b>新築 2階・借地</b>已勾：借地＋規格住宅</button>
-          <button type="button" data-preset="new3F"><b>新築 3階建て</b>延床258㎡ · 較貴</button>
-        </div>
-        <h3 class="sub">省錢開關 · 勾了就立刻套用到下面所有計算</h3>
-        <div class="leverbox" id="levers"></div>
-      </div>
-
-      <div class="optcard">
-        <h3>我的錢</h3>
-        <div class="field"><label>現金 <span class="u">NT$萬 · 自有，不含貸款</span></label><input type="number" id="i-own" value="500" step="10" min="0"></div>
-        <div class="field"><label>台灣可貸額度上限 <span class="u">NT$萬 · 房產增貸＋信貸</span></label><input type="number" id="i-loanCap" value="600" step="10" min="0"></div>
-        <div class="field"><label>貸款利率 <span class="u">%</span></label><input type="number" id="i-rate" value="3.0" step="0.1" min="0.5" max="12"></div>
-        <div class="field"><label>貸款年期 <span class="u">年</span></label><input type="number" id="i-term" value="20" step="1" min="3" max="35"></div>
-        <div class="field"><label>匯率 <span class="u">JPY / TWD</span></label><input type="number" id="i-fx" value="4.7" step="0.05" min="2" max="8"></div>
-      </div>
-
-      <div class="optcard">
-        <h3>路線</h3>
-        <div class="modeswitch">
-          <button type="button" id="m-used" aria-pressed="false">中古改裝</button>
-          <button type="button" id="m-new" aria-pressed="true">新築</button>
-        </div>
-        <div id="grp-used" hidden>
-          <div class="field"><label>物件價格</label><input type="number" id="i-propPrice" value="28400000" step="100000"></div>
-          <div class="field"><label>取得諸費用</label><input type="number" id="i-propFee" value="2000000" step="50000"></div>
-          <div class="field"><label>改裝工事</label><input type="number" id="i-reno" value="7900000" step="100000"></div>
-        </div>
-        <div class="field"><label>廚房設備</label><input type="number" id="i-kitchen" value="2100000" step="100000"></div>
-        <div class="field"><label>運轉資金 <span class="u">第一年燒錢</span></label><input type="number" id="i-working" value="4500000" step="100000"></div>
-      </div>
-
-      <div class="optcard optnew">
-        <h3>土地</h3>
-        <div class="lvstatus" id="st-tenure">—</div>
-        <div class="field"><label>土地面積 <span class="u">㎡</span></label><input type="number" id="i-landArea" value="450" step="10" min="100"></div>
-        <div class="field"><label>間口 <span class="u">m · 臨路寬</span></label><input type="number" id="i-frontage" value="18" step="1" min="6"></div>
-        <div class="field"><label>土地單價 <span class="u">¥/㎡</span></label><input type="number" id="i-landUnit" value="52000" step="1000"></div>
-        <div class="field"><label>取得諸費用 <span class="u">%</span></label><input type="number" id="i-landFeePct" value="6" step="0.5"></div>
-        <div class="field"><label>地代率 <span class="u">%/年 · 借地時</span></label><input type="number" id="i-leaseRate" value="3" step="0.25" min="0.5" max="10"></div>
-      </div>
-
-      <div class="optcard optnew">
-        <h3>建物</h3>
-        <div class="field wide"><label>樓層數</label><select id="s-floors">
-          <option value="2" selected>2階建て</option>
-          <option value="3">3階建て（footprint 小·住家大·較貴）</option>
-        </select></div>
-        <div class="lvstatus" id="st-spec">—</div>
-        <div class="field wide"><label>斷熱等級</label><select id="s-insul">
-          <option value="5">等級5（省建設費，暖房費高）</option>
-          <option value="6" selected>等級6 HEAT20 G2 相當</option>
-          <option value="7">等級7（最省暖房，最貴）</option>
-        </select></div>
-        <div class="field"><label>住居面積 <span class="u">㎡ 總計</span></label><input type="number" id="i-resArea" value="110" step="5"></div>
-        <div class="field"><label>住居單價 <span class="u">¥/㎡</span></label><input type="number" id="i-resUnit" value="250000" step="5000"></div>
-        <div class="field"><label>店舖面積 <span class="u">㎡</span></label><input type="number" id="i-shopArea" value="52" step="2"></div>
-        <div class="field"><label>店舖單價 <span class="u">¥/㎡</span></label><input type="number" id="i-shopUnit" value="320000" step="5000"></div>
-        <div class="field"><label>1階玄關・階段室 <span class="u">㎡</span></label><input type="number" id="i-entry1F" value="26" step="2" min="6"></div>
-        <div class="field"><label>3階建て加成 <span class="u">%</span></label><input type="number" id="i-f3prem" value="10" step="1" min="0" max="30"></div>
-        <div class="field"><label>別途工事 <span class="u">外構·配管·設計</span></label><input type="number" id="i-extra" value="10500000" step="100000"></div>
-      </div>
-
-      <div class="optcard optnew">
-        <h3>車庫與停車</h3>
-        <div class="field wide"><label>車庫</label><select id="s-garage">
-          <option value="none">不建車庫（全部露天）</option>
-          <option value="builtin|24|1" selected>內建車庫　1台 24㎡</option>
-          <option value="builtin|45|2">內建車庫　2台 45㎡</option>
-          <option value="builtin|66|3">內建車庫　3台 66㎡</option>
-          <option value="detached|24|1">獨立車庫　1台 24㎡</option>
-          <option value="detached|45|2">獨立車庫　2台 45㎡</option>
-        </select></div>
-        <div class="field"><label>車庫面積 <span class="u">㎡</span></label><input type="number" id="i-garArea" value="24" step="5" min="0"></div>
-        <div class="field"><label>車庫單價 <span class="u">¥/㎡</span></label><input type="number" id="i-garUnit" value="180000" step="5000"></div>
-        <div class="field wide"><label>私家車停哪</label><select id="s-priv">
-          <option value="mix" selected>停車庫，放不下的租月極 ★省地</option>
-          <option value="garage">停車庫，放不下的停自家露天</option>
-          <option value="open">全部停自家露天（佔客位）</option>
-          <option value="rent">全部租月極停車場</option>
-        </select></div>
-        <div class="field"><label>私家車 <span class="u">台</span></label><input type="number" id="i-privCars" value="3" step="1" min="0" max="8"></div>
-        <div class="field"><label>月極租金 <span class="u">¥/台/月</span></label><input type="number" id="i-privRent" value="4500" step="500"></div>
-        <label class="checkline"><input type="checkbox" id="c-garRes">
-          <span>車庫計入居住部分<br><span style="color:var(--muted);font-size:11.5px">已依你確認：預設不計入。勾選可看另一種認定。</span></span></label>
-      </div>
-
-      <div class="optcard optnew">
-        <h3>ロードヒーティング</h3>
-        <div class="field wide"><label>設置範圍</label><select id="s-rh">
-          <option value="0">不做（人工除雪）</option>
-          <option value="pipe">只埋配管，機器後裝（省 2/3）</option>
-          <option value="30" selected>玄關前 30㎡</option>
-          <option value="45">玄關＋取餐動線 45㎡</option>
-          <option value="60">玄關＋車庫前 60㎡</option>
-        </select></div>
-        <div class="field"><label>設置單價 <span class="u">¥/㎡</span></label><input type="number" id="i-rhUnit" value="60000" step="5000"></div>
-        <div class="field"><label>運轉費 <span class="u">¥/㎡/冬月</span></label><input type="number" id="i-rhRun" value="1300" step="100"></div>
-      </div>
-
-      <div class="optcard">
-        <h3>營收</h3>
-        <div class="field"><label>日商 <span class="u">¥／日</span></label><input type="number" id="i-daily" value="70000" step="1000"></div>
-        <div class="field"><label>營業日 <span class="u">日／月</span></label><input type="number" id="i-days" value="25" step="1" min="15" max="31"></div>
-        <div class="field"><label>原價率 <span class="u">%</span></label><input type="number" id="i-cogs" value="34" step="0.5"></div>
-        <div class="field"><label>包材率 <span class="u">% · 外帶特有</span></label><input type="number" id="i-pack" value="4.5" step="0.1"></div>
-        <div class="field"><label>刷卡手續 <span class="u">%</span></label><input type="number" id="i-card" value="2.8" step="0.1"></div>
-      </div>
-
-      <div class="optcard">
-        <h3>固定費</h3>
-        <div class="field"><label>工讀人事 <span class="u">¥／月</span></label><input type="number" id="i-labor" value="175000" step="5000"></div>
-        <div class="field"><label>夏季水電燃料 <span class="u">¥／月</span></label><input type="number" id="i-utilS" value="125000" step="5000"></div>
-        <div class="field"><label>冬季水電燃料 <span class="u">¥／月 不含RH</span></label><input type="number" id="i-utilW" value="190000" step="5000"></div>
-        <div class="field"><label>冬季月數</label><input type="number" id="i-winM" value="5" step="1" min="0" max="8"></div>
-        <div class="field"><label>除排雪 <span class="u">¥／冬月</span></label><input type="number" id="i-snow" value="60000" step="5000"></div>
-        <div class="field"><label>除雪月數</label><input type="number" id="i-snowM" value="4" step="1" min="0" max="6"></div>
-        <div class="field"><label>廣告販促 <span class="u">¥／月</span></label><input type="number" id="i-ad" value="60000" step="5000"></div>
-        <div class="field"><label>雜費消耗 <span class="u">¥／月</span></label><input type="number" id="i-misc" value="50000" step="5000"></div>
-        <div class="field"><label>固定資產稅＋保險 <span class="u">¥／年</span></label><input type="number" id="i-tax" value="720000" step="50000"></div>
-        <div class="field"><label>修繕積立 <span class="u">¥／年</span></label><input type="number" id="i-repair" value="150000" step="20000"></div>
-        <div class="field"><label>稅理士 <span class="u">¥／年</span></label><input type="number" id="i-cpa" value="300000" step="50000"></div>
-      </div>
-
-      <div class="optcard">
-        <h3>你的生活與稅</h3>
-        <div class="field"><label>日本生活費 <span class="u">¥／月</span></label><input type="number" id="i-living" value="170000" step="10000"></div>
-        <div class="field"><label>社保稅 個人負擔 <span class="u">%</span></label><input type="number" id="i-selfBurden" value="22" step="1"></div>
-        <div class="field"><label>社保 公司負擔 <span class="u">%</span></label><input type="number" id="i-coBurden" value="15" step="1"></div>
-        <div class="field"><label>目標法人年利益 <span class="u">簽證更新緩衝</span></label><input type="number" id="i-corpProfit" value="1500000" step="100000"></div>
-      </div>
-
-      <div class="optcard">
-        <h3>第一年爬坡 <span class="u">達成率 %</span></h3>
-        <div class="field"><label>第1季</label><input type="number" id="i-q1" value="40" step="5" min="0" max="100"></div>
-        <div class="field"><label>第2季</label><input type="number" id="i-q2" value="60" step="5" min="0" max="100"></div>
-        <div class="field"><label>第3季</label><input type="number" id="i-q3" value="80" step="5" min="0" max="100"></div>
-        <div class="field"><label>第4季</label><input type="number" id="i-q4" value="95" step="5" min="0" max="100"></div>
-      </div>
-
-    </div>
-  </div>
+<section class="block" id="sec-save">
+  <div class="block-head"><span class="sec-num">04</span><div><h2>省錢開關</h2>
+    <p>判定紅了就從這裡救。勾了立刻套用，底部的判定條會跟著翻牌</p></div></div>
+  <div class="block-body"><div class="leverbox" id="levers"></div></div>
 </section>
-
-<section class="block" id="sec-plan">
-  <div class="block-head"><span class="sec-num">03</span><div><h2>配置圖與平面圖</h2>
+<section class="block" id="sec-be">
+  <div class="block-head"><span class="sec-num">05</span><div><h2>三條損益線</h2>
+    <p>你的日商落在哪一段，決定這件事是生意還是負擔</p></div></div>
+  <div class="block-body"><div class="lines" id="lines"></div></div>
+</section><section class="block" id="sec-fund">
+  <div class="block-head"><span class="sec-num">06</span><div><h2>資金結構</h2>
+    <p>總投資如何被自有與借款切開，以及每月要還多少</p></div></div>
+  <div class="block-body"><div class="costgrid" id="costgrid"></div><div class="flags" id="fundflags"></div></div>
+</section><section class="block" id="sec-cf">
+  <div class="block-head"><span class="sec-num">07</span><div><h2>12個月現金流</h2>
+    <p>成熟期（第2–3年）。北海道的冬天在表上看得見</p></div></div>
+  <div class="block-body">
+    <svg class="chart" id="chart" viewBox="0 0 720 190" preserveAspectRatio="none" role="img" aria-label="12個月淨現金流"></svg>
+    <div class="legend">
+      <span><i style="background:var(--ok)"></i>正現金流</span>
+      <span><i style="background:var(--bad)"></i>負現金流</span>
+      <span>❄ 冬季高暖房費月份</span>
+    </div>
+    <div class="scroll" style="margin-top:18px">
+      <table id="cf"><thead><tr><th>月</th><th>係數</th><th>月商</th><th>變動費</th><th>人事</th>
+        <th>水電</th><th>RH</th><th>除雪</th><th>其他</th><th>營業利益</th><th>淨現金</th></tr></thead>
+        <tbody></tbody><tfoot></tfoot></table>
+    </div>
+  </div>
+</section><section class="block" id="sec-y1">
+  <div class="block-head"><span class="sec-num">08</span><div><h2>第一年燒錢</h2>
+    <p>運轉資金夠不夠撐過爬坡期</p></div></div>
+  <div class="block-body"><div class="checks" id="year1"></div><div class="flags" id="y1flags"></div></div>
+</section><section class="block" id="sec-mx">
+  <div class="block-head"><span class="sec-num">09</span><div><h2>自有資金 × 營收情境</h2>
+    <p>格內為年度餘裕。橘框是你目前的位置</p></div></div>
+  <div class="block-body"><div class="scroll"><table class="matrix" id="matrix"></table></div><div class="flags" id="mxflags"></div></div>
+</section><section class="block" id="sec-plan">
+  <div class="block-head"><span class="sec-num">10</span><div><h2>配置圖與平面圖</h2>
     <p>依設定即時重畫。示意用，實際配置依基地形狀與法規</p></div></div>
   <div class="block-body">
     <div class="plans">
@@ -699,63 +705,183 @@ label.lever.excl:hover{opacity:.8}
       <span><i style="background:transparent;border-style:dashed"></i>冬季不可用</span>
     </div>
   </div>
-</section>
-
-<section class="block" id="sec-site">
-  <div class="block-head"><span class="sec-num">04</span><div><h2>基地檢查</h2>
+</section><section class="block" id="sec-site">
+  <div class="block-head"><span class="sec-num">11</span><div><h2>基地檢查</h2>
     <p>停車位、居住比例、建蔽容積——買地前必須先算贏的幾件事</p></div></div>
   <div class="block-body"><div class="checks" id="checks"></div><div class="flags" id="checkflags"></div></div>
 </section>
-
-<section class="block" id="sec-fund">
-  <div class="block-head"><span class="sec-num">05</span><div><h2>資金結構</h2>
-    <p>總投資如何被自有與借款切開，以及每月要還多少</p></div></div>
-  <div class="block-body"><div class="costgrid" id="costgrid"></div><div class="flags" id="fundflags"></div></div>
-</section>
-
-<section class="block" id="sec-be">
-  <div class="block-head"><span class="sec-num">06</span><div><h2>三條損益線</h2>
-    <p>你的日商落在哪一段，決定這件事是生意還是負擔</p></div></div>
-  <div class="block-body"><div class="lines" id="lines"></div></div>
-</section>
-
-<section class="block" id="sec-cf">
-  <div class="block-head"><span class="sec-num">07</span><div><h2>12個月現金流</h2>
-    <p>成熟期（第2–3年）。北海道的冬天在表上看得見</p></div></div>
+<details class="block" id="sec-adv">
+  <summary class="block-head"><span class="sec-num">12</span><div><h2>進階微調</h2>
+    <p>土地單價、建物單價、固定費、稅率⋯⋯不確定就別動，預設值已經是合理推估<span class="collapse-hint">點此展開</span></p></div></summary>
   <div class="block-body">
-    <svg class="chart" id="chart" viewBox="0 0 720 190" preserveAspectRatio="none" role="img" aria-label="12個月淨現金流"></svg>
-    <div class="legend">
-      <span><i style="background:var(--ok)"></i>正現金流</span>
-      <span><i style="background:var(--bad)"></i>負現金流</span>
-      <span>❄ 冬季高暖房費月份</span>
-    </div>
-    <div class="scroll" style="margin-top:18px">
-      <table id="cf"><thead><tr><th>月</th><th>係數</th><th>月商</th><th>變動費</th><th>人事</th>
-        <th>水電</th><th>RH</th><th>除雪</th><th>其他</th><th>營業利益</th><th>淨現金</th></tr></thead>
-        <tbody></tbody><tfoot></tfoot></table>
+    <div class="optgrid">
+      <div class="optcard">
+        <h3>取得與週轉</h3>
+        <div class="field"><label>廚房設備</label><input type="number" id="i-kitchen" value="2100000" step="100000"></div>
+        <div class="field"><label>運轉資金 <span class="u">第一年燒錢</span></label><input type="number" id="i-working" value="4500000" step="100000"></div>
+
+      </div>
+      <div class="optcard optnew">
+        <h3>土地</h3>
+        <div class="lvstatus" id="st-tenure">—</div>
+        <div class="field"><label>土地面積 <span class="u">㎡</span></label><input type="number" id="i-landArea" value="450" step="10" min="100"></div>
+        <div class="field"><label>間口 <span class="u">m · 臨路寬</span></label><input type="number" id="i-frontage" value="18" step="1" min="6"></div>
+        <div class="field"><label>土地單價 <span class="u">¥/㎡</span></label><input type="number" id="i-landUnit" value="52000" step="1000"></div>
+        <div class="field"><label>取得諸費用 <span class="u">%</span></label><input type="number" id="i-landFeePct" value="6" step="0.5"></div>
+        <div class="field"><label>地代率 <span class="u">%/年 · 借地時</span></label><input type="number" id="i-leaseRate" value="3" step="0.25" min="0.5" max="10"></div>
+      </div>
+      <div class="optcard optnew">
+        <h3>建物</h3>
+        <div class="field wide"><label>樓層數</label><select id="s-floors">
+          <option value="2" selected>2階建て</option>
+          <option value="3">3階建て（footprint 小·住家大·較貴）</option>
+        </select></div>
+        <div class="lvstatus" id="st-spec">—</div>
+        <div class="field wide"><label>斷熱等級</label><select id="s-insul">
+          <option value="5">等級5（省建設費，暖房費高）</option>
+          <option value="6" selected>等級6 HEAT20 G2 相當</option>
+          <option value="7">等級7（最省暖房，最貴）</option>
+        </select></div>
+        <div class="field"><label>住居面積 <span class="u">㎡ 總計</span></label><input type="number" id="i-resArea" value="110" step="5"></div>
+        <div class="field"><label>住居單價 <span class="u">¥/㎡</span></label><input type="number" id="i-resUnit" value="250000" step="5000"></div>
+        <div class="field"><label>店舖面積 <span class="u">㎡</span></label><input type="number" id="i-shopArea" value="52" step="2"></div>
+        <div class="field"><label>店舖單價 <span class="u">¥/㎡</span></label><input type="number" id="i-shopUnit" value="320000" step="5000"></div>
+        <div class="field"><label>1階玄關・階段室 <span class="u">㎡</span></label><input type="number" id="i-entry1F" value="26" step="2" min="6"></div>
+        <div class="field"><label>3階建て加成 <span class="u">%</span></label><input type="number" id="i-f3prem" value="10" step="1" min="0" max="30"></div>
+        <div class="field"><label>別途工事 <span class="u">外構·配管·設計</span></label><input type="number" id="i-extra" value="10500000" step="100000"></div>
+      </div>
+      <div class="optcard optnew">
+        <h3>車庫與停車</h3>
+        <div class="field wide"><label>車庫</label><select id="s-garage">
+          <option value="none">不建車庫（全部露天）</option>
+          <option value="builtin|24|1" selected>內建車庫　1台 24㎡</option>
+          <option value="builtin|45|2">內建車庫　2台 45㎡</option>
+          <option value="builtin|66|3">內建車庫　3台 66㎡</option>
+          <option value="detached|24|1">獨立車庫　1台 24㎡</option>
+          <option value="detached|45|2">獨立車庫　2台 45㎡</option>
+        </select></div>
+        <div class="field"><label>車庫面積 <span class="u">㎡</span></label><input type="number" id="i-garArea" value="24" step="5" min="0"></div>
+        <div class="field"><label>車庫單價 <span class="u">¥/㎡</span></label><input type="number" id="i-garUnit" value="180000" step="5000"></div>
+        <div class="field wide"><label>私家車停哪</label><select id="s-priv">
+          <option value="mix" selected>停車庫，放不下的租月極 ★省地</option>
+          <option value="garage">停車庫，放不下的停自家露天</option>
+          <option value="open">全部停自家露天（佔客位）</option>
+          <option value="rent">全部租月極停車場</option>
+        </select></div>
+        <div class="field"><label>私家車 <span class="u">台</span></label><input type="number" id="i-privCars" value="3" step="1" min="0" max="8"></div>
+        <div class="field"><label>月極租金 <span class="u">¥/台/月</span></label><input type="number" id="i-privRent" value="4500" step="500"></div>
+        <label class="checkline"><input type="checkbox" id="c-garRes">
+          <span>車庫計入居住部分<br><span style="color:var(--muted);font-size:11.5px">已依你確認：預設不計入。勾選可看另一種認定。</span></span></label>
+      </div>
+      <div class="optcard optnew">
+        <h3>ロードヒーティング</h3>
+        <div class="field wide"><label>設置範圍</label><select id="s-rh">
+          <option value="0">不做（人工除雪）</option>
+          <option value="pipe">只埋配管，機器後裝（省 2/3）</option>
+          <option value="30" selected>玄關前 30㎡</option>
+          <option value="45">玄關＋取餐動線 45㎡</option>
+          <option value="60">玄關＋車庫前 60㎡</option>
+        </select></div>
+        <div class="field"><label>設置單價 <span class="u">¥/㎡</span></label><input type="number" id="i-rhUnit" value="60000" step="5000"></div>
+        <div class="field"><label>運轉費 <span class="u">¥/㎡/冬月</span></label><input type="number" id="i-rhRun" value="1300" step="100"></div>
+      </div>
+      <div class="optcard">
+        <h3>營收</h3>
+        <div class="field"><label>營業日 <span class="u">日／月</span></label><input type="number" id="i-days" value="25" step="1" min="15" max="31"></div>
+        <div class="field"><label>原價率 <span class="u">%</span></label><input type="number" id="i-cogs" value="34" step="0.5"></div>
+        <div class="field"><label>包材率 <span class="u">% · 外帶特有</span></label><input type="number" id="i-pack" value="4.5" step="0.1"></div>
+        <div class="field"><label>刷卡手續 <span class="u">%</span></label><input type="number" id="i-card" value="2.8" step="0.1"></div>
+      </div>
+      <div class="optcard">
+        <h3>固定費</h3>
+        <div class="field"><label>工讀人事 <span class="u">¥／月</span></label><input type="number" id="i-labor" value="175000" step="5000"></div>
+        <div class="field"><label>夏季水電燃料 <span class="u">¥／月</span></label><input type="number" id="i-utilS" value="125000" step="5000"></div>
+        <div class="field"><label>冬季水電燃料 <span class="u">¥／月 不含RH</span></label><input type="number" id="i-utilW" value="190000" step="5000"></div>
+        <div class="field"><label>冬季月數</label><input type="number" id="i-winM" value="5" step="1" min="0" max="8"></div>
+        <div class="field"><label>除排雪 <span class="u">¥／冬月</span></label><input type="number" id="i-snow" value="60000" step="5000"></div>
+        <div class="field"><label>除雪月數</label><input type="number" id="i-snowM" value="4" step="1" min="0" max="6"></div>
+        <div class="field"><label>廣告販促 <span class="u">¥／月</span></label><input type="number" id="i-ad" value="60000" step="5000"></div>
+        <div class="field"><label>雜費消耗 <span class="u">¥／月</span></label><input type="number" id="i-misc" value="50000" step="5000"></div>
+        <div class="field"><label>固定資產稅＋保險 <span class="u">¥／年</span></label><input type="number" id="i-tax" value="720000" step="50000"></div>
+        <div class="field"><label>修繕積立 <span class="u">¥／年</span></label><input type="number" id="i-repair" value="150000" step="20000"></div>
+        <div class="field"><label>稅理士 <span class="u">¥／年</span></label><input type="number" id="i-cpa" value="300000" step="50000"></div>
+      </div>
+      <div class="optcard">
+        <h3>你的生活與稅</h3>
+        <div class="field"><label>社保稅 個人負擔 <span class="u">%</span></label><input type="number" id="i-selfBurden" value="22" step="1"></div>
+        <div class="field"><label>社保 公司負擔 <span class="u">%</span></label><input type="number" id="i-coBurden" value="15" step="1"></div>
+        <div class="field"><label>目標法人年利益 <span class="u">簽證更新緩衝</span></label><input type="number" id="i-corpProfit" value="1500000" step="100000"></div>
+      </div>
+      <div class="optcard">
+        <h3>第一年爬坡 <span class="u">達成率 %</span></h3>
+        <div class="field"><label>第1季</label><input type="number" id="i-q1" value="40" step="5" min="0" max="100"></div>
+        <div class="field"><label>第2季</label><input type="number" id="i-q2" value="60" step="5" min="0" max="100"></div>
+        <div class="field"><label>第3季</label><input type="number" id="i-q3" value="80" step="5" min="0" max="100"></div>
+        <div class="field"><label>第4季</label><input type="number" id="i-q4" value="95" step="5" min="0" max="100"></div>
+      </div>
+
     </div>
   </div>
-</section>
-
-<section class="block" id="sec-y1">
-  <div class="block-head"><span class="sec-num">08</span><div><h2>第一年燒錢</h2>
-    <p>運轉資金夠不夠撐過爬坡期</p></div></div>
-  <div class="block-body"><div class="checks" id="year1"></div><div class="flags" id="y1flags"></div></div>
-</section>
-
-<section class="block" id="sec-mx">
-  <div class="block-head"><span class="sec-num">09</span><div><h2>自有資金 × 營收情境</h2>
-    <p>格內為年度餘裕。橘框是你目前的位置</p></div></div>
-  <div class="block-body"><div class="scroll"><table class="matrix" id="matrix"></table></div><div class="flags" id="mxflags"></div></div>
-</section>
+</details>
+<details class="block" id="sec-guide">
+  <summary class="block-head"><span class="sec-num">13</span><div><h2>名詞表</h2>
+    <p>看到不懂的字回來查<span class="collapse-hint">點此展開</span></p></div></summary>
+  <div class="block-body">
+    <div class="deflist">
+      <div class="row"><div class="t">経営・管理<br>（簽證）</div><div class="d">外國人在日本<b>自己開店必需的在留資格</b>。2025年10月起要求資本金 ¥30,000,000 以上、至少1名常勤員工、事業計畫須專業士確認、本人或員工日語 N2。更新時會審查事業是否獲利。<b>這是第一道關，比錢還前面。</b></div></div>
+      <div class="row"><div class="t">行政書士</div><div class="d">日本專門處理許認可與在留資格申請的專業代理人。<b>你的第一步就是找一位做可行性判定</b>——這關沒過，其他數字都不用算。</div></div>
+      <div class="row"><div class="t">現金</div><div class="d">你真正拿得出來、<b>不用還的錢</b>。存款、可變現的投資。<b>不含任何貸款。</b></div></div>
+      <div class="row"><div class="t">台灣可貸<br>額度上限</div><div class="d">你在台灣<b>實際借得到的天花板</b>（房產增貸＋股票質借＋信貸合計）。不是「想借多少」，是銀行願意給多少——鑑價、DBR、收入都會卡。送件前先找銀行試算。</div></div>
+      <div class="row"><div class="t">DBR 22倍</div><div class="d">台灣金管會規範：個人<b>無擔保</b>債務（信貸、卡債）總額不得超過月薪 22 倍。有擔保的房貸不計入。這條決定你的信貸上限。</div></div>
+      <div class="row"><div class="t">資金缺口</div><div class="d">總投資 −（現金＋可貸上限）。<b>缺口 &gt; 0 就是這個方案的錢湊不出來</b>，跟賺不賺得回來無關。這是最優先的否決條件。</div></div>
+      <div class="row"><div class="t">日商</div><div class="d">一天的營業額。這是<b>假設，不是上限</b>——兩口業務用平底鍋的物理產能超過 ¥180,000／日，所以 ¥70,000 只是保守的規劃起點。</div></div>
+      <div class="row"><div class="t">店存活線</div><div class="d">只覆蓋店的固定費與變動費。過了這條線店不會倒，<b>但你沒有薪水</b>。</div></div>
+      <div class="row"><div class="t">你也活線</div><div class="d">再加上你的日本生活費、台灣的貸款月付、社保稅。<b>低於這條線就是每個月從存款裡拿錢補洞。</b></div></div>
+      <div class="row"><div class="t">安全線</div><div class="d">再加法人年度利益。<b>経営・管理簽證更新會看事業是否獲利</b>，連續赤字是更新風險——所以這條線不是貪心，是保簽證。</div></div>
+      <div class="row"><div class="t">年度餘裕</div><div class="d">營業利益減掉「你的薪水＋公司負擔的社保」之後剩下的。負數代表這個組合每年短少多少。</div></div>
+      <div class="row"><div class="t">役員報酬</div><div class="d">日文的「董事薪酬」＝<b>你自己從公司領的薪水</b>。它是公司的費用，也是你的生活費與還款來源。</div></div>
+      <div class="row"><div class="t">見せ金</div><div class="d">日文「充場面的錢」。資本金若是借來擺著給審查看、審完就匯走，會被入管認定為見せ金而<b>直接否決</b>。錢必須真的投入事業，且通帳全履歷要保全。</div></div>
+      <div class="row"><div class="t">事業用<br>定期借地</div><div class="d">租土地、自己蓋房子，<b>建物登記在法人名下</b>——入管的「事業所確保」要件照樣滿足。省下整筆土地款，代價是每年地代與期滿的<b>更地返還</b>（拆屋還地）義務。存續期間要談到 30 年以上。</div></div>
+      <div class="row"><div class="t">地代</div><div class="d">借地時<b>每年付給地主的租金</b>，本工具以土地價值的百分比估算（預設 3%／年）。</div></div>
+      <div class="row"><div class="t">古家付き土地</div><div class="d">「附帶老屋的土地」。買下後拆掉重建，總價常比純建地便宜 20–30%，但要多一筆<b>解体費</b>，且須確認無<b>石綿</b>（石棉）。</div></div>
+      <div class="row"><div class="t">間口 / 奧行</div><div class="d">間口＝<b>臨路那一邊的寬度</b>；奧行＝<b>往內的深度</b>。間口太窄會讓招牌看不見、停車格排不下。</div></div>
+      <div class="row"><div class="t">建蔽率</div><div class="d"><b>一樓佔地面積 ÷ 土地面積。</b>限制房子在地上「攤開」多大，一般上限 60%。</div></div>
+      <div class="row"><div class="t">容積率</div><div class="d"><b>各樓層面積總和 ÷ 土地面積。</b>限制總共能蓋多少樓地板，一般上限 200%。車庫可扣除延床的 1/5。</div></div>
+      <div class="row"><div class="t">居住比例</div><div class="d">住居 ÷ 總樓地板。<b>≥50% 才保得住固定資產稅的住宅用地特例</b>（土地稅額降至 1/6）。依你的確認，<b>車庫不計入居住部分</b>，只進分母。建議做到 53% 以上留邊際。</div></div>
+      <div class="row"><div class="t">注文住宅<br>規格住宅</div><div class="d">注文＝<b>完全客製</b>；規格＝用工務店<b>既有的設計方案</b>，便宜約 20%。住居部分不需要客製，把客製預算留給廚房。</div></div>
+      <div class="row"><div class="t">斷熱等級</div><div class="d">日本的保溫性能分級，數字越大越保暖、建設費越高。<b>北海道降一級，每年暖房費就多一大筆</b>——約 7 年就把省下的建設費吃回去。</div></div>
+      <div class="row"><div class="t">ロード<br>ヒーティング</div><div class="d">融雪設備。<b>配管必須在鋪裝前埋</b>，事後補要把停車場打掉重來；機器可以之後再裝。所以「只埋配管」是唯一合理的省法。</div></div>
+      <div class="row"><div class="t">無落雪屋根</div><div class="d">北海道的屋頂形式，<b>讓雪留在屋頂上慢慢融</b>，而不是滑落砸到樓下。落雪式則必須在屋簷下留出雪會掉落的空間。</div></div>
+      <div class="row"><div class="t">風除室</div><div class="d">大門外再加一道門形成的<b>緩衝小間</b>。北海道必備——擋風雪，也是外帶客人冬天等餐的地方。</div></div>
+      <div class="row"><div class="t">雪置場</div><div class="d">鏟下來的雪要<b>堆的地方</b>，一般要留敷地的 15%。沒留就會沒車位。</div></div>
+      <div class="row"><div class="t">月極<br>（つきぎめ）</div><div class="d">日文「按月計費」，這裡指<b>月租停車場</b>。把私家車停外面，換回自家的客用車位。</div></div>
+      <div class="row"><div class="t">冬季車位</div><div class="d">積雪後實際可用的車位，約為夏季的 72%，另外還要扣掉雪置場。<b>北海道的外帶店沒車位就沒生意。</b></div></div>
+      <div class="row"><div class="t">別途工事</div><div class="d">建物本體<b>以外</b>的工程：外構（庭院鋪面）、給排水引入、電力引入、招牌、設計費等。最常被漏算的一筆。</div></div>
+      <div class="row"><div class="t">取得諸費用</div><div class="d">買房買地時<b>本體價格以外</b>要付的錢：仲介手續費、登記費、不動產取得稅、印花稅、火險等，約成交價的 6%。</div></div>
+      <div class="row"><div class="t">稅理士</div><div class="d">日本的<b>會計師／稅務代理人</b>。法人報稅實務上一定要請。</div></div>
+      <div class="row"><div class="t">變動費率</div><div class="d">原價＋包材＋刷卡手續。<b>包材是外帶店特有的成本</b>（內用店沒有），約佔營收 4–5%，很多人會漏算。</div></div>
+      <div class="row"><div class="t">季節係數</div><div class="d">千歲的旺淡季擺盪只有 ±15%（2月雪祭、8月盆、12月忘年會為高點）。這正是選千歲不選富良野的量化理由——富良野的擺盪是 ±80%。</div></div>
+      <div class="row"><div class="t">❄ 標記</div><div class="d">冬季高暖房費月份（11–3月）。<b>1–4 月是連續負現金流</b>，這是北海道的結構性成本，不能優化掉，只能先備好現金。</div></div>
+    </div>
+  </div>
+</details>
 
 <footer class="foot">
-  <b>車庫的認定。</b>依你的確認，<b>車庫不計入居住部分</b>，只進總樓地板的分母。居住比例需 ≥50% 才保得住固定資產稅的住宅用地特例（土地稅額 1/6）；建議做到 53% 以上，並在設計階段向千歲市稅務課確認。<br>
-  <b>事業用定期借地。</b>租地建屋，建物登記在法人名下——入管的「事業所確保」要件照樣滿足。省下整筆土地款，代價是每年地代與期滿的更地返還義務。契約要看清楚存續期間與中途解約條款。<br>
+  <b>車庫的認定。</b>依你的確認，<b>車庫不計入居住部分</b>，只進總樓地板的分母。居住比例需 ≥50% 才保得住固定資產稅的住宅用地特例；建議做到 53% 以上，並在設計階段向千歲市稅務課確認。<br>
   <b>數字的限制。</b>建物單價、土地實勢價、地代率、營收假設為推估區間，2024–2026年北海道建材與人工大幅上漲，須以在地工務店見積與不動產實查為準，誤差可達 ±15%。用途地域、防火區劃、危險物規制須逐案向千歲市役所、保健所、消防署確認。<b>本工具為規劃用試算，不構成法律、稅務或投資建議。</b>
 </footer>
 
 </main>
+</div>
+
+<div id="stickybar" hidden>
+  <span class="sb-tag" id="sb-tag">—</span>
+  <span class="sb-item">總投資 <b id="sb-total">—</b></span>
+  <span class="sb-item" id="sb-gap-wrap">缺口 <b id="sb-gap">—</b></span>
+  <span class="sb-item">你也活線 <b id="sb-be">—</b></span>
+  <span class="sb-item">日商 <b id="sb-daily">—</b></span>
+  <span class="sb-item">年度餘裕 <b id="sb-slack">—</b></span>
+  <a class="sb-jump" href="#sec-hl">看完整判定 ↑</a>
 </div>
 
 <script>
@@ -1371,10 +1497,9 @@ function drawChart(m){
 var LASTCHANGE=null, PREV=null, VALMEM={};
 function fieldLabel(el){
   if(!el) return "設定";
-  var f=el.closest ? el.closest(".field") : null;
+  var f=el.closest ? el.closest(".field, .bigfield") : null;
   if(f){ var l=f.querySelector("label");
          if(l){ var t=(l.childNodes[0]&&l.childNodes[0].textContent||l.textContent).trim(); if(t) return t; } }
-  if(el.id==="i-loanCap") return "台灣可貸額度上限";
   return el.id||"設定";
 }
 function readable(el){
@@ -1384,7 +1509,7 @@ function readable(el){
 }
 function snapMemo(){
   VALMEM={};
-  document.querySelectorAll("#sec-setup input, #sec-setup select").forEach(function(el){
+  document.querySelectorAll("main input[id], main select[id]").forEach(function(el){
     VALMEM[el.id]=el.tagName==="SELECT"?readable(el):el.value;
   });
 }
@@ -1579,8 +1704,11 @@ function render(){
   $("f3wrap").hidden=!(mode==="new"&&m.floors===3);
   $("sec-plan").hidden=(mode!=="new");
   $("sec-site").hidden=(mode!=="new");
-  document.querySelector('a[href="#sec-plan"]').style.display=(mode==="new")?"":"none";
-  document.querySelector('a[href="#sec-site"]').style.display=(mode==="new")?"":"none";
+  ["#sec-plan","#sec-site"].forEach(function(h){
+    var a=document.querySelector('a[href="'+h+'"]');
+    if(a){ a.classList.toggle("off",mode!=="new");
+           a.title=(mode!=="new")?"中古模式沒有這一段":""; }
+  });
 
   drawSite(m); drawSection(m); drawFloors(m); drawChart(m); drawMatrix(m); drawLevers(m);
 
@@ -1745,6 +1873,13 @@ function render(){
 
   m.state=st;
   drawChange(m); drawRead(m);
+  $("sb-tag").textContent=tag;
+  $("sb-total").textContent=yen(m.total);
+  $("sb-be").textContent=yen(m.beYou);
+  $("sb-daily").textContent=yen(m.daily);
+  $("sb-slack").textContent=sign(m.slack);
+  $("sb-gap").textContent=m.gapJP>0?yen(m.gapJP):"0";
+  $("sb-gap-wrap").style.display=m.gapJP>0?"":"none";
   PREV={total:m.total,beYou:m.beYou,slack:m.slack,gapJP:m.gapJP,state:st,daily:m.daily,
         custWinter:m.custWinter,resPct:m.resPct};
   snapMemo();
@@ -1794,6 +1929,15 @@ document.querySelectorAll("input, select").forEach(function(el){
   el.addEventListener("input",function(){noteFieldChange(el);clearPreset();render();});
   el.addEventListener("change",function(){noteFieldChange(el);clearPreset();render();});
 });
+
+/* 判定捲出畫面時，底部浮出精簡判定條 */
+(function(){
+  var hl=$("sec-hl"), bar=$("stickybar");
+  if(!hl||!bar||!("IntersectionObserver" in window)) return;
+  new IntersectionObserver(function(es){
+    es.forEach(function(e){ bar.hidden = e.isIntersecting; });
+  },{threshold:0}).observe(hl);
+})();
 
 /* scroll-spy nav */
 (function(){
