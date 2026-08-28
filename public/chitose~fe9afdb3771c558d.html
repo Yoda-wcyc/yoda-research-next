@@ -301,6 +301,28 @@ main.main{min-width:0;flex:1;padding:26px 26px 90px;max-width:1180px}
 .chain{font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:2;
   background:var(--surface-2);border-left:3px solid var(--accent);
   padding:13px 16px;border-radius:2px;overflow-x:auto;white-space:pre}
+
+/* ── 省錢開關 ── */
+.leverbox{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:10px}
+label.lever{display:grid;grid-template-columns:auto 1fr;gap:11px;align-items:start;
+  padding:12px 14px;border:1px solid var(--line-strong);border-radius:3px;
+  background:var(--surface);cursor:pointer;transition:border-color .14s,background .14s}
+label.lever:hover{border-color:var(--accent)}
+label.lever.on{border-color:var(--accent);border-width:2px;padding:11px 13px;background:var(--accent-soft)}
+label.lever.bad.on{border-color:var(--bad);background:var(--bad-soft)}
+label.lever input{accent-color:var(--accent);width:17px;height:17px;margin-top:2px;flex:none}
+.lv-body{display:grid;gap:3px;min-width:0}
+.lv-name{font-weight:700;font-size:13.5px;line-height:1.45}
+.lv-nums{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;
+  font-size:12px;color:var(--muted)}
+.lv-nums b{color:var(--ink)}
+.lv-nums b.good{color:var(--ok)} .lv-nums b.warnc{color:var(--bad)}
+.lv-note{font-size:12px;color:var(--ink-2);line-height:1.6}
+.lv-cost{font-size:11.5px;color:var(--muted);line-height:1.6}
+.lv-sum{grid-column:1/-1;margin-top:4px;padding:12px 14px;border-radius:3px;
+  background:var(--surface-2);border-left:3px solid var(--accent);
+  font-size:13.5px;line-height:1.7}
+.lv-sum b{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;color:var(--accent)}
 </style>
 </head>
 <body>
@@ -326,9 +348,8 @@ main.main{min-width:0;flex:1;padding:26px 26px 90px;max-width:1180px}
   <a href="#sec-cf"><span class="nav-num">07</span><div class="nav-dot"></div>12個月現金流</a>
   <a href="#sec-y1"><span class="nav-num">08</span><div class="nav-dot"></div>第一年燒錢</a>
   <a href="#sec-mx"><span class="nav-num">09</span><div class="nav-dot"></div>自有資金矩陣</a>
-  <div class="nav-section-label">對策</div>
-  <a href="#sec-save"><span class="nav-num">10</span><div class="nav-dot"></div>省錢清單</a>
-  <a href="#sec-judge"><span class="nav-num">11</span><div class="nav-dot"></div>完整研判</a>
+  <div class="nav-section-label">結論</div>
+  <a href="#sec-judge"><span class="nav-num">10</span><div class="nav-dot"></div>完整研判</a>
   <div class="izy-section">
     <div class="izy-badge">
       <div class="izy-badge-label">Yoda Research</div>
@@ -387,7 +408,7 @@ main.main{min-width:0;flex:1;padding:26px 26px 90px;max-width:1180px}
     </div>
     <div class="flags">
       <div class="flag" data-t="warn"><b>這張表算不出來的三件事：</b>① 你能不能真的每天賣掉那麼多（需求，不是產能）② 建物單價與土地實勢價的實際見積（誤差可達 ±15%）③ 簽證會不會過（那是行政書士的事，不是算術）。</div>
-      <div class="flag" data-t="ok"><b>怎麼用：</b>先按上面的方案預設載入一組，再拉「日商」和「自有資金」兩個滑桿看它怎麼翻牌。判定變紅時，直接跳到 <b>10 省錢清單</b>。</div>
+      <div class="flag" data-t="ok"><b>怎麼用：</b>先按上面的方案預設載入一組，再拉「日商」和「自有資金」兩個滑桿看它怎麼翻牌。判定變紅時，直接用 <b>02 設定</b> 最上面的「省錢開關」。</div>
     </div>
   </div>
 </section>
@@ -408,6 +429,11 @@ main.main{min-width:0;flex:1;padding:26px 26px 90px;max-width:1180px}
           <button type="button" data-preset="newLease"><b>新築 2階・借地</b>不買地，事業用定期借地</button>
           <button type="button" data-preset="new3F"><b>新築 3階建て</b>延床258㎡ · 較貴</button>
         </div>
+      </div>
+
+      <div class="optcard" id="levercard" style="grid-column:1/-1">
+        <h3>省錢開關 · 勾了就立刻套用到下面所有計算</h3>
+        <div class="leverbox" id="levers"></div>
       </div>
 
       <div class="optcard">
@@ -641,14 +667,8 @@ main.main{min-width:0;flex:1;padding:26px 26px 90px;max-width:1180px}
   <div class="block-body"><div class="scroll"><table class="matrix" id="matrix"></table></div><div class="flags" id="mxflags"></div></div>
 </section>
 
-<section class="block" id="sec-save">
-  <div class="block-head"><span class="sec-num">10</span><div><h2>省錢清單</h2>
-    <p>每一條都算給你看省多少、日商門檻降多少、代價是什麼。依目前設定即時計算</p></div></div>
-  <div class="block-body"><div class="scroll"><table id="savetbl"></table></div><div class="flags" id="saveflags"></div></div>
-</section>
-
 <section class="block" id="sec-judge">
-  <div class="block-head"><span class="sec-num">11</span><div><h2>完整研判</h2>
+  <div class="block-head"><span class="sec-num">10</span><div><h2>完整研判</h2>
     <p>把上面所有區塊收束成一段話：這個組合成不成立、卡在哪、下一步做什麼</p></div></div>
   <div class="block-body"><div class="verdictdoc" id="judge"></div></div>
 </section>
@@ -714,79 +734,175 @@ function garageSpec(){
   return {type:p[0],area:parseFloat(p[1])||0,cars:parseInt(p[2],10)||0,
           unit:p[0]==="detached"?100000:180000};
 }
+
 function rhSpec(){
   var r=sv("s-rh");
   if(r==="pipe") return {area:30,costMul:1/3,run:0,pipeOnly:true};
   var a=parseFloat(r)||0;
   return {area:a,costMul:1,run:1,pipeOnly:false};
 }
+
 function applyOptions(){
   document.querySelectorAll(".optnew").forEach(function(e){e.hidden=(mode!=="new");});
   if(mode!=="new") return;
-  var gs=garageSpec();
-  $("i-garArea").value=gs.area; $("i-garUnit").value=gs.unit;
-  var ins=INSUL[sv("s-insul")]||INSUL[6];
-  $("i-resUnit").value=Math.round(ins.res*parseFloat(sv("s-spec")||"1"));
-  $("i-utilS").value=ins.summer; $("i-utilW").value=ins.winter;
+  var E=eff();
+  $("i-garArea").value=E.garArea; $("i-garUnit").value=E.garUnit;
+  $("i-resUnit").value=Math.round(E.resUnit);
+  $("i-utilS").value=E.utilS; $("i-utilW").value=E.utilW;
+}
+
+/* ── 省錢開關 ───────────────────────────────────────── */
+var LEVERS=[
+  {id:"lease",  n:"土地改事業用定期借地", newOnly:true,
+   cost:"每年地代；期滿有更地返還（拆屋）義務，存續期間要談到 30 年以上",
+   note:"租地建屋，建物登記在法人名下——入管的事業所要件照樣滿足"},
+  {id:"kikaku", n:"住居改規格住宅（−20%）", newOnly:true,
+   cost:"格局選項受限，但店舖仍可完全客製",
+   note:"住居不需要客製，把客製預算留給廚房"},
+  {id:"res90",  n:"住居縮到 90㎡", newOnly:true,
+   cost:"居住空間變小；注意居住比例仍須 ≥50%",
+   note:"日本都市小宅 90㎡ 很常見"},
+  {id:"furuya", n:"買「古家付き土地」拆掉重建", newOnly:true,
+   cost:"多一筆解体費 ¥2,000,000，且要確認無石綿",
+   note:"老屋帶大地常比純建地便宜 20–30%，日本很常見的做法"},
+  {id:"land6k", n:"土地單價降 ¥6,000/㎡（往外圍找）", newOnly:true,
+   cost:"離 ちとせモール 遠一點",
+   note:"長都／上長都外圍仍在同一生活圈"},
+  {id:"land400",n:"土地縮到 400㎡", newOnly:true,
+   cost:"冬季客用車位少 1–2 台 ⚠ 停車位是外帶店命脈",
+   note:"建蔽率與容積率都還很寬鬆，縮地不影響建物"},
+  {id:"shop44", n:"店舖縮到 44㎡", newOnly:true,
+   cost:"廚房動線變緊，尖峰產能受限",
+   note:"日本很多 13 坪的持ち帰り店，可行但要設計得好"},
+  {id:"gardet", n:"車庫改獨立式", newOnly:true,
+   cost:"要走出去才到車庫，但仍是室內",
+   note:"獨立車庫單價約內建的 55%"},
+  {id:"rhpipe", n:"ロードヒーティング 只埋配管", newOnly:true,
+   cost:"頭幾年冬天玄關要人工鏟雪",
+   note:"配管必須鋪裝前埋，機器之後隨時可加裝"},
+  {id:"kitused",n:"廚房設備全部用中古", newOnly:false,
+   cost:"故障風險與保固較差",
+   note:"冷藏冷凍／作業台買中古沒問題；平底鍋台與排氣不要省"},
+  {id:"insul5", n:"斷熱降到等級5", newOnly:true, bad:true,
+   cost:"⚠ 不建議：暖房費差額約 7 年就把省下的建設費吃回去",
+   note:"這是唯一一條「省了反而虧」的，門檻箭頭會往上"}
+];
+function lv(id,force){
+  if(force && force.hasOwnProperty(id)) return force[id];
+  var e=$("lv-"+id); return !!(e && e.checked);
+}
+
+/* 把原始輸入 + 省錢開關 → 實際生效的設定 */
+function eff(force){
+  var gs=garageSpec(), rs=rhSpec();
+  var E={
+    landArea:v("i-landArea"), landUnit:v("i-landUnit"), landFeePct:v("i-landFeePct"),
+    resArea:v("i-resArea"), shopArea:v("i-shopArea"), entry1F:v("i-entry1F"),
+    shopUnit:v("i-shopUnit"), extra:v("i-extra"), kitchen:v("i-kitchen"),
+    working:v("i-working"), tenure:sv("s-tenure"), specMul:parseFloat(sv("s-spec"))||1,
+    insul:sv("s-insul"), floors:parseInt(sv("s-floors"),10)||2,
+    garType:gs.type, garArea:gs.area, garCars:gs.cars, garUnit:gs.unit,
+    rhArea:rs.area, rhCostMul:rs.costMul, rhRunMul:rs.run, rhPipeOnly:rs.pipeOnly,
+    demolition:0
+  };
+  if(mode!=="new") return E;
+  if(lv("lease",force))   E.tenure="lease";
+  if(lv("kikaku",force))  E.specMul=Math.min(E.specMul,0.80);
+  if(lv("insul5",force))  E.insul="5";
+  if(lv("res90",force))   E.resArea=Math.min(E.resArea,90);
+  if(lv("shop44",force))  E.shopArea=Math.min(E.shopArea,44);
+  if(lv("land400",force)) E.landArea=Math.min(E.landArea,400);
+  if(lv("furuya",force)){ E.landUnit=E.landUnit*0.75; E.demolition=2000000; }
+  if(lv("land6k",force))  E.landUnit=Math.max(0,E.landUnit-6000);
+  if(lv("gardet",force) && E.garType==="builtin"){ E.garType="detached"; E.garUnit=100000; }
+  if(lv("rhpipe",force)){ if(E.rhArea===0)E.rhArea=30; E.rhCostMul=1/3; E.rhRunMul=0; E.rhPipeOnly=true; }
+  if(lv("kitused",force)) E.kitchen=Math.min(E.kitchen,1600000);
+  E.resUnit=(INSUL[E.insul]||INSUL[6]).res*E.specMul;
+  E.utilS=(INSUL[E.insul]||INSUL[6]).summer;
+  E.utilW=(INSUL[E.insul]||INSUL[6]).winter;
+  return E;
+}
+
+/* 成本與年固定費：model 與逐項邊際試算共用 */
+function core(E){
+  var c={items:[]};
+  c.rhCost=E.rhArea*v("i-rhUnit")*E.rhCostMul;
+  c.rhRunM=E.rhArea*v("i-rhRun")*E.rhRunMul;
+  c.leaseYr=0;
+  if(mode==="used"){
+    c.items.push(["物件價格",v("i-propPrice")]);
+    c.items.push(["取得諸費用",v("i-propFee")]);
+    c.items.push(["改裝工事",v("i-reno")]);
+  }else{
+    c.landValue=E.landArea*E.landUnit;
+    var land=0,landFee=0;
+    if(E.tenure==="lease") c.leaseYr=c.landValue*v("i-leaseRate")/100;
+    else { land=c.landValue; landFee=land*E.landFeePct/100; }
+    c.cLand=land; c.cLandFee=landFee;
+    c.res1F=Math.min(E.entry1F,E.resArea);
+    var upper=Math.max(0,E.resArea-c.res1F);
+    if(E.floors===3){ c.res2F=Math.round(upper*0.56); c.res3F=upper-c.res2F; }
+    else { c.res2F=upper; c.res3F=0; }
+    c.premium=(E.floors===3)?(1+v("i-f3prem")/100):1;
+    c.cRes=E.resArea*E.resUnit*c.premium;
+    c.cShop=E.shopArea*E.shopUnit*c.premium;
+    c.cGar=E.garArea*E.garUnit*(E.garType==="builtin"?c.premium:1);
+    if(E.tenure==="lease") c.items.push(["土地 "+E.landArea+"㎡（借地・不購入）",0]);
+    else{
+      c.items.push(["土地 "+E.landArea+"㎡ × "+yen(E.landUnit)+"/㎡",land]);
+      c.items.push(["土地諸費用 "+E.landFeePct+"%",landFee]);
+    }
+    if(E.demolition>0) c.items.push(["古家解体費",E.demolition]);
+    c.items.push(["住居 "+E.resArea+"㎡（1F"+c.res1F+"／2F"+c.res2F+(E.floors===3?"／3F"+c.res3F:"")+"）",c.cRes]);
+    c.items.push(["店舖 "+E.shopArea+"㎡",c.cShop]);
+    if(c.cGar>0) c.items.push([(E.garType==="detached"?"獨立":"內建")+"車庫 "+E.garArea+"㎡",c.cGar]);
+    if(c.rhCost>0) c.items.push(["ロードヒーティング "+E.rhArea+"㎡"+(E.rhPipeOnly?"（只埋配管）":""),c.rhCost]);
+    c.items.push(["別途工事",E.extra]);
+    c.footprint=E.shopArea+c.res1F+(E.garType==="builtin"?E.garArea:0);
+    c.detachedGar=(E.garType==="detached")?E.garArea:0;
+    c.floorTotal=E.resArea+E.shopArea+E.garArea;
+  }
+  c.items.push(["廚房設備",E.kitchen]);
+  c.items.push(["運轉資金",E.working]);
+  c.total=c.items.reduce(function(s,r){return s+r[1];},0);
+
+  var overflow=Math.max(0,v("i-privCars")-E.garCars), priv=sv("s-priv");
+  if(priv==="rent"){ c.openPriv=0; c.rentCars=v("i-privCars"); }
+  else if(priv==="mix"){ c.openPriv=0; c.rentCars=overflow; }
+  else if(priv==="garage"){ c.openPriv=overflow; c.rentCars=0; }
+  else { c.openPriv=v("i-privCars"); c.rentCars=0; }
+
+  var winM=v("i-winM"), snM=v("i-snowM");
+  var utilS=(mode==="new")?E.utilS:v("i-utilS");
+  var utilW=(mode==="new")?E.utilW:v("i-utilW");
+  c.utilS=utilS; c.utilW=utilW;
+  c.privRentM=c.rentCars*v("i-privRent");
+  c.otherM=v("i-ad")+v("i-misc")+c.privRentM+c.leaseYr/12+(v("i-tax")+v("i-repair")+v("i-cpa"))/12;
+  c.fixedYr=v("i-labor")*12+utilS*(12-winM)+utilW*winM+c.rhRunM*winM+v("i-snow")*snM+c.otherM*12;
+  return c;
+}
+
+/* 給定 total 與 fixedYr，算出「你也活線」日商 */
+function beOf(total,fixedYr,fx,perD){
+  var loanTW=Math.max(0,total-v("i-own")*10000*fx)/fx;
+  var p=pmt(loanTW,v("i-rate"),v("i-term"))*fx;
+  var sb=v("i-selfBurden")/100;
+  var salM=sb>=1?0:(v("i-living")+p)/(1-sb);
+  return {be:(fixedYr+salM*12*(1+v("i-coBurden")/100))/perD, loanTW:loanTW, pmtJP:p};
 }
 
 function model(){
-  var fx=v("i-fx")||4.7, m={fx:fx,mode:mode,items:[]};
-  var rs=rhSpec(), gs=garageSpec();
-  m.rhArea=(mode==="new")?rs.area:0;
-  m.rhCost=m.rhArea*v("i-rhUnit")*rs.costMul;
-  m.rhRunM=m.rhArea*v("i-rhRun")*rs.run;
-  m.rhPipeOnly=rs.pipeOnly;
-  m.garType=(mode==="new")?gs.type:"none";
-  m.garRes=$("c-garRes").checked;
-  m.priv=sv("s-priv"); m.privCars=v("i-privCars"); m.garCars=gs.cars;
-  var overflow=Math.max(0,m.privCars-m.garCars);
-  if(m.priv==="rent"){ m.openPriv=0; m.rentCars=m.privCars; }
-  else if(m.priv==="mix"){ m.openPriv=0; m.rentCars=overflow; }
-  else if(m.priv==="garage"){ m.openPriv=overflow; m.rentCars=0; }
-  else { m.openPriv=m.privCars; m.rentCars=0; }
-  m.leaseYr=0;
-
-  if(mode==="used"){
-    m.items.push(["物件價格",v("i-propPrice")]);
-    m.items.push(["取得諸費用",v("i-propFee")]);
-    m.items.push(["改裝工事",v("i-reno")]);
-  }else{
-    m.landArea=v("i-landArea"); m.frontage=v("i-frontage");
-    m.tenure=sv("s-tenure");
-    m.landValue=m.landArea*v("i-landUnit");
-    var land=0,landFee=0;
-    if(m.tenure==="lease"){ m.leaseYr=m.landValue*v("i-leaseRate")/100; }
-    else { land=m.landValue; landFee=land*v("i-landFeePct")/100; }
-    m.resArea=v("i-resArea"); m.shopArea=v("i-shopArea"); m.garArea=v("i-garArea");
-    m.floors=parseInt(sv("s-floors"),10)||2;
-    m.res1F=Math.min(v("i-entry1F"),m.resArea);
-    var upper=Math.max(0,m.resArea-m.res1F);
-    if(m.floors===3){ m.res2F=Math.round(upper*0.56); m.res3F=upper-m.res2F; }
-    else { m.res2F=upper; m.res3F=0; }
-    var prem=(m.floors===3)?(1+v("i-f3prem")/100):1; m.premium=prem;
-    var res=m.resArea*v("i-resUnit")*prem,
-        shop=m.shopArea*v("i-shopUnit")*prem,
-        gar=m.garArea*v("i-garUnit")*(m.garType==="builtin"?prem:1);
-    m.cRes=res; m.cShop=shop; m.cGar=gar; m.cLand=land; m.cLandFee=landFee;
-    if(m.tenure==="lease") m.items.push(["土地 "+m.landArea+"㎡（借地・不購入）",0]);
-    else{
-      m.items.push(["土地 "+m.landArea+"㎡ × "+yen(v("i-landUnit"))+"/㎡",land]);
-      m.items.push(["土地諸費用 "+v("i-landFeePct")+"%",landFee]);
-    }
-    m.items.push(["住居 "+m.resArea+"㎡（1F"+m.res1F+"／2F"+m.res2F+(m.floors===3?"／3F"+m.res3F:"")+"）",res]);
-    m.items.push(["店舖 "+m.shopArea+"㎡",shop]);
-    if(gar>0) m.items.push([(m.garType==="detached"?"獨立":"內建")+"車庫 "+m.garArea+"㎡",gar]);
-    if(m.rhCost>0) m.items.push(["ロードヒーティング "+m.rhArea+"㎡"+(m.rhPipeOnly?"（只埋配管）":""),m.rhCost]);
-    m.items.push(["別途工事",v("i-extra")]);
-    m.footprint=m.shopArea+m.res1F+(m.garType==="builtin"?m.garArea:0);
-    m.detachedGar=(m.garType==="detached")?m.garArea:0;
-    m.floorTotal=m.resArea+m.shopArea+m.garArea;
+  var fx=v("i-fx")||4.7, E=eff(), c=core(E);
+  var m={fx:fx,mode:mode,E:E};
+  for(var k in c) m[k]=c[k];
+  m.rhArea=E.rhArea; m.rhPipeOnly=E.rhPipeOnly;
+  m.garType=E.garType; m.garArea=E.garArea; m.garCars=E.garCars;
+  m.garRes=$("c-garRes").checked; m.priv=sv("s-priv"); m.privCars=v("i-privCars");
+  m.working=E.working;
+  if(mode==="new"){
+    m.landArea=E.landArea; m.frontage=v("i-frontage"); m.tenure=E.tenure;
+    m.resArea=E.resArea; m.shopArea=E.shopArea; m.floors=E.floors;
   }
-  m.items.push(["廚房設備",v("i-kitchen")]);
-  m.items.push(["運轉資金",v("i-working")]);
-  m.total=m.items.reduce(function(s,r){return s+r[1];},0);
-
   m.ownTW=v("i-own")*10000; m.ownJP=m.ownTW*fx;
   m.loanJP=Math.max(0,m.total-m.ownJP); m.loanTW=m.loanJP/fx;
   m.pmtTW=pmt(m.loanTW,v("i-rate"),v("i-term")); m.pmtJP=m.pmtTW*fx;
@@ -795,12 +911,7 @@ function model(){
   m.seasonSum=SEASON.reduce(function(a,b){return a+b;},0);
   m.annual=m.monthly*m.seasonSum;
   m.varRate=(v("i-cogs")+v("i-pack")+v("i-card"))/100; m.cm=1-m.varRate;
-
-  var winM=v("i-winM"), snM=v("i-snowM");
-  m.labor=v("i-labor"); m.utilS=v("i-utilS"); m.utilW=v("i-utilW"); m.snow=v("i-snow");
-  m.privRentM=m.rentCars*v("i-privRent");
-  m.otherM=v("i-ad")+v("i-misc")+m.privRentM+m.leaseYr/12+(v("i-tax")+v("i-repair")+v("i-cpa"))/12;
-  m.fixedYr=m.labor*12+m.utilS*(12-winM)+m.utilW*winM+m.rhRunM*winM+m.snow*snM+m.otherM*12;
+  m.labor=v("i-labor"); m.snow=v("i-snow");
   m.opProfit=m.annual*m.cm-m.fixedYr;
 
   var take=v("i-living")+m.pmtJP, sb=v("i-selfBurden")/100;
@@ -826,7 +937,7 @@ function model(){
 
   var q=[v("i-q1"),v("i-q2"),v("i-q3"),v("i-q4")].map(function(x){return x/100;});
   var y1=0; for(var j=0;j<12;j++) y1+=m.monthly*SEASON[j]*q[Math.floor(j/3)];
-  m.y1sales=y1; m.y1op=y1*m.cm-m.fixedYr; m.y1net=m.y1op-m.needYr; m.working=v("i-working");
+  m.y1sales=y1; m.y1op=y1*m.cm-m.fixedYr; m.y1net=m.y1op-m.needYr;
 
   if(mode==="new"){
     m.snowArea=m.landArea*0.15; m.approach=20;
@@ -845,16 +956,45 @@ function model(){
   return m;
 }
 
-/* what-if: change total investment and/or annual fixed cost, return new break-even daily */
-function whatIf(m,dTotal,dFixed){
-  var total=m.total+dTotal;
-  var loanJP=Math.max(0,total-m.ownJP), loanTW=loanJP/m.fx;
-  var p=pmt(loanTW,v("i-rate"),v("i-term"))*m.fx;
-  var sb=v("i-selfBurden")/100;
-  var salM=sb>=1?0:(v("i-living")+p)/(1-sb);
-  var need=salM*12*(1+v("i-coBurden")/100);
-  var fixed=m.fixedYr+(dFixed||0);
-  return {total:total,loanTW:loanTW,be:(fixed+need)/m.perD};
+/* 逐項邊際效果：其他開關維持現狀，只切換這一項 */
+function leverDelta(id,m){
+  var offC=core(eff((function(){var o={};o[id]=false;return o;})()));
+  var onC =core(eff((function(){var o={};o[id]=true; return o;})()));
+  var offB=beOf(offC.total,offC.fixedYr,m.fx,m.perD);
+  var onB =beOf(onC.total, onC.fixedYr, m.fx,m.perD);
+  return {save:offC.total-onC.total, dFixed:onC.fixedYr-offC.fixedYr,
+          dBE:onB.be-offB.be, beOn:onB.be, loanOn:onB.loanTW};
+}
+
+function drawLevers(m){
+  var box=$("levers"); if(!box) return;
+  var h="", on=0, saved=0;
+  LEVERS.forEach(function(L){
+    if(L.newOnly && mode!=="new") return;
+    var d=leverDelta(L.id,m);
+    if(Math.abs(d.save)<1000 && Math.abs(d.dFixed)<1000 && Math.abs(d.dBE)<1) return;
+    var checked=lv(L.id);
+    if(checked){ on++; saved+=d.save; }
+    h+="<label class='lever"+(L.bad?" bad":"")+(checked?" on":"")+"'>"+
+       "<input type='checkbox' id='lv-"+L.id+"'"+(checked?" checked":"")+">"+
+       "<span class='lv-body'><span class='lv-name'>"+esc(L.n)+"</span>"+
+       "<span class='lv-nums'>省 <b>"+(d.save>=0?yen(d.save):"−"+yen(-d.save))+"</b>"+
+       (Math.abs(d.dFixed)>=1000?("　年固定費 "+(d.dFixed>0?"+":"−")+yen(Math.abs(d.dFixed))):"")+
+       "　門檻 <b class='"+(d.dBE<0?"good":"warnc")+"'>"+(d.dBE<0?"↓":"↑")+Math.abs(Math.round(d.dBE)).toLocaleString("en-US")+"</b></span>"+
+       "<span class='lv-note'>"+esc(L.note)+"</span>"+
+       "<span class='lv-cost'>代價："+esc(L.cost)+"</span></span></label>";
+  });
+  var baseC=core(eff((function(){var o={};LEVERS.forEach(function(L){o[L.id]=false;});return o;})()));
+  var baseB=beOf(baseC.total,baseC.fixedYr,m.fx,m.perD);
+  h+="<div class='lv-sum'>"+
+     (on?("已套用 <b>"+on+"</b> 項　總投資 "+yen(baseC.total)+" → <b>"+yen(m.total)+"</b>　"+
+          "日商門檻 "+yen(baseB.be)+" → <b>"+yen(m.beYou)+"</b>")
+        :("尚未套用任何一項　總投資 <b>"+yen(m.total)+"</b>　日商門檻 <b>"+yen(m.beYou)+"</b>"))+
+     "</div>";
+  box.innerHTML=h;
+  box.querySelectorAll("input[type=checkbox]").forEach(function(cb){
+    cb.addEventListener("change",render);
+  });
 }
 
 /* ── drawing helpers ───────────────────────────────── */
@@ -1155,7 +1295,7 @@ function drawJudge(m){
   o+="<p><b>③ 降低總投資</b>　"+
      (mode==="new"&&m.tenure!=="lease"
        ? "最大的一條是<b>土地改事業用定期借地</b>，一筆就省 "+yen(m.cLand+m.cLandFee)+"，而入管的事業所要件照樣滿足。"
-       : "看 10 省錢清單，每一條都算好了省多少、門檻降多少。")+
+       : "到上面 02 設定的「省錢開關」勾選，每一條都算好了省多少、門檻降多少。")+
      "</p></div>";
 
   /* 可證偽觸發 */
@@ -1172,50 +1312,10 @@ function drawJudge(m){
      "<p>・<b>運轉資金</b>（不可逆）現金流斷一次就結束，沒有第二次。目前需備 "+yen(Math.max(m.working,-m.y1net))+"。<br>"+
      "・<b>保健所的住居／營業區劃分離</b>（不可逆）唯一一項做不好就<b>拿不到營業許可、根本開不了店</b>的工程。<br>"+
      "・<b>ロードヒーティング 配管</b>（不可逆）鋪裝後要埋得把整片停車場打掉；機器可以之後再裝。<br>"+
-     "・<b>斷熱等級</b>（會複利）唯一一條省了反而虧的——省錢清單上它的門檻箭頭是往上的。</p></div>";
+     "・<b>斷熱等級</b>（會複利）唯一一條省了反而虧的——省錢開關裡它的門檻箭頭是往上的。</p></div>";
 
   $("judge").innerHTML=o;
 }
-
-function drawMatrix(m){
-  var owns=[300,500,700,900,1200,1500], you=Math.round(m.ownTW/10000);
-  if(owns.indexOf(you)<0){owns.push(you);owns.sort(function(a,b){return a-b;});}
-  var scen=[["保守",0.83],["基準",1.00],["強氣",1.21]];
-  var h="<thead><tr><th>自有資金</th><th>需借款</th><th>月付</th>";
-  scen.forEach(function(s){h+="<th>"+s[0]+" 日商"+yen(Math.round(m.daily*s[1]))+"</th>";});
-  h+="</tr></thead><tbody>";
-  owns.forEach(function(o){
-    var ownJP=o*10000*m.fx, loanJP=Math.max(0,m.total-ownJP), loanTW=loanJP/m.fx;
-    var p=pmt(loanTW,v("i-rate"),v("i-term"))*m.fx;
-    var sb=v("i-selfBurden")/100, salM=sb>=1?0:(v("i-living")+p)/(1-sb);
-    var need=salM*12*(1+v("i-coBurden")/100);
-    h+="<tr"+(o===you?" class='you'":"")+"><td>NT$"+o.toLocaleString("en-US")+"萬</td>"+
-       "<td class='cell'>"+(loanTW>0?("NT$"+Math.round(loanTW/10000).toLocaleString("en-US")+"萬"):"—")+"</td>"+
-       "<td class='cell'>"+(p>0?yen(p):"—")+"</td>";
-    scen.forEach(function(s){
-      var slack=(m.daily*s[1]*m.perD-m.fixedYr)-need;
-      h+="<td class='cell "+(slack>=1000000?"g":(slack>=0?"y":"r"))+"'>"+sign(slack)+"</td>";
-    });
-    h+="</tr>";
-  });
-  $("matrix").innerHTML=h+"</tbody>";
-
-  var minOwn=null;
-  for(var o2=100;o2<=3500;o2+=25){
-    var ownJP=o2*10000*m.fx, loanTW=Math.max(0,m.total-ownJP)/m.fx;
-    var p=pmt(loanTW,v("i-rate"),v("i-term"))*m.fx;
-    var sb=v("i-selfBurden")/100, salM=sb>=1?0:(v("i-living")+p)/(1-sb);
-    if((m.daily*m.perD-m.fixedYr)-salM*12*(1+v("i-coBurden")/100)>=0){minOwn=o2;break;}
-  }
-  var f=[];
-  if(minOwn!==null) f.push([you>=minOwn?"ok":"bad",
-    "以日商 "+yen(m.daily)+" 與這個配置，<b>自有資金至少要 NT$"+minOwn.toLocaleString("en-US")+"萬</b>才打平。你現在是 NT$"+you.toLocaleString("en-US")+"萬。"]);
-  else f.push(["bad","<b>不論自有資金多少都打不平。</b>就算零貸款，日商 "+yen(m.daily)+" 也養不起這個固定費結構。"]);
-  f.push(["ok","綠＝年度餘裕 ¥1,000,000 以上（舒適）　黃＝打平到 ¥1,000,000（吃緊）　紅＝赤字"]);
-  $("mxflags").innerHTML=f.map(function(x){return "<div class='flag' data-t='"+x[0]+"'>"+x[1]+"</div>";}).join("");
-}
-
-
 
 function drawMatrix(m){
   var owns=[300,500,700,900,1200,1500], you=Math.round(m.ownTW/10000);
@@ -1255,78 +1355,6 @@ function drawMatrix(m){
   $("mxflags").innerHTML=f.map(function(x){return "<div class='flag' data-t='"+x[0]+"'>"+x[1]+"</div>";}).join("");
 }
 
-function drawSavings(m){
-  var L=[];
-  function add(name,dTotal,dFixed,cost,note){
-    if(Math.abs(dTotal)<1000 && Math.abs(dFixed||0)<1000) return;
-    var w=whatIf(m,dTotal,dFixed);
-    L.push({name:name,save:-dTotal,dFixed:dFixed||0,newBE:w.be,dBE:w.be-m.beYou,
-            loanTW:w.loanTW,cost:cost,note:note});
-  }
-  if(mode==="new"){
-    if(m.tenure!=="lease")
-      add("土地改事業用定期借地",-(m.cLand+m.cLandFee),m.landValue*v("i-leaseRate")/100,
-        "每年地代 "+yen(m.landValue*v("i-leaseRate")/100)+"；期滿有更地返還義務",
-        "整筆土地款不用出。入管的事業所要件照樣滿足（建物登記在法人名下）");
-    if(parseFloat(sv("s-spec"))>0.9)
-      add("住居改規格住宅（−20%）",-m.cRes*0.20,0,"格局選項受限，但店舖仍可客製","住居部分不需要客製，把客製預算留給廚房");
-    if(m.resArea>90)
-      add("住居縮到 90㎡",-(m.resArea-90)*v("i-resUnit")*m.premium,0,
-        "居住空間變小（日本都市小宅 90㎡ 很常見）","注意居住比例仍須 ≥50%");
-    if(m.shopArea>44)
-      add("店舖縮到 44㎡",-(m.shopArea-44)*v("i-shopUnit")*m.premium,0,
-        "廚房動線變緊，尖峰產能受限","日本很多 13 坪的持ち帰り店，可行但要設計得好");
-    if(m.landArea>400 && m.tenure!=="lease")
-      add("土地縮到 400㎡",-(m.landArea-400)*v("i-landUnit")*(1+v("i-landFeePct")/100),0,
-        "冬季客用車位少 1–2 台","停車位是外帶店命脈，這條要很小心");
-    if(m.tenure!=="lease")
-      add("土地單價降 ¥6,000/㎡（往外圍找）",-m.landArea*6000*(1+v("i-landFeePct")/100),0,
-        "離 ちとせモール 遠一點","長都/上長都外圍仍在同一生活圈");
-    add("買「古家付き土地」拆掉重建",-(m.tenure==="lease"?0:m.landValue*0.25)+2000000,0,
-      "多一筆解体費約 ¥2,000,000，且要確認無石綿",
-      "老屋帶大地常比純建地便宜 20–30%，日本很常見的做法");
-    if(!m.rhPipeOnly && m.rhCost>0)
-      add("ロードヒーティング 只埋配管",-m.rhCost*(2/3),-m.rhRunM*v("i-winM"),
-        "頭幾年冬天玄關要人工鏟雪","配管必須鋪裝前埋，機器可以之後再裝");
-    if(m.garType==="builtin" && m.garArea>0)
-      add("車庫改獨立式",-m.garArea*(v("i-garUnit")*m.premium-100000),0,
-        "要走出去才到車庫；但仍是室內","獨立車庫單價約內建的 55%");
-    if(sv("s-insul")!=="5")
-      add("斷熱降到等級5",-(m.resArea*(INSUL[sv("s-insul")].res-INSUL[5].res)*parseFloat(sv("s-spec"))*m.premium),
-        (INSUL[5].winter-INSUL[sv("s-insul")].winter)*v("i-winM"),
-        "冬季暖房費每年多 "+yen((INSUL[5].winter-INSUL[sv("s-insul")].winter)*v("i-winM")),
-        "⚠ 不建議：暖房費差額約 7 年就把省下的建設費吃回去");
-  }
-  if(v("i-kitchen")>1600000)
-    add("廚房設備全部用中古",-(v("i-kitchen")-1600000),0,"故障風險與保固較差",
-      "冷藏冷凍/作業台買中古沒問題；平底鍋台與排氣不要省");
-
-  L.sort(function(a,b){return b.save-a.save;});
-
-  var h="<thead><tr><th>省錢做法</th><th>省下</th><th>年固定費變化</th><th>新日商門檻</th><th>門檻變化</th><th>代價</th></tr></thead><tbody>";
-  if(!L.length) h+="<tr><td colspan='6' style='text-align:center;color:var(--muted)'>目前設定已經很精簡，沒有可再省的大項</td></tr>";
-  L.forEach(function(x){
-    h+="<tr><td><b>"+esc(x.name)+"</b><br><span style='color:var(--muted);font-size:11.5px;white-space:normal'>"+esc(x.note)+"</span></td>"+
-       "<td class='n' style='color:"+(x.save>0?"var(--ok)":"var(--bad)")+"'>"+(x.save>0?yen(x.save):"−"+yen(-x.save))+"</td>"+
-       "<td class='n'>"+(x.dFixed?(x.dFixed>0?"+":"−")+yen(Math.abs(x.dFixed))+"/年":"—")+"</td>"+
-       "<td class='n'>"+yen(x.newBE)+"</td>"+
-       "<td class='n' style='color:"+(x.dBE<0?"var(--ok)":"var(--bad)")+"'>"+(x.dBE<0?"↓ ":"↑ ")+Math.abs(Math.round(x.dBE)).toLocaleString("en-US")+"</td>"+
-       "<td style='white-space:normal;font-size:12px;color:var(--muted);max-width:22ch'>"+esc(x.cost)+"</td></tr>";
-  });
-  $("savetbl").innerHTML=h+"</tbody>";
-
-  var f=[];
-  var big=L.slice(0,3).reduce(function(s,x){return s+Math.max(0,x.save);},0);
-  if(big>0){
-    var w=whatIf(m,-big,L.slice(0,3).reduce(function(s,x){return s+(x.dFixed||0);},0));
-    f.push([w.be<=m.daily?"ok":"warn","<b>前三大合計可省 "+yen(big)+"</b>（≈NT$"+man(big/m.fx/10000)+"），日商門檻降到 "+yen(w.be)+"、借款降到 NT$"+man(w.loanTW/10000)+"。"+
-      (w.be<=m.daily?"這樣就低於你設定的日商了 ✅":"仍高於你設定的 "+yen(m.daily)+"，還要再想辦法。")]);
-  }
-  f.push(["ok","<b>不要省的三樣：</b>① 運轉資金（第一年的命）② 廚房排氣與平底鍋台（產品品質）③ 斷熱等級（7 年回本，省了反而虧）。"]);
-  f.push(["ok","<b>還有兩筆錢不在表上：</b>千歲市商店街空き店舗対策事業補助金、小規模事業者持続化補助金（約 ¥500,000–2,000,000）。金額依年度公告，要向千歲市與商工會確認。"]);
-  $("saveflags").innerHTML=f.map(function(x){return "<div class='flag' data-t='"+x[0]+"'>"+x[1]+"</div>";}).join("");
-}
-
 function render(){
   applyOptions();
   var m=model();
@@ -1338,7 +1366,7 @@ function render(){
   document.querySelector('a[href="#sec-plan"]').style.display=(mode==="new")?"":"none";
   document.querySelector('a[href="#sec-site"]').style.display=(mode==="new")?"":"none";
 
-  drawSite(m); drawSection(m); drawFloors(m); drawChart(m); drawMatrix(m); drawSavings(m); drawJudge(m);
+  drawSite(m); drawSection(m); drawFloors(m); drawChart(m); drawMatrix(m); drawJudge(m); drawLevers(m);
 
   if(mode==="new"){
     var ck=[
