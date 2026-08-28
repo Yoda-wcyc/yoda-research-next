@@ -71,10 +71,10 @@ header.masthead{padding-bottom:18px;margin-bottom:22px;border-bottom:2px solid v
   font-size:clamp(24px,3.6vw,34px);line-height:1.2;margin:0 0 6px;letter-spacing:-.01em;text-wrap:balance}
 .masthead p{color:var(--muted);font-size:14px;max-width:60ch;margin:0}
 
-section.block{scroll-margin-top:20px;margin-bottom:26px;
+.block{scroll-margin-top:20px;margin-bottom:26px;
   background:var(--surface);border:1px solid var(--line);border-radius:3px;
   box-shadow:var(--shadow);overflow:hidden}
-@media (max-width:900px){section.block{scroll-margin-top:86px}}
+@media (max-width:900px){.block{scroll-margin-top:86px}}
 .block-head{padding:14px 20px;border-bottom:1px solid var(--line);background:var(--surface-2)}
 .block-head h2{font-family:'Noto Serif TC',Georgia,serif;font-size:18px;font-weight:700;margin:0}
 .block-head p{font-size:12.5px;color:var(--muted);margin:3px 0 0;max-width:70ch}
@@ -323,6 +323,21 @@ label.lever input{accent-color:var(--accent);width:17px;height:17px;margin-top:2
   background:var(--surface-2);border-left:3px solid var(--accent);
   font-size:13.5px;line-height:1.7}
 .lv-sum b{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;color:var(--accent)}
+
+/* ── 可收合區塊 ── */
+details.block > summary.block-head{cursor:pointer;list-style:none;user-select:none}
+details.block > summary.block-head::-webkit-details-marker{display:none}
+details.block > summary.block-head::after{content:"";flex:none;align-self:center;margin-left:auto;
+  width:0;height:0;border-left:6px solid var(--muted);
+  border-top:5px solid transparent;border-bottom:5px solid transparent;transition:transform .18s ease}
+details.block[open] > summary.block-head::after{transform:rotate(90deg)}
+details.block > summary.block-head:hover::after{border-left-color:var(--accent)}
+details.block:not([open]) > summary.block-head{border-bottom:0}
+details.block:not([open]) > .block-body{display:none}
+.collapse-hint{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--muted);
+  letter-spacing:.06em;margin-left:10px}
+/* 卡片內的次標題（省錢開關併入方案預設） */
+.optcard > h3.sub{margin-top:6px;padding-top:14px;border-top:1px solid var(--line);border-bottom:0;padding-bottom:0}
 </style>
 </head>
 <body>
@@ -388,9 +403,9 @@ label.lever input{accent-color:var(--accent);width:17px;height:17px;margin-top:2
   </div>
 </section>
 
-<section class="block" id="sec-guide">
-  <div class="block-head"><span class="sec-num">01</span><div><h2>名詞與使用說明</h2>
-    <p>三條損益線是什麼、為什麼要看冬天、以及這張表算不出來的東西</p></div></div>
+<details class="block" id="sec-guide">
+  <summary class="block-head"><span class="sec-num">01</span><div><h2>名詞與使用說明</h2>
+    <p>三條損益線是什麼、為什麼要看冬天、以及這張表算不出來的東西<span class="collapse-hint">點此展開</span></p></div></summary>
   <div class="block-body">
     <div class="deflist">
       <div class="row"><div class="t">日商</div><div class="d">一天的營業額。這是<b>假設，不是上限</b>——兩口業務用平底鍋的物理產能超過 ¥180,000／日，所以 ¥70,000 只是保守的規劃起點。拉上面的滑桿看不同假設下的結果。</div></div>
@@ -411,7 +426,7 @@ label.lever input{accent-color:var(--accent);width:17px;height:17px;margin-top:2
       <div class="flag" data-t="ok"><b>怎麼用：</b>先按上面的方案預設載入一組，再拉「日商」和「自有資金」兩個滑桿看它怎麼翻牌。判定變紅時，直接用 <b>02 設定</b> 最上面的「省錢開關」。</div>
     </div>
   </div>
-</section>
+</details>
 
 <section class="block" id="sec-setup">
   <div class="block-head"><span class="sec-num">02</span><div><h2>設定</h2>
@@ -419,7 +434,7 @@ label.lever input{accent-color:var(--accent);width:17px;height:17px;margin-top:2
   <div class="block-body">
     <div class="optgrid">
 
-      <div class="optcard" style="grid-column:1/-1">
+      <div class="optcard" id="presetcard" style="grid-column:1/-1">
         <h3>方案預設</h3>
         <div class="presets">
           <button type="button" data-preset="usedA"><b>中古A 青葉4丁目</b>¥19.8M · 千歲駅徒歩9分</button>
@@ -429,10 +444,7 @@ label.lever input{accent-color:var(--accent);width:17px;height:17px;margin-top:2
           <button type="button" data-preset="newLease"><b>新築 2階・借地</b>不買地，事業用定期借地</button>
           <button type="button" data-preset="new3F"><b>新築 3階建て</b>延床258㎡ · 較貴</button>
         </div>
-      </div>
-
-      <div class="optcard" id="levercard" style="grid-column:1/-1">
-        <h3>省錢開關 · 勾了就立刻套用到下面所有計算</h3>
+        <h3 class="sub">省錢開關 · 勾了就立刻套用到下面所有計算</h3>
         <div class="leverbox" id="levers"></div>
       </div>
 
@@ -1546,6 +1558,12 @@ document.querySelectorAll("input, select").forEach(function(el){
 
 /* scroll-spy nav */
 (function(){
+  document.querySelectorAll("nav.sidenav a[href^='#']").forEach(function(a){
+    a.addEventListener("click",function(){
+      var t=document.getElementById(a.getAttribute("href").slice(1));
+      if(t && t.tagName==="DETAILS") t.open=true;
+    });
+  });
   var links={}, order=[];
   document.querySelectorAll("nav.sidenav a[href^='#']").forEach(function(a){
     var id=a.getAttribute("href").slice(1); links[id]=a; order.push(id);
