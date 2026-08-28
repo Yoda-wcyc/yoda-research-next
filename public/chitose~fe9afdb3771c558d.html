@@ -81,22 +81,58 @@ header.masthead{padding-bottom:18px;margin-bottom:22px;border-bottom:2px solid v
 .block-body{padding:20px}
 
 /* ── verdict ── */
-#s-verdict{border-left:6px solid var(--muted)}
-#s-verdict[data-state="ok"]{border-left-color:var(--ok)}
-#s-verdict[data-state="warn"]{border-left-color:var(--warn)}
-#s-verdict[data-state="bad"]{border-left-color:var(--bad)}
-#s-verdict[data-state="ok"] .block-body{background:var(--ok-soft)}
-#s-verdict[data-state="warn"] .block-body{background:var(--warn-soft)}
-#s-verdict[data-state="bad"] .block-body{background:var(--bad-soft)}
+#sec-hl{border-left:6px solid var(--muted);
+  transition:background-color .22s ease}
+#sec-hl[data-state="ok"]  {border-left-color:var(--ok)}
+#sec-hl[data-state="warn"]{border-left-color:var(--warn)}
+#sec-hl[data-state="bad"] {border-left-color:var(--bad)}
+/* 標題列 */
+#sec-hl[data-state="ok"]   > .block-head{background:var(--ok-soft);  border-bottom-color:var(--ok)}
+#sec-hl[data-state="warn"] > .block-head{background:var(--warn-soft);border-bottom-color:var(--warn)}
+#sec-hl[data-state="bad"]  > .block-head{background:var(--bad-soft); border-bottom-color:var(--bad)}
+#sec-hl[data-state="ok"]   .sec-num{color:var(--ok);  border-color:var(--ok);  background:transparent}
+#sec-hl[data-state="warn"] .sec-num{color:var(--warn);border-color:var(--warn);background:transparent}
+#sec-hl[data-state="bad"]  .sec-num{color:var(--bad); border-color:var(--bad); background:transparent}
+/* 內容 */
+#sec-hl[data-state="ok"]   > .block-body{background:var(--ok-soft)}
+#sec-hl[data-state="warn"] > .block-body{background:var(--warn-soft)}
+#sec-hl[data-state="bad"]  > .block-body{background:var(--bad-soft)}
+/* 標題文字染色 */
+#sec-hl[data-state="ok"]   #v-title{color:var(--ok)}
+#sec-hl[data-state="warn"] #v-title{color:var(--warn)}
+#sec-hl[data-state="bad"]  #v-title{color:var(--bad)}
+/* KPI 磚：連格線與底色一起換，才不會在染色底上浮出白盒 */
+#sec-hl[data-state="ok"]   .kpis{background:var(--ok)}
+#sec-hl[data-state="warn"] .kpis{background:var(--warn)}
+#sec-hl[data-state="bad"]  .kpis{background:var(--bad)}
+#sec-hl[data-state="ok"]   .kpis,#sec-hl[data-state="ok"]   .kpi{border-color:var(--ok)}
+#sec-hl[data-state="warn"] .kpis,#sec-hl[data-state="warn"] .kpi{border-color:var(--warn)}
+#sec-hl[data-state="bad"]  .kpis,#sec-hl[data-state="bad"]  .kpi{border-color:var(--bad)}
+#sec-hl[data-state="ok"]   .kpi{background:var(--ok-soft)}
+#sec-hl[data-state="warn"] .kpi{background:var(--warn-soft)}
+#sec-hl[data-state="bad"]  .kpi{background:var(--bad-soft)}
+/* 分隔線與滑桿 */
+#sec-hl[data-state="ok"]   .quickdial{border-top-color:var(--ok)}
+#sec-hl[data-state="warn"] .quickdial{border-top-color:var(--warn)}
+#sec-hl[data-state="bad"]  .quickdial{border-top-color:var(--bad)}
+#sec-hl[data-state="ok"]   .quickdial input[type=range]{accent-color:var(--ok)}
+#sec-hl[data-state="warn"] .quickdial input[type=range]{accent-color:var(--warn)}
+#sec-hl[data-state="bad"]  .quickdial input[type=range]{accent-color:var(--bad)}
+#sec-hl[data-state="ok"]   .quickdial label b{color:var(--ok)}
+#sec-hl[data-state="warn"] .quickdial label b{color:var(--warn)}
+#sec-hl[data-state="bad"]  .quickdial label b{color:var(--bad)}
+/* 判定徽章 */
 .verdict-tag{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:11px;
-  font-weight:600;letter-spacing:.14em;text-transform:uppercase;padding:3px 10px;
+  font-weight:600;letter-spacing:.14em;text-transform:uppercase;padding:4px 12px;
   border-radius:2px;background:var(--ink);color:var(--bg);margin-bottom:9px}
-#s-verdict[data-state="ok"] .verdict-tag{background:var(--ok);color:#fff}
-#s-verdict[data-state="warn"] .verdict-tag{background:var(--warn);color:#fff}
-#s-verdict[data-state="bad"] .verdict-tag{background:var(--bad);color:#fff}
-#v-title{font-family:'Noto Serif TC',Georgia,serif;font-size:clamp(18px,2.4vw,23px);
-  margin:0;font-weight:700;line-height:1.35;text-wrap:balance}
-#v-text{margin:9px 0 0;color:var(--ink-2);font-size:14.5px;max-width:76ch}
+#sec-hl[data-state="ok"]   .verdict-tag{background:var(--ok);color:#fff}
+#sec-hl[data-state="warn"] .verdict-tag{background:var(--warn);color:#fff}
+#sec-hl[data-state="bad"]  .verdict-tag{background:var(--bad);color:#fff}
+/* nav 的 00 也跟著亮狀態色 */
+nav.sidenav a[href="#sec-hl"] .nav-dot{transition:background .22s ease}
+body[data-verdict="ok"]   nav.sidenav a[href="#sec-hl"] .nav-dot{background:var(--ok)}
+body[data-verdict="warn"] nav.sidenav a[href="#sec-hl"] .nav-dot{background:var(--warn)}
+body[data-verdict="bad"]  nav.sidenav a[href="#sec-hl"] .nav-dot{background:var(--bad)}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:1px;
   background:var(--line);margin-top:20px;border:1px solid var(--line)}
 .kpi{background:var(--surface);padding:13px 15px}
@@ -346,6 +382,17 @@ label.lever.excl{opacity:.5}
 label.lever.excl:hover{opacity:.8}
 .lv-excl{font-size:11.5px;color:var(--bad);line-height:1.6;font-weight:700}
 .lv-warn{font-size:11.5px;color:var(--warn);line-height:1.6;font-weight:700}
+
+.presets button{position:relative}
+.presets button.active{border-color:var(--accent);border-width:2px;padding:12px 11px;
+  background:var(--accent-soft)}
+.presets button.active b{color:var(--accent)}
+.presets button.active::after{content:"● 使用中";position:absolute;top:6px;right:9px;
+  font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.06em;
+  color:var(--accent);font-weight:600}
+.presets button.active{padding-top:22px}
+.presets button.star:not(.active){border-color:var(--accent)}
+.presets button.star:not(.active) b{color:var(--accent)}
 </style>
 </head>
 <body>
@@ -397,13 +444,14 @@ label.lever.excl:hover{opacity:.8}
     <p id="v-text">—</p>
     <div class="kpis">
       <div class="kpi"><span class="k">總投資</span><span class="v num" id="k-total">—</span><span class="n" id="k-total-tw">—</span></div>
-      <div class="kpi"><span class="k">需借款</span><span class="v num" id="k-loan">—</span><span class="n" id="k-loan-m">—</span></div>
+      <div class="kpi"><span class="k">動用貸款</span><span class="v num" id="k-loan">—</span><span class="n" id="k-loan-m">—</span></div>
+      <div class="kpi" id="kpi-gap"><span class="k">資金缺口</span><span class="v num" id="k-gap">—</span><span class="n" id="k-gap-n">—</span></div>
       <div class="kpi"><span class="k">你也活線 日商</span><span class="v num" id="k-be">—</span><span class="n">含生活費與還款</span></div>
       <div class="kpi"><span class="k">設定日商</span><span class="v num" id="k-daily">—</span><span class="n" id="k-daily-gap">—</span></div>
       <div class="kpi"><span class="k">年度餘裕</span><span class="v num" id="k-slack">—</span><span class="n">營業利益減必要額</span></div>
     </div>
     <div class="quickdial">
-      <div class="qd"><label>自有資金 <b id="qd-own">—</b></label>
+      <div class="qd"><label>現金（不含貸款） <b id="qd-own">—</b></label>
         <input type="range" id="r-own" min="0" max="2500" step="10" value="500" aria-label="自有資金"></div>
       <div class="qd"><label>日商 <b id="qd-daily">—</b></label>
         <input type="range" id="r-daily" min="25000" max="160000" step="1000" value="70000" aria-label="日商"></div>
@@ -420,6 +468,9 @@ label.lever.excl:hover{opacity:.8}
       <div class="row"><div class="t">店存活線</div><div class="d">只覆蓋店的固定費與變動費。過了這條線店不會倒，<b>但你沒有薪水</b>。</div></div>
       <div class="row"><div class="t">你也活線</div><div class="d">再加上你的日本生活費、台灣的貸款月付、以及社保稅。<b>低於這條線就是每個月從存款裡拿錢補洞。</b></div></div>
       <div class="row"><div class="t">安全線</div><div class="d">再加法人年度利益。経営・管理簽證更新時會看事業是否獲利，<b>連續赤字是更新風險</b>——所以這條線不是貪心，是保簽證。</div></div>
+      <div class="row"><div class="t">現金</div><div class="d">你<b>真正拿得出來、不用還的錢</b>——存款、可變現的投資。<b>不含任何貸款。</b>這是分母，決定你要借多少。</div></div>
+      <div class="row"><div class="t">台灣可貸<br>額度上限</div><div class="d">你在台灣<b>實際借得到的天花板</b>（房產增貸＋股票質借＋信貸的合計上限）。這不是「想借多少」，是銀行願意給多少——鑑價、DBR 22倍、收入都會卡。送件前先問銀行試算。</div></div>
+      <div class="row"><div class="t">資金缺口</div><div class="d">總投資 −（現金＋可貸上限）。<b>缺口 &gt; 0 就代表這個方案的錢湊不出來</b>，跟賺不賺得回來無關——連開始都開始不了。這是最優先的否決條件，排在簽證與損益之前。</div></div>
       <div class="row"><div class="t">年度餘裕</div><div class="d">營業利益減掉「你的薪水＋社保」之後剩下的。負數代表這個組合每年短少多少。</div></div>
       <div class="row"><div class="t">居住比例</div><div class="d">住居 ÷ 總樓地板。<b>≥50% 才保得住固定資產稅的住宅用地特例</b>（土地稅額降至 1/6）。依你的確認，<b>車庫不計入居住部分</b>，只進分母。建議做到 53% 以上留邊際。</div></div>
       <div class="row"><div class="t">事業用<br>定期借地</div><div class="d">租土地、自己蓋房子，建物登記在法人名下。<b>入管的「事業所確保」要件照樣滿足。</b>省下整筆土地款，代價是每年地代與期滿的更地返還（拆屋）義務。存續期間要談到 30 年以上。</div></div>
@@ -458,7 +509,8 @@ label.lever.excl:hover{opacity:.8}
 
       <div class="optcard">
         <h3>我的錢</h3>
-        <div class="field"><label>自有資金 <span class="u">NT$萬</span></label><input type="number" id="i-own" value="500" step="10" min="0"></div>
+        <div class="field"><label>現金 <span class="u">NT$萬 · 自有，不含貸款</span></label><input type="number" id="i-own" value="500" step="10" min="0"></div>
+        <div class="field"><label>台灣可貸額度上限 <span class="u">NT$萬 · 房產增貸＋信貸</span></label><input type="number" id="i-loanCap" value="600" step="10" min="0"></div>
         <div class="field"><label>貸款利率 <span class="u">%</span></label><input type="number" id="i-rate" value="3.0" step="0.1" min="0.5" max="12"></div>
         <div class="field"><label>貸款年期 <span class="u">年</span></label><input type="number" id="i-term" value="20" step="1" min="3" max="35"></div>
         <div class="field"><label>匯率 <span class="u">JPY / TWD</span></label><input type="number" id="i-fx" value="4.7" step="0.05" min="2" max="8"></div>
@@ -704,6 +756,7 @@ var SEASON=[0.95,1.00,1.05,0.90,1.00,0.95,1.10,1.15,1.00,0.95,1.00,1.15];
 var WINTER=[1,1,1,0,0,0,0,0,0,0,1,1];
 var SNOWM =[1,1,1,0,0,0,0,0,0,0,0,1];
 var mode="new";
+var ACTIVE_PRESET=null;
 
 var INSUL={5:{res:225000,winter:260000,summer:130000},
            6:{res:250000,winter:190000,summer:125000},
@@ -919,7 +972,8 @@ function core(E){
 
 /* 給定 total 與 fixedYr，算出「你也活線」日商 */
 function beOf(total,fixedYr,fx,perD){
-  var loanTW=Math.max(0,total-v("i-own")*10000*fx)/fx;
+  var needTW=Math.max(0,total-v("i-own")*10000*fx)/fx;
+  var loanTW=Math.min(needTW,v("i-loanCap")*10000);
   var p=pmt(loanTW,v("i-rate"),v("i-term"))*fx;
   var sb=v("i-selfBurden")/100;
   var salM=sb>=1?0:(v("i-living")+p)/(1-sb);
@@ -938,8 +992,13 @@ function model(){
     m.landArea=E.landArea; m.frontage=v("i-frontage"); m.tenure=E.tenure;
     m.resArea=E.resArea; m.shopArea=E.shopArea; m.floors=E.floors;
   }
-  m.ownTW=v("i-own")*10000; m.ownJP=m.ownTW*fx;
-  m.loanJP=Math.max(0,m.total-m.ownJP); m.loanTW=m.loanJP/fx;
+  m.cashTW=v("i-own")*10000; m.cashJP=m.cashTW*fx;
+  m.ownTW=m.cashTW; m.ownJP=m.cashJP;              /* 舊名保留給矩陣使用 */
+  m.capTW=v("i-loanCap")*10000; m.capJP=m.capTW*fx;
+  m.needJP=Math.max(0,m.total-m.cashJP);           /* 現金之外還缺多少 */
+  m.loanJP=Math.min(m.needJP,m.capJP);             /* 實際借得到的 */
+  m.gapJP=m.needJP-m.loanJP;                       /* 借不到、也沒現金的部分 */
+  m.loanTW=m.loanJP/fx; m.gapTW=m.gapJP/fx; m.needTW=m.needJP/fx;
   m.pmtTW=pmt(m.loanTW,v("i-rate"),v("i-term")); m.pmtJP=m.pmtTW*fx;
 
   m.daily=v("i-daily"); m.days=v("i-days"); m.monthly=m.daily*m.days;
@@ -1049,7 +1108,7 @@ function drawLevers(m){
      "</div>";
   box.innerHTML=h;
   box.querySelectorAll("input[data-lv]").forEach(function(cb){
-    cb.addEventListener("change",function(){ setLever(cb.getAttribute("data-lv"),cb.checked); render(); });
+    cb.addEventListener("change",function(){ ACTIVE_PRESET=null; setLever(cb.getAttribute("data-lv"),cb.checked); render(); });
   });
   $("st-tenure").innerHTML = (m.tenure==="lease")
     ? "土地取得：<b>事業用定期借地</b>（由省錢開關控制）"
@@ -1306,7 +1365,12 @@ function drawJudge(m){
 
   /* 主線 */
   o+="<div class='vd-part'><h4>主線</h4><p>";
-  if(m.total<30000000){
+  if(m.gapJP>0){
+    o+="<b>錢先湊不出來。</b>總投資 "+yen(m.total)+"，你的現金 "+yen(m.cashJP)+
+       " 加上台灣可貸上限 "+yen(m.capJP)+"（NT$"+man(m.capTW/10000)+"），"+
+       "還差 <b>"+yen(m.gapJP)+"</b>。這一關跟日商多少、生意好不好完全無關——"+
+       "資金到不了位，後面所有數字都不用算。先用省錢開關把總投資壓到 "+yen(m.cashJP+m.capJP)+" 以下。";
+  }else if(m.total<30000000){
     o+="這個組合<b>過不了簽證那一關</b>。2025年10月改正後，経営・管理要求資本金 ¥30,000,000 以上，"+
        "而目前總投資只有 "+yen(m.total)+"。生意算得再漂亮，這關卡住就沒有後面——先把規模拉上來，或改走特定技能的長線。";
   }else if(gap>=m.beYou*0.12){
@@ -1383,18 +1447,21 @@ function drawMatrix(m){
   var owns=[300,500,700,900,1200,1500], you=Math.round(m.ownTW/10000);
   if(owns.indexOf(you)<0){owns.push(you);owns.sort(function(a,b){return a-b;});}
   var scen=[["保守",0.83],["基準",1.00],["強氣",1.21]];
-  var h="<thead><tr><th>自有資金</th><th>需借款</th><th>月付</th>";
+  var h="<thead><tr><th>現金</th><th>貸款／缺口</th><th>月付</th>";
   scen.forEach(function(s){h+="<th>"+s[0]+" 日商"+yen(Math.round(m.daily*s[1]))+"</th>";});
   h+="</tr></thead><tbody>";
   owns.forEach(function(o){
-    var ownJP=o*10000*m.fx, loanJP=Math.max(0,m.total-ownJP), loanTW=loanJP/m.fx;
+    var ownJP=o*10000*m.fx, needTW=Math.max(0,m.total-ownJP)/m.fx;
+    var loanTW=Math.min(needTW,m.capTW), gapTW=needTW-loanTW;
     var p=pmt(loanTW,v("i-rate"),v("i-term"))*m.fx;
     var sb=v("i-selfBurden")/100, salM=sb>=1?0:(v("i-living")+p)/(1-sb);
     var need=salM*12*(1+v("i-coBurden")/100);
     h+="<tr"+(o===you?" class='you'":"")+"><td>NT$"+o.toLocaleString("en-US")+"萬</td>"+
-       "<td class='cell'>"+(loanTW>0?("NT$"+man(loanTW/10000)):"—")+"</td>"+
+       "<td class='cell'"+(gapTW>0?" style='color:var(--bad)'":"")+">"+
+         (gapTW>0?("缺 NT$"+man(gapTW/10000)):(loanTW>0?("NT$"+man(loanTW/10000)):"—"))+"</td>"+
        "<td class='cell'>"+(p>0?yen(p):"—")+"</td>";
     scen.forEach(function(s){
+      if(gapTW>0){ h+="<td class='cell r'>湊不出錢</td>"; return; }
       var slack=(m.daily*s[1]*m.perD-m.fixedYr)-need;
       h+="<td class='cell "+(slack>=1000000?"g":(slack>=0?"y":"r"))+"'>"+sign(slack)+"</td>";
     });
@@ -1469,12 +1536,22 @@ function render(){
   m.items.forEach(function(r){cg.insertAdjacentHTML("beforeend",
     "<div>"+esc(r[0])+"</div><div>"+yen(r[1])+"</div><div>"+man(r[1]/m.fx/10000)+"</div>");});
   cg.insertAdjacentHTML("beforeend","<div class='tot'>總投資</div><div class='tot'>"+yen(m.total)+"</div><div class='tot'>"+man(m.total/m.fx/10000)+"</div>");
-  cg.insertAdjacentHTML("beforeend","<div>自有資金</div><div>"+yen(m.ownJP)+"</div><div>"+man(m.ownTW/10000)+"</div>");
-  cg.insertAdjacentHTML("beforeend","<div><b>需借款</b></div><div><b>"+yen(m.loanJP)+"</b></div><div><b>"+man(m.loanTW/10000)+"</b></div>");
+  cg.insertAdjacentHTML("beforeend","<div>① 現金（自有，不含貸款）</div><div>"+yen(m.cashJP)+"</div><div>"+man(m.cashTW/10000)+"</div>");
+  cg.insertAdjacentHTML("beforeend","<div>現金之外還缺</div><div>"+yen(m.needJP)+"</div><div>"+man(m.needTW/10000)+"</div>");
+  cg.insertAdjacentHTML("beforeend","<div>② 台灣可貸額度上限</div><div>"+yen(m.capJP)+"</div><div>"+man(m.capTW/10000)+"</div>");
+  cg.insertAdjacentHTML("beforeend","<div><b>實際動用貸款</b></div><div><b>"+yen(m.loanJP)+"</b></div><div><b>"+man(m.loanTW/10000)+"</b></div>");
   cg.insertAdjacentHTML("beforeend","<div>每月還款</div><div>"+yen(m.pmtJP)+"</div><div>NT$"+Math.round(m.pmtTW).toLocaleString("en-US")+"</div>");
+  if(m.gapJP>0) cg.insertAdjacentHTML("beforeend","<div style='color:var(--bad)'><b>③ 資金缺口（借不到）</b></div><div style='color:var(--bad)'><b>"+yen(m.gapJP)+"</b></div><div style='color:var(--bad)'><b>"+man(m.gapTW/10000)+"</b></div>");
   if(m.leaseYr>0) cg.insertAdjacentHTML("beforeend","<div>每月地代（借地）</div><div>"+yen(m.leaseYr/12)+"</div><div>—</div>");
 
   var ff=[], loanW=m.loanTW/10000;
+  if(m.gapJP>0){
+    ff.push(["bad","<b>資金缺口 "+yen(m.gapJP)+"（NT$"+man(m.gapTW/10000)+"）。</b>"+
+      "總投資 "+yen(m.total)+" 減掉現金 "+yen(m.cashJP)+"，還缺 "+yen(m.needJP)+"；"+
+      "但你設定的台灣可貸額度上限只有 NT$"+man(m.capTW/10000)+"。"+
+      "<b>這筆錢湊不出來，方案在資金面就不成立</b>——不是賺不賺得回來的問題。"+
+      "要嘛提高現金或可貸額度，要嘛用省錢開關把總投資壓到 "+yen(m.cashJP+m.capJP)+" 以下。"]);
+  }
   if(loanW>800) ff.push(["bad","<b>借款 NT$"+man(loanW)+" 超過 NT$800萬的建議上限。</b>台灣的銀行未必核得到，日商門檻也會被推到很難達成的水準。看下面的省錢清單。"]);
   else if(loanW>600) ff.push(["warn","借款 NT$"+man(loanW)+" 介於安全值（500萬）與上限（800萬）之間。可行，但沒有容錯空間。"]);
   else if(m.loanJP>0) ff.push(["ok","借款 NT$"+man(loanW)+" 在安全區間內。"]);
@@ -1528,20 +1605,26 @@ function render(){
   $("y1flags").innerHTML=y1.map(function(x){return "<div class='flag' data-t='"+x[0]+"'>"+x[1]+"</div>";}).join("");
 
   var st,tag,title,text,gap=m.daily-m.beYou;
-  if(m.total<30000000){
+  if(m.gapJP>0){
+    st="bad";tag="錢不夠";
+    title="資金缺口 "+yen(m.gapJP)+"，這個方案湊不出錢";
+    text="總投資 "+yen(m.total)+"，現金 "+yen(m.cashJP)+"，台灣可貸上限 NT$"+man(m.capTW/10000)+
+      "（"+yen(m.capJP)+"），加起來還差 "+yen(m.gapJP)+"。這一關跟賺不賺得回來無關——錢先湊不出來。"+
+      "用省錢開關把總投資壓到 "+yen(m.cashJP+m.capJP)+" 以下，或提高現金／可貸額度。";
+  }else if(m.total<30000000){
     st="bad";tag="簽證擋住";
     title="總投資低於 ¥30,000,000，這條路線撐不起経営・管理簽證";
     text="2025年10月改正後，経営・管理要求資本金 ¥30,000,000 以上、至少1名常勤員工、事業計畫須專業士確認、本人或員工 N2 日語。生意算得再漂亮，這關過不了就沒有後面。";
   }else if(gap>=m.beYou*0.12){
-    st="ok";tag="可行";
+    st="ok";tag="活得下去";
     title="日商 "+yen(m.daily)+" 高於你也活線 "+yen(m.beYou)+"，年度餘裕 "+yen(m.slack);
     text="這個組合站得住。剩下的問題不是財務，是你能不能真的每天賣到 "+yen(m.daily)+"——約 "+Math.round(m.daily/650)+"–"+Math.round(m.daily/480)+" 位客人。長都駅西側的工廠地帶午餐團訂是最穩的那一塊，先去把它談下來。";
   }else if(gap>=0){
-    st="warn";tag="勉強";
+    st="warn";tag="掙扎";
     title="日商只比你也活線高 "+yen(gap)+"，幾乎沒有容錯空間";
     text="任何一個變數往壞的方向走——客流少一成、暖房費多兩成、日圓貶值——就會翻負。到「省錢清單」把借款壓下來，或把日商目標調到 "+yen(Math.ceil(m.beSafe/1000)*1000)+"（安全線）再重算。";
   }else{
-    st="bad";tag="還差一段";
+    st="bad";tag="活不下去";
     title="日商 "+yen(m.daily)+" 低於你也活線 "+yen(m.beYou)+"，每年短少 "+yen(-m.slack);
     var needDaily=Math.ceil(m.beYou/1000)*1000;
     var needOwn=null;
@@ -1556,11 +1639,18 @@ function render(){
       "　③ 到最下面的「省錢清單」把總投資壓下來。";
   }
   $("sec-hl").setAttribute("data-state",st);
+  document.body.setAttribute("data-verdict",st);
+  document.querySelectorAll("[data-preset]").forEach(function(b){
+    b.classList.toggle("active", b.getAttribute("data-preset")===ACTIVE_PRESET);
+  });
   $("v-tag").textContent=tag; $("v-title").textContent=title; $("v-text").textContent=text;
   $("k-total").textContent=yen(m.total);
   $("k-total-tw").textContent="NT$"+man(m.total/m.fx/10000);
   $("k-loan").textContent=yen(m.loanJP);
-  $("k-loan-m").textContent=m.loanJP>0?("月付 "+yen(m.pmtJP)):"無需借款";
+  $("k-loan-m").textContent=m.loanJP>0?("月付 "+yen(m.pmtJP)+"　上限 NT$"+man(m.capTW/10000)):"無需借款";
+  $("k-gap").textContent=m.gapJP>0?("−"+yen(m.gapJP).slice(1)):"0";
+  $("k-gap").style.color=m.gapJP>0?"var(--bad)":"";
+  $("k-gap-n").textContent=m.gapJP>0?("NT$"+man(m.gapTW/10000)+" 湊不出來"):"現金＋貸款足以覆蓋";
   $("k-be").textContent=yen(m.beYou);
   $("k-daily").textContent=yen(m.daily);
   $("k-daily-gap").textContent=(gap>=0?"高於門檻 ":"低於門檻 ")+yen(Math.abs(gap));
@@ -1580,7 +1670,8 @@ $("m-new").addEventListener("click",function(){setMode("new");});
 
 document.querySelectorAll("[data-preset]").forEach(function(b){
   b.addEventListener("click",function(){
-    var p=PRESETS[b.getAttribute("data-preset")]; if(!p)return;
+    var key=b.getAttribute("data-preset"), p=PRESETS[key]; if(!p)return;
+    ACTIVE_PRESET=key;
     Object.keys(p).forEach(function(k){
       if(k==="mode"||k==="sel")return;
       var el=$("i-"+k); if(el)el.value=p[k];
@@ -1600,11 +1691,13 @@ document.querySelectorAll("[data-preset]").forEach(function(b){
 
 [["i-own","r-own"],["i-daily","r-daily"]].forEach(function(pr){
   var n=$(pr[0]),r=$(pr[1]);
-  n.addEventListener("input",function(){r.value=n.value;render();});
-  r.addEventListener("input",function(){n.value=r.value;render();});
+  n.addEventListener("input",function(){r.value=n.value;ACTIVE_PRESET=null;render();});
+  r.addEventListener("input",function(){n.value=r.value;ACTIVE_PRESET=null;render();});
 });
+function clearPreset(){ ACTIVE_PRESET=null; }
 document.querySelectorAll("input, select").forEach(function(el){
-  el.addEventListener("input",render); el.addEventListener("change",render);
+  el.addEventListener("input",function(){clearPreset();render();});
+  el.addEventListener("change",function(){clearPreset();render();});
 });
 
 /* scroll-spy nav */
