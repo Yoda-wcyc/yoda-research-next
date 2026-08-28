@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="robots" content="noindex,nofollow">
+<title>中古B 盡職調查清單</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap">
+<style>
+
+:root{
+  --bg:#EDF1F4; --surface:#FFFFFF; --surface-2:#F5F8FA;
+  --ink:#14202B; --ink-2:#3D4E5C; --muted:#66788A;
+  --line:#D3DCE3; --line-strong:#B6C3CD;
+  --accent:#B85718; --accent-2:#8C420F; --accent-soft:#F7E7D9;
+  --ok:#256F51; --ok-soft:#DCEDE5;
+  --warn:#8F6413; --warn-soft:#F6EBD3;
+  --bad:#9B3527; --bad-soft:#F7E1DD;
+  --plan-land:#DCE5EB; --plan-shop:#E0AE79; --plan-res:#B4CCBE; --plan-gar:#B9C2CB;
+  --plan-snow:#C9DAE6; --plan-rh:#EEBE93; --plan-road:#A9B6C0;
+  --plan-stall:#FFFFFF; --plan-wet:#A9C6D6; --plan-core:#D6CFC3; --plan-wall:#14202B;
+  --shadow:0 1px 2px rgba(20,32,43,.06),0 8px 24px -12px rgba(20,32,43,.18);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0C141B; --surface:#141F29; --surface-2:#19262F;
+    --ink:#E6EDF2; --ink-2:#B7C5D0; --muted:#8798A6;
+    --line:#243440; --line-strong:#374A58;
+    --accent:#EC8A44; --accent-2:#F5A96E; --accent-soft:#2B1C11;
+    --ok:#59BF93; --ok-soft:#123028;
+    --warn:#DCA847; --warn-soft:#2E2413;
+    --bad:#E97965; --bad-soft:#331A16;
+    --plan-land:#2B3D4B; --plan-shop:#8A5A30; --plan-res:#33604B; --plan-gar:#3D4B57;
+    --plan-snow:#2A4356; --plan-rh:#7A4A21; --plan-road:#151F27;
+    --plan-stall:#3A4C59; --plan-wet:#2F5468; --plan-core:#4A4438; --plan-wall:#EAF1F6;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px -14px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0C141B; --surface:#141F29; --surface-2:#19262F;
+  --ink:#E6EDF2; --ink-2:#B7C5D0; --muted:#8798A6;
+  --line:#243440; --line-strong:#374A58;
+  --accent:#EC8A44; --accent-2:#F5A96E; --accent-soft:#2B1C11;
+  --ok:#59BF93; --ok-soft:#123028;
+  --warn:#DCA847; --warn-soft:#2E2413;
+  --bad:#E97965; --bad-soft:#331A16;
+  --plan-land:#2B3D4B; --plan-shop:#8A5A30; --plan-res:#33604B; --plan-gar:#3D4B57;
+  --plan-snow:#2A4356; --plan-rh:#7A4A21; --plan-road:#151F27;
+  --plan-stall:#3A4C59; --plan-wet:#2F5468; --plan-core:#4A4438; --plan-wall:#EAF1F6;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px -14px rgba(0,0,0,.7);
+}
+
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:'Noto Sans TC',system-ui,-apple-system,sans-serif;
+  font-size:15px;line-height:1.75;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1080px;margin:0 auto;padding:26px 22px 90px}
+.num,.calc{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+
+header.mast{display:flex;flex-wrap:wrap;gap:20px 28px;align-items:flex-end;
+  padding-bottom:20px;margin-bottom:26px;border-bottom:2px solid var(--ink)}
+.mast-l{flex:1;min-width:260px}
+.eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:5px}
+.mast h1{font-family:'Noto Serif TC',Georgia,serif;font-weight:700;
+  font-size:clamp(24px,4vw,34px);line-height:1.2;margin:0 0 7px;letter-spacing:-.01em}
+.mast p{margin:0;color:var(--muted);font-size:13.5px;max-width:56ch}
+.mast-r{display:flex;flex-direction:column;gap:9px;min-width:210px}
+.prog-bar{height:9px;background:var(--surface-2);border:1px solid var(--line-strong);
+  border-radius:2px;overflow:hidden}
+.prog-bar i{display:block;height:100%;width:0;background:var(--ok);transition:width .25s ease}
+.prog-t{font-size:12px;color:var(--muted)}
+.prog-t b{font-family:'IBM Plex Mono',monospace;color:var(--ink);font-size:15px}
+.killcount{font-size:12px;color:var(--bad);font-weight:700;
+  background:var(--bad-soft);border:1px solid var(--bad);border-radius:2px;padding:6px 10px}
+.killcount b{font-family:'IBM Plex Mono',monospace;font-size:14px}
+.killcount.done{color:var(--ok);background:var(--ok-soft);border-color:var(--ok)}
+#btn-reset{padding:7px 11px;font-family:inherit;font-size:12px;cursor:pointer;
+  background:var(--surface);color:var(--muted);border:1px solid var(--line-strong);border-radius:2px}
+#btn-reset:hover{border-color:var(--bad);color:var(--bad)}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:3px;
+  box-shadow:var(--shadow);padding:20px 22px 24px;margin-bottom:22px}
+.card h2{font-family:'Noto Serif TC',Georgia,serif;font-size:19px;font-weight:700;
+  margin:0 0 14px;display:flex;align-items:center;gap:11px}
+.card h2 .n{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;
+  color:var(--accent);border:1px solid var(--accent);border-radius:2px;padding:2px 8px;flex:none}
+.card h3{font-size:15px;font-weight:700;margin:22px 0 9px}
+.card h3:first-of-type{margin-top:6px}
+.lede{margin:-6px 0 16px;font-size:13.5px;color:var(--muted);max-width:74ch}
+
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1px;
+  background:var(--line);border:1px solid var(--line);margin-bottom:14px}
+.fact{background:var(--surface-2);padding:11px 13px}
+.fact .k{display:block;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:2px}
+.fact .v{display:block;font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600}
+.fact .s{display:block;font-size:11.5px;color:var(--muted);margin-top:2px}
+
+.calc{background:var(--surface-2);border-left:3px solid var(--accent);border-radius:2px;
+  padding:14px 16px;font-size:12.5px;line-height:1.95;white-space:pre;overflow-x:auto;margin:0 0 12px}
+.note{border-left:3px solid var(--muted);background:var(--surface-2);border-radius:2px;
+  padding:11px 14px;font-size:13.5px;line-height:1.8;margin:12px 0 0}
+.note.ok{border-left-color:var(--ok);background:var(--ok-soft);color:var(--ok)}
+.note.warn{border-left-color:var(--warn);background:var(--warn-soft);color:var(--warn)}
+.note.bad{border-left-color:var(--bad);background:var(--bad-soft);color:var(--bad)}
+.note b{color:inherit;font-weight:700}
+.note a{color:inherit;font-weight:700}
+
+.item{border:1px solid var(--line-strong);border-radius:3px;margin-bottom:10px;
+  background:var(--surface);overflow:hidden}
+.item.kill{border-left:4px solid var(--bad)}
+.item.done{background:var(--ok-soft);border-color:var(--ok)}
+.item.done.kill{border-left-color:var(--ok)}
+.item-h{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:start;
+  padding:13px 15px;cursor:pointer;user-select:none}
+.item-h input{width:19px;height:19px;accent-color:var(--ok);margin-top:2px;flex:none;cursor:pointer}
+.item-t{font-size:14.5px;font-weight:700;line-height:1.6}
+.item.done .item-t{text-decoration:line-through;text-decoration-thickness:1px;opacity:.7}
+.killtag{font-family:'IBM Plex Mono',monospace;font-size:9.5px;font-weight:700;
+  letter-spacing:.08em;color:#fff;background:var(--bad);border-radius:2px;
+  padding:2px 6px;margin-right:7px;vertical-align:2px;white-space:nowrap}
+.item.done .killtag{background:var(--ok)}
+.exp{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);flex:none;
+  border:1px solid var(--line-strong);border-radius:2px;padding:2px 7px}
+.item-b{padding:0 15px 15px 46px;display:none}
+.item.open .item-b{display:block}
+.item-b dl{display:grid;grid-template-columns:max-content 1fr;gap:7px 16px;margin:0;
+  padding-top:11px;border-top:1px solid var(--line);align-items:baseline}
+.item-b dt{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+  font-weight:700;white-space:nowrap;margin:0}
+.item-b dd{margin:0;font-size:13.5px;line-height:1.8;color:var(--ink-2)}
+.item-b dd b{color:var(--ink)}
+.item-b dd.failtxt{color:var(--bad)}
+@media (max-width:560px){
+  .item-b{padding-left:15px}
+  .item-b dl{grid-template-columns:1fr;gap:2px}
+  .item-b dt{margin-top:9px}
+}
+
+.whotbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:9px 11px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+thead th{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);
+  font-weight:600;border-bottom:1.5px solid var(--line-strong);white-space:nowrap}
+td.num{text-align:right;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+th[style*="right"]{text-align:right}
+tfoot td{font-weight:700;border-top:1.5px solid var(--line-strong);border-bottom:0}
+tbody tr:hover td{background:var(--surface-2)}
+
+footer.foot{margin-top:30px;padding-top:18px;border-top:1px solid var(--line);
+  font-size:12px;color:var(--muted);line-height:1.85;max-width:84ch}
+footer.foot b{color:var(--ink-2)}
+
+@media print{
+  body{background:#fff}
+  .mast-r,#btn-reset{display:none}
+  .card{break-inside:avoid;box-shadow:none;border-color:#bbb}
+  .item-b{display:block!important}
+  .item{break-inside:avoid}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="mast">
+  <div class="mast-l">
+    <div class="eyebrow">盡職調查清單 · Due Diligence</div>
+    <h1>中古B　長都駅前1丁目</h1>
+    <p>下斡旋之前要查完的每一件事。勾選會自動存在這台裝置上，去日本可以邊看邊打勾。</p>
+  </div>
+  <div class="mast-r">
+    <div class="prog"><div class="prog-bar"><i id="pbar"></i></div>
+      <div class="prog-t"><b id="pdone">0</b> / <span id="ptotal">0</span> 已完成</div></div>
+    <div class="killcount" id="killbox">一票否決項目 <b id="killdone">0</b>/<span id="killtotal">0</span></div>
+    <button type="button" id="btn-reset">清除所有勾選</button>
+  </div>
+</header>
+
+<section class="card">
+  <h2><span class="n">A</span>物件事實</h2>
+  <div class="facts">
+    <div class="fact"><span class="k">所在</span><span class="v">千歲市 長都駅前1丁目</span></div>
+    <div class="fact"><span class="k">價格</span><span class="v">¥28,400,000</span><span class="s">≈ NT$604萬</span></div>
+    <div class="fact"><span class="k">交通</span><span class="v">JR千歲線 長都駅 徒歩7分</span></div>
+    <div class="fact"><span class="k">土地</span><span class="v">252.44㎡</span><span class="s">約 76.4 坪</span></div>
+    <div class="fact"><span class="k">建物</span><span class="v">137.62㎡</span><span class="s">約 41.6 坪</span></div>
+    <div class="fact"><span class="k">格局</span><span class="v">2LDK</span><span class="s">隔間少＝好改店舖</span></div>
+    <div class="fact"><span class="k">屋齡</span><span class="v">2003年12月築</span><span class="s">23年・新耐震</span></div>
+    <div class="fact"><span class="k">設備</span><span class="v">オール電化</span><span class="s">⚠ 見 C-2</span></div>
+  </div>
+  <div class="note ok"><b>先講這物件的三個優點：</b>① 2003年築＝耐震與斷熱都在好世代（1981年新耐震之後、2000年基準之後）② 2LDK 卻有 137.62㎡＝隔間少、大空間，切出獨立廚房容易 ③ 長都駅徒歩7分，西側工廠地帶與ちとせモール都在生活圈內。</div>
+</section>
+
+<section class="card">
+  <h2><span class="n">B</span>我先幫你算出來的兩個問題</h2>
+
+  <h3>B-1　停車位不夠，除非私家車停外面</h3>
+  <div class="calc">土地 252.44㎡
+  − 建物 footprint（2階建て推估）      約 75㎡
+  − 雪置場（敷地 15%，北海道必留）     約 38㎡
+  − 玄關動線                           約 20㎡
+  ─────────────────────────────────
+  可停車面積                          約 119㎡
+       ↓ 每台含通路約 21㎡
+  夏季 5 台 ／ 冬季 4 台（積雪後約 72%）
+
+  你有 3 台私家車：
+    停自家露天 → 客用冬季剩 1 台   ✗ 外帶店不可能靠 1 個車位活
+    租月極     → 客用冬季 4 台     ○ 一年約 ¥162,000</div>
+  <div class="note bad"><b>結論：這個物件成立的前提是「私家車全部租月極」。</b>看屋時務必實地確認能停幾台、雪堆去哪，並問清楚附近月極停車場的空位與行情。</div>
+
+  <h3>B-2　價格可能偏高，這是你的議價材料</h3>
+  <div class="calc">土地 252.44㎡ × 長都實勢推估 ¥48,000/㎡  ≈ ¥12,100,000
+  （長都駅 公示地價 ¥41,133/㎡，實勢通常高於公示）
+
+  ¥28,400,000 − ¥12,100,000 = ¥16,300,000  ← 這是建物被算的價
+                ÷ 137.62㎡ = 約 ¥118,000/㎡
+
+  但：木造 23 年，新築同級約 ¥200,000–250,000/㎡，
+      23 年後合理殘存約 20–30% → ¥40,000–75,000/㎡</div>
+  <div class="note warn"><b>建物部分看起來高了 ¥600–1,000萬。</b>三種可能：① 屋況特別好或有大規模翻修 ② 「長都駅前」的立地溢價 ③ 就是開高等你殺。<b>看屋時要問到答案，這決定你能砍多少。</b>（此為推估，須以實際謄本、固定資產評價證明與同區成交比對為準）</div>
+</section>
+
+<section class="card">
+  <h2><span class="n">C</span>階段一　不用出國，先在台灣查完</h2>
+  <p class="lede">這一階段有<b>四個一票否決項目</b>。任何一項不過，就不用飛日本了——先做這個，省一趟機票。</p>
+  <div id="stage1"></div>
+</section>
+
+<section class="card">
+  <h2><span class="n">D</span>階段二　現地看屋（去兩次，冬夏各一）</h2>
+  <p class="lede">只看夏天會被騙。<b>11月或1月一定要去一次</b>，那才是這門生意真正的考場。</p>
+  <div id="stage2"></div>
+</section>
+
+<section class="card">
+  <h2><span class="n">E</span>階段三　下斡旋前的最後確認</h2>
+  <p class="lede">錢還沒付出去之前，最後一次把關。<b>E-1 的特約條款是保命用的，沒有它不要簽。</b></p>
+  <div id="stage3"></div>
+</section>
+
+<section class="card">
+  <h2><span class="n">F</span>問問題的對象與怎麼問</h2>
+  <div class="whotbl">
+    <table>
+      <thead><tr><th>要查什麼</th><th>找誰</th><th>怎麼問</th></tr></thead>
+      <tbody>
+        <tr><td>用途地域・建蔽容積</td><td>千歲市役所<br>都市計画課</td><td>線上先查「ちとせまるごとマップ」，再電話確認。也可申請「用途地域等証明」</td></tr>
+        <tr><td>飲食店營業許可的可行性</td><td>千歲市<br>保健所</td><td><b>帶平面圖去做「事前相談」</b>。這是免費的，而且是全流程最重要的一次會面</td></tr>
+        <tr><td>消防設備要求</td><td>千歲市<br>消防本部</td><td>說明「1樓要做飲食店、樓上住人」，問需要哪些設備與屆出</td></tr>
+        <tr><td>固定資產稅（店舖化後）</td><td>千歲市役所<br>稅務課</td><td>問住宅用地特例會不會失效、居住比例怎麼算</td></tr>
+        <tr><td>除雪路線等級</td><td>千歲市役所<br>建設課</td><td>問這條路是不是優先除雪路線、幾點會除到</td></tr>
+        <tr><td>重要土地等調査法</td><td>內閣府 指定區域圖</td><td>北千歲駐屯地在附近，先確認有無落在注視／特別注視區域</td></tr>
+        <tr><td>電力容量與動力引込</td><td>北海道電力</td><td>問現況契約容量、增設三相200V的可行性與費用</td></tr>
+        <tr><td>上下水道</td><td>千歲市 水道局</td><td>確認公共下水道已接、口徑夠不夠營業用</td></tr>
+        <tr><td>物件本身的一切</td><td>不動產仲介</td><td>要求提供：謄本、公図、固定資產評價證明、去年一整年水電實績、修繕履歷</td></tr>
+        <tr><td>簽證可行性</td><td>行政書士</td><td><b>這是你真正的第一步</b>，費用約 ¥30,000–50,000</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <h2><span class="n">G</span>如果全部通過，錢長這樣</h2>
+  <div class="whotbl">
+    <table>
+      <thead><tr><th>項目</th><th style="text-align:right">金額</th><th style="text-align:right">台幣</th></tr></thead>
+      <tbody>
+        <tr><td>物件價格</td><td class="num">¥28,400,000</td><td class="num">604萬</td></tr>
+        <tr><td>取得諸費用（仲介・登記・不動產取得稅・保險）</td><td class="num">¥2,000,000</td><td class="num">43萬</td></tr>
+        <tr><td>改裝工事（住居／營業區劃・廚房・排氣・グリストラップ）</td><td class="num">¥7,900,000</td><td class="num">168萬</td></tr>
+        <tr><td>廚房設備（中古混用）</td><td class="num">¥2,100,000</td><td class="num">45萬</td></tr>
+        <tr><td>運轉資金（第一年燒錢）</td><td class="num">¥4,500,000</td><td class="num">96萬</td></tr>
+      </tbody>
+      <tfoot><tr><td><b>合計</b></td><td class="num"><b>¥44,900,000</b></td><td class="num"><b>955萬</b></td></tr></tfoot>
+    </table>
+  </div>
+  <div class="note ok">以你現金 NT$500萬＋可貸上限 NT$600萬 計，<b>這個方案的錢湊得出來</b>（借 NT$455萬，在安全區間內）。日商門檻約 ¥67,000–68,000。<br>
+  <a href="./chitose~fe9afdb3771c558d.html">→ 回試算盤按「中古B」預設看完整數字</a></div>
+  <div class="note warn"><b>但別忘了簽證那一關：</b>總投資 ¥44,900,000 已跨過 経営・管理 的 ¥30,000,000 資本金門檻，但資本金必須<b>真的投入事業並保全通帳全履歷</b>，否則會被認定為「見せ金」。</div>
+</section>
+
+<footer class="foot">
+  <b>使用說明。</b>勾選狀態存在你這台裝置的瀏覽器裡，換裝置或清除瀏覽資料會消失。可用瀏覽器的列印功能存成 PDF 帶著走。<br>
+  <b>限制。</b>本清單的價格分析、停車位試算、建物殘值推估均為<b>依公開資訊所做的推估</b>，非鑑價。物件資訊擷取自公開掛牌（2026年8月），在庫與價格隨時變動。用途地域、保健所與消防要求須逐案向千歲市役所、保健所、消防署確認。<b>本清單為規劃用工具，不構成法律、稅務或投資建議。</b>
+</footer>
+</div>
+
+<script>
+/* 盡職調查項目。kill=一票否決；why=為什麼重要；fail=不合格會怎樣 */
+var ITEMS = {
+stage1: [
+ {id:"s1a", kill:1, t:"用途地域是什麼？能不能開飲食店？",
+  who:"千歲市役所 都市計画課 ／ ちとせまるごとマップ",
+  why:"這是整件事的第一道門。用途地域決定你能不能在這棟房子裡賣吃的、能開多大。",
+  ok:"第二種住居／準住居／近隣商業＝寬鬆　第一種中高層住居専用＝可（≤500㎡·2階以下）",
+  fail:"若是<b>第一種低層住居専用地域</b>，店舖只能 ≤50㎡ 且 <總樓地板1/2——52㎡ 的店舖規劃要重做。若完全不許可，這物件直接出局。"},
+ {id:"s1b", kill:1, t:"是市街化区域嗎？地目是宅地嗎？",
+  who:"謄本 ／ 都市計画課",
+  why:"市街化調整区域原則不可增改建與用途變更；地目若是田／畑，還要過農地法。",
+  ok:"市街化区域 ＋ 地目「宅地」",
+  fail:"調整区域或農地＝<b>這物件不能改成店舖</b>，直接出局。長都駅前應為市街化区域，但一定要親自確認，不要相信仲介口頭說法。"},
+ {id:"s1c", kill:1, t:"公共下水道接了嗎？是自來水還是井水？",
+  who:"千歲市 水道局 ／ 仲介",
+  why:"飲食店排水要接下水道並裝油脂分離槽；若用井水，保健所要求每年 26 項目水質檢驗。",
+  ok:"公共下水道已接 ＋ 自來水",
+  fail:"淨化槽＝要換更大的（¥100–200萬）；<b>井水＝強烈建議直接放棄</b>，每年檢驗成本與不合格風險都高。"},
+ {id:"s1d", kill:1, t:"重要土地等調査法的指定區域嗎？",
+  who:"內閣府 指定區域圖",
+  why:"北千歲駐屯地在附近。若落在特別注視區域，200㎡ 以上的買賣須事前申報。",
+  ok:"不在區域內，或在注視區域（僅需留意）",
+  fail:"不是禁止外國人買，但<b>漏辦有罰則且會延誤交屋</b>。落在特別注視區域就要提前告知仲介與司法書士，把申報時程算進去。"},
+ {id:"s1e", t:"建蔽率／容積率是多少？現況有沒有超建？",
+  who:"謄本 ／ 都市計画課",
+  why:"若現況已超建（既存不適格），改裝與融資都會出問題。",
+  ok:"建蔽 60%／容積 200%，且現況在範圍內",
+  fail:"既存不適格的物件，銀行融資與用途變更都可能卡住。"},
+ {id:"s1f", t:"前面道路寬度幾米？接道長度夠嗎？",
+  who:"謄本・公図 ／ 仲介",
+  why:"消防與保健所都會看接道；太窄會影響營業許可與消防車進出。",
+  ok:"幅員 4m 以上（6m 以上更好），接道 2m 以上",
+  fail:"接道不足會直接卡住營業許可。"},
+ {id:"s1g", t:"這條路是市府的優先除雪路線嗎？",
+  who:"千歲市役所 建設課",
+  why:"北海道的生活道路可能中午才除到雪。",
+  ok:"幹線或優先除雪路線",
+  fail:"<b>非優先路線＝冬天早上客人開不進來</b>，冬季營收要再打折。這條很容易被忽略，但對外帶店是生死問題。"},
+ {id:"s1h", t:"航空機騒音區域嗎？",
+  who:"千歲市役所",
+  why:"新千歲空港與自衛隊基地在附近，部分區域有建築限制與噪音。",
+  ok:"不在區域內",
+  fail:"有建築限制的話會影響改裝；噪音則影響住居品質（你要住 30 年）。"},
+ {id:"s1i", t:"現況的固定資產稅是多少？改成店舖後會變多少？",
+  who:"仲介（固定資產評價證明）＋ 千歲市役所 稅務課",
+  why:"住宅用地特例（土地稅額 1/6）在店舖化後可能失效。",
+  ok:"居住部分 ≥ 總樓地板 1/2，特例保留",
+  fail:"特例失效每年多繳數十萬日圓。<b>137.62㎡ 裡切 52㎡ 給店舖＝居住 62%，應該安全</b>，但要書面確認。"},
+ {id:"s1j", t:"要求仲介提供：謄本、公図、固定資產評價證明、修繕履歷",
+  who:"不動產仲介",
+  why:"沒有這些文件，上面每一項都只是口頭說法。",
+  ok:"全部拿到紙本或 PDF",
+  fail:"仲介不願提供＝警訊，考慮換一家或放棄這件。"}
+],
+stage2: [
+ {id:"s2a", kill:1, t:"★ 去年一整年的電費明細（12個月）",
+  who:"仲介 → 屋主",
+  why:"這是 <b>オール電化</b> 物件，2003年築很可能是蓄熱式暖房機。北海道全電化住宅冬季電費常見 ¥30,000–50,000／月，而你還要再加營業用電。",
+  ok:"拿到 12 個月實際帳單，冬季在可接受範圍",
+  fail:"<b>只給你「平均」或「大概」就是紅旗。</b>冬季電費若遠高於試算的 ¥190,000／月（含營業），12個月現金流會多出好幾個赤字月。這是這個物件最大的財務未知數。"},
+ {id:"s2b", kill:1, t:"能不能引三相200V動力電？容量夠嗎？費用多少？",
+  who:"北海道電力 ／ 電氣工事店",
+  why:"營業用冷凍庫、製麵機、排氣設備需要動力電。オール電化住宅通常是單相。",
+  ok:"可增設，費用在 ¥200,000–500,000 內",
+  fail:"若引込困難或費用暴增，改裝預算要大幅上修。"},
+ {id:"s2c", t:"給湯能力夠營業用嗎？熱水器幾年了？",
+  who:"現場確認 ／ 仲介",
+  why:"家用電熱水器供不上飲食店的洗滌需求；且熱水器與蓄暖壽命約 15–20 年，2003年築已達更新期。",
+  ok:"能力足夠，或已知更新費用並列入預算",
+  fail:"エコキュート更新約 ¥400,000–600,000、蓄暖每台 ¥300,000–500,000。這是<b>看不見但一定會來的支出</b>，也是議價材料。"},
+ {id:"s2d", kill:1, t:"2LDK 的格局，能不能切出「住居與營業完全分離」？",
+  who:"帶設計師或工務店一起看 ／ 保健所事前相談",
+  why:"保健所要求家用廚房不可兼作營業廚房，兩區必須物理分離、各自有出入口。",
+  ok:"現況格局能切出獨立 52㎡ 店舖＋獨立出入口",
+  fail:"<b>這是中古改裝路線最貴、也最可能失敗的一項。</b>切不出來就拿不到營業許可，整件事結束。137.62㎡ 的 2LDK 大空間對這一項是有利的，但要現場確認承重牆位置。"},
+ {id:"s2e", t:"排氣管道能不能拉到室外？路徑在哪？",
+  who:"工務店 ／ 現場",
+  why:"廚房排氣（含牛肉鍋與煎炸）需要獨立管道通到室外，且不能影響鄰居。",
+  ok:"有可行路徑，且不影響住居與鄰地",
+  fail:"排氣做不好＝油煙留在店內、鄰居投訴、產品品質下降。這是「不要省」的項目之一。"},
+ {id:"s2f", t:"屋外有沒有空間裝油脂分離槽（グリストラップ）？",
+  who:"現場",
+  why:"飲食店排水必備。",
+  ok:"屋外有 1–2㎡ 可施工空間且能接下水道",
+  fail:"沒空間就要在屋內做，動線與成本都變差。"},
+ {id:"s2g", kill:1, t:"★ 實地數車位：夏天能停幾台？雪堆去哪？",
+  who:"現場（冬天那次特別重要）",
+  why:"我試算是夏 5 台／冬 4 台，但實際受基地形狀、出入口位置影響很大。",
+  ok:"冬季至少 4 台可用，且雪有地方堆",
+  fail:"<b>冬季客用車位低於 3 台，這個物件對外帶店就不成立。</b>同時要問附近月極停車場的空位與價格（你有 3 台私家車要停出去）。"},
+ {id:"s2h", t:"附近月極停車場：有空位嗎？多少錢？走幾分鐘？",
+  who:"現場走一圈 ／ 在地不動產",
+  why:"你的 3 台私家車必須停外面，客用車位才夠。",
+  ok:"步行 5 分內有空位，¥4,000–6,000／台／月",
+  fail:"沒空位或太遠＝私家車只能停自家，客用車位剩 1 台。"},
+ {id:"s2i", kill:1, t:"★ 平日中午去駅西側工廠地帶，看有沒有午餐人流",
+  who:"你自己，站在那裡看",
+  why:"B2B 午餐團訂是這門生意最穩的一塊，整個營收假設建立在它上面。",
+  ok:"看得到人、看得到現有的便當車或食堂在做生意",
+  fail:"<b>若中午沒人、或大家都自帶便當／有員工食堂，B2B 這條線不成立</b>，日商假設要整個下修。這一項比任何法規都更決定生意成敗。"},
+ {id:"s2j", t:"ちとせモール 的歸途動線：客人回家會經過這裡嗎？",
+  who:"現場，傍晚時段",
+  why:"買完菜回家順手買晚餐，是這家店的第二大客源。",
+  ok:"在主要歸宅方向的路徑上",
+  fail:"若在反方向，家庭客這一塊要打折。"},
+ {id:"s2k", t:"建物狀態：漏水痕跡、外牆裂縫、屋頂形式、基礎",
+  who:"現場 ／ 建物檢查（ホームインスペクション）",
+  why:"2003年築算年輕，但北海道的凍融循環對外牆與基礎很傷。",
+  ok:"無漏水痕、無明顯裂縫、無落雪屋根或有足夠落雪空間",
+  fail:"建議花 ¥50,000–100,000 請專業做建物檢查，比事後發現便宜太多。"},
+ {id:"s2l", t:"★ 冬天那一趟：雪積多高？路好開嗎？店門口會不會被雪封？",
+  who:"你自己，11月或1月",
+  why:"只看夏天完全不知道冬天長什麼樣。",
+  ok:"路有除雪、門口有地方堆雪、車進得來",
+  fail:"這一趟是整個計畫最重要的實地驗證。<b>看了冬天還想做，才是真的想做。</b>"}
+],
+stage3: [
+ {id:"s3a", kill:1, t:"★ 契約書加入「取得不到飲食店營業許可時無條件解約」特約",
+  who:"仲介 ／ 司法書士",
+  why:"你買這棟房子的唯一理由是開店。如果最後開不成，這筆錢不能被套住。",
+  ok:"白紙解約條款寫進契約，手付金全額退還",
+  fail:"<b>沒有這一條不要簽。</b>日本的不動產契約可以載明許認可特約與融資特約，這是標準做法，仲介應該熟悉。"},
+ {id:"s3b", kill:1, t:"保健所事前相談：帶著改裝平面圖去談過了嗎？",
+  who:"千歲市保健所",
+  why:"這是免費的，而且是全流程最重要的一次會面——他們會直接告訴你這個格局行不行。",
+  ok:"保健所口頭確認「照這個圖做應該可以」",
+  fail:"沒談過就簽約，等於賭運氣。<b>務必在下斡旋之前談。</b>"},
+ {id:"s3c", t:"消防署確認：需要哪些設備？要辦哪些屆出？",
+  who:"千歲市消防本部",
+  why:"住宅＋飲食店＝複合用途防火對象物，設備要求與純住宅不同。",
+  ok:"清單拿到手，費用列進改裝預算",
+  fail:"事後才發現要裝自動火災報知設備，預算會爆。"},
+ {id:"s3d", t:"融資特約：台灣端的資金如果沒到位，能不能解約？",
+  who:"仲介",
+  why:"你的資金來自台灣的房產增貸，核貸有不確定性。",
+  ok:"融資特約寫進契約",
+  fail:"資金沒下來卻不能解約，手付金會被沒收。"},
+ {id:"s3e", t:"契約不適合責任（瑕疵擔保）的範圍與期間？",
+  who:"仲介 ／ 司法書士",
+  why:"中古屋交屋後才發現漏水、白蟻、設備故障，誰負責。",
+  ok:"至少涵蓋雨漏・白蟻・主要設備，期間 3 個月以上",
+  fail:"「現況有姿有姿」（現況交付、免責）代表所有問題你自己吞。"},
+ {id:"s3f", t:"改裝工事：至少拿三家工務店的正式見積",
+  who:"在地工務店",
+  why:"我試算的 ¥7,900,000 是推估，實際可能差 ±15%。",
+  ok:"三家見積，項目可比對",
+  fail:"只拿一家等於沒有議價，也不知道有沒有漏項。"},
+ {id:"s3g", kill:1, t:"★ 行政書士的経営・管理可行性判定",
+  who:"日本行政書士（費用約 ¥30,000–50,000）",
+  why:"就算房子完美，簽證過不了也是零。",
+  ok:"行政書士判定「以這個規模與計畫，有機會通過」",
+  fail:"<b>這關沒過，上面全部不用做。</b>嚴格說這一項應該排在最前面——先花 ¥50,000 問清楚，再花 ¥28,400,000 買房。"},
+ {id:"s3h", t:"法人設立與銀行帳戶：確認開得了戶",
+  who:"日本司法書士 ／ 銀行",
+  why:"資本金要匯進法人帳戶，但非居住者代表的法人開戶常被拒。",
+  ok:"確認有可行路徑（在住協力者掛董事，或先取得在留資格）",
+  fail:"開不了戶＝資本金匯不進去＝整條線停住。"},
+ {id:"s3i", t:"台灣端：房產增貸的正式核貸額度下來了嗎？",
+  who:"台灣的銀行",
+  why:"整個資金結構建立在「可貸上限」這個數字上，那是最容易高估的一格。",
+  ok:"銀行給出書面核貸額度",
+  fail:"口頭試算與實際核貸常有落差。<b>核貸下來之前不要下斡旋。</b>"}
+]
+};
+
+(function(){
+"use strict";
+var KEY="chitose-dd-usedB-v1", state={};
+try{ state=JSON.parse(localStorage.getItem(KEY)||"{}")||{}; }catch(e){ state={}; }
+function save(){ try{ localStorage.setItem(KEY,JSON.stringify(state)); }catch(e){} }
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+
+var all=[];
+function render(listId,arr){
+  var box=document.getElementById(listId); if(!box) return;
+  box.innerHTML=arr.map(function(it){
+    var done=!!state[it.id];
+    return "<div class='item"+(it.kill?" kill":"")+(done?" done":"")+"' data-id='"+it.id+"'>"+
+      "<div class='item-h'>"+
+        "<input type='checkbox' data-cb='"+it.id+"'"+(done?" checked":"")+">"+
+        "<div class='item-t'>"+(it.kill?"<span class='killtag'>一票否決</span>":"")+esc(it.t)+"</div>"+
+        "<span class='exp'>詳細</span>"+
+      "</div>"+
+      "<div class='item-b'><dl>"+
+        "<dt>問誰</dt><dd>"+it.who+"</dd>"+
+        "<dt>為什麼重要</dt><dd>"+it.why+"</dd>"+
+        "<dt>什麼算過關</dt><dd>"+it.ok+"</dd>"+
+        "<dt>不過關會怎樣</dt><dd class='failtxt'>"+it.fail+"</dd>"+
+      "</dl></div></div>";
+  }).join("");
+}
+["stage1","stage2","stage3"].forEach(function(k){ render(k,ITEMS[k]); all=all.concat(ITEMS[k]); });
+
+function tally(){
+  var done=0,kd=0,kt=0;
+  all.forEach(function(it){
+    if(state[it.id]) done++;
+    if(it.kill){ kt++; if(state[it.id]) kd++; }
+  });
+  document.getElementById("pdone").textContent=done;
+  document.getElementById("ptotal").textContent=all.length;
+  document.getElementById("pbar").style.width=(all.length?done/all.length*100:0).toFixed(1)+"%";
+  document.getElementById("killdone").textContent=kd;
+  document.getElementById("killtotal").textContent=kt;
+  document.getElementById("killbox").classList.toggle("done",kd===kt&&kt>0);
+}
+
+document.addEventListener("click",function(e){
+  var cb=e.target.closest?e.target.closest("input[data-cb]"):null;
+  if(cb){
+    state[cb.getAttribute("data-cb")]=cb.checked; save();
+    cb.closest(".item").classList.toggle("done",cb.checked); tally();
+    e.stopPropagation(); return;
+  }
+  var h=e.target.closest?e.target.closest(".item-h"):null;
+  if(h) h.parentNode.classList.toggle("open");
+});
+document.getElementById("btn-reset").addEventListener("click",function(){
+  if(!confirm("清除所有勾選？這個動作無法復原。")) return;
+  state={}; save();
+  ["stage1","stage2","stage3"].forEach(function(k){ render(k,ITEMS[k]); });
+  tally();
+});
+tally();
+})();
+
+</script>
+</body>
+</html>
