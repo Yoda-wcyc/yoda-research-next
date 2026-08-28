@@ -1,0 +1,1195 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="千歲市長都・外帶店開店試算工具">
+<title>千歲開店試算盤</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap">
+
+<style>
+:root{
+  --bg:#EDF1F4; --surface:#FFFFFF; --surface-2:#F5F8FA;
+  --ink:#14202B; --ink-2:#3D4E5C; --muted:#66788A;
+  --line:#D3DCE3; --line-strong:#B6C3CD;
+  --accent:#B85718; --accent-2:#8C420F; --accent-soft:#F7E7D9;
+  --ok:#256F51; --ok-soft:#DCEDE5;
+  --warn:#8F6413; --warn-soft:#F6EBD3;
+  --bad:#9B3527; --bad-soft:#F7E1DD;
+  --plan-land:#DCE5EB; --plan-shop:#E0AE79; --plan-res:#B4CCBE; --plan-gar:#B9C2CB;
+  --plan-snow:#C9DAE6; --plan-rh:#EEBE93; --plan-road:#A9B6C0;
+  --plan-stall:#FFFFFF; --plan-wet:#A9C6D6; --plan-core:#D6CFC3; --plan-wall:#14202B;
+  --shadow:0 1px 2px rgba(20,32,43,.06),0 8px 24px -12px rgba(20,32,43,.18);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0C141B; --surface:#141F29; --surface-2:#19262F;
+    --ink:#E6EDF2; --ink-2:#B7C5D0; --muted:#8798A6;
+    --line:#243440; --line-strong:#374A58;
+    --accent:#EC8A44; --accent-2:#F5A96E; --accent-soft:#2B1C11;
+    --ok:#59BF93; --ok-soft:#123028;
+    --warn:#DCA847; --warn-soft:#2E2413;
+    --bad:#E97965; --bad-soft:#331A16;
+    --plan-land:#2B3D4B; --plan-shop:#8A5A30; --plan-res:#33604B; --plan-gar:#3D4B57;
+    --plan-snow:#2A4356; --plan-rh:#7A4A21; --plan-road:#151F27;
+    --plan-stall:#3A4C59; --plan-wet:#2F5468; --plan-core:#4A4438; --plan-wall:#EAF1F6;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px -14px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0C141B; --surface:#141F29; --surface-2:#19262F;
+  --ink:#E6EDF2; --ink-2:#B7C5D0; --muted:#8798A6;
+  --line:#243440; --line-strong:#374A58;
+  --accent:#EC8A44; --accent-2:#F5A96E; --accent-soft:#2B1C11;
+  --ok:#59BF93; --ok-soft:#123028;
+  --warn:#DCA847; --warn-soft:#2E2413;
+  --bad:#E97965; --bad-soft:#331A16;
+  --plan-land:#2B3D4B; --plan-shop:#8A5A30; --plan-res:#33604B; --plan-gar:#3D4B57;
+  --plan-snow:#2A4356; --plan-rh:#7A4A21; --plan-road:#151F27;
+  --plan-stall:#3A4C59; --plan-wet:#2F5468; --plan-core:#4A4438; --plan-wall:#EAF1F6;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px -14px rgba(0,0,0,.7);
+}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:'Noto Sans TC',system-ui,-apple-system,sans-serif;
+  font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased}
+.num{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.wrap{max-width:1360px;margin:0 auto;padding:28px 20px 80px}
+
+header.masthead{display:flex;flex-wrap:wrap;align-items:flex-end;gap:16px 28px;
+  padding-bottom:20px;margin-bottom:22px;border-bottom:2px solid var(--ink)}
+.masthead h1{font-family:'Noto Serif TC',Georgia,serif;font-weight:700;
+  font-size:clamp(26px,4vw,38px);line-height:1.15;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.masthead .sub{color:var(--muted);font-size:14px;max-width:54ch;margin:0}
+.masthead .stamp{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:right;line-height:1.7}
+
+.verdict{border:1px solid var(--line);border-left:6px solid var(--muted);
+  background:var(--surface);border-radius:3px;box-shadow:var(--shadow);padding:20px 22px;margin-bottom:24px}
+.verdict[data-state="ok"]{border-left-color:var(--ok);background:var(--ok-soft)}
+.verdict[data-state="warn"]{border-left-color:var(--warn);background:var(--warn-soft)}
+.verdict[data-state="bad"]{border-left-color:var(--bad);background:var(--bad-soft)}
+.verdict-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px 16px;margin-bottom:6px}
+.verdict-tag{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;
+  letter-spacing:.14em;text-transform:uppercase;padding:3px 9px;border-radius:2px;
+  background:var(--ink);color:var(--bg)}
+.verdict[data-state="ok"] .verdict-tag{background:var(--ok);color:#fff}
+.verdict[data-state="warn"] .verdict-tag{background:var(--warn);color:#fff}
+.verdict[data-state="bad"] .verdict-tag{background:var(--bad);color:#fff}
+.verdict h2{font-family:'Noto Serif TC',Georgia,serif;font-size:clamp(19px,2.6vw,25px);
+  margin:0;font-weight:700;line-height:1.3;text-wrap:balance}
+.verdict p{margin:8px 0 0;color:var(--ink-2);font-size:14.5px;max-width:76ch}
+.verdict-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:1px;background:var(--line);margin-top:18px;border:1px solid var(--line)}
+.kpi{background:var(--surface);padding:12px 14px}
+.verdict[data-state="ok"] .kpi{background:var(--ok-soft)}
+.verdict[data-state="warn"] .kpi{background:var(--warn-soft)}
+.verdict[data-state="bad"] .kpi{background:var(--bad-soft)}
+.kpi .k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);
+  font-weight:500;display:block;margin-bottom:3px}
+.kpi .v{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;
+  font-size:20px;font-weight:600;line-height:1.2;display:block}
+.kpi .n{font-size:11.5px;color:var(--muted);display:block;margin-top:2px}
+
+.split{display:grid;grid-template-columns:344px minmax(0,1fr);gap:24px;align-items:start}
+@media (max-width:1020px){.split{grid-template-columns:1fr}}
+.rail{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow-y:auto;
+  display:flex;flex-direction:column;gap:12px;padding-right:4px}
+@media (max-width:1020px){.rail{position:static;max-height:none;overflow:visible}}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:3px;
+  box-shadow:var(--shadow);overflow:hidden}
+.panel > summary{list-style:none;cursor:pointer;padding:11px 14px;display:flex;align-items:center;
+  gap:9px;font-weight:700;font-size:13.5px;background:var(--surface-2);
+  border-bottom:1px solid transparent;user-select:none}
+.panel[open] > summary{border-bottom-color:var(--line)}
+.panel > summary::-webkit-details-marker{display:none}
+.panel > summary::before{content:"";width:0;height:0;border-left:5px solid var(--muted);
+  border-top:4px solid transparent;border-bottom:4px solid transparent;
+  transition:transform .18s ease;flex:none}
+.panel[open] > summary::before{transform:rotate(90deg)}
+.panel > summary .hint{margin-left:auto;font-weight:400;font-size:11px;color:var(--muted);
+  font-family:'IBM Plex Mono',monospace}
+.panel-body{padding:13px 14px 15px;display:flex;flex-direction:column;gap:11px}
+
+.field{display:grid;grid-template-columns:1fr auto;gap:3px 8px;align-items:baseline}
+.field > label{font-size:12.5px;color:var(--ink-2);line-height:1.35}
+.field > label .u{color:var(--muted);font-size:11px}
+.field input[type="number"]{grid-column:2;width:104px;padding:5px 7px;text-align:right;
+  font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px;
+  background:var(--surface-2);color:var(--ink);border:1px solid var(--line-strong);border-radius:2px}
+.field input[type="range"]{grid-column:1 / -1;width:100%;accent-color:var(--accent);margin:2px 0 0}
+.field select{grid-column:1 / -1;width:100%;padding:6px 8px;font-family:inherit;font-size:13px;
+  background:var(--surface-2);color:var(--ink);border:1px solid var(--line-strong);border-radius:2px}
+.field.wide{grid-template-columns:1fr}
+.field input:focus-visible,.field select:focus-visible,button:focus-visible{
+  outline:2px solid var(--accent);outline-offset:1px}
+.subhead{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+  font-weight:700;margin:4px 0 -2px;padding-top:6px;border-top:1px solid var(--line)}
+.subhead:first-child{border-top:0;padding-top:0;margin-top:0}
+
+.modeswitch{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line-strong);
+  border:1px solid var(--line-strong);border-radius:2px;overflow:hidden}
+.modeswitch button{padding:8px 4px;border:0;background:var(--surface);color:var(--muted);
+  font-family:inherit;font-size:13px;font-weight:500;cursor:pointer}
+.modeswitch button[aria-pressed="true"]{background:var(--ink);color:var(--bg);font-weight:700}
+.presets{display:flex;flex-wrap:wrap;gap:6px}
+.presets button{flex:1 1 calc(50% - 3px);padding:7px 6px;font-family:inherit;font-size:12px;
+  background:var(--surface-2);color:var(--ink-2);border:1px solid var(--line-strong);
+  border-radius:2px;cursor:pointer;line-height:1.3}
+.presets button:hover{border-color:var(--accent);color:var(--accent)}
+
+.results{display:flex;flex-direction:column;gap:22px;min-width:0}
+section.block{background:var(--surface);border:1px solid var(--line);border-radius:3px;
+  box-shadow:var(--shadow);overflow:hidden}
+.block-head{padding:13px 18px;border-bottom:1px solid var(--line);
+  display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;background:var(--surface-2)}
+.block-head h3{font-family:'Noto Serif TC',Georgia,serif;font-size:17px;font-weight:700;margin:0}
+.block-head .lede{font-size:12.5px;color:var(--muted);margin:0}
+.block-body{padding:16px 18px 18px}
+
+table{width:100%;border-collapse:collapse;font-size:13px}
+.scroll{overflow-x:auto}
+th,td{padding:6px 9px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+thead th{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);
+  font-weight:600;border-bottom:1.5px solid var(--line-strong);background:var(--surface)}
+tbody td.n{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+tbody tr:hover td{background:var(--surface-2)}
+tfoot td{font-weight:700;border-top:1.5px solid var(--line-strong);border-bottom:0;
+  font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+tfoot td:first-child{font-family:'Noto Sans TC',sans-serif}
+td.neg{color:var(--bad)} td.pos{color:var(--ok)}
+tr.winter td:first-child::after{content:" ❄";color:var(--muted);font-size:11px}
+
+.costgrid{display:grid;grid-template-columns:1fr auto auto;font-size:13.5px}
+.costgrid > div{padding:7px 4px;border-bottom:1px solid var(--line)}
+.costgrid > div:nth-child(3n+2),.costgrid > div:nth-child(3n+3){text-align:right;
+  font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+.costgrid > div:nth-child(3n+3){color:var(--muted);font-size:12px;padding-left:14px}
+.costgrid .tot{font-weight:700;border-bottom:0;border-top:1.5px solid var(--line-strong);
+  padding-top:9px;font-size:15px}
+
+.lines{display:grid;gap:10px}
+.line{display:grid;grid-template-columns:auto 1fr auto;gap:4px 12px;align-items:center}
+.line .lbl{font-size:13px;font-weight:500;white-space:nowrap}
+.line .lbl small{display:block;font-weight:400;color:var(--muted);font-size:11.5px}
+.line .bar{height:9px;background:var(--surface-2);border:1px solid var(--line);
+  border-radius:2px;position:relative;overflow:visible;min-width:60px}
+.line .bar i{position:absolute;top:0;bottom:0;left:0;display:block}
+.line .val{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;
+  font-size:15px;font-weight:600;white-space:nowrap}
+.marker{position:absolute;top:-5px;bottom:-5px;width:2px;background:var(--ink);z-index:2}
+
+.matrix td.cell{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-weight:500}
+.matrix td.cell.g{background:var(--ok-soft);color:var(--ok)}
+.matrix td.cell.y{background:var(--warn-soft);color:var(--warn)}
+.matrix td.cell.r{background:var(--bad-soft);color:var(--bad)}
+.matrix tr.you td{box-shadow:inset 0 2px 0 var(--accent),inset 0 -2px 0 var(--accent)}
+.matrix tr.you td:first-child{box-shadow:inset 2px 0 0 var(--accent),inset 0 2px 0 var(--accent),inset 0 -2px 0 var(--accent);font-weight:700}
+.matrix tr.you td:last-child{box-shadow:inset -2px 0 0 var(--accent),inset 0 2px 0 var(--accent),inset 0 -2px 0 var(--accent)}
+
+.flags{display:flex;flex-direction:column;gap:7px;margin-top:12px}
+.flag{display:block;font-size:13px;padding:8px 11px;border-radius:2px;
+  border-left:3px solid var(--muted);background:var(--surface-2);line-height:1.55}
+.flag[data-t="bad"]{border-left-color:var(--bad);background:var(--bad-soft);color:var(--bad)}
+.flag[data-t="warn"]{border-left-color:var(--warn);background:var(--warn-soft);color:var(--warn)}
+.flag[data-t="ok"]{border-left-color:var(--ok);background:var(--ok-soft);color:var(--ok)}
+
+.checks{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:1px;
+  background:var(--line);border:1px solid var(--line)}
+.check{background:var(--surface);padding:11px 13px}
+.check .k{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+  display:block;margin-bottom:2px}
+.check .v{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;
+  font-size:17px;font-weight:600;display:block}
+.check .n{font-size:11.5px;color:var(--muted);display:block}
+.check[data-t="bad"] .v{color:var(--bad)}
+.check[data-t="warn"] .v{color:var(--warn)}
+.check[data-t="ok"] .v{color:var(--ok)}
+
+.plans{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:18px;margin-bottom:18px}
+@media (max-width:840px){.plans{grid-template-columns:1fr}}
+.floorgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px}
+.plan-wrap{min-width:0}
+.plan-title{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+  font-weight:700;margin:0 0 7px;display:flex;align-items:baseline;gap:8px}
+.plan-title b{color:var(--ink);font-size:13px;letter-spacing:0;text-transform:none}
+.plan-title span{margin-left:auto;font-family:'IBM Plex Mono',monospace;
+  text-transform:none;letter-spacing:0;font-weight:500}
+svg.plan{width:100%;height:auto;display:block;background:var(--surface);
+  border:1px solid var(--line-strong);border-radius:2px}
+svg.plan text{font-family:'Noto Sans TC',sans-serif}
+.chart{width:100%;height:190px;display:block}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-top:9px}
+.legend span{display:flex;align-items:center;gap:5px}
+.legend i{width:11px;height:11px;border-radius:2px;display:block;border:1px solid var(--line-strong)}
+
+footer.foot{margin-top:34px;padding-top:18px;border-top:1px solid var(--line);
+  font-size:12px;color:var(--muted);line-height:1.75;max-width:84ch}
+footer.foot b{color:var(--ink-2)}
+@media (prefers-reduced-motion:reduce){*{transition:none !important}}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+  <div>
+    <h1>千歲開店試算盤</h1>
+    <p class="sub">北海道千歲市長都・水煎包／牛肉鍋外帶店。左邊選配置，右邊即時算錢、畫圖，並判斷你活不活得下來。</p>
+  </div>
+  <div class="stamp">Chitose · Osatsu<br>Takeout · Pre-flight<br><span id="stamp-mode">新築 2階</span></div>
+</header>
+
+<div class="verdict" id="verdict" data-state="warn">
+  <div class="verdict-head">
+    <span class="verdict-tag" id="v-tag">計算中</span>
+    <h2 id="v-title">—</h2>
+  </div>
+  <p id="v-text">—</p>
+  <div class="verdict-kpis">
+    <div class="kpi"><span class="k">總投資</span><span class="v num" id="k-total">—</span><span class="n" id="k-total-tw">—</span></div>
+    <div class="kpi"><span class="k">需借款</span><span class="v num" id="k-loan">—</span><span class="n" id="k-loan-m">—</span></div>
+    <div class="kpi"><span class="k">你也活線 日商</span><span class="v num" id="k-be">—</span><span class="n">含生活費與還款</span></div>
+    <div class="kpi"><span class="k">設定日商</span><span class="v num" id="k-daily">—</span><span class="n" id="k-daily-gap">—</span></div>
+    <div class="kpi"><span class="k">年度餘裕</span><span class="v num" id="k-slack">—</span><span class="n">營業利益減必要額</span></div>
+  </div>
+</div>
+
+<div class="split">
+
+  <div class="rail">
+
+    <details class="panel" open>
+      <summary>方案預設<span class="hint">一鍵載入</span></summary>
+      <div class="panel-body">
+        <div class="presets">
+          <button type="button" data-preset="usedA">中古A 青葉4丁目<br>¥19.8M · 千歲駅徒歩9分</button>
+          <button type="button" data-preset="usedB">中古B 長都駅前1丁目<br>¥28.4M · 長都駅徒歩7分</button>
+          <button type="button" data-preset="newSlim" style="border-color:var(--accent);color:var(--accent)">新築 2階・小車庫 ★<br>車庫1台 · 2台租月極</button>
+          <button type="button" data-preset="newFull">新築 2階・大車庫<br>車庫2台 · 1台露天</button>
+          <button type="button" data-preset="new3F" style="flex:1 1 100%">新築 3階建て　延床258㎡（參考用·較貴）<br>1F店舖+車庫／2F居住公／3F居住私</button>
+        </div>
+      </div>
+    </details>
+
+    <details class="panel" open>
+      <summary>我的錢<span class="hint">TWD</span></summary>
+      <div class="panel-body">
+        <div class="field"><label>自有資金 <span class="u">NT$萬</span></label><input type="number" id="i-own" value="500" step="10" min="0"><input type="range" id="r-own" min="0" max="2500" step="10" value="500"></div>
+        <div class="field"><label>貸款利率 <span class="u">%</span></label><input type="number" id="i-rate" value="3.0" step="0.1" min="0.5" max="12"></div>
+        <div class="field"><label>貸款年期 <span class="u">年</span></label><input type="number" id="i-term" value="20" step="1" min="3" max="35"></div>
+        <div class="field"><label>匯率 <span class="u">JPY / TWD</span></label><input type="number" id="i-fx" value="4.7" step="0.05" min="2" max="8"></div>
+      </div>
+    </details>
+
+    <details class="panel" open>
+      <summary>配置選項<span class="hint">會連動價格</span></summary>
+      <div class="panel-body">
+        <div class="modeswitch">
+          <button type="button" id="m-used" aria-pressed="false">中古改裝</button>
+          <button type="button" id="m-new" aria-pressed="true">新築</button>
+        </div>
+
+        <div id="opt-new">
+          <p class="subhead">樓層數</p>
+          <div class="field wide"><select id="s-floors">
+            <option value="2" selected>2階建て（footprint 大，樓梯少）</option>
+            <option value="3">3階建て（footprint 小，住家大）</option>
+          </select></div>
+          <div class="field"><label>1階玄關・階段室 <span class="u">㎡</span></label><input type="number" id="i-entry1F" value="26" step="2" min="6"></div>
+          <div class="field"><label>3階建て工程加成 <span class="u">% · 構造計算·準耐火</span></label><input type="number" id="i-f3prem" value="10" step="1" min="0" max="30"></div>
+
+          <p class="subhead">車庫</p>
+          <div class="field wide"><select id="s-garage">
+            <option value="none">不建車庫（全部露天）</option>
+            <option value="builtin|24|1" selected>內建車庫　1台 24㎡</option>
+            <option value="builtin|45|2">內建車庫　2台 45㎡</option>
+            <option value="builtin|66|3">內建車庫　3台 66㎡</option>
+            <option value="detached|24|1">獨立車庫　1台 24㎡</option>
+            <option value="detached|45|2">獨立車庫　2台 45㎡</option>
+          </select></div>
+          <div class="field wide"><label style="font-size:12px;color:var(--muted);line-height:1.5">
+            <input type="checkbox" id="c-garRes" style="accent-color:var(--accent)"> 車庫計入居住部分<br>
+            <span style="font-size:11.5px">已依你確認：<b>預設不計入</b>。勾選可看另一種認定的結果。</span></label></div>
+
+          <p class="subhead">ロードヒーティング</p>
+          <div class="field wide"><select id="s-rh">
+            <option value="0">不做（人工除雪）</option>
+            <option value="30" selected>玄關前 30㎡</option>
+            <option value="45">玄關＋取餐動線 45㎡</option>
+            <option value="60">玄關＋車庫前 60㎡</option>
+          </select></div>
+          <div class="field"><label>設置單價 <span class="u">¥/㎡</span></label><input type="number" id="i-rhUnit" value="60000" step="5000"></div>
+          <div class="field"><label>運轉費 <span class="u">¥/㎡/冬月</span></label><input type="number" id="i-rhRun" value="1300" step="100"></div>
+
+          <p class="subhead">斷熱等級</p>
+          <div class="field wide"><select id="s-insul">
+            <option value="5">等級5（省錢，暖房費高）</option>
+            <option value="6" selected>等級6 HEAT20 G2 相當</option>
+            <option value="7">等級7（最省暖房，最貴）</option>
+          </select></div>
+
+          <p class="subhead">廚房設備</p>
+          <div class="field wide"><select id="s-kitchen">
+            <option value="1600000">中古為主 ¥1.6M</option>
+            <option value="2100000" selected>中古混用 ¥2.1M</option>
+            <option value="3300000">全新 ¥3.3M</option>
+          </select></div>
+
+          <p class="subhead">私家車停哪</p>
+          <div class="field wide"><select id="s-priv">
+            <option value="garage" selected>停車庫，放不下的停自家露天</option>
+            <option value="mix">停車庫，放不下的租月極 ★省地</option>
+            <option value="open">全部停自家露天（佔客位）</option>
+            <option value="rent">全部租月極停車場</option>
+          </select></div>
+          <div class="field"><label>私家車 <span class="u">台</span></label><input type="number" id="i-privCars" value="3" step="1" min="0" max="8"></div>
+          <div class="field"><label>月極租金 <span class="u">¥/台/月</span></label><input type="number" id="i-privRent" value="4500" step="500"></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="panel" open>
+      <summary>物件與工程<span class="hint">JPY</span></summary>
+      <div class="panel-body">
+        <div id="grp-used" hidden>
+          <div class="field"><label>物件價格</label><input type="number" id="i-propPrice" value="28400000" step="100000"></div>
+          <div class="field"><label>取得諸費用</label><input type="number" id="i-propFee" value="2000000" step="50000"></div>
+          <div class="field"><label>改裝工事</label><input type="number" id="i-reno" value="7900000" step="100000"></div>
+        </div>
+        <div id="grp-new">
+          <div class="field"><label>土地面積 <span class="u">㎡</span></label><input type="number" id="i-landArea" value="450" step="10" min="100"></div>
+          <div class="field"><label>間口 <span class="u">m · 臨路寬</span></label><input type="number" id="i-frontage" value="18" step="1" min="6"></div>
+          <div class="field"><label>土地單價 <span class="u">¥/㎡</span></label><input type="number" id="i-landUnit" value="52000" step="1000"></div>
+          <div class="field"><label>土地諸費用 <span class="u">%</span></label><input type="number" id="i-landFeePct" value="6" step="0.5"></div>
+          <div class="field"><label>住居面積 <span class="u">㎡ 總計</span></label><input type="number" id="i-resArea" value="110" step="5"></div>
+          <div class="field"><label>住居單價 <span class="u">¥/㎡</span></label><input type="number" id="i-resUnit" value="250000" step="5000"></div>
+          <div class="field"><label>店舖面積 <span class="u">㎡</span></label><input type="number" id="i-shopArea" value="52" step="2"></div>
+          <div class="field"><label>店舖單價 <span class="u">¥/㎡</span></label><input type="number" id="i-shopUnit" value="320000" step="5000"></div>
+          <div class="field"><label>車庫面積 <span class="u">㎡</span></label><input type="number" id="i-garArea" value="24" step="5" min="0"></div>
+          <div class="field"><label>車庫單價 <span class="u">¥/㎡</span></label><input type="number" id="i-garUnit" value="180000" step="5000"></div>
+          <div class="field"><label>別途工事 <span class="u">外構·配管·設計</span></label><input type="number" id="i-extra" value="10500000" step="100000"></div>
+        </div>
+        <div class="field"><label>廚房設備</label><input type="number" id="i-kitchen" value="2100000" step="100000"></div>
+        <div class="field"><label>運轉資金 <span class="u">第一年燒錢</span></label><input type="number" id="i-working" value="4500000" step="100000"></div>
+      </div>
+    </details>
+
+    <details class="panel" open>
+      <summary>營收<span class="hint">JPY</span></summary>
+      <div class="panel-body">
+        <div class="field"><label>日商 <span class="u">¥／日</span></label><input type="number" id="i-daily" value="70000" step="1000"><input type="range" id="r-daily" min="25000" max="130000" step="1000" value="70000"></div>
+        <div class="field"><label>營業日 <span class="u">日／月</span></label><input type="number" id="i-days" value="25" step="1" min="15" max="31"></div>
+        <div class="field"><label>原價率 <span class="u">%</span></label><input type="number" id="i-cogs" value="34" step="0.5"></div>
+        <div class="field"><label>包材率 <span class="u">% · 外帶特有</span></label><input type="number" id="i-pack" value="4.5" step="0.1"></div>
+        <div class="field"><label>刷卡手續 <span class="u">%</span></label><input type="number" id="i-card" value="2.8" step="0.1"></div>
+      </div>
+    </details>
+
+    <details class="panel">
+      <summary>固定費<span class="hint">JPY</span></summary>
+      <div class="panel-body">
+        <div class="field"><label>工讀人事 <span class="u">¥／月</span></label><input type="number" id="i-labor" value="175000" step="5000"></div>
+        <div class="field"><label>夏季水電燃料 <span class="u">¥／月</span></label><input type="number" id="i-utilS" value="125000" step="5000"></div>
+        <div class="field"><label>冬季水電燃料 <span class="u">¥／月 不含RH</span></label><input type="number" id="i-utilW" value="190000" step="5000"></div>
+        <div class="field"><label>冬季月數</label><input type="number" id="i-winM" value="5" step="1" min="0" max="8"></div>
+        <div class="field"><label>除排雪 <span class="u">¥／冬月</span></label><input type="number" id="i-snow" value="60000" step="5000"></div>
+        <div class="field"><label>除雪月數</label><input type="number" id="i-snowM" value="4" step="1" min="0" max="6"></div>
+        <div class="field"><label>廣告販促 <span class="u">¥／月</span></label><input type="number" id="i-ad" value="60000" step="5000"></div>
+        <div class="field"><label>雜費消耗 <span class="u">¥／月</span></label><input type="number" id="i-misc" value="50000" step="5000"></div>
+        <div class="field"><label>固定資產稅＋保險 <span class="u">¥／年</span></label><input type="number" id="i-tax" value="750000" step="50000"></div>
+        <div class="field"><label>修繕積立 <span class="u">¥／年</span></label><input type="number" id="i-repair" value="150000" step="20000"></div>
+        <div class="field"><label>稅理士 <span class="u">¥／年</span></label><input type="number" id="i-cpa" value="300000" step="50000"></div>
+      </div>
+    </details>
+
+    <details class="panel">
+      <summary>你的生活與稅<span class="hint">JPY</span></summary>
+      <div class="panel-body">
+        <div class="field"><label>日本生活費 <span class="u">¥／月</span></label><input type="number" id="i-living" value="170000" step="10000"></div>
+        <div class="field"><label>社保稅 個人負擔 <span class="u">%</span></label><input type="number" id="i-selfBurden" value="22" step="1"></div>
+        <div class="field"><label>社保 公司負擔 <span class="u">%</span></label><input type="number" id="i-coBurden" value="15" step="1"></div>
+        <div class="field"><label>目標法人年利益 <span class="u">簽證更新緩衝</span></label><input type="number" id="i-corpProfit" value="1500000" step="100000"></div>
+      </div>
+    </details>
+
+    <details class="panel">
+      <summary>第一年爬坡<span class="hint">達成率 %</span></summary>
+      <div class="panel-body">
+        <div class="field"><label>第1季</label><input type="number" id="i-q1" value="40" step="5" min="0" max="100"></div>
+        <div class="field"><label>第2季</label><input type="number" id="i-q2" value="60" step="5" min="0" max="100"></div>
+        <div class="field"><label>第3季</label><input type="number" id="i-q3" value="80" step="5" min="0" max="100"></div>
+        <div class="field"><label>第4季</label><input type="number" id="i-q4" value="95" step="5" min="0" max="100"></div>
+      </div>
+    </details>
+
+  </div>
+
+  <div class="results">
+
+    <section class="block" id="sec-plan">
+      <div class="block-head"><h3>配置圖與平面圖</h3><p class="lede">依左邊參數即時重畫。示意用，實際配置依基地形狀與法規</p></div>
+      <div class="block-body">
+        <div class="plans">
+          <div class="plan-wrap">
+            <p class="plan-title"><b>配置圖</b> Site Plan <span id="sp-note">—</span></p>
+            <svg class="plan" id="sitePlan" viewBox="0 0 460 480" role="img" aria-label="基地配置圖"></svg>
+          </div>
+          <div class="plan-wrap">
+            <p class="plan-title"><b>斷面圖</b> Section <span id="sec-note">—</span></p>
+            <svg class="plan" id="section" viewBox="0 0 360 480" role="img" aria-label="建物斷面圖"></svg>
+          </div>
+        </div>
+        <div class="floorgrid">
+          <div class="plan-wrap">
+            <p class="plan-title"><b>1階</b> 事業・車庫 <span id="f1-note">—</span></p>
+            <svg class="plan" id="floor1" viewBox="0 0 300 230" role="img" aria-label="一樓平面圖"></svg>
+          </div>
+          <div class="plan-wrap">
+            <p class="plan-title"><b>2階</b> <span class="f2label">居住・公</span> <span id="f2-note">—</span></p>
+            <svg class="plan" id="floor2" viewBox="0 0 300 230" role="img" aria-label="二樓平面圖"></svg>
+          </div>
+          <div class="plan-wrap" id="f3wrap">
+            <p class="plan-title"><b>3階</b> 居住・私 <span id="f3-note">—</span></p>
+            <svg class="plan" id="floor3" viewBox="0 0 300 230" role="img" aria-label="三樓平面圖"></svg>
+          </div>
+        </div>
+        <div class="legend">
+          <span><i style="background:var(--plan-shop)"></i>店舖・事業</span>
+          <span><i style="background:var(--plan-res)"></i>居室</span>
+          <span><i style="background:var(--plan-wet)"></i>水回り</span>
+          <span><i style="background:var(--plan-core)"></i>玄關・階段・收納</span>
+          <span><i style="background:var(--plan-gar)"></i>車庫</span>
+          <span><i style="background:var(--plan-rh)"></i>ロードヒーティング</span>
+          <span><i style="background:var(--plan-snow)"></i>雪置場</span>
+          <span><i style="background:var(--plan-stall)"></i>可用車位</span>
+          <span><i style="background:transparent;border-style:dashed"></i>冬季不可用</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" id="sec-checks">
+      <div class="block-head"><h3>基地檢查</h3><p class="lede">停車位、居住比例、建蔽容積——買地前必須先算贏的四件事</p></div>
+      <div class="block-body">
+        <div class="checks" id="checks"></div>
+        <div class="flags" id="checkflags"></div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="block-head"><h3>資金結構</h3><p class="lede">總投資如何被自有與借款切開，以及每月要還多少</p></div>
+      <div class="block-body">
+        <div class="costgrid" id="costgrid"></div>
+        <div class="flags" id="fundflags"></div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="block-head"><h3>三條損益線</h3><p class="lede">你的日商落在哪一段，決定這件事是生意還是負擔</p></div>
+      <div class="block-body"><div class="lines" id="lines"></div></div>
+    </section>
+
+    <section class="block">
+      <div class="block-head"><h3>12個月現金流</h3><p class="lede">成熟期（第2–3年）。北海道的冬天在表上看得見</p></div>
+      <div class="block-body">
+        <svg class="chart" id="chart" viewBox="0 0 720 190" preserveAspectRatio="none" role="img" aria-label="12個月淨現金流"></svg>
+        <div class="legend">
+          <span><i style="background:var(--ok)"></i>正現金流</span>
+          <span><i style="background:var(--bad)"></i>負現金流</span>
+          <span>❄ 冬季高暖房費月份</span>
+        </div>
+        <div class="scroll" style="margin-top:16px">
+          <table id="cf">
+            <thead><tr><th>月</th><th>係數</th><th>月商</th><th>變動費</th><th>人事</th>
+              <th>水電</th><th>RH</th><th>除雪</th><th>其他</th><th>營業利益</th><th>淨現金</th></tr></thead>
+            <tbody></tbody><tfoot></tfoot>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="block-head"><h3>第一年燒錢</h3><p class="lede">運轉資金夠不夠撐過爬坡期</p></div>
+      <div class="block-body">
+        <div class="checks" id="year1"></div>
+        <div class="flags" id="y1flags"></div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="block-head"><h3>自有資金 × 營收情境</h3><p class="lede">格內為年度餘裕。橘框是你目前的位置</p></div>
+      <div class="block-body">
+        <div class="scroll"><table class="matrix" id="matrix"></table></div>
+        <div class="flags" id="mxflags"></div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<footer class="foot">
+  <b>怎麼讀。</b>「你也活線」是把日本生活費與台灣還款都算進去後的損益兩平日商；低於這條線就是每月從存款補洞。「安全線」再加法人年度利益，因為経営・管理簽證更新會看事業獲利，連續赤字是更新風險。<br>
+  <b>車庫的認定。</b>本試算依你的確認，<b>車庫不計入居住部分</b>，只進總樓地板的分母。居住比例需 ≥50% 才保得住固定資產稅的住宅用地特例（土地稅額 1/6）；建議做到 53% 以上留邊際，並在設計階段就向千歲市稅務課確認。<br>
+  <b>ロードヒーティング。</b>設置費以面積×單價計，運轉費按 ¥1,300／㎡／冬月估算並自動加進冬季水電。實際耗能依熱源（電氣／燈油／熱泵）差異很大。<br>
+  <b>數字的限制。</b>建物單價、土地實勢價、營收假設為推估區間，2024–2026年北海道建材與人工大幅上漲，須以在地工務店見積與不動產實查為準，誤差可達 ±15%。用途地域、防火區劃、危險物規制須逐案向千歲市役所、保健所、消防署確認。<b>本工具為規劃用試算，不構成法律、稅務或投資建議。</b>
+</footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+var SEASON=[0.95,1.00,1.05,0.90,1.00,0.95,1.10,1.15,1.00,0.95,1.00,1.15];
+var WINTER=[1,1,1,0,0,0,0,0,0,0,1,1];
+var SNOWM =[1,1,1,0,0,0,0,0,0,0,0,1];
+var mode="new";
+
+var INSUL={5:{res:225000,winter:260000,summer:130000},
+           6:{res:250000,winter:190000,summer:125000},
+           7:{res:285000,winter:165000,summer:122000}};
+
+var PRESETS={
+  usedA:{mode:"used",propPrice:19800000,propFee:1400000,reno:7900000,kitchen:2100000,working:4500000,
+    utilS:130000,utilW:260000,snow:50000,tax:450000,repair:240000},
+  usedB:{mode:"used",propPrice:28400000,propFee:2000000,reno:7900000,kitchen:2100000,working:4500000,
+    utilS:130000,utilW:260000,snow:50000,tax:450000,repair:240000},
+  newSlim:{mode:"new",landArea:450,frontage:18,landUnit:52000,landFeePct:6,resArea:110,
+    shopArea:52,shopUnit:320000,extra:10500000,working:4500000,privCars:3,privRent:4500,
+    snow:60000,tax:720000,repair:150000,entry1F:26,f3prem:10,
+    sel:{floors:"2",garage:"builtin|24|1",rh:"30",insul:"6",kitchen:"2100000",priv:"mix"}},
+  newFull:{mode:"new",landArea:450,frontage:18,landUnit:52000,landFeePct:6,resArea:110,
+    shopArea:52,shopUnit:320000,extra:10500000,working:4500000,privCars:3,privRent:4500,
+    snow:60000,tax:750000,repair:150000,entry1F:26,f3prem:10,
+    sel:{floors:"2",garage:"builtin|45|2",rh:"30",insul:"6",kitchen:"2100000",priv:"garage"}},
+  new3F:{mode:"new",landArea:450,frontage:18,landUnit:52000,landFeePct:6,resArea:153,
+    shopArea:60,shopUnit:320000,extra:11500000,working:4500000,privCars:3,privRent:4500,
+    snow:60000,tax:900000,repair:180000,entry1F:14,f3prem:10,
+    sel:{floors:"3",garage:"builtin|45|2",rh:"30",insul:"6",kitchen:"2100000",priv:"garage"}}
+};
+
+function $(id){return document.getElementById(id);}
+function v(id){var e=$(id);return e?(parseFloat(e.value)||0):0;}
+function sv(id){var e=$(id);return e?e.value:"";}
+function yen(n){return "¥"+Math.round(n).toLocaleString("en-US");}
+function yenS(n){var a=Math.abs(n);if(a>=1e8)return (n/1e8).toFixed(2)+"億";
+  if(a>=1e4)return Math.round(n/1e4).toLocaleString("en-US")+"万";return Math.round(n).toLocaleString("en-US");}
+function sign(n){return (n>=0?"+":"−")+Math.abs(Math.round(n)).toLocaleString("en-US");}
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+function pmt(p,ap,y){if(p<=0)return 0;var i=ap/100/12,n=y*12;if(i<=0)return p/n;
+  var f=Math.pow(1+i,n);return p*i*f/(f-1);}
+
+/* option groups drive the numeric fields */
+function garageSpec(){
+  var g=sv("s-garage");
+  if(!g||g==="none") return {type:"none",area:0,cars:0,unit:180000};
+  var p=g.split("|");
+  return {type:p[0],area:parseFloat(p[1])||0,cars:parseInt(p[2],10)||0,
+          unit:p[0]==="detached"?100000:180000};
+}
+function applyOptions(){
+  if(mode!=="new") return;
+  var gs=garageSpec();
+  $("i-garArea").value=gs.area;
+  $("i-garUnit").value=gs.unit;
+  var ins=INSUL[sv("s-insul")]||INSUL[6];
+  $("i-resUnit").value=ins.res;
+  $("i-utilS").value=ins.summer;
+  $("i-utilW").value=ins.winter;
+  $("i-kitchen").value=sv("s-kitchen");
+}
+
+function model(){
+  var fx=v("i-fx")||4.7, m={fx:fx,mode:mode,items:[]};
+  m.rhArea = mode==="new" ? parseFloat(sv("s-rh"))||0 : 0;
+  m.rhCost = m.rhArea*v("i-rhUnit");
+  m.rhRunM = m.rhArea*v("i-rhRun");
+  var gs=garageSpec();
+  m.garType = mode==="new" ? gs.type : "none";
+  m.garRes  = $("c-garRes").checked;
+  m.priv    = sv("s-priv");
+  m.privCars= v("i-privCars");
+  m.garCars = gs.cars;
+  // where the private cars actually end up (garage overflow must go somewhere)
+  var overflow=Math.max(0,m.privCars-m.garCars);
+  if(m.priv==="rent"){        m.openPriv=0;        m.rentCars=m.privCars; }
+  else if(m.priv==="mix"){    m.openPriv=0;        m.rentCars=overflow; }
+  else if(m.priv==="garage"){ m.openPriv=overflow; m.rentCars=0; }
+  else {                      m.openPriv=m.privCars; m.rentCars=0; }
+
+  if(mode==="used"){
+    m.items.push(["物件價格",v("i-propPrice")]);
+    m.items.push(["取得諸費用",v("i-propFee")]);
+    m.items.push(["改裝工事",v("i-reno")]);
+  }else{
+    m.landArea=v("i-landArea"); m.frontage=v("i-frontage");
+    var land=m.landArea*v("i-landUnit"), landFee=land*v("i-landFeePct")/100;
+    m.resArea=v("i-resArea"); m.shopArea=v("i-shopArea"); m.garArea=v("i-garArea");
+    m.floors=parseInt(sv("s-floors"),10)||2;
+
+    // residential split by storey
+    m.res1F=Math.min(v("i-entry1F"), m.resArea);          // 玄關・階段室
+    var upper=Math.max(0,m.resArea-m.res1F);
+    if(m.floors===3){ m.res2F=Math.round(upper*0.56); m.res3F=upper-m.res2F; }
+    else            { m.res2F=upper; m.res3F=0; }
+
+    var prem = (m.floors===3) ? (1+v("i-f3prem")/100) : 1;
+    m.premium=prem;
+    var res=m.resArea*v("i-resUnit")*prem,
+        shop=m.shopArea*v("i-shopUnit")*prem,
+        gar=m.garArea*v("i-garUnit")*(m.garType==="builtin"?prem:1);
+    m.items.push(["土地 "+m.landArea+"㎡ × "+yen(v("i-landUnit"))+"/㎡",land]);
+    m.items.push(["土地諸費用 "+v("i-landFeePct")+"%",landFee]);
+    m.items.push(["住居 "+m.resArea+"㎡"+(m.floors===3?"（1F"+m.res1F+"／2F"+m.res2F+"／3F"+m.res3F+"）":"（1F"+m.res1F+"／2F"+m.res2F+"）"),res]);
+    m.items.push(["店舖 "+m.shopArea+"㎡",shop]);
+    if(gar>0) m.items.push([(m.garType==="detached"?"獨立":"內建")+"車庫 "+m.garArea+"㎡",gar]);
+    if(m.rhCost>0) m.items.push(["ロードヒーティング "+m.rhArea+"㎡",m.rhCost]);
+    m.items.push(["別途工事",v("i-extra")]);
+    m.footprint = m.shopArea + m.res1F + (m.garType==="builtin"?m.garArea:0);
+    m.detachedGar = (m.garType==="detached")?m.garArea:0;
+    m.floorTotal = m.resArea+m.shopArea+m.garArea;
+  }
+  m.items.push(["廚房設備",v("i-kitchen")]);
+  m.items.push(["運轉資金",v("i-working")]);
+  m.total=m.items.reduce(function(s,r){return s+r[1];},0);
+
+  m.ownTW=v("i-own")*10000; m.ownJP=m.ownTW*fx;
+  m.loanJP=Math.max(0,m.total-m.ownJP); m.loanTW=m.loanJP/fx;
+  m.pmtTW=pmt(m.loanTW,v("i-rate"),v("i-term")); m.pmtJP=m.pmtTW*fx;
+
+  m.daily=v("i-daily"); m.days=v("i-days"); m.monthly=m.daily*m.days;
+  m.seasonSum=SEASON.reduce(function(a,b){return a+b;},0);
+  m.annual=m.monthly*m.seasonSum;
+  m.varRate=(v("i-cogs")+v("i-pack")+v("i-card"))/100; m.cm=1-m.varRate;
+
+  var winM=v("i-winM"), snM=v("i-snowM");
+  m.labor=v("i-labor"); m.utilS=v("i-utilS"); m.utilW=v("i-utilW"); m.snow=v("i-snow");
+  m.privRentM = m.rentCars*v("i-privRent");
+  m.otherM=v("i-ad")+v("i-misc")+m.privRentM+(v("i-tax")+v("i-repair")+v("i-cpa"))/12;
+  m.fixedYr=m.labor*12+m.utilS*(12-winM)+m.utilW*winM+m.rhRunM*winM+m.snow*snM+m.otherM*12;
+  m.opProfit=m.annual*m.cm-m.fixedYr;
+
+  var take=v("i-living")+m.pmtJP, sb=v("i-selfBurden")/100;
+  m.salaryM=sb>=1?0:take/(1-sb); m.salaryYr=m.salaryM*12;
+  m.coSocYr=m.salaryYr*v("i-coBurden")/100; m.needYr=m.salaryYr+m.coSocYr;
+  m.slack=m.opProfit-m.needYr;
+
+  var perD=m.days*m.seasonSum*m.cm; m.perD=perD;
+  m.beShop=m.fixedYr/perD;
+  m.beYou=(m.fixedYr+m.needYr)/perD;
+  m.beSafe=(m.fixedYr+m.needYr+v("i-corpProfit"))/perD;
+
+  m.months=[];var totOp=0,totNet=0,cum=0,minCum=0,neg=0;
+  for(var i=0;i<12;i++){
+    var sales=m.monthly*SEASON[i], vc=sales*m.varRate;
+    var util=WINTER[i]?m.utilW:m.utilS, rh=WINTER[i]?m.rhRunM:0, sn=SNOWM[i]?m.snow:0;
+    var op=sales-vc-m.labor-util-rh-sn-m.otherM;
+    var net=op-(m.salaryM*(1+v("i-coBurden")/100));
+    cum+=net; if(cum<minCum)minCum=cum; if(net<0)neg++;
+    totOp+=op; totNet+=net;
+    m.months.push({i:i,c:SEASON[i],sales:sales,vc:vc,util:util,rh:rh,snow:sn,op:op,net:net,winter:!!WINTER[i]});
+  }
+  m.totOp=totOp;m.totNet=totNet;m.minCum=minCum;m.negMonths=neg;
+
+  var q=[v("i-q1"),v("i-q2"),v("i-q3"),v("i-q4")].map(function(x){return x/100;});
+  var y1=0; for(var j=0;j<12;j++) y1+=m.monthly*SEASON[j]*q[Math.floor(j/3)];
+  m.y1sales=y1; m.y1op=y1*m.cm-m.fixedYr; m.y1net=m.y1op-m.needYr; m.working=v("i-working");
+
+  if(mode==="new"){
+    m.snowArea=m.landArea*0.15;
+    m.approach=20;
+    m.parkArea=Math.max(0,m.landArea-m.footprint-m.detachedGar-m.snowArea-m.approach-m.rhArea*0.5);
+    m.stallsSummer=Math.floor(m.parkArea/21);
+    m.stallsWinter=Math.floor(m.stallsSummer*0.72);
+    m.custSummer=Math.max(0,m.stallsSummer-m.openPriv);
+    m.custWinter=Math.max(0,m.stallsWinter-m.openPriv);
+    var num=m.garRes?(m.resArea+m.garArea):m.resArea;
+    m.resPct=m.floorTotal>0?(num/m.floorTotal*100):0;
+    m.bcr=m.landArea>0?((m.footprint+m.detachedGar)/m.landArea*100):0;
+    var exempt=Math.min(m.garArea,m.floorTotal/5);
+    m.far=m.landArea>0?((m.floorTotal-exempt)/m.landArea*100):0;
+    m.depth=m.frontage>0?m.landArea/m.frontage:0;
+  }
+  return m;
+}
+
+/* ── drawing helpers ───────────────────────────────── */
+function R(x,y,w,h,fill,stroke,sw,dash){
+  return "<rect x='"+x.toFixed(1)+"' y='"+y.toFixed(1)+"' width='"+Math.max(0,w).toFixed(1)+
+    "' height='"+Math.max(0,h).toFixed(1)+"' fill='"+fill+"' stroke='"+(stroke||"var(--plan-wall)")+
+    "' stroke-width='"+(sw||1.4)+"'"+(dash?" stroke-dasharray='5 3'":"")+"/>";
+}
+function T(x,y,t,sz,fill,anchor,bold){
+  return "<text x='"+x.toFixed(1)+"' y='"+y.toFixed(1)+"' font-size='"+(sz||10)+"' fill='"+
+    (fill||"var(--ink-2)")+"' text-anchor='"+(anchor||"middle")+"'"+(bold?" font-weight='700'":"")+">"+esc(t)+"</text>";
+}
+
+function drawSite(m){
+  var svg=$("sitePlan");
+  if(mode!=="new"){svg.innerHTML=T(230,240,"配置圖僅適用新築模式",13,"var(--muted)");$("sp-note").textContent="—";return;}
+  var W=460,H=480,padX=44,padT=30,padB=44;
+  var Lw=m.frontage, Ld=m.depth;
+  var s=Math.min((W-padX*2)/Lw,(H-padT-padB)/Ld);
+  var px=function(u){return u*s;};
+  var ox=(W-px(Lw))/2, oy=padT, o="";
+
+  o+=R(ox,oy,px(Lw),px(Ld),"var(--plan-land)","var(--plan-wall)",2);
+
+  // building at rear
+  var bW=Lw-1.6, bD=m.footprint/bW;
+  var bx=ox+px(0.8), by=oy+px(0.8);
+  var segs=[["店舖",m.shopArea,"var(--plan-shop)"],["玄關",m.res1F,"var(--plan-core)"]];
+  if(m.garType==="builtin"&&m.garArea>0) segs.push(["車庫",m.garArea,"var(--plan-gar)"]);
+  var cx=bx;
+  segs.forEach(function(sg){
+    var w=m.footprint>0?px(bW)*(sg[1]/m.footprint):0;
+    o+=R(cx,by,w,px(bD),sg[2],"var(--plan-wall)",1.4);
+    if(w>36){
+      o+=T(cx+w/2,by+px(bD)/2-1,sg[0],10,"var(--ink)","middle",true);
+      o+=T(cx+w/2,by+px(bD)/2+11,Math.round(sg[1])+"㎡",9,"var(--ink-2)");
+    }
+    cx+=w;
+  });
+  o+=R(bx,by,px(bW),px(bD),"none","var(--plan-wall)",2.2);
+  o+=T(bx+px(bW)/2,by-4,m.floors+"階建て 建物",9.5,"var(--muted)");
+  var yA=by+px(bD);
+
+  if(m.detachedGar>0){
+    var gW=Math.min(6.5,Lw*0.4), gD=m.detachedGar/gW;
+    o+=R(ox+px(Lw-gW-0.8),yA+px(0.7),px(gW),px(gD),"var(--plan-gar)","var(--plan-wall)",1.4);
+    o+=T(ox+px(Lw-gW/2-0.8),yA+px(0.7)+px(gD)/2+3,"獨立車庫 "+m.garArea+"㎡",9,"var(--ink)","middle",true);
+    yA+=px(gD+0.7);
+  }
+
+  var snowW=Math.min(3.2,Lw*0.22);
+  var frontD=Math.max(0,Ld-(yA-oy)/s-0.5);
+  o+=R(ox+px(0.1),yA+px(0.3),px(snowW),px(frontD),"var(--plan-snow)","var(--plan-wall)",1.2,true);
+  o+=T(ox+px(snowW)/2,yA+px(frontD/2),"雪置場",9.5,"var(--ink-2)","middle",true);
+  o+=T(ox+px(snowW)/2,yA+px(frontD/2)+12,Math.round(m.snowArea)+"㎡",9,"var(--ink-2)");
+
+  if(m.rhArea>0){
+    var rhD=2.6, rhW=Math.min(Lw-snowW-0.8, m.rhArea/rhD);
+    o+=R(ox+px(snowW+0.3),yA+px(0.3),px(rhW),px(rhD),"var(--plan-rh)","var(--accent)",1.8);
+    o+=T(ox+px(snowW+0.3)+px(rhW)/2,yA+px(rhD/2)+3.5,"ロードヒーティング "+m.rhArea+"㎡",9,"var(--ink)","middle",true);
+    yA+=px(rhD+0.3);
+  }
+
+  // stalls
+  var sW=2.5,sD=5.5,availW=Lw-snowW-0.7;
+  var perRow=Math.max(1,Math.floor(availW/sW));
+  var drawn=0,row=0,py=yA+px(0.5);
+  while(drawn<m.stallsSummer && py+px(sD)<oy+px(Ld)-px(0.3) && row<4){
+    for(var k=0;k<perRow&&drawn<m.stallsSummer;k++){
+      var sx=ox+px(snowW+0.5+k*sW);
+      var ok=drawn<m.stallsWinter;
+      o+=R(sx,py,px(sW)-2,px(sD),ok?"var(--plan-stall)":"none","var(--plan-wall)",ok?1.3:1,!ok);
+      o+=T(sx+px(sW)/2-1,py+px(sD)/2+3.5,String(drawn+1),9,ok?"var(--ink)":"var(--muted)","middle",ok);
+      drawn++;
+    }
+    py+=px(sD)+px(row%2===0?5.0:1.0); row++;
+  }
+
+  o+=R(ox-10,oy+px(Ld),px(Lw)+20,17,"var(--plan-road)","var(--plan-wall)",1.4);
+  o+=T(ox+px(Lw)/2,oy+px(Ld)+12,"前面道路",10,"var(--ink-2)","middle",true);
+  o+=T(ox+px(Lw)/2,oy-13,"間口 "+Lw.toFixed(1)+" m",10.5,"var(--ink)","middle",true);
+  o+="<text x='"+(ox-16)+"' y='"+(oy+px(Ld)/2)+"' font-size='10.5' font-weight='700' fill='var(--ink)' text-anchor='middle' transform='rotate(-90 "+(ox-16)+" "+(oy+px(Ld)/2)+")'>奥行 "+Ld.toFixed(1)+" m</text>";
+  o+=T(W/2,H-22,"客用車位　夏 "+m.custSummer+" 台 ／ 冬 "+m.custWinter+" 台",10,"var(--ink)","middle",true);
+  o+=T(W/2,H-8,"虛線＝積雪後不可用　示意圖，實際配置依基地形狀",9,"var(--muted)");
+  svg.innerHTML=o;
+  $("sp-note").textContent=m.landArea+"㎡ · "+Lw.toFixed(1)+"×"+Ld.toFixed(1)+"m";
+}
+
+/* room layouts: [x,y,w,h] as % of floor rect, share of floor area, label, sub, fill */
+var PLAN1=[
+  [0,0,50,62,.50,"廚房","作業台·2槽シンク·手洗","var(--plan-shop)"],
+  [0,62,50,38,.22,"取餐口・風除室","客用出入口","var(--plan-rh)"],
+  [50,0,18,42,.11,"更衣・倉庫","保健所要求","var(--plan-shop)"],
+  [50,42,18,58,.17,"玄關・階段","住居出入口","var(--plan-core)"],
+  [68,0,32,100,0,"車庫","","var(--plan-gar)"]
+];
+var PLAN2_3F=[
+  [0,0,58,72,.42,"LDK","對面式廚房","var(--plan-res)"],
+  [0,72,58,28,.14,"和室","客間・予備","var(--plan-res)"],
+  [58,0,42,30,.13,"浴室・洗面","","var(--plan-wet)"],
+  [58,30,42,26,.11,"WC・洗濯","","var(--plan-wet)"],
+  [58,56,42,20,.09,"収納","","var(--plan-core)"],
+  [58,76,42,24,.11,"階段・廊下","","var(--plan-core)"]
+];
+var PLAN3=[
+  [0,0,38,58,.26,"主寢室","","var(--plan-res)"],
+  [0,58,38,42,.13,"WIC・収納","","var(--plan-core)"],
+  [38,0,31,58,.19,"寢室2","","var(--plan-res)"],
+  [69,0,31,58,.18,"寢室3","","var(--plan-res)"],
+  [38,58,30,42,.13,"書房・工作室","","var(--plan-res)"],
+  [68,58,14,42,.04,"WC","","var(--plan-wet)"],
+  [82,58,18,42,.07,"階段・廊下","","var(--plan-core)"]
+];
+var PLAN2_2F=[
+  [0,0,52,60,.32,"LDK","對面式廚房","var(--plan-res)"],
+  [0,60,52,40,.20,"主寢室","","var(--plan-res)"],
+  [52,0,26,42,.13,"寢室2","","var(--plan-res)"],
+  [78,0,22,42,.11,"寢室3","","var(--plan-res)"],
+  [52,42,26,32,.10,"浴室・洗面","","var(--plan-wet)"],
+  [78,42,22,32,.06,"WC","","var(--plan-wet)"],
+  [52,74,48,26,.08,"階段・廊下・収納","","var(--plan-core)"]
+];
+
+function drawPlan(svgId,rooms,floorArea,caption,special){
+  var svg=$(svgId); if(!svg)return;
+  var W=272,H=178,x0=14,y0=30;
+  var o=T(150,15,caption,10,"var(--ink)","middle",true);
+  rooms.forEach(function(r){
+    var x=x0+W*r[0]/100, y=y0+H*r[1]/100, w=W*r[2]/100, h=H*r[3]/100;
+    var area=(special&&special[r[4+0]]!==undefined)?0:0;
+    var a=(r[8]!==undefined)?r[8]:Math.round(floorArea*r[4]);
+    o+=R(x,y,w,h,r[7],"var(--plan-wall)",1.3);
+    if(w>40&&h>26){
+      o+=T(x+w/2,y+h/2-(r[6]&&h>44?4:-2),r[5],w>72?10.5:9.2,"var(--ink)","middle",true);
+      if(h>34) o+=T(x+w/2,y+h/2+(r[6]&&h>44?8:11),a+"㎡",8.8,"var(--ink-2)");
+      if(r[6]&&h>52&&w>62) o+=T(x+w/2,y+h/2+20,r[6],8,"var(--muted)");
+    }else if(w>24&&h>16){
+      o+=T(x+w/2,y+h/2+3,r[5].length>4?r[5].slice(0,4):r[5],7.8,"var(--ink)","middle",true);
+    }
+  });
+  o+=R(x0,y0,W,H,"none","var(--plan-wall)",2.4);
+  svg.innerHTML=o;
+}
+
+function drawFloors(m){
+  ["floor1","floor2","floor3"].forEach(function(id){var e=$(id);if(e)e.innerHTML="";});
+  if(mode!=="new"){
+    $("f1-note").textContent=$("f2-note").textContent=$("f3-note").textContent="—";
+    $("f3wrap").hidden=true; return;
+  }
+  var show3=(m.floors===3);
+  $("f3wrap").hidden=!show3;
+  document.querySelectorAll(".f2label").forEach(function(e){e.textContent=show3?"居住・公":"居住";});
+
+  // 1F — garage share computed separately
+  var p1=PLAN1.map(function(r){return r.slice();});
+  var shopSum=m.shopArea;
+  p1[0][8]=Math.round(shopSum*0.63); p1[1][8]=Math.round(shopSum*0.22); p1[2][8]=shopSum-p1[0][8]-p1[1][8];
+  p1[3][8]=m.res1F;
+  if(m.garType==="builtin"&&m.garArea>0){ p1[4][8]=m.garArea; }
+  else { p1=p1.slice(0,4); p1[0][2]=74;p1[1][2]=74;p1[2][0]=74;p1[2][2]=26;p1[3][0]=74;p1[3][2]=26; }
+  drawPlan("floor1",p1,0,"1階　"+Math.round(m.footprint)+"㎡　建蔽率 "+m.bcr.toFixed(1)+"%");
+  $("f1-note").textContent=Math.round(m.footprint)+"㎡";
+
+  drawPlan("floor2",show3?PLAN2_3F:PLAN2_2F,m.res2F,"2階　"+m.res2F+"㎡");
+  $("f2-note").textContent=m.res2F+"㎡";
+
+  if(show3){ drawPlan("floor3",PLAN3,m.res3F,"3階　"+m.res3F+"㎡"); $("f3-note").textContent=m.res3F+"㎡"; }
+}
+
+function drawSection(m){
+  var svg=$("section");
+  if(mode!=="new"){svg.innerHTML=T(180,240,"斷面圖僅適用新築模式",13,"var(--muted)");$("sec-note").textContent="—";return;}
+  var W=360,H=480,x0=64,bw=228,o="";
+  var gl=H-108;                       // ground line y
+  var hs=[3.0,2.5,2.4];               // storey clear heights (m)
+  var scale=44;                       // px per metre
+  var y=gl, floors=[];
+  for(var i=0;i<m.floors;i++){ var hpx=hs[i]*scale; y-=hpx; floors.push({y:y,h:hpx,i:i}); }
+  var top=y;
+
+  // roof (無落雪 flat-ish with parapet)
+  o+="<path d='M "+(x0-14)+" "+top+" L "+(x0+bw+14)+" "+top+" L "+(x0+bw+14)+" "+(top-13)+" L "+(x0-14)+" "+(top-7)+" Z' fill='var(--plan-gar)' stroke='var(--plan-wall)' stroke-width='1.6'/>";
+  o+=T(x0+bw/2,top-19,"無落雪屋根（スノーダクト式）",9.5,"var(--ink-2)","middle",true);
+
+  var names=[["1階","事業・車庫"],["2階",m.floors===3?"居住・公":"居住"],["3階","居住・私"]];
+  floors.forEach(function(f){
+    if(f.i===0){
+      var wShop=bw*(m.shopArea/Math.max(1,m.footprint));
+      var wCore=bw*(m.res1F/Math.max(1,m.footprint));
+      o+=R(x0,f.y,wShop,f.h,"var(--plan-shop)","var(--plan-wall)",1.4);
+      o+=T(x0+wShop/2,f.y+f.h/2+4,"店舖 "+m.shopArea+"㎡",10,"var(--ink)","middle",true);
+      o+=R(x0+wShop,f.y,wCore,f.h,"var(--plan-core)","var(--plan-wall)",1.4);
+      if(m.garType==="builtin"&&m.garArea>0){
+        o+=R(x0+wShop+wCore,f.y,bw-wShop-wCore,f.h,"var(--plan-gar)","var(--plan-wall)",1.4);
+        o+=T(x0+wShop+wCore+(bw-wShop-wCore)/2,f.y+f.h/2+4,"車庫",10,"var(--ink)","middle",true);
+      }
+    }else{
+      var area=(f.i===1)?m.res2F:m.res3F;
+      o+=R(x0,f.y,bw,f.h,"var(--plan-res)","var(--plan-wall)",1.4);
+      o+=T(x0+bw/2,f.y+f.h/2+4,names[f.i][1]+" "+area+"㎡",10,"var(--ink)","middle",true);
+    }
+    o+=T(x0-9,f.y+f.h/2+4,names[f.i][0],10,"var(--ink)","end",true);
+    o+="<line x1='"+(x0+bw+8)+"' y1='"+f.y+"' x2='"+(x0+bw+8)+"' y2='"+(f.y+f.h)+"' stroke='var(--muted)' stroke-width='1'/>";
+    o+="<text x='"+(x0+bw+20)+"' y='"+(f.y+f.h/2+4)+"' font-size='9' fill='var(--muted)' text-anchor='middle' font-family='IBM Plex Mono,monospace'>"+hs[f.i].toFixed(1)+"m</text>";
+  });
+  o+=R(x0,top,bw,gl-top,"none","var(--plan-wall)",2.4);
+
+  // ground + foundation
+  o+="<line x1='16' y1='"+gl+"' x2='"+(W-16)+"' y2='"+gl+"' stroke='var(--plan-wall)' stroke-width='2.2'/>";
+  o+=T(28,gl-6,"GL",9,"var(--muted)","start",true);
+  var fd=1.0*scale;
+  o+=R(x0+4,gl,bw-8,fd,"var(--plan-core)","var(--plan-wall)",1.4);
+  o+=T(x0+bw/2,gl+fd/2+4,"基礎（凍結深度 1.0m 以下）",9.5,"var(--ink-2)","middle",true);
+  o+="<path d='M "+(x0-30)+" "+gl+" L "+(x0-30)+" "+(gl+fd)+"' stroke='var(--muted)' stroke-width='1'/>";
+
+  // annotations
+  var notes=[];
+  notes.push("1階天井高 3.0m（廚房排氣・車庫）");
+  if(m.floors===3) notes.push("木造3階建て＝構造計算必須・準耐火構造");
+  notes.push("斷熱等級 "+sv("s-insul")+"　全周高氣密");
+  var ny=32;
+  notes.forEach(function(n){ o+=T(W/2,ny,"・"+n,9,"var(--muted)"); ny+=13; });
+  o+=T(W/2,H-8,"斷面示意　高度為淨高，非結構圖",9,"var(--muted)");
+  svg.innerHTML=o;
+  $("sec-note").textContent=m.floors+"階 · 延床"+Math.round(m.floorTotal)+"㎡";
+}
+
+function drawChart(m){
+  var W=720,H=190,pad=6,zero=H/2,bw=(W-pad*2)/12;
+  var mx=Math.max.apply(null,m.months.map(function(r){return Math.abs(r.net);}).concat([1]));
+  var o="<line x1='0' y1='"+zero+"' x2='"+W+"' y2='"+zero+"' stroke='var(--line-strong)'/>";
+  m.months.forEach(function(r,i){
+    var h=Math.abs(r.net)/mx*(H/2-16), x=pad+i*bw+bw*0.16, w=bw*0.68;
+    var y=r.net>=0?zero-h:zero, col=r.net>=0?"var(--ok)":"var(--bad)";
+    o+="<rect x='"+x.toFixed(1)+"' y='"+y.toFixed(1)+"' width='"+w.toFixed(1)+"' height='"+Math.max(1,h).toFixed(1)+"' fill='"+col+"' opacity='"+(r.winter?"1":"0.62")+"'/>";
+    o+="<text x='"+(x+w/2).toFixed(1)+"' y='"+(r.net>=0?(y-4):(y+h+12)).toFixed(1)+"' text-anchor='middle' font-size='9' font-family='IBM Plex Mono,monospace' fill='var(--muted)'>"+(i+1)+"</text>";
+  });
+  $("chart").innerHTML=o;
+}
+
+function drawMatrix(m){
+  var owns=[300,500,700,900,1200,1500], you=Math.round(m.ownTW/10000);
+  if(owns.indexOf(you)<0){owns.push(you);owns.sort(function(a,b){return a-b;});}
+  var scen=[["保守",0.83],["基準",1.00],["強氣",1.21]];
+  var h="<thead><tr><th>自有資金</th><th>需借款</th><th>月付</th>";
+  scen.forEach(function(s){h+="<th>"+s[0]+" 日商"+yen(Math.round(m.daily*s[1]))+"</th>";});
+  h+="</tr></thead><tbody>";
+  owns.forEach(function(o){
+    var ownJP=o*10000*m.fx, loanJP=Math.max(0,m.total-ownJP), loanTW=loanJP/m.fx;
+    var p=pmt(loanTW,v("i-rate"),v("i-term"))*m.fx;
+    var sb=v("i-selfBurden")/100, salM=sb>=1?0:(v("i-living")+p)/(1-sb);
+    var need=salM*12*(1+v("i-coBurden")/100);
+    h+="<tr"+(o===you?" class='you'":"")+"><td>NT$"+o.toLocaleString("en-US")+"萬</td>"+
+       "<td class='cell'>"+(loanTW>0?("NT$"+Math.round(loanTW/10000).toLocaleString("en-US")+"萬"):"—")+"</td>"+
+       "<td class='cell'>"+(p>0?yen(p):"—")+"</td>";
+    scen.forEach(function(s){
+      var slack=(m.daily*s[1]*m.perD-m.fixedYr)-need;
+      h+="<td class='cell "+(slack>=1000000?"g":(slack>=0?"y":"r"))+"'>"+sign(slack)+"</td>";
+    });
+    h+="</tr>";
+  });
+  $("matrix").innerHTML=h+"</tbody>";
+
+  var minOwn=null;
+  for(var o2=100;o2<=3500;o2+=25){
+    var ownJP=o2*10000*m.fx, loanTW=Math.max(0,m.total-ownJP)/m.fx;
+    var p=pmt(loanTW,v("i-rate"),v("i-term"))*m.fx;
+    var sb=v("i-selfBurden")/100, salM=sb>=1?0:(v("i-living")+p)/(1-sb);
+    if((m.daily*m.perD-m.fixedYr)-salM*12*(1+v("i-coBurden")/100)>=0){minOwn=o2;break;}
+  }
+  var f=[];
+  if(minOwn!==null) f.push([you>=minOwn?"ok":"bad",
+    "以日商 "+yen(m.daily)+" 與這個配置，<b>自有資金至少要 NT$"+minOwn.toLocaleString("en-US")+"萬</b>才打平。你現在是 NT$"+you.toLocaleString("en-US")+"萬。"]);
+  else f.push(["bad","<b>不論自有資金多少都打不平。</b>就算零貸款，日商 "+yen(m.daily)+" 也養不起這個固定費結構。"]);
+  f.push(["ok","綠＝年度餘裕 ¥1,000,000 以上（舒適）　黃＝打平到 ¥1,000,000（吃緊）　紅＝赤字"]);
+  $("mxflags").innerHTML=f.map(function(x){return "<div class='flag' data-t='"+x[0]+"'>"+x[1]+"</div>";}).join("");
+}
+
+/* ── render ────────────────────────────────────────── */
+function render(){
+  applyOptions();
+  var m=model();
+  $("stamp-mode").textContent = mode==="used"?"中古改裝":"新築";
+  $("opt-new").hidden = (mode!=="new");
+  $("sec-checks").hidden = (mode!=="new");
+  $("sec-plan").hidden = false;
+
+  drawSite(m); drawSection(m); drawFloors(m); drawChart(m); drawMatrix(m);
+
+  // checks
+  if(mode==="new"){
+    var ck=[
+      ["冬季客用車位",m.custWinter+" 台","夏季 "+m.custSummer+" 台"+(m.openPriv>0?" · 已扣私家車 "+m.openPriv+" 台佔位":"")+(m.rentCars>0?" · "+m.rentCars+"台租外面":""),
+        m.custWinter>=5?"ok":(m.custWinter>=3?"warn":"bad")],
+      ["私家車安置",m.garCars>0?(Math.min(m.privCars,m.garCars)+" 台進車庫"):"0 台進車庫",
+        (m.openPriv>0?m.openPriv+"台露天 ":"")+(m.rentCars>0?m.rentCars+"台月極 "+yen(m.rentCars*v("i-privRent")*12)+"/年":"")||"全部收容",
+        m.openPriv===0?"ok":"warn"],
+      ["居住比例",m.resPct.toFixed(1)+"%",(m.garRes?"車庫計入":"車庫不計入")+" · 需 ≥50%",
+        m.resPct>=53?"ok":(m.resPct>=50?"warn":"bad")],
+      ["建蔽率",m.bcr.toFixed(1)+"%","上限一般 60%",m.bcr<=55?"ok":(m.bcr<=60?"warn":"bad")],
+      ["容積率",m.far.toFixed(1)+"%","上限一般 200% · 車庫扣延床1/5",m.far<=180?"ok":(m.far<=200?"warn":"bad")],
+      ["延床面積",Math.round(m.floorTotal)+"㎡",m.floors+"階建て · 住居"+m.resArea+" 店舖"+m.shopArea+" 車庫"+m.garArea,"ok"],
+      ["基地尺寸",m.frontage.toFixed(1)+"×"+m.depth.toFixed(1)+"m","雪置場 "+Math.round(m.snowArea)+"㎡",
+        m.frontage>=15?"ok":"warn"]
+    ];
+    $("checks").innerHTML=ck.map(function(c){
+      return "<div class='check' data-t='"+c[3]+"'><span class='k'>"+c[0]+"</span><span class='v'>"+c[1]+"</span><span class='n'>"+c[2]+"</span></div>";}).join("");
+
+    var cf=[];
+    if(m.custWinter<3) cf.push(["bad","<b>冬季只剩 "+m.custWinter+" 個客用車位。</b>北海道的外帶店沒車位就沒生意——加大土地、縮小建築面積，或把私家車改成月極停車場。"]);
+    else if(m.custWinter<5) cf.push(["warn","冬季客用車位 "+m.custWinter+" 台，尖峰會塞。把私家車移到月極（"+yen(v("i-privRent"))+"／台／月）比多買土地便宜得多。"]);
+    else cf.push(["ok","冬季客用車位 "+m.custWinter+" 台，對外帶店足夠。"]);
+    if(m.openPriv>0) cf.push(["warn","<b>私家車有 "+m.openPriv+" 台停在自家露天，直接吃掉 "+m.openPriv+" 個客用車位。</b>改成「放不下的租月極」：每台 "+yen(v("i-privRent"))+"／月＝一年 "+yen(v("i-privRent")*12)+"，換回 "+m.openPriv+" 個冬季客位。以車位換營收，這筆非常划算。"]);
+
+    if(m.resPct<50) cf.push(["bad","<b>居住比例 "+m.resPct.toFixed(1)+"% 低於 50%。</b>車庫已依你的確認不計入居住部分，固定資產稅的住宅用地特例（土地稅額 1/6）會失效，每年多繳數十萬日圓。把住居加大或店舖／車庫縮小。"]);
+    else if(m.resPct<53) cf.push(["warn","居住比例 "+m.resPct.toFixed(1)+"%，只比 50% 高一點。任何設計變更都可能踩線——做到 53% 留邊際，並在設計階段向千歲市稅務課書面確認。"]);
+    else cf.push(["ok","居住比例 "+m.resPct.toFixed(1)+"%（車庫不計入），住宅用地特例有安全邊際。"]);
+
+    if(m.rhArea>0) cf.push(["ok","ロードヒーティング "+m.rhArea+"㎡：設置 "+yen(m.rhCost)+"，冬季運轉約 "+yen(m.rhRunM)+"／月（已計入冬季水電）。配管必須在鋪裝前埋設，事後補要打掉重來。"]);
+    else cf.push(["warn","未設 ロードヒーティング。外帶店的客人在門口滑倒是會賠錢也會沒生意的——至少把配管先埋，機器之後再裝。"]);
+
+    if(m.garType==="builtin") cf.push(["warn","內建車庫在建基法上屬「自動車車庫」＝特殊建築物，與住宅間可能需準耐火區劃＋特定防火設備；燈油槽放車庫內另涉消防法危險物規制。兩件都要請設計者與消防署確認。"]);
+
+    if(m.floors===3) cf.push(["warn","<b>3階建ての追加關卡（已加 "+v("i-f3prem")+"% 工程加成）：</b>① 木造3階建ては構造計算（許容応力度計算）必須 ② 準防火地域なら準耐火構造 ③ 1階に飲食店＝複合用途(16)項イ、自動火災報知設備の要否は消防署に個別確認 ④ 北海道で木造3階建てを施工できる工務店は限られる（見積は必ず複数社）⑤ 老後の階段。這五項要在設計前逐一確認。"]);
+    else cf.push(["ok","2階建て：構造・防火・施工者選擇都比3階建て單純，工期與成本也低。"]);
+    $("checkflags").innerHTML=cf.map(function(x){return "<div class='flag' data-t='"+x[0]+"'>"+x[1]+"</div>";}).join("");
+  }
+
+  // cost grid
+  var cg=$("costgrid"); cg.innerHTML="";
+  m.items.forEach(function(r){cg.insertAdjacentHTML("beforeend",
+    "<div>"+esc(r[0])+"</div><div>"+yen(r[1])+"</div><div>"+Math.round(r[1]/m.fx/10000).toLocaleString("en-US")+"萬</div>");});
+  cg.insertAdjacentHTML("beforeend","<div class='tot'>總投資</div><div class='tot'>"+yen(m.total)+"</div><div class='tot'>"+Math.round(m.total/m.fx/10000).toLocaleString("en-US")+"萬</div>");
+  cg.insertAdjacentHTML("beforeend","<div>自有資金</div><div>"+yen(m.ownJP)+"</div><div>"+Math.round(m.ownTW/10000).toLocaleString("en-US")+"萬</div>");
+  cg.insertAdjacentHTML("beforeend","<div><b>需借款</b></div><div><b>"+yen(m.loanJP)+"</b></div><div><b>"+Math.round(m.loanTW/10000).toLocaleString("en-US")+"萬</b></div>");
+  cg.insertAdjacentHTML("beforeend","<div>每月還款</div><div>"+yen(m.pmtJP)+"</div><div>NT$"+Math.round(m.pmtTW).toLocaleString("en-US")+"</div>");
+
+  var ff=[];
+  var loanW=m.loanTW/10000;
+  if(loanW>800) ff.push(["bad","<b>借款 NT$"+Math.round(loanW).toLocaleString("en-US")+"萬 已超過 NT$800萬的建議上限。</b>台灣的銀行未必核得到，而且日商門檻會被推到很難達成的水準。"]);
+  else if(loanW>600) ff.push(["warn","借款 NT$"+Math.round(loanW).toLocaleString("en-US")+"萬 介於安全值（500萬）與上限（800萬）之間。可行，但沒有容錯空間。"]);
+  else if(m.loanJP>0) ff.push(["ok","借款 NT$"+Math.round(loanW).toLocaleString("en-US")+"萬 在安全區間內。"]);
+  else ff.push(["ok","自有資金足以覆蓋全部投資，無需借款。"]);
+  if(m.ownJP>0&&m.loanJP>m.ownJP*2) ff.push(["warn","借款是自有資金的 "+(m.loanJP/m.ownJP).toFixed(1)+" 倍，槓桿偏高。日圓貶值時還款壓力會放大——用台灣端的現金流還台灣的債，兩邊各自封閉，就不吃匯率。"]);
+  if(m.total>=30000000) ff.push(["ok","總投資 "+yen(m.total)+" 已達 経営・管理簽證的 ¥30,000,000 資本金水準。資金須實際投入事業並保全通帳全履歷，否則會被認定為「見せ金」。"]);
+  else ff.push(["warn","總投資 "+yen(m.total)+" 低於 経営・管理簽證的 ¥30,000,000 資本金要件，這條路線本身撐不起簽證申請。"]);
+  $("fundflags").innerHTML=ff.map(function(x){return "<div class='flag' data-t='"+x[0]+"'>"+x[1]+"</div>";}).join("");
+
+  // lines
+  var scale=Math.max(m.beSafe,m.daily)*1.15;
+  function bar(val,color){
+    return "<div class='bar'><i style='width:"+Math.min(100,val/scale*100).toFixed(1)+"%;background:"+color+"'></i>"+
+      "<span class='marker' style='left:"+Math.min(99.5,m.daily/scale*100).toFixed(1)+"%'></span></div>";
+  }
+  $("lines").innerHTML=
+    "<div class='line'><span class='lbl'>店存活線<small>店不倒，但你沒薪水</small></span>"+bar(m.beShop,"var(--muted)")+"<span class='val'>"+yen(m.beShop)+"</span></div>"+
+    "<div class='line'><span class='lbl'>你也活線<small>含生活費與台灣還款</small></span>"+bar(m.beYou,"var(--accent)")+"<span class='val'>"+yen(m.beYou)+"</span></div>"+
+    "<div class='line'><span class='lbl'>安全線<small>再加法人年利益，簽證更新無虞</small></span>"+bar(m.beSafe,"var(--ok)")+"<span class='val'>"+yen(m.beSafe)+"</span></div>"+
+    "<div class='line' style='margin-top:6px;padding-top:10px;border-top:1px solid var(--line)'><span class='lbl'>你設定的日商<small>黑線標記在上方三條上</small></span><div class='bar' style='background:transparent;border-color:transparent'></div><span class='val' style='color:var(--accent)'>"+yen(m.daily)+"</span></div>";
+
+  // monthly table
+  var tb=$("cf").querySelector("tbody"); tb.innerHTML="";
+  m.months.forEach(function(r){
+    tb.insertAdjacentHTML("beforeend","<tr"+(r.winter?" class='winter'":"")+"><td>"+(r.i+1)+"月</td>"+
+      "<td class='n'>"+r.c.toFixed(2)+"</td><td class='n'>"+yenS(r.sales)+"</td><td class='n'>"+yenS(r.vc)+"</td>"+
+      "<td class='n'>"+yenS(m.labor)+"</td><td class='n'>"+yenS(r.util)+"</td>"+
+      "<td class='n'>"+(r.rh?yenS(r.rh):"—")+"</td><td class='n'>"+(r.snow?yenS(r.snow):"—")+"</td>"+
+      "<td class='n'>"+yenS(m.otherM)+"</td><td class='n'>"+yenS(r.op)+"</td>"+
+      "<td class='n "+(r.net<0?"neg":"pos")+"'>"+sign(r.net)+"</td></tr>");
+  });
+  $("cf").querySelector("tfoot").innerHTML="<tr><td>年計</td><td>"+m.seasonSum.toFixed(2)+"</td>"+
+    "<td>"+yenS(m.annual)+"</td><td>"+yenS(m.annual*m.varRate)+"</td><td>"+yenS(m.labor*12)+"</td>"+
+    "<td>"+yenS(m.months.reduce(function(s,r){return s+r.util;},0))+"</td>"+
+    "<td>"+yenS(m.months.reduce(function(s,r){return s+r.rh;},0))+"</td>"+
+    "<td>"+yenS(m.months.reduce(function(s,r){return s+r.snow;},0))+"</td>"+
+    "<td>"+yenS(m.otherM*12)+"</td><td>"+yenS(m.totOp)+"</td>"+
+    "<td class='"+(m.totNet<0?"neg":"pos")+"'>"+sign(m.totNet)+"</td></tr>";
+
+  // year 1
+  $("year1").innerHTML=
+    "<div class='check'><span class='k'>第一年營收</span><span class='v'>"+yenS(m.y1sales)+"</span><span class='n'>成熟期的 "+Math.round(m.y1sales/m.annual*100)+"%</span></div>"+
+    "<div class='check' data-t='"+(m.y1op>=0?"ok":"bad")+"'><span class='k'>第一年營業利益</span><span class='v'>"+sign(m.y1op)+"</span><span class='n'>役員報酬前</span></div>"+
+    "<div class='check' data-t='"+(m.y1net>=0?"ok":"bad")+"'><span class='k'>第一年淨現金</span><span class='v'>"+sign(m.y1net)+"</span><span class='n'>含你的薪水與還款</span></div>"+
+    "<div class='check' data-t='"+(m.working+m.y1net>=0?"ok":"bad")+"'><span class='k'>運轉資金餘額</span><span class='v'>"+sign(m.working+m.y1net)+"</span><span class='n'>備 "+yenS(m.working)+" 減燒掉的</span></div>";
+  var y1=[];
+  if(m.y1net<0&&m.working+m.y1net<0)
+    y1.push(["bad","<b>運轉資金不夠。</b>第一年會燒掉 "+yen(-m.y1net)+"，你只備了 "+yen(m.working)+"，缺口 "+yen(-(m.working+m.y1net))+"。運轉資金至少加到 "+yen(Math.ceil(-m.y1net/500000)*500000)+"。"]);
+  else if(m.y1net<0&&m.working+m.y1net<-m.y1net*0.25)
+    y1.push(["warn","運轉資金撐得過第一年，但緩衝很薄。北海道 1–4 月是連續負現金流，建議再加 ¥1,000,000。"]);
+  else if(m.y1net<0) y1.push(["ok","運轉資金足以撐過第一年爬坡，且留有緩衝。"]);
+  else y1.push(["ok","第一年就有正現金流——這假設偏樂觀，外帶店的市場教育期通常要一年。"]);
+  if(m.negMonths>0) y1.push([m.negMonths>=5?"warn":"ok","成熟期仍有 <b>"+m.negMonths+" 個月</b>負現金流，累計最深谷底 "+yen(m.minCum)+"。元兇是冬季暖房——結構性成本，只能先備好現金。"]);
+  $("y1flags").innerHTML=y1.map(function(x){return "<div class='flag' data-t='"+x[0]+"'>"+x[1]+"</div>";}).join("");
+
+  // verdict
+  var st,tag,title,text,gap=m.daily-m.beYou;
+  if(m.total<30000000){
+    st="bad";tag="簽證擋住";
+    title="總投資低於 ¥30,000,000，這條路線撐不起経営・管理簽證";
+    text="2025年10月改正後，経営・管理要求資本金 ¥30,000,000 以上、至少1名常勤員工、事業計畫須專業士確認、本人或員工 N2 日語。生意算得再漂亮，這關過不了就沒有後面。";
+  }else if(gap>=m.beYou*0.12){
+    st="ok";tag="可行";
+    title="日商 "+yen(m.daily)+" 高於你也活線 "+yen(m.beYou)+"，年度餘裕 "+yen(m.slack);
+    text="這個組合站得住。剩下的問題不是財務，是你能不能真的每天賣到 "+yen(m.daily)+"——約 "+Math.round(m.daily/650)+"–"+Math.round(m.daily/480)+" 位客人。長都駅西側的工廠地帶午餐團訂是最穩的那一塊，先去把它談下來。";
+  }else if(gap>=0){
+    st="warn";tag="勉強";
+    title="日商只比你也活線高 "+yen(gap)+"，幾乎沒有容錯空間";
+    text="任何一個變數往壞的方向走——客流少一成、暖房費多兩成、日圓貶值——就會翻負。降低借款額，或把日商目標調到 "+yen(Math.ceil(m.beSafe/1000)*1000)+"（安全線）再重算。";
+  }else{
+    st="bad";tag="活不下去";
+    title="日商 "+yen(m.daily)+" 低於你也活線 "+yen(m.beYou)+"，每年短少 "+yen(-m.slack);
+    text="以這個資金結構，你每月要從存款拿 "+yen(-m.slack/12)+" 補洞。三條路：把日商提到 "+yen(Math.ceil(m.beYou/1000)*1000)+" 以上、增加自有資金把借款壓下來、或換更便宜的物件路線。";
+  }
+  $("verdict").setAttribute("data-state",st);
+  $("v-tag").textContent=tag; $("v-title").textContent=title; $("v-text").textContent=text;
+  $("k-total").textContent=yen(m.total);
+  $("k-total-tw").textContent="NT$"+Math.round(m.total/m.fx/10000).toLocaleString("en-US")+"萬";
+  $("k-loan").textContent=yen(m.loanJP);
+  $("k-loan-m").textContent=m.loanJP>0?("月付 "+yen(m.pmtJP)):"無需借款";
+  $("k-be").textContent=yen(m.beYou);
+  $("k-daily").textContent=yen(m.daily);
+  $("k-daily-gap").textContent=(gap>=0?"高於門檻 ":"低於門檻 ")+yen(Math.abs(gap));
+  $("k-slack").textContent=sign(m.slack);
+}
+
+/* ── wiring ────────────────────────────────────────── */
+function setMode(n){
+  mode=n;
+  $("m-used").setAttribute("aria-pressed",String(n==="used"));
+  $("m-new").setAttribute("aria-pressed",String(n==="new"));
+  $("grp-used").hidden=(n!=="used");
+  $("grp-new").hidden=(n!=="new");
+  render();
+}
+$("m-used").addEventListener("click",function(){setMode("used");});
+$("m-new").addEventListener("click",function(){setMode("new");});
+
+document.querySelectorAll("[data-preset]").forEach(function(b){
+  b.addEventListener("click",function(){
+    var p=PRESETS[b.getAttribute("data-preset")]; if(!p)return;
+    Object.keys(p).forEach(function(k){
+      if(k==="mode"||k==="sel")return;
+      var el=$("i-"+k); if(el)el.value=p[k];
+    });
+    if(p.sel){
+      if(p.sel.floors)$("s-floors").value=p.sel.floors;
+      if(p.sel.garage)$("s-garage").value=p.sel.garage;
+      if(p.sel.rh)$("s-rh").value=p.sel.rh;
+      if(p.sel.insul)$("s-insul").value=p.sel.insul;
+      if(p.sel.kitchen)$("s-kitchen").value=p.sel.kitchen;
+      if(p.sel.priv)$("s-priv").value=p.sel.priv;
+    }
+    $("r-own").value=$("i-own").value;
+    $("r-daily").value=$("i-daily").value;
+    setMode(p.mode);
+  });
+});
+
+[["i-own","r-own"],["i-daily","r-daily"]].forEach(function(pr){
+  var n=$(pr[0]),r=$(pr[1]);
+  n.addEventListener("input",function(){r.value=n.value;render();});
+  r.addEventListener("input",function(){n.value=r.value;render();});
+});
+document.querySelectorAll("input, select").forEach(function(el){
+  el.addEventListener("input",render);
+  el.addEventListener("change",render);
+});
+
+render();
+})();
+</script>
+
+</body>
+</html>
