@@ -63,47 +63,8 @@ body{margin:0;background:var(--bg);color:var(--ink);
 .num{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
 
 /* ── shell ── */
-.shell{display:grid;grid-template-columns:216px minmax(0,1fr);min-height:100vh}
-@media (max-width:900px){.shell{grid-template-columns:1fr}}
 
-/* ── side nav (report style) ── */
-nav.sidenav{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;
-  display:flex;flex-direction:column;gap:2px;padding:22px 0 30px;
-  background:var(--surface);border-right:1px solid var(--line)}
-@media (max-width:900px){
-  nav.sidenav{position:sticky;top:0;height:auto;max-height:none;flex-direction:row;flex-wrap:wrap;
-    align-items:center;gap:3px 10px;padding:11px 16px 10px;
-    border-right:0;border-bottom:1px solid var(--line);z-index:20}
-}
-.nav-brand{padding:0 20px 16px;margin-bottom:8px;border-bottom:1px solid var(--line)}
-.nav-brand b{display:block;font-family:'Noto Serif TC',Georgia,serif;font-size:19px;
-  font-weight:700;line-height:1.25;letter-spacing:-.01em}
-.nav-brand-sub{display:block;font-size:11px;color:var(--muted);margin-top:4px;
-  font-family:'IBM Plex Mono',monospace;letter-spacing:.06em}
-@media (max-width:900px){
-  .nav-brand{width:100%;border-bottom:0;padding:0;margin:0 0 6px}
-  .nav-brand b{font-size:17px}.nav-brand-sub{display:none}
-  .nav-section-label{display:none}
-}
-.nav-section-label{font-size:10px;letter-spacing:.14em;text-transform:uppercase;
-  color:var(--muted);font-weight:700;padding:14px 20px 5px}
-nav.sidenav > a{display:flex;align-items:center;gap:9px;padding:7px 20px;
-  color:var(--ink-2);text-decoration:none;font-size:13.5px;line-height:1.4;
-  border-left:3px solid transparent}
-nav.sidenav > a:hover{color:var(--accent);background:var(--surface-2)}
-nav.sidenav > a.on{color:var(--accent);border-left-color:var(--accent);
-  background:var(--accent-soft);font-weight:700}
-nav.sidenav > a:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
-.nav-dot{width:5px;height:5px;border-radius:50%;background:var(--line-strong);flex:none}
-nav.sidenav > a.on .nav-dot{background:var(--accent)}
-@media (max-width:900px){
-  nav.sidenav > a{padding:3px 0;border-left:0;font-size:12.5px;background:none!important}
-  nav.sidenav > a.on{background:none;text-decoration:underline;text-underline-offset:3px}
-  .nav-dot{display:none}
-}
 
-main.main{min-width:0;padding:26px 26px 90px;max-width:1180px}
-@media (max-width:640px){main.main{padding:18px 15px 70px}}
 
 header.masthead{padding-bottom:18px;margin-bottom:22px;border-bottom:2px solid var(--ink)}
 .masthead h1{font-family:'Noto Serif TC',Georgia,serif;font-weight:700;
@@ -260,40 +221,132 @@ svg.plan text{font-family:'Noto Sans TC',sans-serif}
 footer.foot{padding-top:20px;border-top:1px solid var(--line);
   font-size:12px;color:var(--muted);line-height:1.85;max-width:86ch}
 footer.foot b{color:var(--ink-2)}
-</style>
 
+/* ── report-style nav (對齊 台股/美股報告 nav 規格) ── */
+.shell{display:flex;min-height:100vh}
+nav.sidenav{width:230px;min-width:230px;background:var(--surface);
+  border-right:1px solid var(--line);position:sticky;top:0;height:100vh;overflow-y:auto;
+  padding:28px 0 40px;display:flex;flex-direction:column;
+  scrollbar-width:thin;scrollbar-color:rgba(120,140,160,.35) transparent}
+.nav-brand{padding:0 18px 22px;border-bottom:1px solid var(--line);margin-bottom:14px}
+.nav-brand-title{font-family:'Noto Serif TC',Georgia,serif;font-size:17px;
+  color:var(--accent);font-weight:700;line-height:1.25}
+.nav-brand-sub{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);
+  letter-spacing:.1em;margin-top:6px;text-transform:uppercase}
+.nav-section-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--muted);padding:14px 18px 5px;font-weight:600}
+nav.sidenav a{display:flex;align-items:center;gap:9px;padding:7px 18px;color:var(--ink-2);
+  text-decoration:none;font-size:13px;line-height:1.4;transition:all .14s;
+  border-left:2px solid transparent}
+nav.sidenav a:hover{color:var(--ink);background:var(--surface-2);border-left-color:var(--accent)}
+nav.sidenav a.on{color:var(--accent);background:var(--accent-soft);
+  border-left-color:var(--accent);font-weight:700}
+nav.sidenav a:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.nav-num{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--muted);
+  min-width:16px;font-variant-numeric:tabular-nums}
+nav.sidenav a.on .nav-num{color:var(--accent)}
+.nav-dot{width:5px;height:5px;border-radius:50%;background:var(--line-strong);min-width:5px}
+nav.sidenav a.on .nav-dot{background:var(--accent)}
+.izy-section{margin-top:auto;padding:18px;border-top:1px solid var(--line)}
+.izy-badge{background:var(--surface-2);border:1px solid var(--line);border-radius:7px;padding:11px 13px}
+.izy-badge-label{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.06em;
+  color:var(--accent);text-transform:uppercase;margin-bottom:4px;font-weight:600}
+.izy-badge-text{font-size:11.5px;color:var(--muted);line-height:1.55}
+
+@media (max-width:900px){
+  .shell{display:block}
+  nav.sidenav{position:sticky;top:0;width:auto;min-width:0;height:auto;max-height:none;
+    flex-direction:row;flex-wrap:wrap;align-items:center;gap:4px 12px;
+    border-right:0;border-bottom:1px solid var(--line);padding:11px 15px 9px;z-index:20}
+  .nav-brand{width:100%;border-bottom:0;padding:0;margin:0 0 5px}
+  .nav-brand-title{font-size:15px}
+  .nav-brand-sub{display:none}
+  .nav-section-label{display:none}
+  nav.sidenav a{padding:2px 0;border-left:0;font-size:12px;white-space:nowrap;background:none!important}
+  nav.sidenav a.on{background:none;text-decoration:underline;text-underline-offset:3px}
+  .nav-dot{display:none}
+  .izy-section{display:none}
+}
+
+main.main{min-width:0;flex:1;padding:26px 26px 90px;max-width:1180px}
+@media (max-width:640px){main.main{padding:18px 15px 70px}}
+
+/* 段號徽章（區塊標題左側） */
+.block-head{display:flex;align-items:baseline;gap:12px}
+.sec-num{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;
+  color:var(--accent);background:var(--accent-soft);border:1px solid var(--accent);
+  border-radius:2px;padding:2px 7px;flex:none;letter-spacing:.04em}
+.block-head > div{min-width:0}
+
+/* 兩欄定義清單（詞→解釋，右欄成一條線） */
+.deflist{display:grid;grid-template-columns:max-content 1fr;gap:11px 22px;align-items:baseline}
+.deflist .row{display:contents}
+.deflist .t{font-weight:700;font-size:13.5px;white-space:nowrap}
+.deflist .t code{font-family:'IBM Plex Mono',monospace;font-size:12.5px;
+  background:var(--surface-2);padding:1px 5px;border-radius:2px}
+.deflist .d{color:var(--ink-2);font-size:13.5px;line-height:1.7}
+@media (max-width:560px){
+  .deflist{grid-template-columns:1fr;gap:3px 0}
+  .deflist .row{display:block;padding-bottom:12px}
+  .deflist .t{margin-bottom:2px}
+}
+
+/* 完整研判 */
+.verdictdoc{display:flex;flex-direction:column;gap:20px}
+.vd-part > h4{margin:0 0 7px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--accent);font-weight:700}
+.vd-part p{margin:0;font-size:14.5px;line-height:1.85;color:var(--ink-2);max-width:76ch}
+.vd-part p + p{margin-top:9px}
+.vd-part b{color:var(--ink)}
+.chain{font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:2;
+  background:var(--surface-2);border-left:3px solid var(--accent);
+  padding:13px 16px;border-radius:2px;overflow-x:auto;white-space:pre}
+</style>
 </head>
 <body>
 <div class="shell">
 
 <nav class="sidenav" id="nav">
-  <div class="nav-brand"><b>千歲開店試算盤</b><span class="nav-brand-sub">Chitose · Osatsu</span></div>
+  <div class="nav-brand">
+    <div class="nav-brand-title">千歲開店試算盤</div>
+    <div class="nav-brand-sub">▸ Chitose · Osatsu</div>
+  </div>
   <div class="nav-section-label">結論</div>
-  <a href="#s-verdict"><span class="nav-dot"></span>判定</a>
+  <a href="#sec-hl"><span class="nav-num">00</span><div class="nav-dot"></div>判定摘要</a>
+  <div class="nav-section-label">說明</div>
+  <a href="#sec-guide"><span class="nav-num">01</span><div class="nav-dot"></div>名詞與使用說明</a>
   <div class="nav-section-label">輸入</div>
-  <a href="#s-setup"><span class="nav-dot"></span>設定</a>
+  <a href="#sec-setup"><span class="nav-num">02</span><div class="nav-dot"></div>設定</a>
   <div class="nav-section-label">設計</div>
-  <a href="#s-plan"><span class="nav-dot"></span>配置圖與平面圖</a>
-  <a href="#s-site"><span class="nav-dot"></span>基地檢查</a>
+  <a href="#sec-plan"><span class="nav-num">03</span><div class="nav-dot"></div>配置圖與平面圖</a>
+  <a href="#sec-site"><span class="nav-num">04</span><div class="nav-dot"></div>基地檢查</a>
   <div class="nav-section-label">財務</div>
-  <a href="#s-fund"><span class="nav-dot"></span>資金結構</a>
-  <a href="#s-be"><span class="nav-dot"></span>三條損益線</a>
-  <a href="#s-cf"><span class="nav-dot"></span>12個月現金流</a>
-  <a href="#s-y1"><span class="nav-dot"></span>第一年燒錢</a>
-  <a href="#s-mx"><span class="nav-dot"></span>自有資金矩陣</a>
+  <a href="#sec-fund"><span class="nav-num">05</span><div class="nav-dot"></div>資金結構</a>
+  <a href="#sec-be"><span class="nav-num">06</span><div class="nav-dot"></div>三條損益線</a>
+  <a href="#sec-cf"><span class="nav-num">07</span><div class="nav-dot"></div>12個月現金流</a>
+  <a href="#sec-y1"><span class="nav-num">08</span><div class="nav-dot"></div>第一年燒錢</a>
+  <a href="#sec-mx"><span class="nav-num">09</span><div class="nav-dot"></div>自有資金矩陣</a>
   <div class="nav-section-label">對策</div>
-  <a href="#s-save"><span class="nav-dot"></span>省錢清單</a>
+  <a href="#sec-save"><span class="nav-num">10</span><div class="nav-dot"></div>省錢清單</a>
+  <a href="#sec-judge"><span class="nav-num">11</span><div class="nav-dot"></div>完整研判</a>
+  <div class="izy-section">
+    <div class="izy-badge">
+      <div class="izy-badge-label">Yoda Research</div>
+      <div class="izy-badge-text">北海道千歲市長都<br>水煎包／牛肉鍋外帶店<br>開店可行性試算</div>
+    </div>
+  </div>
 </nav>
 
 <main class="main">
 
 <header class="masthead">
   <h1>千歲開店試算盤</h1>
-  <p>北海道千歲市長都・水煎包／牛肉鍋外帶店。改設定，右邊即時算錢、畫圖，並判斷你活不活得下來。</p>
+  <p>北海道千歲市長都・水煎包／牛肉鍋外帶店。改設定，下面所有區塊即時算錢、畫圖，並判斷你活不活得下來。</p>
 </header>
 
-<section class="block" id="s-verdict" data-state="warn">
-  <div class="block-head"><h2>判定</h2><p>把你的錢、這個物件方案、和營收假設放在一起，會發生什麼事</p></div>
+<section class="block" id="sec-hl" data-state="warn">
+  <div class="block-head"><span class="sec-num">00</span><div><h2>判定摘要</h2>
+    <p>把你的錢、這個物件方案、和營收假設放在一起，會發生什麼事</p></div></div>
   <div class="block-body">
     <span class="verdict-tag" id="v-tag">計算中</span>
     <h3 id="v-title">—</h3>
@@ -314,8 +367,34 @@ footer.foot b{color:var(--ink-2)}
   </div>
 </section>
 
-<section class="block" id="s-setup">
-  <div class="block-head"><h2>設定</h2><p>全部展開，改哪一項下面所有區塊立刻重算重畫</p></div>
+<section class="block" id="sec-guide">
+  <div class="block-head"><span class="sec-num">01</span><div><h2>名詞與使用說明</h2>
+    <p>三條損益線是什麼、為什麼要看冬天、以及這張表算不出來的東西</p></div></div>
+  <div class="block-body">
+    <div class="deflist">
+      <div class="row"><div class="t">日商</div><div class="d">一天的營業額。這是<b>假設，不是上限</b>——兩口業務用平底鍋的物理產能超過 ¥180,000／日，所以 ¥70,000 只是保守的規劃起點。拉上面的滑桿看不同假設下的結果。</div></div>
+      <div class="row"><div class="t">店存活線</div><div class="d">只覆蓋店的固定費與變動費。過了這條線店不會倒，<b>但你沒有薪水</b>。</div></div>
+      <div class="row"><div class="t">你也活線</div><div class="d">再加上你的日本生活費、台灣的貸款月付、以及社保稅。<b>低於這條線就是每個月從存款裡拿錢補洞。</b></div></div>
+      <div class="row"><div class="t">安全線</div><div class="d">再加法人年度利益。経営・管理簽證更新時會看事業是否獲利，<b>連續赤字是更新風險</b>——所以這條線不是貪心，是保簽證。</div></div>
+      <div class="row"><div class="t">年度餘裕</div><div class="d">營業利益減掉「你的薪水＋社保」之後剩下的。負數代表這個組合每年短少多少。</div></div>
+      <div class="row"><div class="t">居住比例</div><div class="d">住居 ÷ 總樓地板。<b>≥50% 才保得住固定資產稅的住宅用地特例</b>（土地稅額降至 1/6）。依你的確認，<b>車庫不計入居住部分</b>，只進分母。建議做到 53% 以上留邊際。</div></div>
+      <div class="row"><div class="t">事業用<br>定期借地</div><div class="d">租土地、自己蓋房子，建物登記在法人名下。<b>入管的「事業所確保」要件照樣滿足。</b>省下整筆土地款，代價是每年地代與期滿的更地返還（拆屋）義務。存續期間要談到 30 年以上。</div></div>
+      <div class="row"><div class="t">ロード<br>ヒーティング</div><div class="d">融雪設備。<b>配管必須在鋪裝前埋</b>，事後補要把停車場打掉重來；機器可以之後再裝。所以「只埋配管」是唯一合理的省法。</div></div>
+      <div class="row"><div class="t">冬季車位</div><div class="d">積雪後實際可用的車位，約為夏季的 72%，另外還要扣掉敷地 15% 的雪置場。<b>北海道的外帶店沒車位就沒生意。</b></div></div>
+      <div class="row"><div class="t">變動費率</div><div class="d">原價＋包材＋刷卡手續。<b>包材是外帶店特有的成本</b>（內用店沒有），約佔營收 4–5%，很多人會漏算。</div></div>
+      <div class="row"><div class="t">季節係數</div><div class="d">千歲的旺淡季擺盪只有 ±15%（2月雪祭、8月盆、12月忘年會為高點）。這正是選千歲不選富良野的量化理由——富良野的擺盪是 ±80%。</div></div>
+      <div class="row"><div class="t">❄ 標記</div><div class="d">冬季高暖房費月份（11–3月）。<b>1–4 月是連續負現金流</b>，這是北海道的結構性成本，不能優化掉，只能先備好現金。</div></div>
+    </div>
+    <div class="flags">
+      <div class="flag" data-t="warn"><b>這張表算不出來的三件事：</b>① 你能不能真的每天賣掉那麼多（需求，不是產能）② 建物單價與土地實勢價的實際見積（誤差可達 ±15%）③ 簽證會不會過（那是行政書士的事，不是算術）。</div>
+      <div class="flag" data-t="ok"><b>怎麼用：</b>先按上面的方案預設載入一組，再拉「日商」和「自有資金」兩個滑桿看它怎麼翻牌。判定變紅時，直接跳到 <b>10 省錢清單</b>。</div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="sec-setup">
+  <div class="block-head"><span class="sec-num">02</span><div><h2>設定</h2>
+    <p>全部展開，改哪一項下面所有區塊立刻重算重畫</p></div></div>
   <div class="block-body">
     <div class="optgrid">
 
@@ -472,8 +551,9 @@ footer.foot b{color:var(--ink-2)}
   </div>
 </section>
 
-<section class="block" id="s-plan">
-  <div class="block-head"><h2>配置圖與平面圖</h2><p>依設定即時重畫。示意用，實際配置依基地形狀與法規</p></div>
+<section class="block" id="sec-plan">
+  <div class="block-head"><span class="sec-num">03</span><div><h2>配置圖與平面圖</h2>
+    <p>依設定即時重畫。示意用，實際配置依基地形狀與法規</p></div></div>
   <div class="block-body">
     <div class="plans">
       <div class="plan-wrap">
@@ -513,23 +593,27 @@ footer.foot b{color:var(--ink-2)}
   </div>
 </section>
 
-<section class="block" id="s-site">
-  <div class="block-head"><h2>基地檢查</h2><p>停車位、居住比例、建蔽容積——買地前必須先算贏的幾件事</p></div>
+<section class="block" id="sec-site">
+  <div class="block-head"><span class="sec-num">04</span><div><h2>基地檢查</h2>
+    <p>停車位、居住比例、建蔽容積——買地前必須先算贏的幾件事</p></div></div>
   <div class="block-body"><div class="checks" id="checks"></div><div class="flags" id="checkflags"></div></div>
 </section>
 
-<section class="block" id="s-fund">
-  <div class="block-head"><h2>資金結構</h2><p>總投資如何被自有與借款切開，以及每月要還多少</p></div>
+<section class="block" id="sec-fund">
+  <div class="block-head"><span class="sec-num">05</span><div><h2>資金結構</h2>
+    <p>總投資如何被自有與借款切開，以及每月要還多少</p></div></div>
   <div class="block-body"><div class="costgrid" id="costgrid"></div><div class="flags" id="fundflags"></div></div>
 </section>
 
-<section class="block" id="s-be">
-  <div class="block-head"><h2>三條損益線</h2><p>你的日商落在哪一段，決定這件事是生意還是負擔</p></div>
+<section class="block" id="sec-be">
+  <div class="block-head"><span class="sec-num">06</span><div><h2>三條損益線</h2>
+    <p>你的日商落在哪一段，決定這件事是生意還是負擔</p></div></div>
   <div class="block-body"><div class="lines" id="lines"></div></div>
 </section>
 
-<section class="block" id="s-cf">
-  <div class="block-head"><h2>12個月現金流</h2><p>成熟期（第2–3年）。北海道的冬天在表上看得見</p></div>
+<section class="block" id="sec-cf">
+  <div class="block-head"><span class="sec-num">07</span><div><h2>12個月現金流</h2>
+    <p>成熟期（第2–3年）。北海道的冬天在表上看得見</p></div></div>
   <div class="block-body">
     <svg class="chart" id="chart" viewBox="0 0 720 190" preserveAspectRatio="none" role="img" aria-label="12個月淨現金流"></svg>
     <div class="legend">
@@ -545,23 +629,31 @@ footer.foot b{color:var(--ink-2)}
   </div>
 </section>
 
-<section class="block" id="s-y1">
-  <div class="block-head"><h2>第一年燒錢</h2><p>運轉資金夠不夠撐過爬坡期</p></div>
+<section class="block" id="sec-y1">
+  <div class="block-head"><span class="sec-num">08</span><div><h2>第一年燒錢</h2>
+    <p>運轉資金夠不夠撐過爬坡期</p></div></div>
   <div class="block-body"><div class="checks" id="year1"></div><div class="flags" id="y1flags"></div></div>
 </section>
 
-<section class="block" id="s-mx">
-  <div class="block-head"><h2>自有資金 × 營收情境</h2><p>格內為年度餘裕。橘框是你目前的位置</p></div>
+<section class="block" id="sec-mx">
+  <div class="block-head"><span class="sec-num">09</span><div><h2>自有資金 × 營收情境</h2>
+    <p>格內為年度餘裕。橘框是你目前的位置</p></div></div>
   <div class="block-body"><div class="scroll"><table class="matrix" id="matrix"></table></div><div class="flags" id="mxflags"></div></div>
 </section>
 
-<section class="block" id="s-save">
-  <div class="block-head"><h2>省錢清單</h2><p>每一條都算給你看省多少、日商門檻降多少、代價是什麼。依目前設定即時計算</p></div>
+<section class="block" id="sec-save">
+  <div class="block-head"><span class="sec-num">10</span><div><h2>省錢清單</h2>
+    <p>每一條都算給你看省多少、日商門檻降多少、代價是什麼。依目前設定即時計算</p></div></div>
   <div class="block-body"><div class="scroll"><table id="savetbl"></table></div><div class="flags" id="saveflags"></div></div>
 </section>
 
+<section class="block" id="sec-judge">
+  <div class="block-head"><span class="sec-num">11</span><div><h2>完整研判</h2>
+    <p>把上面所有區塊收束成一段話：這個組合成不成立、卡在哪、下一步做什麼</p></div></div>
+  <div class="block-body"><div class="verdictdoc" id="judge"></div></div>
+</section>
+
 <footer class="foot">
-  <b>怎麼讀。</b>「你也活線」是把日本生活費與台灣還款都算進去後的損益兩平日商；低於這條線就是每月從存款補洞。「安全線」再加法人年度利益，因為経営・管理簽證更新會看事業獲利，連續赤字是更新風險。<br>
   <b>車庫的認定。</b>依你的確認，<b>車庫不計入居住部分</b>，只進總樓地板的分母。居住比例需 ≥50% 才保得住固定資產稅的住宅用地特例（土地稅額 1/6）；建議做到 53% 以上，並在設計階段向千歲市稅務課確認。<br>
   <b>事業用定期借地。</b>租地建屋，建物登記在法人名下——入管的「事業所確保」要件照樣滿足。省下整筆土地款，代價是每年地代與期滿的更地返還義務。契約要看清楚存續期間與中途解約條款。<br>
   <b>數字的限制。</b>建物單價、土地實勢價、地代率、營收假設為推估區間，2024–2026年北海道建材與人工大幅上漲，須以在地工務店見積與不動產實查為準，誤差可達 ±15%。用途地域、防火區劃、危險物規制須逐案向千歲市役所、保健所、消防署確認。<b>本工具為規劃用試算，不構成法律、稅務或投資建議。</b>
@@ -1004,6 +1096,87 @@ function drawChart(m){
   $("chart").innerHTML=o;
 }
 
+function drawJudge(m){
+  var gap=m.daily-m.beYou, o="";
+  var route = (mode==="used") ? "中古改裝" :
+    (m.tenure==="lease" ? "新築・事業用定期借地" : "新築・"+m.floors+"階建て");
+  var loanW=m.loanTW/10000, ownW=m.ownTW/10000;
+
+  /* 主線 */
+  o+="<div class='vd-part'><h4>主線</h4><p>";
+  if(m.total<30000000){
+    o+="這個組合<b>過不了簽證那一關</b>。2025年10月改正後，経営・管理要求資本金 ¥30,000,000 以上，"+
+       "而目前總投資只有 "+yen(m.total)+"。生意算得再漂亮，這關卡住就沒有後面——先把規模拉上來，或改走特定技能的長線。";
+  }else if(gap>=m.beYou*0.12){
+    o+="<b>"+route+"</b> 這條路站得住。總投資 "+yen(m.total)+"、借款 NT$"+man(loanW)+
+       "，你也活線落在日商 "+yen(m.beYou)+"，而你設的 "+yen(m.daily)+" 高出 "+yen(gap)+"，年度還有 "+yen(m.slack)+" 的餘裕。"+
+       "剩下的問題已經不是財務，是<b>你能不能真的每天賣掉 "+yen(m.daily)+"</b>。";
+  }else if(gap>=0){
+    o+="<b>"+route+"</b> 剛好卡在線上。日商 "+yen(m.daily)+" 只比你也活線 "+yen(m.beYou)+" 高 "+yen(gap)+"，"+
+       "<b>幾乎沒有容錯空間</b>——客流少一成、暖房費多兩成、或日圓貶值，就會翻負。這不是不能做，是不能出錯。";
+  }else{
+    o+="<b>"+route+"</b> 目前不成立。日商 "+yen(m.daily)+" 低於你也活線 "+yen(m.beYou)+"，"+
+       "每年短少 "+yen(-m.slack)+"，等於每個月要從存款拿 "+yen(-m.slack/12)+" 補洞。"+
+       "但這是<b>三個假設相乘的結果，不是判死刑</b>——動其中任何一個都可能翻牌。";
+  }
+  o+="</p></div>";
+
+  /* 因果鍊 */
+  var chain="";
+  if(mode==="new" && m.tenure!=="lease")
+    chain+="買地 "+yen(m.cLand)+" ↓ 借款 NT$"+man(loanW)+" ↓ 月付 "+yen(m.pmtJP)+" ↓ 日商門檻 "+yen(m.beYou)+"\n";
+  else if(mode==="new")
+    chain+="借地（不買地） ↓ 借款降到 NT$"+man(loanW)+" ↓ 月付 "+yen(m.pmtJP)+" ↓ 日商門檻 "+yen(m.beYou)+"\n";
+  else
+    chain+="中古 "+yen(m.total)+" ↓ 借款 NT$"+man(loanW)+" ↓ 月付 "+yen(m.pmtJP)+" ↓ 日商門檻 "+yen(m.beYou)+"\n";
+  chain+="冬季暖房 "+yen(m.utilW)+"/月 ↓ 1–4月連續負現金 ↓ 運轉資金要備 "+yen(Math.max(m.working,-m.y1net))+"\n";
+  if(mode==="new")
+    chain+="footprint "+Math.round(m.footprint)+"㎡ ↓ 冬季客位 "+m.custWinter+"台 ↓ 尖峰承載上限";
+  else
+    chain+="改裝 ↓ 保健所區劃分離 ↓ 沒做好＝拿不到營業許可";
+  o+="<div class='vd-part'><h4>核心因果鍊</h4><div class='chain'>"+esc(chain)+"</div></div>";
+
+  /* 三條路 / 下一步 */
+  o+="<div class='vd-part'><h4>"+(gap>=0?"要更安全，動這三個":"要成立，三條路任選一條")+"</h4><p>";
+  var needDaily=Math.ceil(m.beYou/1000)*1000;
+  var needOwn=null;
+  for(var oo=100;oo<=4000;oo+=25){
+    var lt=Math.max(0,m.total-oo*10000*m.fx)/m.fx;
+    var p=pmt(lt,v("i-rate"),v("i-term"))*m.fx;
+    var sb=v("i-selfBurden")/100, sm=sb>=1?0:(v("i-living")+p)/(1-sb);
+    if((m.daily*m.perD-m.fixedYr)-sm*12*(1+v("i-coBurden")/100)>=0){needOwn=oo;break;}
+  }
+  o+="<b>① 營收</b>　日商做到 "+yen(needDaily)+" 以上（現在設 "+yen(m.daily)+"）。"+
+     "兩口業務用平底鍋的物理產能超過 ¥180,000／日，這是需求問題不是產能問題——"+
+     "長都駅西側工廠地帶的午餐團訂是最實在的一塊，不看天氣、不看地點、現金流可預測。</p>";
+  if(needOwn!==null)
+    o+="<p><b>② 自有資金</b>　拉到 NT$"+needOwn.toLocaleString("en-US")+"萬（現在 NT$"+man(ownW)+"）就能打平。"+
+       "差額 NT$"+man(Math.max(0,needOwn-ownW))+"。</p>";
+  o+="<p><b>③ 降低總投資</b>　"+
+     (mode==="new"&&m.tenure!=="lease"
+       ? "最大的一條是<b>土地改事業用定期借地</b>，一筆就省 "+yen(m.cLand+m.cLandFee)+"，而入管的事業所要件照樣滿足。"
+       : "看 10 省錢清單，每一條都算好了省多少、門檻降多少。")+
+     "</p></div>";
+
+  /* 可證偽觸發 */
+  o+="<div class='vd-part'><h4>可證偽的觸發條件</h4><p>"+
+     "這些是「如果出現就代表判斷錯了」的訊號，去日本踩點時直接驗：</p>"+
+     "<p>・<b>4月和11月各去一次長都</b>——只看旺季會被騙。若淡季平日中午工廠地帶沒有午餐人流，B2B 這條線就不成立，整個模型的營收假設要下修。<br>"+
+     "・<b>問到目標物件去年整年的實際暖氣費</b>——若遠高於模型的 "+yen(m.utilW)+"／月，冬季負現金流的月數會增加。<br>"+
+     "・<b>確認前面道路是不是市府優先除雪路線</b>——不是的話，冬天早上客人開不進來，冬季營收要再打折。<br>"+
+     "・<b>行政書士的可行性判定</b>——這關沒過，上面所有數字都不用算。</p></div>";
+
+  /* 不要省 */
+  o+="<div class='vd-part'><h4>不論怎麼省，這四樣不要動</h4><p>"+
+     "判準是<b>「不可逆」或「會複利」</b>——在鋪裝、灌漿、拉管線之前要決定的，不要省；之後隨時能加的，通通可以晚做。</p>"+
+     "<p>・<b>運轉資金</b>（不可逆）現金流斷一次就結束，沒有第二次。目前需備 "+yen(Math.max(m.working,-m.y1net))+"。<br>"+
+     "・<b>保健所的住居／營業區劃分離</b>（不可逆）唯一一項做不好就<b>拿不到營業許可、根本開不了店</b>的工程。<br>"+
+     "・<b>ロードヒーティング 配管</b>（不可逆）鋪裝後要埋得把整片停車場打掉；機器可以之後再裝。<br>"+
+     "・<b>斷熱等級</b>（會複利）唯一一條省了反而虧的——省錢清單上它的門檻箭頭是往上的。</p></div>";
+
+  $("judge").innerHTML=o;
+}
+
 function drawMatrix(m){
   var owns=[300,500,700,900,1200,1500], you=Math.round(m.ownTW/10000);
   if(owns.indexOf(you)<0){owns.push(you);owns.sort(function(a,b){return a-b;});}
@@ -1160,12 +1333,12 @@ function render(){
   $("qd-own").textContent="NT$"+man(v("i-own"));
   $("qd-daily").textContent=yen(m.daily);
   $("f3wrap").hidden=!(mode==="new"&&m.floors===3);
-  $("s-plan").hidden=(mode!=="new");
-  $("s-site").hidden=(mode!=="new");
-  document.querySelector('a[href="#s-plan"]').style.display=(mode==="new")?"":"none";
-  document.querySelector('a[href="#s-site"]').style.display=(mode==="new")?"":"none";
+  $("sec-plan").hidden=(mode!=="new");
+  $("sec-site").hidden=(mode!=="new");
+  document.querySelector('a[href="#sec-plan"]').style.display=(mode==="new")?"":"none";
+  document.querySelector('a[href="#sec-site"]').style.display=(mode==="new")?"":"none";
 
-  drawSite(m); drawSection(m); drawFloors(m); drawChart(m); drawMatrix(m); drawSavings(m);
+  drawSite(m); drawSection(m); drawFloors(m); drawChart(m); drawMatrix(m); drawSavings(m); drawJudge(m);
 
   if(mode==="new"){
     var ck=[
@@ -1292,7 +1465,7 @@ function render(){
       (needOwn!==null?("　② 自有資金到 NT$"+needOwn.toLocaleString("en-US")+"萬"):"")+
       "　③ 到最下面的「省錢清單」把總投資壓下來。";
   }
-  $("s-verdict").setAttribute("data-state",st);
+  $("sec-hl").setAttribute("data-state",st);
   $("v-tag").textContent=tag; $("v-title").textContent=title; $("v-text").textContent=text;
   $("k-total").textContent=yen(m.total);
   $("k-total-tw").textContent="NT$"+man(m.total/m.fx/10000);
@@ -1330,7 +1503,7 @@ document.querySelectorAll("[data-preset]").forEach(function(b){
     $("r-own").value=$("i-own").value;
     $("r-daily").value=$("i-daily").value;
     setMode(p.mode);
-    $("s-verdict").scrollIntoView({block:"start"});
+    $("sec-hl").scrollIntoView({block:"start"});
   });
 });
 
@@ -1346,7 +1519,7 @@ document.querySelectorAll("input, select").forEach(function(el){
 /* scroll-spy nav */
 (function(){
   var links={}, order=[];
-  document.querySelectorAll("nav.sidenav > a").forEach(function(a){
+  document.querySelectorAll("nav.sidenav a[href^='#']").forEach(function(a){
     var id=a.getAttribute("href").slice(1); links[id]=a; order.push(id);
   });
   var vis={};
