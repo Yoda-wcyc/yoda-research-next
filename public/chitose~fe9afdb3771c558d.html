@@ -327,16 +327,6 @@ main.main{min-width:0;flex:1;padding:26px 26px 90px;max-width:1180px}
   .deflist .t{margin-bottom:2px}
 }
 
-/* 完整研判 */
-.verdictdoc{display:flex;flex-direction:column;gap:20px}
-.vd-part > h4{margin:0 0 7px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;
-  color:var(--accent);font-weight:700}
-.vd-part p{margin:0;font-size:14.5px;line-height:1.85;color:var(--ink-2);max-width:76ch}
-.vd-part p + p{margin-top:9px}
-.vd-part b{color:var(--ink)}
-.chain{font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:2;
-  background:var(--surface-2);border-left:3px solid var(--accent);
-  padding:13px 16px;border-radius:2px;overflow-x:auto;white-space:pre}
 
 /* ── 省錢開關 ── */
 .leverbox{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:10px}
@@ -393,6 +383,32 @@ label.lever.excl:hover{opacity:.8}
 .presets button.active{padding-top:22px}
 .presets button.star:not(.active){border-color:var(--accent)}
 .presets button.star:not(.active) b{color:var(--accent)}
+
+/* 判定摘要：改動回應與判讀 */
+#v-change{margin:16px 0 0;padding:13px 15px;border-radius:2px;
+  background:var(--surface);border:1px solid var(--line-strong);border-left:3px solid var(--ink)}
+#v-change:empty{display:none}
+#v-change .vc-h{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--muted);font-weight:700;display:block;margin-bottom:5px}
+#v-change .vc-what{font-size:13.5px;font-weight:700;line-height:1.65;display:block}
+#v-change .vc-eff{font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--ink-2);
+  display:block;margin-top:5px;line-height:1.8}
+#v-change .vc-say{font-size:13.5px;line-height:1.75;display:block;margin-top:7px;color:var(--ink)}
+#v-change[data-t="good"]{border-left-color:var(--ok)}
+#v-change[data-t="bad"]{border-left-color:var(--bad)}
+#v-change[data-t="flat"]{border-left-color:var(--muted)}
+#v-read{margin-top:18px;padding-top:16px;border-top:1px solid var(--line-strong)}
+#v-read:empty{display:none}
+#v-read h4{margin:0 0 9px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--muted);font-weight:700}
+#v-read ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+#v-read li{font-size:13.5px;line-height:1.75;padding-left:16px;position:relative;color:var(--ink-2);max-width:78ch}
+#v-read li::before{content:"";position:absolute;left:0;top:.72em;width:5px;height:5px;
+  border-radius:50%;background:var(--muted)}
+#v-read li b{color:var(--ink)}
+#v-read li.hot::before{background:var(--bad)}
+#v-read li.warm::before{background:var(--warn)}
+#v-read li.good::before{background:var(--ok)}
 </style>
 </head>
 <body>
@@ -418,8 +434,6 @@ label.lever.excl:hover{opacity:.8}
   <a href="#sec-cf"><span class="nav-num">07</span><div class="nav-dot"></div>12個月現金流</a>
   <a href="#sec-y1"><span class="nav-num">08</span><div class="nav-dot"></div>第一年燒錢</a>
   <a href="#sec-mx"><span class="nav-num">09</span><div class="nav-dot"></div>自有資金矩陣</a>
-  <div class="nav-section-label">結論</div>
-  <a href="#sec-judge"><span class="nav-num">10</span><div class="nav-dot"></div>完整研判</a>
   <div class="izy-section">
     <div class="izy-badge">
       <div class="izy-badge-label">Yoda Research</div>
@@ -442,6 +456,7 @@ label.lever.excl:hover{opacity:.8}
     <span class="verdict-tag" id="v-tag">計算中</span>
     <h3 id="v-title">—</h3>
     <p id="v-text">—</p>
+    <div id="v-change"></div>
     <div class="kpis">
       <div class="kpi"><span class="k">總投資</span><span class="v num" id="k-total">—</span><span class="n" id="k-total-tw">—</span></div>
       <div class="kpi"><span class="k">動用貸款</span><span class="v num" id="k-loan">—</span><span class="n" id="k-loan-m">—</span></div>
@@ -456,6 +471,7 @@ label.lever.excl:hover{opacity:.8}
       <div class="qd"><label>日商 <b id="qd-daily">—</b></label>
         <input type="range" id="r-daily" min="25000" max="160000" step="1000" value="70000" aria-label="日商"></div>
     </div>
+    <div id="v-read"></div>
   </div>
 </section>
 
@@ -731,12 +747,6 @@ label.lever.excl:hover{opacity:.8}
   <div class="block-head"><span class="sec-num">09</span><div><h2>自有資金 × 營收情境</h2>
     <p>格內為年度餘裕。橘框是你目前的位置</p></div></div>
   <div class="block-body"><div class="scroll"><table class="matrix" id="matrix"></table></div><div class="flags" id="mxflags"></div></div>
-</section>
-
-<section class="block" id="sec-judge">
-  <div class="block-head"><span class="sec-num">10</span><div><h2>完整研判</h2>
-    <p>把上面所有區塊收束成一段話：這個組合成不成立、卡在哪、下一步做什麼</p></div></div>
-  <div class="block-body"><div class="verdictdoc" id="judge"></div></div>
 </section>
 
 <footer class="foot">
@@ -1108,7 +1118,7 @@ function drawLevers(m){
      "</div>";
   box.innerHTML=h;
   box.querySelectorAll("input[data-lv]").forEach(function(cb){
-    cb.addEventListener("change",function(){ ACTIVE_PRESET=null; setLever(cb.getAttribute("data-lv"),cb.checked); render(); });
+    cb.addEventListener("change",function(){ ACTIVE_PRESET=null; noteLeverChange(cb.getAttribute("data-lv"),cb.checked); setLever(cb.getAttribute("data-lv"),cb.checked); render(); });
   });
   $("st-tenure").innerHTML = (m.tenure==="lease")
     ? "土地取得：<b>事業用定期借地</b>（由省錢開關控制）"
@@ -1357,90 +1367,167 @@ function drawChart(m){
   $("chart").innerHTML=o;
 }
 
-function drawJudge(m){
-  var gap=m.daily-m.beYou, o="";
-  var route = (mode==="used") ? "中古改裝" :
-    (m.tenure==="lease" ? "新築・事業用定期借地" : "新築・"+m.floors+"階建て");
-  var loanW=m.loanTW/10000, ownW=m.ownTW/10000;
+/* ── 改動追蹤：記下你剛剛動了哪一個設定 ───────────── */
+var LASTCHANGE=null, PREV=null, VALMEM={};
+function fieldLabel(el){
+  if(!el) return "設定";
+  var f=el.closest ? el.closest(".field") : null;
+  if(f){ var l=f.querySelector("label");
+         if(l){ var t=(l.childNodes[0]&&l.childNodes[0].textContent||l.textContent).trim(); if(t) return t; } }
+  if(el.id==="i-loanCap") return "台灣可貸額度上限";
+  return el.id||"設定";
+}
+function readable(el){
+  if(!el) return "";
+  if(el.tagName==="SELECT"){ var o=el.options[el.selectedIndex]; return o?o.textContent.trim():el.value; }
+  return el.value;
+}
+function snapMemo(){
+  VALMEM={};
+  document.querySelectorAll("#sec-setup input, #sec-setup select").forEach(function(el){
+    VALMEM[el.id]=el.tagName==="SELECT"?readable(el):el.value;
+  });
+}
+function noteFieldChange(el){
+  var from=VALMEM[el.id], to=el.tagName==="SELECT"?readable(el):el.value;
+  if(from===undefined||String(from)===String(to)) { LASTCHANGE=null; return; }
+  LASTCHANGE={label:fieldLabel(el), from:from, to:to, kind:"field", id:el.id};
+}
+function noteLeverChange(id,on){
+  var L=LEVERS.filter(function(x){return x.id===id;})[0];
+  LASTCHANGE={label:"省錢開關・"+(L?L.n:id), from:on?"未套用":"已套用", to:on?"已套用":"未套用",
+              kind:"lever", id:id};
+}
+function notePresetChange(key,btn){
+  var nm=btn.querySelector("b");
+  LASTCHANGE={label:"方案預設", from:"—", to:(nm?nm.textContent.trim():key), kind:"preset", id:key};
+}
 
-  /* 主線 */
-  o+="<div class='vd-part'><h4>主線</h4><p>";
-  if(m.gapJP>0){
-    o+="<b>錢先湊不出來。</b>總投資 "+yen(m.total)+"，你的現金 "+yen(m.cashJP)+
-       " 加上台灣可貸上限 "+yen(m.capJP)+"（NT$"+man(m.capTW/10000)+"），"+
-       "還差 <b>"+yen(m.gapJP)+"</b>。這一關跟日商多少、生意好不好完全無關——"+
-       "資金到不了位，後面所有數字都不用算。先用省錢開關把總投資壓到 "+yen(m.cashJP+m.capJP)+" 以下。";
-  }else if(m.total<30000000){
-    o+="這個組合<b>過不了簽證那一關</b>。2025年10月改正後，経営・管理要求資本金 ¥30,000,000 以上，"+
-       "而目前總投資只有 "+yen(m.total)+"。生意算得再漂亮，這關卡住就沒有後面——先把規模拉上來，或改走特定技能的長線。";
-  }else if(gap>=m.beYou*0.12){
-    o+="<b>"+route+"</b> 這條路站得住。總投資 "+yen(m.total)+"、借款 NT$"+man(loanW)+
-       "，你也活線落在日商 "+yen(m.beYou)+"，而你設的 "+yen(m.daily)+" 高出 "+yen(gap)+"，年度還有 "+yen(m.slack)+" 的餘裕。"+
-       "剩下的問題已經不是財務，是<b>你能不能真的每天賣掉 "+yen(m.daily)+"</b>。";
-  }else if(gap>=0){
-    o+="<b>"+route+"</b> 剛好卡在線上。日商 "+yen(m.daily)+" 只比你也活線 "+yen(m.beYou)+" 高 "+yen(gap)+"，"+
-       "<b>幾乎沒有容錯空間</b>——客流少一成、暖房費多兩成、或日圓貶值，就會翻負。這不是不能做，是不能出錯。";
+/* ── 你剛剛那一改，造成什麼 ───────────────────────── */
+function drawChange(m){
+  var box=$("v-change"); if(!box) return;
+  if(!LASTCHANGE || !PREV){ box.innerHTML=""; box.removeAttribute("data-t"); return; }
+  var dTotal=m.total-PREV.total, dBE=m.beYou-PREV.beYou,
+      dSlack=m.slack-PREV.slack, dGap=m.gapJP-PREV.gapJP,
+      stateChanged=(m.state!==PREV.state);
+
+  var eff=[];
+  if(Math.abs(dTotal)>=1000) eff.push("總投資 "+(dTotal<0?"↓":"↑")+" "+yen(Math.abs(dTotal)));
+  if(Math.abs(dGap)>=1000)   eff.push("資金缺口 "+(dGap<0?"↓":"↑")+" "+yen(Math.abs(dGap)));
+  if(Math.abs(dBE)>=1)       eff.push("日商門檻 "+(dBE<0?"↓":"↑")+" "+yen(Math.abs(dBE)));
+  if(Math.abs(dSlack)>=1000) eff.push("年度餘裕 "+(dSlack>0?"↑":"↓")+" "+yen(Math.abs(dSlack)));
+
+  /* 判讀：這一改到底好不好、代表什麼 */
+  var say="", tone="flat";
+  if(m.gapJP>0 && PREV.gapJP<=0){
+    tone="bad"; say="<b>這一改把錢弄不夠了。</b>現金加可貸上限已經蓋不住總投資——先回到能湊出錢的範圍，其他都是後話。";
+  }else if(m.gapJP<=0 && PREV.gapJP>0){
+    tone="good"; say="<b>資金這一關過了。</b>錢湊得出來了，接下來要看的是第二關：賺不賺得回來。";
+  }else if(stateChanged && m.state==="ok"){
+    tone="good"; say="<b>翻正了。</b>不過這是模型上的成立，真正的變數是你能不能做到 "+yen(m.daily)+" 的日商——那是需求問題，不是算式問題。";
+  }else if(stateChanged && PREV.state==="ok"){
+    tone="bad"; say="<b>從「活得下去」掉出來了。</b>剛才那個組合是可行的，這一改把它推出了安全區。";
+  }else if(LASTCHANGE.id==="i-daily"||LASTCHANGE.id==="r-daily"){
+    tone=(dSlack>0?"good":"bad");
+    say="日商是<b>假設，不是產能上限</b>——兩口業務用平底鍋的物理產能超過 ¥180,000／日。所以改這個數字不會讓門檻動，只會改變「你賭自己做得到多少」。"+
+        (dSlack>0?"要把它變成事實，最實在的是長都駅西側工廠地帶的午餐團訂。":"往下調是誠實的，但也代表這個方案要重新設計。");
+  }else if(LASTCHANGE.id==="i-loanCap"){
+    tone=(dGap<0?"good":"bad");
+    say="可貸上限是<b>銀行願意給多少，不是你想借多少</b>。調這個數字之前，先拿房產去問一次增貸試算——這是整個模型裡最容易高估的一格。";
+  }else if(LASTCHANGE.id==="i-own"||LASTCHANGE.id==="r-own"){
+    say="現金是<b>不用還的錢</b>。它同時降低借款與月付，所以對日商門檻的槓桿比任何一項省錢做法都大。";
+  }else if(LASTCHANGE.kind==="lever" && LASTCHANGE.id==="insul5"){
+    tone="bad"; say="<b>這是唯一一條省了會虧的。</b>建設費省下來，暖房費每年還回去，約 7 年打平之後就是純虧——而房子你要住 30 年。";
+  }else if(LASTCHANGE.kind==="lever" && LASTCHANGE.id==="lease"){
+    tone=(dBE<0?"good":"flat");
+    say="借地把<b>一次性支出換成每年支出</b>：省下整筆土地款，但每年多一筆地代，而且期滿有更地返還義務。存續期間一定要談到 30 年以上，否則後半段會很難受。";
+  }else if(LASTCHANGE.kind==="lever" && dBE>0){
+    tone="bad"; say="<b>這一項省了反而讓門檻上升</b>——省下的頭期，被它帶來的年度支出吃掉了。";
+  }else if(LASTCHANGE.kind==="lever" && dBE<0){
+    tone="good"; say="門檻降了 "+yen(-dBE)+"。真正的問題是右邊那行「代價」你能不能接受——省錢清單上每一條都在拿別的東西交換。";
+  }else if(LASTCHANGE.kind==="preset"){
+    say="換了一整組設定。所有省錢開關已重置，這是這個方案的<b>原始狀態</b>——接下來要省什麼，自己勾。";
+  }else if(!eff.length){
+    say="這一改對結論沒有影響——它不在任何一條決定成敗的路徑上。";
   }else{
-    o+="<b>"+route+"</b> 目前不成立。日商 "+yen(m.daily)+" 低於你也活線 "+yen(m.beYou)+"，"+
-       "每年短少 "+yen(-m.slack)+"，等於每個月要從存款拿 "+yen(-m.slack/12)+" 補洞。"+
-       "但這是<b>三個假設相乘的結果，不是判死刑</b>——動其中任何一個都可能翻牌。";
+    say=(dBE<0||dSlack>0)?"方向是對的。":"這一改讓條件變嚴了。";
   }
-  o+="</p></div>";
 
-  /* 因果鍊 */
-  var chain="";
-  if(mode==="new" && m.tenure!=="lease")
-    chain+="買地 "+yen(m.cLand)+" ↓ 借款 NT$"+man(loanW)+" ↓ 月付 "+yen(m.pmtJP)+" ↓ 日商門檻 "+yen(m.beYou)+"\n";
-  else if(mode==="new")
-    chain+="借地（不買地） ↓ 借款降到 NT$"+man(loanW)+" ↓ 月付 "+yen(m.pmtJP)+" ↓ 日商門檻 "+yen(m.beYou)+"\n";
-  else
-    chain+="中古 "+yen(m.total)+" ↓ 借款 NT$"+man(loanW)+" ↓ 月付 "+yen(m.pmtJP)+" ↓ 日商門檻 "+yen(m.beYou)+"\n";
-  chain+="冬季暖房 "+yen(m.utilW)+"/月 ↓ 1–4月連續負現金 ↓ 運轉資金要備 "+yen(Math.max(m.working,-m.y1net))+"\n";
-  if(mode==="new")
-    chain+="footprint "+Math.round(m.footprint)+"㎡ ↓ 冬季客位 "+m.custWinter+"台 ↓ 尖峰承載上限";
-  else
-    chain+="改裝 ↓ 保健所區劃分離 ↓ 沒做好＝拿不到營業許可";
-  o+="<div class='vd-part'><h4>核心因果鍊</h4><div class='chain'>"+esc(chain)+"</div></div>";
-
-  /* 三條路 / 下一步 */
-  o+="<div class='vd-part'><h4>"+(gap>=0?"要更安全，動這三個":"要成立，三條路任選一條")+"</h4><p>";
-  var needDaily=Math.ceil(m.beYou/1000)*1000;
-  var needOwn=null;
-  for(var oo=100;oo<=4000;oo+=25){
-    var lt=Math.max(0,m.total-oo*10000*m.fx)/m.fx;
-    var p=pmt(lt,v("i-rate"),v("i-term"))*m.fx;
-    var sb=v("i-selfBurden")/100, sm=sb>=1?0:(v("i-living")+p)/(1-sb);
-    if((m.daily*m.perD-m.fixedYr)-sm*12*(1+v("i-coBurden")/100)>=0){needOwn=oo;break;}
+  /* 額外的硬約束提醒（只在真的踩到時出現） */
+  var extra=[];
+  if(mode==="new"){
+    if(PREV.custWinter!==undefined && m.custWinter<PREV.custWinter)
+      extra.push("⚠ 冬季客用車位從 "+PREV.custWinter+" 台掉到 "+m.custWinter+" 台。");
+    if(PREV.resPct!==undefined && m.resPct<50 && PREV.resPct>=50)
+      extra.push("⚠ 居住比例跌破 50%（"+m.resPct.toFixed(1)+"%），住宅用地特例失效。");
   }
-  o+="<b>① 營收</b>　日商做到 "+yen(needDaily)+" 以上（現在設 "+yen(m.daily)+"）。"+
-     "兩口業務用平底鍋的物理產能超過 ¥180,000／日，這是需求問題不是產能問題——"+
-     "長都駅西側工廠地帶的午餐團訂是最實在的一塊，不看天氣、不看地點、現金流可預測。</p>";
-  if(needOwn!==null)
-    o+="<p><b>② 自有資金</b>　拉到 NT$"+needOwn.toLocaleString("en-US")+"萬（現在 NT$"+man(ownW)+"）就能打平。"+
-       "差額 NT$"+man(Math.max(0,needOwn-ownW))+"。</p>";
-  o+="<p><b>③ 降低總投資</b>　"+
-     (mode==="new"&&m.tenure!=="lease"
-       ? "最大的一條是<b>土地改事業用定期借地</b>，一筆就省 "+yen(m.cLand+m.cLandFee)+"，而入管的事業所要件照樣滿足。"
-       : "到上面 02 設定的「省錢開關」勾選，每一條都算好了省多少、門檻降多少。")+
-     "</p></div>";
+  if(m.total<30000000 && PREV.total>=30000000)
+    extra.push("⚠ 總投資掉到 ¥30,000,000 以下，撐不起経営・管理簽證的資本金要件。");
 
-  /* 可證偽觸發 */
-  o+="<div class='vd-part'><h4>可證偽的觸發條件</h4><p>"+
-     "這些是「如果出現就代表判斷錯了」的訊號，去日本踩點時直接驗：</p>"+
-     "<p>・<b>4月和11月各去一次長都</b>——只看旺季會被騙。若淡季平日中午工廠地帶沒有午餐人流，B2B 這條線就不成立，整個模型的營收假設要下修。<br>"+
-     "・<b>問到目標物件去年整年的實際暖氣費</b>——若遠高於模型的 "+yen(m.utilW)+"／月，冬季負現金流的月數會增加。<br>"+
-     "・<b>確認前面道路是不是市府優先除雪路線</b>——不是的話，冬天早上客人開不進來，冬季營收要再打折。<br>"+
-     "・<b>行政書士的可行性判定</b>——這關沒過，上面所有數字都不用算。</p></div>";
+  box.setAttribute("data-t",tone);
+  box.innerHTML="<span class='vc-h'>剛剛這一改</span>"+
+    "<span class='vc-what'>"+esc(LASTCHANGE.label)+"："+esc(String(LASTCHANGE.from))+" → "+esc(String(LASTCHANGE.to))+"</span>"+
+    (eff.length?"<span class='vc-eff'>"+eff.join("　")+"</span>":"")+
+    "<span class='vc-say'>"+say+(extra.length?"<br>"+extra.join("<br>"):"")+"</span>";
+}
 
-  /* 不要省 */
-  o+="<div class='vd-part'><h4>不論怎麼省，這四樣不要動</h4><p>"+
-     "判準是<b>「不可逆」或「會複利」</b>——在鋪裝、灌漿、拉管線之前要決定的，不要省；之後隨時能加的，通通可以晚做。</p>"+
-     "<p>・<b>運轉資金</b>（不可逆）現金流斷一次就結束，沒有第二次。目前需備 "+yen(Math.max(m.working,-m.y1net))+"。<br>"+
-     "・<b>保健所的住居／營業區劃分離</b>（不可逆）唯一一項做不好就<b>拿不到營業許可、根本開不了店</b>的工程。<br>"+
-     "・<b>ロードヒーティング 配管</b>（不可逆）鋪裝後要埋得把整片停車場打掉；機器可以之後再裝。<br>"+
-     "・<b>斷熱等級</b>（會複利）唯一一條省了反而虧的——省錢開關裡它的門檻箭頭是往上的。</p></div>";
+/* ── 我的判讀：依當前狀態即時給幾條意見 ──────────── */
+function drawRead(m){
+  var box=$("v-read"); if(!box) return;
+  var li=[];
+  /* 1) 現在卡在哪一關 */
+  if(m.gapJP>0)
+    li.push(["hot","<b>現在卡在資金，不是生意。</b>缺口 "+yen(m.gapJP)+"。把總投資壓到 "+yen(m.cashJP+m.capJP)+" 以下，或提高現金／可貸額度——在那之前，日商設多少都沒有意義。"]);
+  else if(m.total<30000000)
+    li.push(["hot","<b>現在卡在簽證。</b>総投資 "+yen(m.total)+" 低於 経営・管理 的 ¥30,000,000 資本金要件。"]);
+  else if(m.daily<m.beYou)
+    li.push(["hot","<b>現在卡在營收。</b>錢湊得出來、簽證規模也夠，但日商要到 "+yen(Math.ceil(m.beYou/1000)*1000)+" 才打平，現在設 "+yen(m.daily)+"。"]);
+  else if(m.daily<m.beSafe)
+    li.push(["warm","<b>過得了門檻，但沒有緩衝。</b>安全線是 "+yen(m.beSafe)+"（含法人年利益，簽證更新會看獲利），現在 "+yen(m.daily)+"。"]);
+  else
+    li.push(["good","<b>三關都過了。</b>資金湊得出來、簽證規模夠、日商高於安全線。剩下的是執行問題。"]);
 
-  $("judge").innerHTML=o;
+  /* 2) 冬天 */
+  if(m.negMonths>0)
+    li.push([m.negMonths>=5?"warm":"", "成熟期仍有 <b>"+m.negMonths+" 個月</b>負現金流，累計谷底 "+yen(m.minCum)+"。這是北海道的暖房結構性成本，優化不掉，只能備現金。"]);
+
+  /* 3) 第一年 */
+  if(m.y1net<0){
+    var need=Math.ceil(-m.y1net/500000)*500000;
+    li.push([(m.working+m.y1net<0)?"hot":"", "第一年會燒掉 "+yen(-m.y1net)+"，你備了 "+yen(m.working)+"。"+
+      ((m.working+m.y1net<0)?("<b>不夠，至少要 "+yen(need)+"。</b>"):"夠，而且留有緩衝。")]);
+  }
+
+  /* 4) 基地層面的硬約束 */
+  if(mode==="new"){
+    if(m.custWinter<5)
+      li.push([m.custWinter<3?"hot":"warm","冬季客用車位只有 <b>"+m.custWinter+" 台</b>。北海道的外帶店沒車位就沒生意——"+
+        (m.openPriv>0?("先把自家露天的 "+m.openPriv+" 台私家車改成月極，一年 "+yen(m.openPriv*v("i-privRent")*12)+" 換回 "+m.openPriv+" 個客位。"):"考慮加大土地或縮小建築面積。")]);
+    if(m.resPct<53)
+      li.push([m.resPct<50?"hot":"warm","居住比例 <b>"+m.resPct.toFixed(1)+"%</b>"+
+        (m.resPct<50?"，已跌破 50%，固定資產稅的住宅用地特例失效。":"，只比 50% 高一點，任何設計變更都可能踩線。")+
+        "（車庫依你的確認不計入居住部分）"]);
+    if(m.tenure==="lease")
+      li.push(["","走借地：省下整筆土地款，但每年地代 "+yen(m.leaseYr)+"，且期滿有更地返還義務。<b>存續期間務必談到 30 年以上。</b>"]);
+  }
+
+  /* 5) 借款壓力 */
+  var loanW=m.loanTW/10000;
+  if(m.gapJP<=0 && loanW>600)
+    li.push([loanW>800?"hot":"warm","借款 NT$"+man(loanW)+"，月付 "+yen(m.pmtJP)+"。"+
+      (loanW>800?"<b>超過 NT$800萬 的建議上限</b>，沒有容錯空間。":"介於安全值與上限之間，可行但要順。")+
+      "日圓貶值時還款壓力會放大——用台灣端的現金流還台灣的債，兩邊各自封閉就不吃匯率。"]);
+
+  /* 6) 下一步該去驗什麼（可證偽） */
+  if(m.gapJP>0)
+    li.push(["","<b>下一步：</b>拿房產去銀行做一次增貸試算。可貸上限是這個模型裡最容易高估的一格，先把它變成真實數字。"]);
+  else if(m.daily<m.beYou)
+    li.push(["","<b>下一步：</b>4月和11月各去一次長都，看平日中午工廠地帶有沒有午餐人流。若沒有，B2B 這條線不成立，整個營收假設要下修。"]);
+  else
+    li.push(["","<b>下一步：</b>找行政書士做経営・管理可行性判定。這關沒過，上面所有數字都不用算。"]);
+
+  box.innerHTML="<h4>我的判讀</h4><ul>"+li.map(function(x){
+    return "<li"+(x[0]?" class='"+x[0]+"'":"")+">"+x[1]+"</li>";}).join("")+"</ul>";
 }
 
 function drawMatrix(m){
@@ -1495,7 +1582,7 @@ function render(){
   document.querySelector('a[href="#sec-plan"]').style.display=(mode==="new")?"":"none";
   document.querySelector('a[href="#sec-site"]').style.display=(mode==="new")?"":"none";
 
-  drawSite(m); drawSection(m); drawFloors(m); drawChart(m); drawMatrix(m); drawJudge(m); drawLevers(m);
+  drawSite(m); drawSection(m); drawFloors(m); drawChart(m); drawMatrix(m); drawLevers(m);
 
   if(mode==="new"){
     var ck=[
@@ -1655,6 +1742,12 @@ function render(){
   $("k-daily").textContent=yen(m.daily);
   $("k-daily-gap").textContent=(gap>=0?"高於門檻 ":"低於門檻 ")+yen(Math.abs(gap));
   $("k-slack").textContent=sign(m.slack);
+
+  m.state=st;
+  drawChange(m); drawRead(m);
+  PREV={total:m.total,beYou:m.beYou,slack:m.slack,gapJP:m.gapJP,state:st,daily:m.daily,
+        custWinter:m.custWinter,resPct:m.resPct};
+  snapMemo();
 }
 
 /* ── wiring ── */
@@ -1671,7 +1764,7 @@ $("m-new").addEventListener("click",function(){setMode("new");});
 document.querySelectorAll("[data-preset]").forEach(function(b){
   b.addEventListener("click",function(){
     var key=b.getAttribute("data-preset"), p=PRESETS[key]; if(!p)return;
-    ACTIVE_PRESET=key;
+    ACTIVE_PRESET=key; notePresetChange(key,b);
     Object.keys(p).forEach(function(k){
       if(k==="mode"||k==="sel")return;
       var el=$("i-"+k); if(el)el.value=p[k];
@@ -1691,13 +1784,15 @@ document.querySelectorAll("[data-preset]").forEach(function(b){
 
 [["i-own","r-own"],["i-daily","r-daily"]].forEach(function(pr){
   var n=$(pr[0]),r=$(pr[1]);
-  n.addEventListener("input",function(){r.value=n.value;ACTIVE_PRESET=null;render();});
-  r.addEventListener("input",function(){n.value=r.value;ACTIVE_PRESET=null;render();});
+  n.addEventListener("input",function(){r.value=n.value;noteFieldChange(n);ACTIVE_PRESET=null;render();});
+  r.addEventListener("input",function(){n.value=r.value;noteFieldChange(n);ACTIVE_PRESET=null;render();});
 });
 function clearPreset(){ ACTIVE_PRESET=null; }
+var PAIRED={"i-own":1,"r-own":1,"i-daily":1,"r-daily":1};   /* 這幾個已由滑桿配對處理，勿重複綁定 */
 document.querySelectorAll("input, select").forEach(function(el){
-  el.addEventListener("input",function(){clearPreset();render();});
-  el.addEventListener("change",function(){clearPreset();render();});
+  if(PAIRED[el.id]) return;
+  el.addEventListener("input",function(){noteFieldChange(el);clearPreset();render();});
+  el.addEventListener("change",function(){noteFieldChange(el);clearPreset();render();});
 });
 
 /* scroll-spy nav */
