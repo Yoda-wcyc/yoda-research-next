@@ -33,6 +33,7 @@ export async function POST(req) {
       contentType: 'text/html; charset=utf-8',
       addRandomSuffix: false,
       allowOverwrite: true,
+      cacheControlMaxAge: 60, // 同路徑覆寫後，邊緣快取最多 60 秒就換新版（預設一個月，改版會卡舊檔）
     });
     return J({ ok: true, reportId: name, url: res.url });
   } catch (e) {
