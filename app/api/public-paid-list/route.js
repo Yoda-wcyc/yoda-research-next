@@ -15,9 +15,10 @@ function catOf(id) {
   if (/^台股/.test(s)) return '台股';
   if (/^關鍵報告|^關鍵/.test(s)) return '關鍵報告';
   if (/^簡報/.test(s)) return '簡報';
-  if (/^總經/.test(s)) return '總經';
-  if (/AI泡沫/.test(s)) return 'AI泡沫';
+  if (/^總經|^總體經濟/.test(s)) return '總經';
+  if (/AI泡沫|泡沫評估/.test(s)) return 'AI泡沫';
   if (/^專題/.test(s)) return '專題';
+  if (/使用手冊/.test(s)) return '使用手冊';   // 缺這條時會落入下面的 fallback，被誤標成「關鍵報告」
   return '關鍵報告';
 }
 

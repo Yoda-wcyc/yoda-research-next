@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 const BASE = "https://yoda-wcyc.github.io";
 // 會員系統 GAS：讀報告覆蓋（軟下架 / 改標題）供前端合併
 const GAS = "https://script.google.com/macros/s/AKfycbwQQ02EzseXtzvHxH3yegvgvQKncv7ReoGaqqsVxzco6cdagOCW13Tr7KlwX2UJtPc7/exec";
-const TABS = ["全部", "付費版", "關鍵報告", "市場觀察", "美股", "台股", "AI泡沫", "總經", "簡報", "專題"];
+const TABS = ["全部", "付費版", "關鍵報告", "市場觀察", "美股", "台股", "AI泡沫", "總經", "簡報", "專題", "使用手冊"];
 // 付費版判定：該筆明確標 paid，或分類為付費旗艦「關鍵報告」
 const isPaidRow = (x) => x.paid === true || x.cat === "關鍵報告";
 
