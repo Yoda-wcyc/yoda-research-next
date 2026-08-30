@@ -34,7 +34,10 @@ export async function POST(req) {
     return J({ ok: true, allow: true, error: '讀取報告失敗：' + String((e && e.message) || e) });
   }
 
-  const wm = isFree ? '免費版 · Yoda Research' : ((payload && payload.wm) || '會員專屬');
+  // 免費浮水印帶報告製作日期（取 reportId 裡的 8 碼日期＝檔名期別）
+  const d8 = (reportId.match(/(\d{8})/) || [])[1];
+  const dateTag = d8 ? ' · ' + d8.slice(0, 4) + '-' + d8.slice(4, 6) + '-' + d8.slice(6, 8) : '';
+  const wm = isFree ? '免費版 · Yoda Research' + dateTag : ((payload && payload.wm) || '會員專屬');
   html = html.split('{{WATERMARK}}').join(wm); // 逐人浮水印（免費檔＝通用戳記）
   return J({ ok: true, allow: true, html, watermark: wm, memberId: (payload && payload.sub) || '' });
 }
