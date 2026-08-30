@@ -23,7 +23,9 @@ export async function POST(req) {
   //   而寄送紀錄(NotifyLog)是按 reportId 記的 → 那份重複檔永遠顯示「未寄」，清單也會出現兩筆。
   //   2026-08-28 曾因某批次上傳用原始檔名，一口氣多出 17 份重複。這裡由伺服器統一補上，
   //   不管哪個上傳入口（主控台、腳本、手動 curl）都不會再犯。
-  if (!/^付費[_-]/.test(name)) name = '付費_' + name;
+  // ★「免費_」前綴（2026-08-30 免費殼通道）為唯一例外：免費檔走 /api/report 免驗票分支，
+  //   必須刻意以 免費_ 命名才會建立，預設行為（自動補 付費_）不變。
+  if (!/^(付費|免費)[_-]/.test(name)) name = '付費_' + name;
 
   try {
     const res = await put(blobPath(name), html, {

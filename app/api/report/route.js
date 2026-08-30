@@ -9,15 +9,21 @@ export const dynamic = 'force-dynamic';
 export function OPTIONS() { return preflight(); }
 
 // 會員開付費報告（快路徑）：驗票(HMAC·<1ms) → 私有 Blob 直讀 → 烤逐人浮水印 → 回 JSON。
+// 免費通道（2026-08-30）：reportId 以「免費_」開頭的檔不驗票——內容仍放私有 Blob、
+// 由 hub 上的免費殼載入，公開 repo 不再存整份正文（撤下＝刪 Blob 一個檔，連結全死）。
 export async function POST(req) {
   let body = {};
   try { body = await req.json(); } catch (e) {}
 
-  const payload = verifyJwt(body.token, process.env.JWT_SECRET || '');
-  if (!payload) return J({ ok: true, allow: false, reason: 'need-login', error: '請重新登入' });
-
   const reportId = String(body.reportId || '').replace(/\.html?$/i, '').trim();
   if (!reportId) return J({ ok: false, error: '缺 reportId' });
+  const isFree = /^免費[_-]/.test(reportId);
+
+  let payload = null;
+  if (!isFree) {
+    payload = verifyJwt(body.token, process.env.JWT_SECRET || '');
+    if (!payload) return J({ ok: true, allow: false, reason: 'need-login', error: '請重新登入' });
+  }
 
   let html;
   try {
@@ -28,7 +34,7 @@ export async function POST(req) {
     return J({ ok: true, allow: true, error: '讀取報告失敗：' + String((e && e.message) || e) });
   }
 
-  const wm = payload.wm || '會員專屬';
-  html = html.split('{{WATERMARK}}').join(wm); // 逐人浮水印
-  return J({ ok: true, allow: true, html, watermark: wm, memberId: payload.sub || '' });
+  const wm = isFree ? '免費版 · Yoda Research' : ((payload && payload.wm) || '會員專屬');
+  html = html.split('{{WATERMARK}}').join(wm); // 逐人浮水印（免費檔＝通用戳記）
+  return J({ ok: true, allow: true, html, watermark: wm, memberId: (payload && payload.sub) || '' });
 }

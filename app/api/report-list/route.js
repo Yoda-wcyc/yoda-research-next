@@ -23,6 +23,7 @@ export async function POST(req) {
     for (const b of (blobs || [])) {
       const id = reportIdFromPath(b.pathname);
       if (!id || seen[id]) continue;
+      if (/^免費[_-]/.test(id)) continue; // 免費殼檔不進會員「我的付費報告」清單
       seen[id] = 1;
       reports.push({ reportId: id, uploadedAt: b.uploadedAt });
     }
