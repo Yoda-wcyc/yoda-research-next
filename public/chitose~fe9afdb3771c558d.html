@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <meta name="robots" content="noindex,nofollow">
-<meta name="description" content="千歲市長都・外帶店開店試算工具">
+<meta name="description" content="千歲／熊本・台式外帶店開店試算工具">
 <title>千歲開店試算盤</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -463,6 +463,10 @@ body[data-verdict="bad"]  .sb-tag{background:var(--bad);color:#fff}
 main.main{padding-bottom:150px}
 nav.sidenav a.off{opacity:.32;pointer-events:none}
 nav.sidenav a.off .nav-dot{background:var(--line)}
+
+.locnote{margin-top:9px;font-size:12.5px;line-height:1.75;color:var(--ink-2);
+  background:var(--surface-2);border-left:3px solid var(--accent);border-radius:2px;padding:9px 12px}
+#s-location{font-size:14px;font-weight:500;padding:11px}
 </style>
 </head>
 <body>
@@ -518,8 +522,8 @@ nav.sidenav a.off .nav-dot{background:var(--line)}
         <p>一打開就看到紅字說你錢不夠——那是<b>預設的範例值</b>（現金 NT$500萬、可貸 NT$600萬、日商 ¥70,000）。到下面 <b>01</b> 改成你自己的數字，整頁會即時重算。</p>
       </div>
       <div class="introcard">
-        <h4>這個工具只算一種情況</h4>
-        <p>北海道<b>千歲市長都</b>、<b>外帶店</b>、水煎包＋牛肉鍋。暖房費、除雪、雪置場、季節係數全部是照北海道寫死的。<b>換城市或換業種都不適用。</b></p>
+        <h4>支援兩個地點，但只算外帶店</h4>
+        <p>可切換 <b>千歲（北海道）</b> 與 <b>熊本（菊陽・大津／TSMC圈）</b>——兩地的暖房冷房、除雪、雪置場、地價、季節係數會整組換掉。<b>但業態固定為台式小吃外帶店</b>，換業種不適用。</p>
       </div>
       <div class="introcard">
         <h4>怎麼用（三步）</h4>
@@ -553,6 +557,14 @@ nav.sidenav a.off .nav-dot{background:var(--line)}
   <div class="block-head"><span class="sec-num">01</span><div><h2>你的三個數字</h2>
     <p>整頁只有這三格是「關於你」的，其他都是關於房子的。先填這三格就好</p></div></div>
   <div class="block-body">
+    <div class="field wide" style="margin-bottom:16px">
+      <label for="s-location" style="font-weight:700;font-size:14px;margin-bottom:6px;display:block">在哪裡開？</label>
+      <select id="s-location">
+        <option value="chitose" selected>千歲（北海道・長都）　冬天 −10℃</option>
+        <option value="kumamoto">熊本（菊陽・大津）　TSMC 圈・台灣人聚集</option>
+      </select>
+      <div class="locnote" id="loc-note">—</div>
+    </div>
     <div class="bigfields">
       <div class="bigfield">
         <label for="i-own">現金<span>自有，<b>不含貸款</b>。存款＋可變現投資</span></label>
@@ -773,8 +785,8 @@ nav.sidenav a.off .nav-dot{background:var(--line)}
         <label class="checkline"><input type="checkbox" id="c-garRes">
           <span>車庫計入居住部分<br><span style="color:var(--muted);font-size:11.5px">已依你確認：預設不計入。勾選可看另一種認定。</span></span></label>
       </div>
-      <div class="optcard optnew">
-        <h3>ロードヒーティング</h3>
+      <div class="optcard optnew" id="card-rh">
+        <h3>ロードヒーティング<span class="u"> 融雪設備・北海道限定</span></h3>
         <div class="field wide"><label>設置範圍</label><select id="s-rh">
           <option value="0">不做（人工除雪）</option>
           <option value="pipe">只埋配管，機器後裝（省 2/3）</option>
@@ -795,10 +807,10 @@ nav.sidenav a.off .nav-dot{background:var(--line)}
       <div class="optcard">
         <h3>固定費</h3>
         <div class="field"><label>工讀人事 <span class="u">¥／月</span></label><input type="number" id="i-labor" value="175000" step="5000"></div>
-        <div class="field"><label>夏季水電燃料 <span class="u">¥／月</span></label><input type="number" id="i-utilS" value="125000" step="5000"></div>
-        <div class="field"><label>冬季水電燃料 <span class="u">¥／月 不含RH</span></label><input type="number" id="i-utilW" value="190000" step="5000"></div>
-        <div class="field"><label>冬季月數</label><input type="number" id="i-winM" value="5" step="1" min="0" max="8"></div>
-        <div class="field"><label>除排雪 <span class="u">¥／冬月</span></label><input type="number" id="i-snow" value="60000" step="5000"></div>
+        <div class="field"><label>平常月水電 <span class="u">¥／月</span></label><input type="number" id="i-utilS" value="125000" step="5000"></div>
+        <div class="field"><label id="lbl-utilW">高峰月水電</label><input type="number" id="i-utilW" value="190000" step="5000"></div>
+        <div class="field"><label id="lbl-winM">高峰月數</label><input type="number" id="i-winM" value="5" step="1" min="0" max="8"></div>
+        <div class="field" id="lbl-snowRow"><label>除排雪 <span class="u">¥／冬月</span></label><input type="number" id="i-snow" value="60000" step="5000"></div>
         <div class="field"><label>除雪月數</label><input type="number" id="i-snowM" value="4" step="1" min="0" max="6"></div>
         <div class="field"><label>廣告販促 <span class="u">¥／月</span></label><input type="number" id="i-ad" value="60000" step="5000"></div>
         <div class="field"><label>雜費消耗 <span class="u">¥／月</span></label><input type="number" id="i-misc" value="50000" step="5000"></div>
@@ -888,15 +900,43 @@ nav.sidenav a.off .nav-dot{background:var(--line)}
 (function(){
 "use strict";
 
-var SEASON=[0.95,1.00,1.05,0.90,1.00,0.95,1.10,1.15,1.00,0.95,1.00,1.15];
-var WINTER=[1,1,1,0,0,0,0,0,0,0,1,1];
-var SNOWM =[1,1,1,0,0,0,0,0,0,0,0,1];
+/* 地點：兩地的氣候、地價、季節性完全不同，切換會連動下面所有計算 */
+var LOCATIONS={
+  chitose:{
+    name:"千歲（北海道・長都）",
+    /* 高峰月＝暖房月：11–3月 */
+    PEAK:[1,1,1,0,0,0,0,0,0,0,1,1], peakM:5,
+    SNOWM:[1,1,1,0,0,0,0,0,0,0,0,1], snowCost:60000, snowM:4,
+    SEASON:[0.95,1.00,1.05,0.90,1.00,0.95,1.10,1.15,1.00,0.95,1.00,1.15],
+    utilS:125000, utilPeak:190000,
+    landUnit:52000, tax:720000, insul:"6", rh:true,
+    snowRatio:0.15, winterStall:0.72,
+    peakLabel:"冬季（暖房）", peakHint:"11–3月　北海道的暖房是結構性成本",
+    note:"冬季暖房與除雪是主要成本；熱食在 −10℃ 有不可替代性；台灣料理幾乎零競爭，但客源仰賴 Rapidus 到位。"
+  },
+  kumamoto:{
+    name:"熊本（菊陽・大津）",
+    /* 高峰月＝冷房月：7–9月（酷暑） */
+    PEAK:[0,0,0,0,0,0,1,1,1,0,0,0], peakM:3,
+    SNOWM:[0,0,0,0,0,0,0,0,0,0,0,0], snowCost:0, snowM:0,
+    SEASON:[1.00,0.98,1.02,0.98,1.00,0.95,0.92,1.05,0.98,1.00,1.05,1.12],
+    utilS:128000, utilPeak:185000,
+    landUnit:95000, tax:820000, insul:"5", rh:false,
+    snowRatio:0, winterStall:1.0,
+    peakLabel:"酷暑（冷房）", peakHint:"7–9月　35℃ 的冷房費，冬天反而輕",
+    note:"沒有暖房、除雪、雪置場——初期省約 400–500 萬、年省約 57 萬。但地價更高（菊陽公示 ¥87,825/㎡、大津 ¥77,350/㎡），且已有多家台灣料理店。夏季酷暑會壓低熱食需求。"
+  }
+};
+var LOC="chitose";
+function L(){ return LOCATIONS[LOC]||LOCATIONS.chitose; }
+var SEASON=L().SEASON, WINTER=L().PEAK, SNOWM=L().SNOWM;
 var mode="new";
 var ACTIVE_PRESET=null;
 
-var INSUL={5:{res:225000,winter:260000,summer:130000},
-           6:{res:250000,winter:190000,summer:125000},
-           7:{res:285000,winter:165000,summer:122000}};
+var INSUL={5:{res:225000},6:{res:250000},7:{res:285000}};
+/* 高峰月水電＝地點基準 ＋ 斷熱等級加減（各地基準等級的調整為 0） */
+var INSUL_ADJ={ chitose:{5:70000,6:0,7:-25000},
+                kumamoto:{5:0,6:-15000,7:-25000} };
 
 var NEWBASE={landArea:450,frontage:18,landUnit:52000,landFeePct:6,leaseRate:3,resArea:110,
   shopArea:52,shopUnit:320000,extra:10500000,working:4500000,privCars:3,privRent:4500,
@@ -946,13 +986,33 @@ function rhSpec(){
   return {area:a,costMul:1,run:1,pipeOnly:false};
 }
 
+function applyLocation(){
+  var sel=$("s-location"); if(sel) LOC=sel.value;
+  var C=L();
+  SEASON=C.SEASON; WINTER=C.PEAK; SNOWM=C.SNOWM;
+  $("i-utilS").value=C.utilS;
+  $("i-utilW").value=C.utilPeak;
+  $("i-winM").value=C.peakM;
+  $("i-snow").value=C.snowCost;
+  $("i-snowM").value=C.snowM;
+  /* 高峰月的意義兩地相反，標籤要跟著換 */
+  var lw=document.querySelector('label[for="lbl-utilW"]');
+  var e1=$("lbl-utilW"), e2=$("lbl-winM"), e3=$("lbl-snowRow");
+  if(e1) e1.innerHTML="高峰月水電 <span class='u'>¥／月・"+C.peakLabel+"</span>";
+  if(e2) e2.innerHTML="高峰月數 <span class='u'>"+C.peakHint+"</span>";
+  if(e3) e3.style.display=(C.snowCost>0)?"":"none";
+  if(!C.rh && $("s-rh")) $("s-rh").value="0";
+  var ln=$("loc-note"); if(ln) ln.textContent=C.note;
+}
 function applyOptions(){
   document.querySelectorAll(".optnew").forEach(function(e){e.hidden=(mode!=="new");});
+  /* 融雪設備只有北海道需要——必須在上面的 .optnew 迴圈之後才判定 */
+  var rhCard=$("card-rh"); if(rhCard) rhCard.hidden=(mode!=="new")||!L().rh;
   if(mode!=="new") return;
   var E=eff();
   $("i-garArea").value=E.garArea; $("i-garUnit").value=E.garUnit;
   $("i-resUnit").value=Math.round(E.resUnit);
-  $("i-utilS").value=E.utilS; $("i-utilW").value=E.utilW;
+  $("i-utilS").value=Math.round(E.utilS); $("i-utilW").value=Math.round(E.utilW);
 }
 
 /* ── 省錢開關 ───────────────────────────────────────── */
@@ -1010,7 +1070,7 @@ function resetLevers(map){
 /* 這個開關在目前設定下適不適用 */
 function leverApplies(id){
   if(mode!=="new") return id==="kitused";
-  if(id==="rhpipe")  return sv("s-rh")!=="0" && !lv("rhpipe");
+  if(id==="rhpipe")  return L().rh && sv("s-rh")!=="0" && !lv("rhpipe");
   if(id==="gardet")  return garageSpec().type==="builtin";
   if(id==="insul5")  return sv("s-insul")!=="5";
   return true;   // 互斥組不在此隱藏：改為顯示為停用並說明原因
@@ -1042,8 +1102,9 @@ function eff(force){
   if(lv("rhpipe",force)){ if(E.rhArea===0)E.rhArea=30; E.rhCostMul=1/3; E.rhRunMul=0; E.rhPipeOnly=true; }
   if(lv("kitused",force)) E.kitchen=Math.min(E.kitchen,1600000);
   E.resUnit=(INSUL[E.insul]||INSUL[6]).res*E.specMul;
-  E.utilS=(INSUL[E.insul]||INSUL[6]).summer;
-  E.utilW=(INSUL[E.insul]||INSUL[6]).winter;
+  var C=L(), adj=(INSUL_ADJ[LOC]||{})[E.insul]||0;
+  E.utilS=C.utilS;
+  E.utilW=C.utilPeak+adj;
   return E;
 }
 
@@ -1170,10 +1231,10 @@ function model(){
   m.y1sales=y1; m.y1op=y1*m.cm-m.fixedYr; m.y1net=m.y1op-m.needYr;
 
   if(mode==="new"){
-    m.snowArea=m.landArea*0.15; m.approach=20;
+    m.snowArea=m.landArea*L().snowRatio; m.approach=20;
     m.parkArea=Math.max(0,m.landArea-m.footprint-m.detachedGar-m.snowArea-m.approach-m.rhArea*0.5);
     m.stallsSummer=Math.floor(m.parkArea/21);
-    m.stallsWinter=Math.floor(m.stallsSummer*0.72);
+    m.stallsWinter=Math.floor(m.stallsSummer*L().winterStall);
     m.custSummer=Math.max(0,m.stallsSummer-m.openPriv);
     m.custWinter=Math.max(0,m.stallsWinter-m.openPriv);
     var num=m.garRes?(m.resArea+m.garArea):m.resArea;
@@ -1570,6 +1631,11 @@ function drawChange(m){
     tone="bad"; say="<b>這一項省了反而讓門檻上升</b>——省下的頭期，被它帶來的年度支出吃掉了。";
   }else if(LASTCHANGE.kind==="lever" && dBE<0){
     tone="good"; say="門檻降了 "+yen(-dBE)+"。真正的問題是右邊那行「代價」你能不能接受——省錢清單上每一條都在拿別的東西交換。";
+  }else if(LASTCHANGE.kind==="loc"){
+    tone=(dBE<0?"good":"flat");
+    say=(LOC==="kumamoto")
+      ? "<b>換到熊本，成本結構整個變了。</b>沒有暖房、除雪、雪置場——同樣的土地還多出 2–3 個車位。但地價更高，而且<b>那裡已經有多家台灣料理店</b>：你不再是唯一的台灣味，差異化要靠「台式早餐＋便當外帶」這個他們沒做的時段。"
+      : "<b>換回千歲，冬天回來了。</b>暖房、除雪、雪置場全部要算，初期多約 400–500 萬、每年多約 57 萬。但換到的是：台灣料理幾乎零競爭，而且 −10℃ 讓熱食有不可替代性。";
   }else if(LASTCHANGE.kind==="preset"){
     say="換了一整組設定。所有省錢開關已重置，這是這個方案的<b>原始狀態</b>——接下來要省什麼，自己勾。";
   }else if(!eff.length){
@@ -1643,6 +1709,12 @@ function drawRead(m){
       (loanW>800?"<b>超過 NT$800萬 的建議上限</b>，沒有容錯空間。":"介於安全值與上限之間，可行但要順。")+
       "日圓貶值時還款壓力會放大——用台灣端的現金流還台灣的債，兩邊各自封閉就不吃匯率。"]);
 
+  /* 5b) 地點特有 */
+  if(LOC==="kumamoto")
+    li.push(["","<b>熊本：客人已經在那裡了</b>——菊陽町台灣人 15→420、熊本市 99→1,012，JASM 第1廠 1,700 人已量產，第2廠 2028 稼働後合計 3,400 人。但<b>已有多家台灣料理店</b>，你的空白在「台式早餐店＋便當外帶」，不是再開一家台灣餐廳。"]);
+  else
+    li.push(["","<b>千歲：你是先行者，但客人還在路上</b>——台灣料理幾乎零競爭，冬天讓熱食不可替代；代價是 Rapidus 尚未量產，客源是賭未來。"]);
+
   /* 6) 下一步該去驗什麼（可證偽） */
   if(m.gapJP>0)
     li.push(["","<b>下一步：</b>拿房產去銀行做一次增貸試算。可貸上限是這個模型裡最容易高估的一格，先把它變成真實數字。"]);
@@ -1697,6 +1769,7 @@ function drawMatrix(m){
 }
 
 function render(){
+  applyLocation();
   applyOptions();
   var m=model();
   $("qd-own").textContent="NT$"+man(v("i-own"));
@@ -1893,6 +1966,23 @@ function setMode(n){
   $("grp-used").hidden=(n!=="used");
   render();
 }
+(function(){
+  var sel=$("s-location"); if(!sel) return;
+  sel.addEventListener("change",function(){
+    var C=LOCATIONS[sel.value]||LOCATIONS.chitose;
+    LOC=sel.value;
+    $("i-landUnit").value=C.landUnit;
+    $("i-tax").value=C.tax;
+    if($("s-insul")) $("s-insul").value=C.insul;
+    if($("s-rh")){
+      if(!C.rh) $("s-rh").value="0";
+      else if($("s-rh").value==="0") $("s-rh").value="30";   /* 切回北海道要還原 */
+    }
+    LASTCHANGE={label:"地點",from:"—",to:C.name,kind:"loc",id:"s-location"};
+    ACTIVE_PRESET=null;
+    render();
+  });
+})();
 $("m-used").addEventListener("click",function(){setMode("used");});
 $("m-new").addEventListener("click",function(){setMode("new");});
 
@@ -1923,7 +2013,7 @@ document.querySelectorAll("[data-preset]").forEach(function(b){
   r.addEventListener("input",function(){n.value=r.value;noteFieldChange(n);ACTIVE_PRESET=null;render();});
 });
 function clearPreset(){ ACTIVE_PRESET=null; }
-var PAIRED={"i-own":1,"r-own":1,"i-daily":1,"r-daily":1};   /* 這幾個已由滑桿配對處理，勿重複綁定 */
+var PAIRED={"i-own":1,"r-own":1,"i-daily":1,"r-daily":1,"s-location":1};   /* 這幾個已由滑桿配對處理，勿重複綁定 */
 document.querySelectorAll("input, select").forEach(function(el){
   if(PAIRED[el.id]) return;
   el.addEventListener("input",function(){noteFieldChange(el);clearPreset();render();});
