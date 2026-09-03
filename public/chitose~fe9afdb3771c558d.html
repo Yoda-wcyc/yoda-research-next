@@ -467,6 +467,28 @@ nav.sidenav a.off .nav-dot{background:var(--line)}
 .locnote{margin-top:9px;font-size:12.5px;line-height:1.75;color:var(--ink-2);
   background:var(--surface-2);border-left:3px solid var(--accent);border-radius:2px;padding:9px 12px}
 #s-location{font-size:14px;font-weight:500;padding:11px}
+
+/* 地點選擇：兩顆大按鈕 */
+.lochead{font-size:14px;font-weight:700;margin-bottom:9px}
+.locpick{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+@media (max-width:560px){.locpick{grid-template-columns:1fr}}
+.locpick button{position:relative;padding:16px 18px 15px;text-align:left;cursor:pointer;
+  background:var(--surface);border:2px solid var(--line-strong);border-radius:3px;
+  font-family:inherit;display:grid;gap:3px;transition:border-color .15s,background .15s}
+.locpick button b{font-family:'Noto Serif TC',Georgia,serif;font-size:20px;font-weight:700;
+  color:var(--ink);line-height:1.2}
+.locpick button span{font-size:12.5px;color:var(--muted)}
+.locpick button em{font-style:normal;font-size:12px;color:var(--ink-2);line-height:1.65;margin-top:5px}
+.locpick button:hover{border-color:var(--accent)}
+.locpick button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.locpick button.on{border-color:var(--accent);background:var(--accent-soft)}
+.locpick button.on b{color:var(--accent)}
+.locpick button.on::after{content:"● 選用中";position:absolute;top:9px;right:12px;
+  font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;
+  color:var(--accent);font-weight:700}
+.sb-loc{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;
+  letter-spacing:.06em;padding:4px 9px;border-radius:2px;flex:none;
+  background:var(--ink);color:var(--bg);opacity:.85}
 </style>
 </head>
 <body>
@@ -557,14 +579,24 @@ nav.sidenav a.off .nav-dot{background:var(--line)}
   <div class="block-head"><span class="sec-num">01</span><div><h2>你的三個數字</h2>
     <p>整頁只有這三格是「關於你」的，其他都是關於房子的。先填這三格就好</p></div></div>
   <div class="block-body">
-    <div class="field wide" style="margin-bottom:16px">
-      <label for="s-location" style="font-weight:700;font-size:14px;margin-bottom:6px;display:block">在哪裡開？</label>
-      <select id="s-location">
-        <option value="chitose" selected>千歲（北海道・長都）　冬天 −10℃</option>
-        <option value="kumamoto">熊本（菊陽・大津）　TSMC 圈・台灣人聚集</option>
-      </select>
-      <div class="locnote" id="loc-note">—</div>
+    <div class="lochead">在哪裡開？</div>
+    <div class="locpick">
+      <button type="button" data-loc="chitose">
+        <b>千歲</b>
+        <span>北海道・千歲市長都</span>
+        <em>冬天 −10℃　台灣料理零競爭　客源賭 Rapidus</em>
+      </button>
+      <button type="button" data-loc="kumamoto">
+        <b>熊本</b>
+        <span>菊陽町・大津町（TSMC 圈）</span>
+        <em>沒有冬天　台灣人 1,430 人已在　但已有競爭者</em>
+      </button>
     </div>
+    <select id="s-location" hidden aria-hidden="true">
+      <option value="chitose" selected>千歲</option>
+      <option value="kumamoto">熊本</option>
+    </select>
+    <div class="locnote" id="loc-note">—</div>
     <div class="bigfields">
       <div class="bigfield">
         <label for="i-own">現金<span>自有，<b>不含貸款</b>。存款＋可變現投資</span></label>
@@ -887,6 +919,7 @@ nav.sidenav a.off .nav-dot{background:var(--line)}
 </div>
 
 <div id="stickybar" hidden>
+  <span class="sb-loc" id="sb-loc">千歲</span>
   <span class="sb-tag" id="sb-tag">—</span>
   <span class="sb-item">總投資 <b id="sb-total">—</b></span>
   <span class="sb-item" id="sb-gap-wrap">缺口 <b id="sb-gap">—</b></span>
@@ -1928,6 +1961,10 @@ function render(){
   }
   $("sec-hl").setAttribute("data-state",st);
   document.body.setAttribute("data-verdict",st);
+  document.querySelectorAll("[data-loc]").forEach(function(b){
+    b.classList.toggle("on", b.getAttribute("data-loc")===LOC);
+  });
+  var sbl=$("sb-loc"); if(sbl) sbl.textContent=(LOC==="kumamoto")?"熊本":"千歲";
   document.querySelectorAll("[data-preset]").forEach(function(b){
     b.classList.toggle("active", b.getAttribute("data-preset")===ACTIVE_PRESET);
   });
@@ -1966,6 +2003,14 @@ function setMode(n){
   $("grp-used").hidden=(n!=="used");
   render();
 }
+document.querySelectorAll("[data-loc]").forEach(function(b){
+  b.addEventListener("click",function(){
+    var sel=$("s-location"); if(!sel) return;
+    if(sel.value===b.getAttribute("data-loc")) return;   /* 已經是這個地點就不重算 */
+    sel.value=b.getAttribute("data-loc");
+    sel.dispatchEvent(new Event("change",{bubbles:true}));
+  });
+});
 (function(){
   var sel=$("s-location"); if(!sel) return;
   sel.addEventListener("change",function(){
