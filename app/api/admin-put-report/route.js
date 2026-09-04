@@ -1,6 +1,7 @@
 import { blobPath } from '../../../lib/blob';
 import { J, preflight } from '../../../lib/cors';
 import { put } from '@vercel/blob';
+import { gunzipSync } from 'zlib';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -8,9 +9,25 @@ export const dynamic = 'force-dynamic';
 export function OPTIONS() { return preflight(); }
 
 // 後台（斷點編輯器）上傳付費檔到 Vercel Blob（選項②·私有）。以 ADMIN_KEY 保護。
+//
+// ★兩種 body 格式（2026-09-04 加上 gzip）：
+//   ① application/json           → 舊格式，{key,name,html} 直接讀
+//   ② x-yoda-encoding: gzip      → body 是「gzip 過的那份 JSON」，這裡解壓再 parse
+//   為什麼要 gzip：Vercel 函式的請求上限 4.5MB，而美股分析已經 4.2~4.3MB，
+//   包成 JSON（引號/反斜線/中文逃脫）就爆表 → Vercel 回純文字 "Request Entity Too Large"，
+//   前端 res.json() 解析失敗噴「Unexpected token 'R'」。gzip 後約 1/10，餘裕很大。
 export async function POST(req) {
   let body = {};
-  try { body = await req.json(); } catch (e) {}
+  try {
+    if ((req.headers.get('x-yoda-encoding') || '').toLowerCase() === 'gzip') {
+      const buf = Buffer.from(await req.arrayBuffer());
+      body = JSON.parse(gunzipSync(buf).toString('utf8'));
+    } else {
+      body = await req.json();
+    }
+  } catch (e) {
+    return J({ ok: false, error: '請求內容無法解析：' + String((e && e.message) || e) });
+  }
 
   if (!process.env.ADMIN_KEY || body.key !== process.env.ADMIN_KEY) {
     return J({ ok: false, error: '管理密碼錯誤' }, 403);

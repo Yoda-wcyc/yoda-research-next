@@ -2366,6 +2366,28 @@ document.getElementById('btn-free').onclick=async function(){
   download(srcName+'_免費精簡版.html', buildFreeDoc());
 };
 document.getElementById('btn-paid').onclick=function(){ if(!doc) return; download(srcName+'_付費內容.html', buildPaidDoc()); };
+// ── 上傳到 Vercel：一律先 gzip（2026-09-04）──────────────────────────────
+// 為什麼：Vercel 函式請求上限 4.5MB，美股分析報告已經 4.2~4.3MB，包成 JSON 後爆表，
+// Vercel 會回「純文字」Request Entity Too Large，前端 res.json() 就噴
+// 「Unexpected token 'R'」——看起來像連線失敗，其實是檔案太大。
+// gzip 後約剩 1/10，餘裕很大。瀏覽器沒有 CompressionStream 才退回原本的 JSON 直送。
+async function putReportToVercel(name, html){
+  var url='https://yoda-research-next.vercel.app/api/admin-put-report';
+  var payload=JSON.stringify({key:KEY,name:name,html:html});
+  if(typeof CompressionStream==='function'){
+    var st=new Blob([payload]).stream().pipeThrough(new CompressionStream('gzip'));
+    var gz=await new Response(st).blob();
+    return fetch(url,{method:'POST',headers:{'x-yoda-encoding':'gzip','Content-Type':'application/octet-stream'},body:gz});
+  }
+  return fetch(url,{method:'POST',body:payload});
+}
+// 伺服器若回的不是 JSON（413/502 之類的純文字或 HTML 錯誤頁），把原文擷取出來當錯誤訊息，
+// 不要讓 res.json() 的解析錯誤蓋掉真正的原因。
+async function readJsonSafe(r){
+  var t=await r.text();
+  try{ return JSON.parse(t); }
+  catch(e){ return {ok:false,error:'伺服器回應非 JSON（HTTP '+r.status+'）：'+t.slice(0,120)}; }
+}
 // ── 上傳付費檔到 Vercel Blob（選項②·私有；會員以 reportId=付費_<檔名> 經 /api/report 讀回）──
 document.getElementById('btn-upload').onclick=async function(){
   if(!doc) return;
@@ -2374,8 +2396,8 @@ document.getElementById('btn-upload').onclick=async function(){
   if(!await uiConfirm('上傳付費檔到 Vercel（快速供報告）?\nreportId＝'+name+'\n(同名會覆蓋舊檔)')) return;
   var b=this; b.disabled=true; var old=b.innerHTML; b.innerHTML='<span class="ic">⏳</span>上傳中…';
   try{
-    var r=await fetch('https://yoda-research-next.vercel.app/api/admin-put-report',{method:'POST',body:JSON.stringify({key:KEY,name:name,html:buildPaidDoc()})});
-    var res=await r.json();
+    var r=await putReportToVercel(name, buildPaidDoc());
+    var res=await readJsonSafe(r);
     b.disabled=false; b.innerHTML=old;
     if(res&&res.ok){ await uiAlert('✅ 已上傳到 Vercel：'+res.reportId+'\n\n會員 reportId＝'+res.reportId+'\n(report-shell 用這個 id 讀回·約1秒開啟)'); }
     else await uiAlert('上傳失敗：'+((res&&res.error)||'未知錯誤'));
