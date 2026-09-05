@@ -136,11 +136,11 @@ var EP=CLOUD
      save:function(n){return '/api/viz-styles?k='+encodeURIComponent(KEY)+'&name='+encodeURIComponent(n)},
      assign:'/api/viz-styles?k='+encodeURIComponent(KEY)+'&name=assign',
      del:function(n){return '/api/viz-styles?k='+encodeURIComponent(KEY)+'&name='+encodeURIComponent(n)+'&del=1'},
-     lab:function(f){return '/api/viz-sample?k='+encodeURIComponent(KEY)+'&name='+encodeURIComponent(f)}}
+     lab:function(f){return f==='__specimen__'?'/api/viz-specimen?k='+encodeURIComponent(KEY):'/api/viz-sample?k='+encodeURIComponent(KEY)+'&name='+encodeURIComponent(f)}}
   : {init:'/api/init', style:function(n){return '/api/style/'+encodeURIComponent(n)},
      save:function(n){return '/api/style/'+encodeURIComponent(n)}, assign:'/api/assign',
      del:function(n){return '/api/delete-style'},
-     lab:function(f){return '/lab/'+encodeURIComponent(f)}};
+     lab:function(f){return f==='__specimen__'?'/specimen':'/lab/'+encodeURIComponent(f)}};
 
 /* ── 控制項規格：[JSON 路徑, 標籤, 型別, min, max, step] ── */
 var SPEC=[
@@ -283,7 +283,7 @@ function paint(){
   try{
     css=YodaTokens.render(STYLE,r.family,ovr,false);
     var d=$('#prev').contentDocument;
-    if(d&&d.styleSheets.length){
+    if(r.type!=='specimen'&&d&&d.styleSheets.length){   /* 總覽頁只讀 token，不需要接管 */
       var base=parseFloat((STYLE.typography||{}).base)||24;
       var b=YodaTokens.bindRules(YodaTokens.harvestFromDoc(d,base),STYLE,ovr);
       css+=b.css; BIND=b.stats;
@@ -388,10 +388,10 @@ function boot(){
     INIT=j;
     $('#styleSel').innerHTML=j.styles.map(function(s){return '<option>'+s+'</option>'}).join('');
     $('#repSel').innerHTML=j.reports.map(function(r){
-      return '<option value="'+r.file+'" data-type="'+r.type+'" data-family="'+r.family+'">'+
-        r.file.replace('.html','')+'（'+r.kb+'KB）</option>'}).join('');
+      var label=r.type==='specimen'?'★ 元素總覽（每個拉桿控制什麼）':r.file.replace('.html','')+'（'+r.kb+'KB）';
+      return '<option value="'+r.file+'" data-type="'+r.type+'" data-family="'+r.family+'">'+label+'</option>'}).join('');
     buildPanel(); buildAssign();
-    var pref=j.reports.find(function(r){return r.type==='mw'})||j.reports[0];
+    var pref=j.reports.find(function(r){return r.type==='specimen'})||j.reports.find(function(r){return r.type==='mw'})||j.reports[0];
     if(pref)$('#repSel').value=pref.file;
     $('#prev').src=EP.lab($('#repSel').value);
     return loadStyle(j.styles.indexOf('baseline.v0')>=0?'baseline.v0':j.styles[0]);

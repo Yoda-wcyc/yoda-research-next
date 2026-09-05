@@ -95,6 +95,7 @@
       var cp = TB.cellPadding || null;
       if (cp) root += decl('--tbl-pad', (cp.top === undefined ? 6 : cp.top) + 'px ' + (cp.right === undefined ? 10 : cp.right) +
         'px ' + (cp.bottom === undefined ? 6 : cp.bottom) + 'px ' + (cp.left === undefined ? 10 : cp.left) + 'px', imp);
+      root += decl('--tbl-zebra', TB.zebra ? 'var(--c-surface2)' : 'transparent', imp);
       if (TB.rowHeight) root += decl('--tbl-row-h', TB.rowHeight + 'px', imp);
       if (TB.headerHeight) root += decl('--tbl-head-h', TB.headerHeight + 'px', imp);
       if (TB.minColWidth) root += decl('--tbl-min-col', TB.minColWidth + 'px', imp);

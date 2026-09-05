@@ -1,0 +1,231 @@
+<!doctype html><html lang="zh-TW"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>元素總覽 · 每個拉桿控制什麼</title>
+<style>
+/* ══ 這一頁只讀 token（--fs-* --lh-* --fw-* --ff-* --ls-* --c-* --r-* --bw* --sp* --tbl-* --tr）
+      fallback 值＝現況基線，所以沒套樣式也長得像報告。
+      「受控」小標是固定 10px 等寬灰字，故意不吃 token，永遠不會跟著動。══ */
+:root{--fs:24px;--fb:-apple-system,BlinkMacSystemFont,'PingFang TC','Microsoft JhengHei','Noto Sans TC',sans-serif;--fm:'SF Mono',Consolas,monospace;
+  --bg:#080b10;--surface:#0d1118;--surface2:#121820;--border:#1c2330;--text:#b8c8d8;--dim:#405060;--accent:#7f9fc6;--red:#cf6f72;--green:#5cae88}
+body.light{--bg:#f2f5f9;--surface:#fff;--surface2:#e8eef5;--border:#ccd6e2;--text:#1a2535;--dim:#6080a0;--accent:#4a6d94;--red:#c00030;--green:#006e4a}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--c-bg,var(--bg));color:var(--c-text,var(--text));font-family:var(--ff-narr,var(--fb));font-size:var(--fs-body,calc(var(--fs)*.7));line-height:var(--lh-body,1.9);padding:var(--sp6,24px) var(--sp8,32px) 80px;transition:background var(--tr,.15s),color var(--tr,.15s)}
+.who{font:10px/1.4 Consolas,monospace;color:#6b7c8e;letter-spacing:0;margin-bottom:6px;opacity:.9}
+.who b{color:#9fb3c8;font-weight:600}
+.blk{background:var(--c-surface,var(--surface));border:var(--bw,1px) solid var(--c-border,var(--border));border-radius:var(--r-m,8px);padding:var(--sp4,16px) var(--sp6,24px);margin-bottom:var(--sp6,24px)}
+.blk.lead{border-left:var(--bw-lead,3px) solid var(--c-accent,var(--accent))}
+.blk2{background:var(--c-surface2,var(--surface2));border:var(--bw,1px) solid var(--c-border,var(--border));border-radius:var(--r-s,4px);padding:var(--sp3,12px) var(--sp4,16px);margin-top:var(--sp3,12px)}
+h1{font:var(--fw-title,600) var(--fs-h1,calc(var(--fs)*1.3))/var(--lh-title,1.3) var(--ff-ui,var(--fb));color:var(--c-text,var(--text));letter-spacing:var(--ls-body,0)}
+h2{font:var(--fw-title,600) var(--fs-h2,calc(var(--fs)*1.05))/var(--lh-title,1.3) var(--ff-ui,var(--fb));color:var(--c-text,var(--text));margin-top:var(--sp2,8px)}
+h3{font:var(--fw-title,600) var(--fs-h3,calc(var(--fs)*.92))/var(--lh-title,1.3) var(--ff-ui,var(--fb));color:var(--c-text,var(--text));margin-top:var(--sp2,8px)}
+.desc{font:var(--fw-body,400) var(--fs-xs,calc(var(--fs)*.46))/var(--lh-data,1.65) var(--ff-data,var(--fm));color:var(--c-text2,#9fb0c4);letter-spacing:var(--ls-tag,.06em);text-transform:uppercase}
+.lead-p{font-size:var(--fs-lead,calc(var(--fs)*.8));font-weight:var(--fw-body,400);line-height:var(--lh-body,1.9);letter-spacing:var(--ls-body,0)}
+p{font-family:var(--ff-narr,var(--fb));font-size:var(--fs-body,calc(var(--fs)*.7));font-weight:var(--fw-body,400);line-height:var(--lh-body,1.9);letter-spacing:var(--ls-body,0);margin-top:var(--sp2,8px)}
+.note{font-family:var(--ff-narr,var(--fb));font-size:var(--fs-note,calc(var(--fs)*.6));line-height:var(--lh-body,1.9);color:var(--c-text2,#9fb0c4);margin-top:var(--sp2,8px)}
+.note b{color:var(--c-text,var(--text))}
+.sm{font-family:var(--ff-data,var(--fm));font-size:var(--fs-sm,calc(var(--fs)*.52));line-height:var(--lh-data,1.65);color:var(--c-text2,#9fb0c4)}
+.xs{font-family:var(--ff-data,var(--fm));font-size:var(--fs-xs,calc(var(--fs)*.46));line-height:var(--lh-data,1.65);color:var(--c-dim,var(--dim))}
+.micro{font-family:var(--ff-data,var(--fm));font-size:var(--fs-micro,calc(var(--fs)*.4));line-height:var(--lh-data,1.65);color:var(--c-dim,var(--dim));letter-spacing:var(--ls-tag,.06em)}
+.ladder{display:grid;grid-template-columns:110px 1fr 70px;gap:var(--sp2,8px) var(--sp3,12px);align-items:baseline}
+.ladder .k{font:10px/1.4 Consolas,monospace;color:#6b7c8e}
+.ladder .px{font:10px/1.4 Consolas,monospace;color:#9fb3c8;text-align:right}
+.l-h1{font:var(--fw-title,600) var(--fs-h1,31px)/var(--lh-title,1.3) var(--ff-ui,var(--fb))}
+.l-h2{font:var(--fw-title,600) var(--fs-h2,25px)/var(--lh-title,1.3) var(--ff-ui,var(--fb))}
+.l-h3{font:var(--fw-title,600) var(--fs-h3,22px)/var(--lh-title,1.3) var(--ff-ui,var(--fb))}
+.l-lead{font:var(--fw-body,400) var(--fs-lead,19px)/var(--lh-body,1.9) var(--ff-narr,var(--fb))}
+.l-body{font:var(--fw-body,400) var(--fs-body,17px)/var(--lh-body,1.9) var(--ff-narr,var(--fb))}
+.l-note{font:var(--fw-body,400) var(--fs-note,14px)/var(--lh-body,1.9) var(--ff-narr,var(--fb));color:var(--c-text2,#9fb0c4)}
+.l-sm{font:var(--fw-body,400) var(--fs-sm,12.5px)/var(--lh-data,1.65) var(--ff-data,var(--fm))}
+.l-xs{font:var(--fw-body,400) var(--fs-xs,11px)/var(--lh-data,1.65) var(--ff-data,var(--fm));color:var(--c-text2,#9fb0c4)}
+.l-micro{font:var(--fw-body,400) var(--fs-micro,9.6px)/var(--lh-data,1.65) var(--ff-data,var(--fm));color:var(--c-dim,var(--dim));letter-spacing:var(--ls-tag,.06em)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp4,16px)}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp4,16px)}
+/* 表格 */
+table{width:100%;border-collapse:collapse;font-family:var(--ff-data,var(--fm));font-size:var(--fs-sm,12.5px);line-height:var(--lh-data,1.65);margin-top:var(--sp2,8px)}
+th{text-align:left;padding:var(--tbl-pad,6px 10px);height:var(--tbl-head-h,34px);color:var(--c-text2,#9fb0c4);font-weight:var(--fw-title,600);border-bottom:var(--bw,1px) solid var(--c-border,var(--border));letter-spacing:var(--ls-tag,.06em);white-space:nowrap;min-width:var(--tbl-min-col,0)}
+td{padding:var(--tbl-pad,6px 10px);height:var(--tbl-row-h,34px);border-bottom:var(--bw,1px) solid var(--c-border,var(--border));white-space:nowrap}
+th.r,td.r{text-align:right;font-variant-numeric:tabular-nums}
+tbody tr:nth-child(even) td{background:var(--tbl-zebra,transparent)}
+.up{color:var(--c-up,var(--red))}.dn{color:var(--c-down,var(--green))}.warn{color:var(--c-warn,#f0c040)}
+/* 介面 */
+.btns{display:flex;gap:var(--sp2,8px);flex-wrap:wrap;margin-top:var(--sp2,8px)}
+.btn{font:var(--fw-title,600) var(--fs-sm,12.5px)/1 var(--ff-ui,var(--fb));padding:var(--sp2,8px) var(--sp3,12px);border-radius:var(--r-s,4px);border:var(--bw,1px) solid var(--c-border,var(--border));background:var(--c-surface,var(--surface));color:var(--c-text2,#9fb0c4);cursor:pointer;transition:all var(--tr,.15s);letter-spacing:var(--ls-tag,.06em)}
+.btn:hover{border-color:var(--c-accent,var(--accent));color:var(--c-text,var(--text))}
+.btn.on{background:var(--c-accent,var(--accent));border-color:var(--c-accent,var(--accent));color:var(--c-bg,var(--bg))}
+.pill{font:var(--fw-title,600) var(--fs-xs,11px)/1 var(--ff-ui,var(--fb));padding:var(--sp,4px) var(--sp3,12px);border-radius:var(--r-pill,9999px);border:var(--bw,1px) solid currentColor;letter-spacing:var(--ls-tag,.06em)}
+.tr-demo{display:inline-block;width:120px;height:28px;border-radius:var(--r-s,4px);background:var(--c-surface2,var(--surface2));border:var(--bw,1px) solid var(--c-border,var(--border));transition:all var(--tr,.15s);vertical-align:middle;cursor:pointer}
+.tr-demo.on{background:var(--c-accent,var(--accent));width:200px;border-radius:var(--r-pill,9999px)}
+/* 詞彙兩欄、小結、圖說 */
+.gl{display:grid;grid-template-columns:150px 1fr;gap:var(--sp2,8px) var(--sp4,16px);margin-top:var(--sp2,8px)}
+.gl-term{font:var(--fw-title,600) var(--fs-body,17px)/var(--lh-body,1.9) var(--ff-narr,var(--fb));color:var(--c-text,var(--text))}
+.gl-def{font:var(--fw-body,400) var(--fs-body,17px)/var(--lh-body,1.9) var(--ff-narr,var(--fb));color:var(--c-text2,#9fb0c4)}
+.verdict{margin-top:var(--sp3,12px);padding:var(--sp3,12px) var(--sp4,16px);border-left:var(--bw-lead,3px) solid var(--c-accent,var(--accent));background:var(--c-surface2,var(--surface2));border-radius:0 var(--r-m,8px) var(--r-m,8px) 0;font-size:var(--fs-body,17px);line-height:var(--lh-body,1.9)}
+pre.fig{font:var(--fs-note,14px)/var(--lh-fig,1.62) var(--ff-data,var(--fm));color:var(--c-text,var(--text));margin-top:var(--sp2,8px);white-space:pre}
+pre.fig .d{color:var(--c-dim,var(--dim))}
+/* 色票 */
+.sw{display:grid;grid-template-columns:repeat(6,1fr);gap:var(--sp2,8px);margin-top:var(--sp2,8px)}
+.sw div{height:44px;border-radius:var(--r-s,4px);border:var(--bw,1px) solid var(--c-border,var(--border));display:flex;align-items:flex-end;padding:3px 5px;font:9px/1.2 Consolas,monospace;color:#6b7c8e}
+/* 間距尺 */
+.sp-rule{display:flex;align-items:flex-end;gap:var(--sp3,12px);margin-top:var(--sp2,8px)}
+.sp-rule i{display:block;background:var(--c-accent,var(--accent));opacity:.7;border-radius:2px}
+.sp-rule span{font:9px/1.2 Consolas,monospace;color:#6b7c8e;display:block;text-align:center;margin-top:3px}
+svg text{font-family:var(--ff-data,var(--fm))}
+nav.demo{display:flex;gap:var(--sp3,12px);align-items:center;padding:var(--sp2,8px) var(--sp4,16px);background:var(--c-surface,var(--surface));border:var(--bw,1px) solid var(--c-border,var(--border));border-radius:var(--r-m,8px);margin-bottom:var(--sp4,16px)}
+nav.demo .n{font:var(--fw-title,600) var(--fs-xs,11px)/1 var(--ff-ui,var(--fb));color:var(--c-text2,#9fb0c4);letter-spacing:var(--ls-tag,.06em)}
+nav.demo .n.on{color:var(--c-accent,var(--accent))}
+</style></head><body>
+
+<nav class="demo"><span class="n on">00 今日重點</span><span class="n">01 市場內部</span><span class="n">02 資金流向</span><span class="n">03 產業輪動</span><span class="micro" style="margin-left:auto">nav · ① xs · ② 介面 · ④ 標籤字距</span></nav>
+
+<div class="who">受控：<b>① h1 主標</b> · ④ 標題字重 · ② 介面字型 · ③ 標題行高</div>
+<h1>Yoda 市場觀察 · 元素總覽：每一種元素受哪幾個拉桿控制</h1>
+<div class="who" style="margin-top:14px">受控：<b>① h2 章標</b> · ④ 標題字重 · ② 介面字型 · ③ 標題行高（報告裡的 .section-title）</div>
+<h2>02　資金往哪裡集中：量回來了，但回來的是軟體那一半</h2>
+<div class="desc">Participation → Volume → Rotation　<span class="who" style="display:inline">← 章節導語：① xs · ② 數據字型 · ④ 標籤字距 · ⑤ 次文字</span></div>
+
+<div class="blk lead" style="margin-top:var(--sp4,16px)">
+  <div class="who">受控：<b>① 字級階梯 全部九級</b>（右欄是即時算出的 px）· ② 三種字型 · ③ 三檔行高</div>
+  <div class="ladder">
+    <span class="k">h1 主標 ×<i data-k="h1"></i></span><span class="l-h1">市場內部結構</span><span class="px" data-px="h1"></span>
+    <span class="k">h2 章標 ×<i data-k="h2"></i></span><span class="l-h2">02　資金往哪裡集中</span><span class="px" data-px="h2"></span>
+    <span class="k">h3 區塊 ×<i data-k="h3"></i></span><span class="l-h3">📉 市場寬度（站上均線比例）</span><span class="px" data-px="h3"></span>
+    <span class="k">lead 重點 ×<i data-k="lead"></i></span><span class="l-lead">量補上來了，但錢更集中。</span><span class="px" data-px="lead"></span>
+    <span class="k">body 正文 ×<i data-k="body"></i></span><span class="l-body">跑得贏大盤的族群數不增反減，多數股票在漲、能贏大盤的變少。</span><span class="px" data-px="body"></span>
+    <span class="k">note 圖說 ×<i data-k="note"></i></span><span class="l-note">怎麼看：三條線＝站在 20／50／200 日均線之上的比例。</span><span class="px" data-px="note"></span>
+    <span class="k">sm 表格 ×<i data-k="sm"></i></span><span class="l-sm">資訊科技　+31.4%　1.12x　REL20 +8.2</span><span class="px" data-px="sm"></span>
+    <span class="k">xs 次要 ×<i data-k="xs"></i></span><span class="l-xs">n=12　·　樣本數　·　資料截止 09/04</span><span class="px" data-px="xs"></span>
+    <span class="k">micro 微標 ×<i data-k="micro"></i></span><span class="l-micro">08-19　08-26　09-04　軸標籤</span><span class="px" data-px="micro"></span>
+  </div>
+</div>
+
+<div class="grid2">
+  <div class="blk">
+    <div class="who">受控：<b>② 敘事字型</b> · ① body · ③ 敘事行高 · ④ 內文字重 · ④ 內文字距 · ⑤ 主文字</div>
+    <h3>正文段落</h3>
+    <p class="lead-p">重點句用 lead：量補上來了，但錢更集中——這是本週最重要的一句話。</p>
+    <p>正文：跑得贏大盤的族群數不增反減，多數股票在漲、能贏大盤的變少。資金往落後的金銀礦、能源、原物料與小型股補漲，但龍頭沒有爆量長黑，所以這是輪動不是撤退。中文長段落最吃行高，1.7 以下會擠、2.0 以上會散。</p>
+    <div class="note"><b>怎麼看：</b>條越長＝這一週掉越多；50% 是分水嶺。（note 圖說：① note · ⑤ 次文字）</div>
+  </div>
+  <div class="blk">
+    <div class="who">受控：<b>詞彙兩欄</b> ① body · ② 敘事字型 · ④ 標題字重(詞) · ⑤ 主文字(詞) 次文字(解釋)</div>
+    <h3>詞彙解釋</h3>
+    <div class="gl">
+      <div class="gl-term">REL5 / REL20</div><div class="gl-def">這檔近 5／20 日的報酬減掉大盤同期報酬，正值代表跑贏大盤。</div>
+      <div class="gl-term">量比</div><div class="gl-def">今日成交量除以 20 日均量，1.0 以上代表比平常熱。</div>
+    </div>
+    <div class="who" style="margin-top:12px">受控：<b>研判小結</b> ① body · ⑥ 左框強調 · ⑥ 圓角中 · ⑤ 卡片2 強調</div>
+    <div class="verdict">小結：放大且集中——量回來了，但回來的是軟體那一半，AI 硬體鏈仍在後段。</div>
+  </div>
+</div>
+
+<div class="blk">
+  <div class="who">受控：<b>⑦ 表格</b> 上下／左右內距 · 列高 · 表頭高 · 斑馬紋 · ① sm · ② 數據字型 · ③ 表格行高 · ⑤ 漲紅／跌綠／次文字(表頭) · ⑥ 框線寬</div>
+  <h3>資料表</h3>
+  <table><thead><tr><th>板塊</th><th class="r">REL5</th><th class="r">REL20</th><th class="r">量比</th><th>型態</th></tr></thead><tbody>
+    <tr><td>資訊科技</td><td class="r up">+31.4%</td><td class="r up">+8.2</td><td class="r">1.12x</td><td><span class="pill up">🔥 量增價強</span></td></tr>
+    <tr><td>金融</td><td class="r dn">-2.68%</td><td class="r dn">-1.4</td><td class="r">0.94x</td><td><span class="sm">整理</span></td></tr>
+    <tr><td>能源</td><td class="r up">+4.10%</td><td class="r dn">-0.3</td><td class="r">1.31x</td><td><span class="pill warn">⚠ 量增價平</span></td></tr>
+    <tr><td>原物料</td><td class="r up">+2.05%</td><td class="r up">+3.9</td><td class="r">1.05x</td><td><span class="sm">補漲</span></td></tr>
+  </tbody></table>
+  <div class="xs" style="margin-top:8px">n=12　·　樣本數　·　資料截止 2026-09-04　（xs：① xs · ⑤ 裝飾）</div>
+</div>
+
+<div class="grid2">
+  <div class="blk">
+    <div class="who">受控：<b>② 介面字型</b> · ① sm/xs · ④ 標題字重 · ④ 標籤字距 · ⑥ 圓角小／框線寬 · ⑧ 過場秒數(滑鼠移上去) · ⑤ 強調</div>
+    <h3>按鈕與標籤</h3>
+    <div class="btns"><span class="btn on">5 日</span><span class="btn">20 日</span><span class="btn">60 日</span><span class="btn">一鍵解釋</span></div>
+    <div class="btns"><span class="pill up">🔥 量增價強</span><span class="pill dn">❄ 量縮價弱</span><span class="pill" style="color:var(--c-accent,var(--accent))">◆ 龍頭</span></div>
+    <div class="who" style="margin-top:12px">受控：<b>⑥ 過場秒數</b>（點方塊看它變形的速度）· ⑥ 圓角小→膠囊 · ⑤ 強調</div>
+    <span class="tr-demo" onclick="this.classList.toggle('on')"></span> <span class="xs">← 點我</span>
+  </div>
+  <div class="blk">
+    <div class="who">受控：<b>⑥ 間距單位</b>（尺＝ sp／sp2／sp3／sp4／sp6／sp8，所有內距外距都是它的倍數）· ⑥ 圓角</div>
+    <h3>間距尺</h3>
+    <div class="sp-rule">
+      <div><i style="width:var(--sp,4px);height:40px"></i><span>sp</span></div>
+      <div><i style="width:var(--sp2,8px);height:40px"></i><span>×2</span></div>
+      <div><i style="width:var(--sp3,12px);height:40px"></i><span>×3</span></div>
+      <div><i style="width:var(--sp4,16px);height:40px"></i><span>×4</span></div>
+      <div><i style="width:var(--sp6,24px);height:40px"></i><span>×6</span></div>
+      <div><i style="width:var(--sp8,32px);height:40px"></i><span>×8</span></div>
+    </div>
+    <div class="blk2"><span class="sm">巢狀卡片（卡片2 底色 · 圓角小 · 內距 sp3/sp4）</span></div>
+  </div>
+</div>
+
+<div class="blk">
+  <div class="who">受控：<b>⑤ 顏色</b> 全部 11 組（深／淺各一套，切主題看）</div>
+  <h3>色票與用途</h3>
+  <div class="sw">
+    <div style="background:var(--c-bg,var(--bg))">bg 底色</div>
+    <div style="background:var(--c-surface,var(--surface))">surface 卡片</div>
+    <div style="background:var(--c-surface2,var(--surface2))">surface2 卡片2</div>
+    <div style="background:var(--c-border,var(--border))">border 框線</div>
+    <div style="background:var(--c-text,var(--text))">text 主文字</div>
+    <div style="background:var(--c-text2,#9fb0c4)">text2 次文字</div>
+    <div style="background:var(--c-dim,var(--dim))">dim 裝飾</div>
+    <div style="background:var(--c-accent,var(--accent))">accent 強調</div>
+    <div style="background:var(--c-up,var(--red))">up 漲・紅</div>
+    <div style="background:var(--c-down,var(--green))">down 跌・綠</div>
+    <div style="background:var(--c-warn,#f0c040)">warn 警示</div>
+    <div style="background:var(--c-orange,#ff8040)">orange</div>
+  </div>
+</div>
+
+<div class="grid2">
+  <div class="blk">
+    <div class="who">受控：<b>SVG 圖</b> 軸標籤 ① micro · ② 數據字型 · ⑤ 次文字(軸) 框線(格線) 漲紅(線) · 圖說 ① note</div>
+    <h3>折線圖</h3>
+    <svg viewBox="0 0 420 130" style="width:100%;max-width:520px;margin-top:8px">
+      <line x1="40" y1="100" x2="410" y2="100" stroke="var(--c-border,#1c2330)"/>
+      <line x1="40" y1="60" x2="410" y2="60" stroke="var(--c-border,#1c2330)" stroke-dasharray="3 3"/>
+      <polyline points="40,80 100,55 160,65 220,30 280,40 340,22 400,35" fill="none" stroke="var(--c-up,#cf6f72)" stroke-width="2"/>
+      <polyline points="40,95 100,88 160,92 220,75 280,80 340,70 400,66" fill="none" stroke="var(--c-down,#5cae88)" stroke-width="2"/>
+      <text x="40" y="118" style="font-size:var(--fs-micro,9.6px)" fill="var(--c-text2,#9fb0c4)">08-19</text>
+      <text x="220" y="118" style="font-size:var(--fs-micro,9.6px)" fill="var(--c-text2,#9fb0c4)" text-anchor="middle">08-27</text>
+      <text x="400" y="118" style="font-size:var(--fs-micro,9.6px)" fill="var(--c-text2,#9fb0c4)" text-anchor="end">09-04</text>
+      <text x="36" y="64" style="font-size:var(--fs-micro,9.6px)" fill="var(--c-dim,#405060)" text-anchor="end">50%</text>
+    </svg>
+    <div class="note"><b>怎麼看：</b>紅線＝站上 20 日線比例，綠線＝站上 200 日線比例；50% 是分水嶺。</div>
+  </div>
+  <div class="blk">
+    <div class="who">受控：<b>純文字圖</b> ① note · ② 數據字型 · ③ 純文字圖行高(綁字元對齊，別動) · ⑤ 裝飾</div>
+    <h3>純文字圖（決策樹／階梯）</h3>
+<pre class="fig">            現在
+             │
+     ┌───────┴───────┐
+   量增價漲        量增價平
+   ▲ 續強          ▼ 出貨
+     │               │
+   進榜            <span class="d">觀察一天</span></pre>
+  </div>
+</div>
+
+<script>
+/* 右欄 px 即時算出來：這一頁自己的小工具，不吃 token */
+(function(){
+  var busy=false;
+  function upd(){
+    if(busy)return; busy=true;
+    try{
+      var cs=getComputedStyle(document.documentElement);
+      var base=parseFloat(cs.getPropertyValue('--fs'))||24;
+      ['h1','h2','h3','lead','body','note','sm','xs','micro'].forEach(function(k){
+        var el=document.querySelector('.l-'+k); if(!el)return;
+        var px=parseFloat(getComputedStyle(el).fontSize);
+        var pe=document.querySelector('[data-px="'+k+'"]'), t1=px.toFixed(1)+'px';
+        if(pe&&pe.textContent!==t1)pe.textContent=t1;          /* 值沒變就不寫，免得觸發自己 */
+        var ke=document.querySelector('[data-k="'+k+'"]'), t2=(px/base).toFixed(2);
+        if(ke&&ke.textContent!==t2)ke.textContent=t2;
+      });
+    }finally{busy=false}
+  }
+  upd();
+  /* 只看兩個會變的地方：<html> 的 style/屬性（小中大、主題）與 <head> 的樣式注入；不看 body 子樹 */
+  new MutationObserver(upd).observe(document.documentElement,{attributes:true});
+  new MutationObserver(upd).observe(document.head,{childList:true,subtree:true,characterData:true});
+  document.body.addEventListener('transitionend',upd);
+})();
+</script>
+</body></html>

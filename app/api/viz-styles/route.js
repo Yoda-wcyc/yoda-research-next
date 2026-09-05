@@ -85,6 +85,8 @@ export async function GET(req) {
     const type = hit ? hit[1] : 'unknown';
     return { ...r, type, family: TYPE_FAMILY[type] || 'fmfb' };
   });
+  // 元素總覽永遠排第一（隨網站部署，不在 Blob）
+  reports.unshift({ file: '__specimen__', type: 'specimen', family: 'fmfb', kb: 0 });
   return J({ styles, assign: assign || {}, reports, types: Object.keys(TYPE_FAMILY), typeFamily: TYPE_FAMILY });
 }
 
