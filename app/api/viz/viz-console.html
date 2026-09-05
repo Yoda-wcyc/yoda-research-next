@@ -314,9 +314,11 @@ function setSize(px,quiet){
   var d; try{d=$('#prev').contentDocument}catch(e){return}
   if(!d)return;
   var r=curReport(), fam=r?r.family:'fmfb', sc={21:0.875,24:1,27:1.125}[px]||1;
+  /* 小/中/大＝樣式「基準」的 0.875／1／1.125 倍，不再寫死 21/24/27——否則基準拉桿永遠被 inline 蓋掉 */
+  var base=(STYLE&&STYLE.typography&&+STYLE.typography.base)||24;
   var H=d.documentElement.style;
   H.removeProperty('--fs'); H.removeProperty('--scale'); H.removeProperty('--fs-scale');
-  if(fam==='fmfb'){ if(r.type==='mw') H.setProperty('--fs-scale',sc); else H.setProperty('--fs',px+'px'); }
+  if(fam==='fmfb'){ if(r.type==='mw') H.setProperty('--fs-scale',sc); else H.setProperty('--fs',(base*sc).toFixed(2)+'px'); }
   else if(fam==='apple') H.setProperty('--fs-scale',sc);
   else H.setProperty('--scale',sc);
   d.documentElement.setAttribute('data-size',{21:'sm',24:'md',27:'lg'}[px]||'md');
