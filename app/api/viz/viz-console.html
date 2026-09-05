@@ -343,6 +343,7 @@ function measure(){
   for(var i=0;i<all.length;i++){
     var el=all[i],tg=el.tagName.toLowerCase();
     if(tg==='script'||tg==='style'||tg==='noscript')continue;
+    if(el.closest&&el.closest('[data-audit-skip]'))continue;
     var has=false;for(var j=0;j<el.childNodes.length;j++){var x=el.childNodes[j];if(x.nodeType===3&&/\S/.test(x.nodeValue)){has=true;break}}
     if(!has)continue;
     var cs=W.getComputedStyle(el);
