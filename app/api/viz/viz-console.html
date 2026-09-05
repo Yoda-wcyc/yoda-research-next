@@ -126,7 +126,7 @@ code{font:11.5px ui-monospace,Consolas,monospace;background:#131a25;padding:1px 
 <script src="/yoda-tokens.js"></script>
 <script>
 var $=function(s){return document.querySelector(s)};
-var INIT=null, STYLE=null, ORIG=null, CURNAME='', TH='dark', SZ=24, OFF=false, tmr=null;
+var INIT=null, STYLE=null, ORIG=null, CURNAME='', TH='dark', SZ=24, OFF=false, tmr=null, BIND=null;
 /* 兩種後端：本機 token_server（可存檔＋可套用） / Vercel（可存檔到 Blob，套用要回本機做） */
 var CLOUD=/\/api\/viz/.test(location.pathname);
 var KEY=new URLSearchParams(location.search).get('k')||'';
@@ -279,9 +279,16 @@ function paint(){
   var r=curReport(); if(!r)return;
   $('#pFam').innerHTML='家族 <b>'+r.family+'</b>';
   if(OFF){apply('');return}
-  var css;
-  try{css=YodaTokens.render(STYLE,r.family,$('#ovr').checked,r.family==='key'&&$('#forceCol')&&$('#forceCol').checked)}
-  catch(e){toast('算繪失敗：'+e.message,1);return}
+  var css, ovr=$('#ovr')?$('#ovr').checked:true;
+  try{
+    css=YodaTokens.render(STYLE,r.family,ovr,false);
+    var d=$('#prev').contentDocument;
+    if(d&&d.styleSheets.length){
+      var base=parseFloat((STYLE.typography||{}).base)||24;
+      var b=YodaTokens.bindRules(YodaTokens.harvestFromDoc(d,base),STYLE,ovr);
+      css+=b.css; BIND=b.stats;
+    }
+  }catch(e){toast('算繪失敗：'+e.message,1);return}
   apply(css);
 }
 function apply(css){
@@ -306,10 +313,12 @@ function setSize(px,quiet){
   SZ=px; document.querySelectorAll('#sizeSeg button').forEach(function(b){b.classList.toggle('on',+b.dataset.sz===+px)});
   var d; try{d=$('#prev').contentDocument}catch(e){return}
   if(!d)return;
-  d.documentElement.style.setProperty('--fs',px+'px');
-  var sc={21:0.875,24:1,27:1.125}[px]||1;
-  d.documentElement.style.setProperty('--scale',sc);
-  d.documentElement.style.setProperty('--fs-scale',sc);
+  var r=curReport(), fam=r?r.family:'fmfb', sc={21:0.875,24:1,27:1.125}[px]||1;
+  var H=d.documentElement.style;
+  H.removeProperty('--fs'); H.removeProperty('--scale'); H.removeProperty('--fs-scale');
+  if(fam==='fmfb'){ if(r.type==='mw') H.setProperty('--fs-scale',sc); else H.setProperty('--fs',px+'px'); }
+  else if(fam==='apple') H.setProperty('--fs-scale',sc);
+  else H.setProperty('--scale',sc);
   d.documentElement.setAttribute('data-size',{21:'sm',24:'md',27:'lg'}[px]||'md');
   if(!quiet)setTimeout(measure,220);
 }
@@ -348,7 +357,7 @@ function measure(){
   }
   var e=$('#pStat');
   e.innerHTML='元素 <b>'+n+'</b> · 樣式簽名 <b>'+Object.keys(sig).length+'</b> · 行高 <b>'+Object.keys(lh).length+
-    '</b> 種 · 對比不合格 <b>'+fail+'</b>';
+    '</b> 種 · 對比不合格 <b>'+fail+'</b>'+(BIND&&!OFF?' · 接管字級 <b>'+BIND.fs+'</b> 行高 <b>'+BIND.lh+'</b>'+(BIND.skipped?' 略過 '+BIND.skipped:''):'');
   e.className='pill '+(fail===0?'good':(fail>200?'warn':''));
 }
 
