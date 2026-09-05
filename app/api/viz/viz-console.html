@@ -1,0 +1,453 @@
+<!doctype html><html lang="zh-TW"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Yoda 視覺控制台</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:#0b0f16;color:#c9d6e4;font:13px/1.6 -apple-system,BlinkMacSystemFont,'PingFang TC','Microsoft JhengHei','Noto Sans TC',sans-serif;overflow:hidden}
+.app{display:grid;grid-template-columns:340px minmax(0,1fr);height:100vh}
+.panel{background:#0e131c;border-right:1px solid #1e2836;overflow-y:auto;padding:0 0 60px}
+.stage{display:flex;flex-direction:column;min-width:0}
+.hd{position:sticky;top:0;z-index:5;background:#0e131c;border-bottom:1px solid #1e2836;padding:12px 14px}
+.hd h1{font-size:15px;font-weight:800;margin:0 0 8px;color:#e6eef8}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+select,input[type=text],input[type=number]{background:#131a25;color:#c9d6e4;border:1px solid #263242;border-radius:5px;padding:5px 7px;font:inherit;font-size:12px}
+select{flex:1;min-width:0}
+button{font:600 12px/1 inherit;padding:7px 10px;border-radius:5px;border:1px solid #263242;background:#16202e;color:#c9d6e4;cursor:pointer;white-space:nowrap}
+button:hover{background:#1d2b3d;border-color:#33465c}
+button.pri{background:#1b3a5c;border-color:#2f6fb5;color:#dbe8f6}
+button.danger{border-color:#5a2630;color:#ff8a8a}
+button:disabled{opacity:.4;cursor:default}
+.tabs{display:flex;gap:4px;padding:10px 14px 0;border-bottom:1px solid #1e2836}
+.tabs button{border:0;border-bottom:2px solid transparent;background:none;border-radius:0;padding:8px 10px;color:#7f93a8}
+.tabs button.on{color:#e6eef8;border-bottom-color:#2f6fb5}
+.pane{display:none;padding:6px 14px}
+.pane.on{display:block}
+.grp{border-top:1px solid #1e2836;padding:11px 0 5px}
+.grp>h2{font-size:11.5px;font-weight:800;color:#8fa6bd;letter-spacing:.06em;margin:0 0 8px;display:flex;justify-content:space-between;align-items:center}
+.grp>h2 span{font-weight:400;color:#5f7286;letter-spacing:0}
+.ctl{display:grid;grid-template-columns:74px 1fr 54px;gap:7px;align-items:center;margin-bottom:6px}
+.ctl label{font-size:11.5px;color:#7f93a8;overflow:hidden;text-overflow:ellipsis}
+.ctl input[type=range]{width:100%}
+.ctl .v{font:11px/1 ui-monospace,Consolas,monospace;color:#a9bdd2;text-align:right}
+.ctl input[type=color]{width:100%;height:24px;padding:0;border:1px solid #263242;border-radius:4px;background:none;cursor:pointer}
+.ctl.wide{grid-template-columns:74px 1fr}
+.cpair{display:grid;grid-template-columns:74px 1fr 1fr 42px;gap:6px;align-items:center;margin-bottom:5px}
+.cpair label{font-size:11.5px;color:#7f93a8}
+.cpair input[type=color]{width:100%;height:23px;padding:0;border:1px solid #263242;border-radius:4px;background:none;cursor:pointer}
+.cpair .cr{font:10px/1 ui-monospace,monospace;text-align:right;color:#7ee0a8}
+.cpair .cr.bad{color:#ff8a8a}
+.hint{font-size:11px;color:#5f7286;line-height:1.65;margin:6px 0 2px}
+.hint b{color:#8fa6bd}
+.bar{background:#0b0f16;border-bottom:1px solid #1e2836;padding:9px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.pill{font:700 11px/1 ui-monospace,monospace;padding:5px 8px;border-radius:5px;background:#131a25;border:1px solid #263242;color:#a9bdd2}
+.pill b{color:#e6eef8}
+.pill.good{color:#7ee0a8;border-color:#255a3c}
+.pill.warn{color:#ffc37a;border-color:#5a4426}
+iframe{flex:1;width:100%;border:0;background:#080b10}
+.seg{display:flex;gap:0;border:1px solid #263242;border-radius:5px;overflow:hidden}
+.seg button{border:0;border-radius:0;border-right:1px solid #263242;padding:6px 9px;background:#131a25}
+.seg button:last-child{border-right:0}
+.seg button.on{background:#2f6fb5;color:#fff}
+table.asg{width:100%;border-collapse:collapse;font-size:12px}
+table.asg th{text-align:left;color:#7f93a8;font-weight:600;padding:5px 4px;border-bottom:1px solid #1e2836}
+table.asg td{padding:3px 4px;border-bottom:1px solid #141c28}
+table.asg td:first-child{color:#a9bdd2;font:600 11.5px ui-monospace,monospace}
+table.asg select{width:100%;font-size:11.5px;padding:3px 5px}
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#16283d;border:1px solid #2f6fb5;color:#dbe8f6;padding:9px 16px;border-radius:6px;font-size:12.5px;z-index:99;display:none;max-width:80vw}
+#toast.bad{background:#2a1519;border-color:#7a3040;color:#ffbcbc}
+#log{white-space:pre;font:11px/1.6 ui-monospace,Consolas,monospace;color:#8fa6bd;background:#0b0f16;border:1px solid #1e2836;border-radius:5px;padding:9px;max-height:230px;overflow:auto;margin-top:9px}
+.warnbox{background:#2a1519;border:1px solid #7a3040;color:#ffbcbc;padding:11px 13px;border-radius:6px;margin:14px;font-size:12.5px;line-height:1.7}
+code{font:11.5px ui-monospace,Consolas,monospace;background:#131a25;padding:1px 5px;border-radius:3px;color:#a9d0f0}
+</style></head><body>
+
+<div id="filewarn" class="warnbox" style="display:none">
+  <b>要先啟動本機伺服器</b>，這頁才能讀寫樣式庫（純檔案開啟的網頁不能寫回硬碟）。<br><br>
+  在終端機執行：<br><code>python "G:\Yoda x Claude\Skill\token_server.py"</code><br><br>
+  然後開 <code>http://localhost:8777/</code>
+</div>
+
+<div class="app" id="app" style="display:none">
+<div class="panel">
+  <div class="hd">
+    <h1>Yoda 視覺控制台</h1>
+    <div class="row">
+      <select id="styleSel" title="要編輯哪一套樣式"></select>
+      <button id="btnNew" title="以目前設定另存成新樣式">另存</button>
+    </div>
+    <div class="row" style="margin-top:6px">
+      <button id="btnSave" class="pri" style="flex:1">儲存</button>
+      <button id="btnRevert">還原</button>
+      <button id="btnDel" class="danger">刪除</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button data-tab="style" class="on">樣式細節</button>
+    <button data-tab="assign">指派表</button>
+    <button data-tab="apply">套用</button>
+  </div>
+
+  <div class="pane on" id="pane-style"></div>
+
+  <div class="pane" id="pane-assign">
+    <div class="hint">每一種報告要用哪一套樣式。改完按<b>儲存指派表</b>。<br>
+      關鍵報告是米色系，預設<b>只套字型／字級／表格、不套顏色</b>。</div>
+    <table class="asg"><thead><tr><th>報告類型</th><th>樣式</th></tr></thead><tbody id="asgBody"></tbody></table>
+    <button id="btnSaveAsg" class="pri" style="width:100%;margin-top:10px">儲存指派表</button>
+  </div>
+
+  <div class="pane" id="pane-apply">
+    <div class="hint">把<b>指派表</b>套到實驗室 16 份報告，輸出到
+      <code>視覺實驗室\_demo\&lt;資料夾&gt;\</code>。<br>原始檔不會被改。</div>
+    <div class="ctl wide" style="margin-top:8px"><label>輸出資料夾</label><input type="text" id="outName" value="out"></div>
+    <div class="ctl wide"><label>強制優先</label>
+      <label style="color:#a9bdd2;font-size:11.5px"><input type="checkbox" id="ovr" checked> 加 !important（美股／台股／市場觀察需要）</label></div>
+    <button id="btnApply" class="pri" style="width:100%;margin-top:8px">套用到 16 份</button>
+    <div id="log"></div>
+  </div>
+</div>
+
+<div class="stage">
+  <div class="bar">
+    <select id="repSel" style="max-width:260px"></select>
+    <div class="seg" id="themeSeg"><button data-th="dark" class="on">深</button><button data-th="light">淺</button></div>
+    <div class="seg" id="sizeSeg"><button data-sz="21">小</button><button data-sz="24" class="on">中</button><button data-sz="27">大</button></div>
+    <button id="btnOff" title="暫時關掉樣式，看原本的樣子">原樣對照</button>
+    <span class="pill" id="pStat">—</span>
+    <span class="pill" id="pFam">—</span>
+  </div>
+  <iframe id="prev" src="about:blank"></iframe>
+</div>
+</div>
+
+<div id="toast"></div>
+
+<script src="/yoda-tokens.js"></script>
+<script>
+var $=function(s){return document.querySelector(s)};
+var INIT=null, STYLE=null, ORIG=null, CURNAME='', TH='dark', SZ=24, OFF=false, tmr=null;
+/* 兩種後端：本機 token_server（可存檔＋可套用） / Vercel（可存檔到 Blob，套用要回本機做） */
+var CLOUD=/\/api\/viz/.test(location.pathname);
+var KEY=new URLSearchParams(location.search).get('k')||'';
+var EP=CLOUD
+  ? {init:'/api/viz-styles?k='+encodeURIComponent(KEY),
+     style:function(n){return '/api/viz-styles?k='+encodeURIComponent(KEY)+'&name='+encodeURIComponent(n)},
+     save:function(n){return '/api/viz-styles?k='+encodeURIComponent(KEY)+'&name='+encodeURIComponent(n)},
+     assign:'/api/viz-styles?k='+encodeURIComponent(KEY)+'&name=assign',
+     del:function(n){return '/api/viz-styles?k='+encodeURIComponent(KEY)+'&name='+encodeURIComponent(n)+'&del=1'},
+     lab:function(f){return '/api/viz-sample?k='+encodeURIComponent(KEY)+'&name='+encodeURIComponent(f)}}
+  : {init:'/api/init', style:function(n){return '/api/style/'+encodeURIComponent(n)},
+     save:function(n){return '/api/style/'+encodeURIComponent(n)}, assign:'/api/assign',
+     del:function(n){return '/api/delete-style'},
+     lab:function(f){return '/lab/'+encodeURIComponent(f)}};
+
+/* ── 控制項規格：[JSON 路徑, 標籤, 型別, min, max, step] ── */
+var SPEC=[
+ ['① 基準與字級階梯','整套字級由基準推導；倍率是它的幾倍',[
+   ['typography.base','基準 px','num',16,34,1],
+   ['typography.ladder.h1','h1 主標','rng',0.8,2.2,0.01],
+   ['typography.ladder.h2','h2 章標','rng',0.7,1.8,0.01],
+   ['typography.ladder.h3','h3 區塊','rng',0.6,1.5,0.01],
+   ['typography.ladder.lead','lead 重點','rng',0.5,1.2,0.01],
+   ['typography.ladder.body','body 正文','rng',0.45,1.1,0.01],
+   ['typography.ladder.note','note 圖說','rng',0.4,0.95,0.01],
+   ['typography.ladder.sm','sm 表格','rng',0.35,0.85,0.01],
+   ['typography.ladder.xs','xs 次要','rng',0.3,0.75,0.01],
+   ['typography.ladder.micro','micro 微標','rng',0.25,0.65,0.01]]],
+ ['② 字型（依角色）','敘事＝內文段落；數據＝表格數字；介面＝按鈕標籤',[
+   ['typography.fonts.narrative','敘事','font'],
+   ['typography.fonts.data','數據','font'],
+   ['typography.fonts.ui','介面','font'],
+   ['roles.bodyFont','綁 body','bool']]],
+ ['③ 行高','中文建議 1.7 以上；fig 是純文字圖專用不要動',[
+   ['typography.lineHeights.title','標題','rng',1.0,1.8,0.05],
+   ['typography.lineHeights.body','敘事','rng',1.3,2.2,0.05],
+   ['typography.lineHeights.data','表格','rng',1.1,2.0,0.05],
+   ['typography.lineHeights.fig','純文字圖','rng',1.0,2.0,0.01]]],
+ ['④ 字重與字距','',[
+   ['typography.weights.title','標題字重','rng',400,900,100],
+   ['typography.weights.body','內文字重','rng',300,700,100],
+   ['typography.letterSpacing.tag','標籤字距','rng',0,0.3,0.01],
+   ['typography.letterSpacing.body','內文字距','rng',-0.02,0.1,0.005]]],
+ ['⑤ 顏色','左＝深色 右＝淺色；右邊小字是這個色對底色的對比（4.5 才算合格）',[
+   ['bg','底色','cpair'],['surface','卡片','cpair'],['surface2','卡片2','cpair'],
+   ['border','框線','cpair'],['text','主文字','cpair'],['text2','次文字','cpair'],
+   ['dim','裝飾','cpair'],['accent','強調','cpair'],
+   ['up','漲・紅','cpair'],['down','跌・綠','cpair'],['warn','警示','cpair']]],
+ ['⑥ 形狀與間距','',[
+   ['shape.radiusS','圓角 小','rng',0,12,1],
+   ['shape.radiusM','圓角 中','rng',0,20,1],
+   ['shape.borderW','框線寬','rng',1,4,1],
+   ['shape.borderLead','左框強調','rng',0,8,1],
+   ['spacing.unit','間距單位','rng',2,8,1],
+   ['motion.transition','過場秒數','rng',0,0.5,0.05]]],
+ ['⑦ 表格','報告最密的地方；勾「套用到所有表格」才會真的改到',[
+   ['table.cellPadding.top','上下內距','rng',2,16,1],
+   ['table.cellPadding.left','左右內距','rng',2,24,1],
+   ['table.rowHeight','列高','rng',20,56,1],
+   ['table.headerHeight','表頭高','rng',20,56,1],
+   ['table.zebra','斑馬紋','bool'],
+   ['table.applyToAll','套用到所有表格','bool']]]
+];
+
+function get(o,p){return p.split('.').reduce(function(a,k){return a==null?a:a[k]},o)}
+function set(o,p,v){var k=p.split('.'),l=k.pop(),t=k.reduce(function(a,x){if(a[x]==null)a[x]={};return a[x]},o);t[l]=v}
+function toast(m,bad){var t=$('#toast');t.textContent=m;t.className=bad?'bad':'';t.style.display='block';
+  clearTimeout(t._t);t._t=setTimeout(function(){t.style.display='none'},bad?5000:2000)}
+function api(m,u,b){return fetch(u,{method:m,headers:{'Content-Type':'application/json'},
+  body:b?JSON.stringify(b):undefined}).then(function(r){return r.json()}).then(function(j){
+  if(j&&j.error){toast(String(j.error).slice(0,300),1);throw new Error(j.error)}return j})}
+
+/* WCAG */
+function lum(h){h=(h||'#000').replace('#','');if(h.length===3)h=h.split('').map(function(c){return c+c}).join('');
+  var a=[0,2,4].map(function(i){var v=parseInt(h.substr(i,2),16)/255;
+    return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)});return .2126*a[0]+.7152*a[1]+.0722*a[2]}
+function cr(a,b){var x=lum(a),y=lum(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05)}
+
+function buildPanel(){
+  var h='';
+  SPEC.forEach(function(g){
+    h+='<div class="grp"><h2>'+g[0]+(g[1]?'<span>'+g[1]+'</span>':'')+'</h2>';
+    g[2].forEach(function(c){
+      var p=c[0],lb=c[1],ty=c[2];
+      if(ty==='cpair'){
+        h+='<div class="cpair" data-key="'+p+'"><label>'+lb+'</label>'+
+           '<input type="color" data-th="dark"><input type="color" data-th="light">'+
+           '<span class="cr"></span></div>';
+      }else if(ty==='bool'){
+        h+='<div class="ctl wide"><label>'+lb+'</label><label style="color:#a9bdd2;font-size:11.5px">'+
+           '<input type="checkbox" data-p="'+p+'"> 開啟</label></div>';
+      }else if(ty==='font'){
+        h+='<div class="ctl wide"><label>'+lb+'</label><select data-p="'+p+'">'+
+           '<option value="sans">黑體</option><option value="serif">襯線 Noto Serif TC</option>'+
+           '<option value="mono">等寬 SF Mono</option></select></div>';
+      }else if(ty==='num'){
+        h+='<div class="ctl"><label>'+lb+'</label><input type="number" data-p="'+p+'" min="'+c[3]+'" max="'+c[4]+'" step="'+c[5]+'"><span class="v"></span></div>';
+      }else{
+        h+='<div class="ctl"><label>'+lb+'</label><input type="range" data-p="'+p+'" min="'+c[3]+'" max="'+c[4]+'" step="'+c[5]+'"><span class="v"></span></div>';
+      }
+    });
+    h+='</div>';
+  });
+  $('#pane-style').innerHTML=h;
+  $('#pane-style').addEventListener('input',onEdit);
+  $('#pane-style').addEventListener('change',onEdit);
+}
+
+function fillPanel(){
+  document.querySelectorAll('#pane-style [data-p]').forEach(function(e){
+    var v=get(STYLE,e.dataset.p);
+    if(e.type==='checkbox')e.checked=!!v;
+    else if(v!=null)e.value=v;
+    var vs=e.parentNode.querySelector('.v'); if(vs)vs.textContent=(v==null?'—':v);
+  });
+  document.querySelectorAll('#pane-style .cpair').forEach(function(row){
+    var k=row.dataset.key;
+    row.querySelectorAll('input[type=color]').forEach(function(inp){
+      var v=get(STYLE,'colors.'+inp.dataset.th+'.'+k);
+      if(v&&/^#[0-9a-f]{6}$/i.test(v))inp.value=v;
+    });
+  });
+  updContrast();
+}
+function updContrast(){
+  document.querySelectorAll('#pane-style .cpair').forEach(function(row){
+    var k=row.dataset.key,el=row.querySelector('.cr');
+    if(k==='bg'||k==='surface'||k==='surface2'||k==='border'){el.textContent='';return}
+    var fg=get(STYLE,'colors.'+TH+'.'+k),bg=get(STYLE,'colors.'+TH+'.surface2')||get(STYLE,'colors.'+TH+'.bg');
+    if(!fg||!bg){el.textContent='';return}
+    var r=cr(fg,bg); el.textContent=r.toFixed(1); el.className='cr'+(r>=4.5?'':' bad');
+  });
+}
+function onEdit(ev){
+  var e=ev.target;
+  if(e.dataset.p){
+    var v=e.type==='checkbox'?e.checked:(e.type==='range'||e.type==='number'?parseFloat(e.value):e.value);
+    set(STYLE,e.dataset.p,v);
+    var vs=e.parentNode.querySelector('.v'); if(vs)vs.textContent=v;
+  }else if(e.type==='color'){
+    set(STYLE,'colors.'+e.dataset.th+'.'+e.closest('.cpair').dataset.key,e.value);
+  }else return;
+  updContrast(); queue();
+}
+function queue(){clearTimeout(tmr);tmr=setTimeout(paint,220)}
+
+/* ── 預覽 ── */
+function curReport(){var o=$('#repSel').selectedOptions[0];return o?{file:o.value,type:o.dataset.type,family:o.dataset.family}:null}
+function paint(){
+  var r=curReport(); if(!r)return;
+  $('#pFam').innerHTML='家族 <b>'+r.family+'</b>';
+  if(OFF){apply('');return}
+  var css;
+  try{css=YodaTokens.render(STYLE,r.family,$('#ovr').checked,r.family==='key'&&$('#forceCol')&&$('#forceCol').checked)}
+  catch(e){toast('算繪失敗：'+e.message,1);return}
+  apply(css);
+}
+function apply(css){
+  var d; try{d=$('#prev').contentDocument}catch(e){return}
+  if(!d||!d.head)return;
+  var s=d.getElementById('yoda-tokens-live');
+  if(!s){s=d.createElement('style');s.id='yoda-tokens-live';d.head.appendChild(s)}
+  else d.head.appendChild(s);              /* 移到最後，確保贏 */
+  s.textContent=css;
+  setTheme(TH,true); setSize(SZ,true); setTimeout(measure,260);
+}
+function setTheme(t,quiet){
+  TH=t; document.querySelectorAll('#themeSeg button').forEach(function(b){b.classList.toggle('on',b.dataset.th===t)});
+  var d; try{d=$('#prev').contentDocument}catch(e){return}
+  if(!d||!d.body)return;
+  d.body.classList.toggle('light',t==='light');
+  d.documentElement.setAttribute('data-theme',t);
+  d.body.setAttribute('data-theme',t);
+  if(!quiet){updContrast();setTimeout(measure,220)}
+}
+function setSize(px,quiet){
+  SZ=px; document.querySelectorAll('#sizeSeg button').forEach(function(b){b.classList.toggle('on',+b.dataset.sz===+px)});
+  var d; try{d=$('#prev').contentDocument}catch(e){return}
+  if(!d)return;
+  d.documentElement.style.setProperty('--fs',px+'px');
+  var sc={21:0.875,24:1,27:1.125}[px]||1;
+  d.documentElement.style.setProperty('--scale',sc);
+  d.documentElement.style.setProperty('--fs-scale',sc);
+  d.documentElement.setAttribute('data-size',{21:'sm',24:'md',27:'lg'}[px]||'md');
+  if(!quiet)setTimeout(measure,220);
+}
+/* 三數字：簽名／行高／對比不合格 —— 與 visual_audit.py 同口徑 */
+function measure(){
+  var d; try{d=$('#prev').contentDocument}catch(e){return}
+  if(!d||!d.body){$('#pStat').textContent='—';return}
+  var W=$('#prev').contentWindow;
+  function L(c){var m=/rgba?\((\d+\.?\d*),\s*(\d+\.?\d*),\s*(\d+\.?\d*)(?:,\s*([\d.]+))?\)/.exec(c||'');
+    if(!m)return null;return{r:+m[1],g:+m[2],b:+m[3],a:m[4]===undefined?1:+m[4]}}
+  function lm(c){function f(v){v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)}
+    return .2126*f(c.r)+.7152*f(c.g)+.0722*f(c.b)}
+  function bl(f,b){var a=f.a;return{r:f.r*a+b.r*(1-a),g:f.g*a+b.g*(1-a),b:f.b*a+b.b*(1-a),a:1}}
+  function bgOf(el){var n=el,acc=null;
+    while(n&&n.nodeType===1){var c=L(W.getComputedStyle(n).backgroundColor);
+      if(c&&c.a>0){acc=acc?bl(acc,c):c;if(acc.a>=1||c.a>=1)return acc}n=n.parentNode}
+    var rt=L(W.getComputedStyle(d.documentElement).backgroundColor);
+    return acc?bl(acc,(rt&&rt.a>0)?rt:{r:255,g:255,b:255,a:1}):((rt&&rt.a>0)?rt:{r:255,g:255,b:255,a:1})}
+  var sig={},lh={},fail=0,n=0,all=d.querySelectorAll('body *');
+  for(var i=0;i<all.length;i++){
+    var el=all[i],tg=el.tagName.toLowerCase();
+    if(tg==='script'||tg==='style'||tg==='noscript')continue;
+    var has=false;for(var j=0;j<el.childNodes.length;j++){var x=el.childNodes[j];if(x.nodeType===3&&/\S/.test(x.nodeValue)){has=true;break}}
+    if(!has)continue;
+    var cs=W.getComputedStyle(el);
+    if(cs.display==='none'||cs.visibility==='hidden'||!el.getClientRects().length)continue;
+    n++;
+    var sz=parseFloat(cs.fontSize),w=parseInt(cs.fontWeight,10)||400;
+    var lv=cs.lineHeight==='normal'?'normal':(Math.round(parseFloat(cs.lineHeight)*100)/100)+'';
+    sig[[cs.fontFamily,sz,lv,w,cs.color].join('|')]=1; lh[lv]=1;
+    var col=L(cs.color)||{r:0,g:0,b:0,a:1};
+    if(el.namespaceURI==='http://www.w3.org/2000/svg'){var f2=L(cs.fill);if(f2&&f2.a>0)col=f2}
+    var bg=bgOf(el); if(col.a<1)col=bl(col,bg);
+    var rr=(Math.max(lm(col),lm(bg))+.05)/(Math.min(lm(col),lm(bg))+.05);
+    if(rr<((sz>=24||(sz>=18.66&&w>=700))?3:4.5))fail++;
+  }
+  var e=$('#pStat');
+  e.innerHTML='元素 <b>'+n+'</b> · 樣式簽名 <b>'+Object.keys(sig).length+'</b> · 行高 <b>'+Object.keys(lh).length+
+    '</b> 種 · 對比不合格 <b>'+fail+'</b>';
+  e.className='pill '+(fail===0?'good':(fail>200?'warn':''));
+}
+
+/* ── 指派表 ── */
+function buildAssign(){
+  var h='';
+  var NAMES={us_stock:'美股分析',tw_stock:'台股分析',mw:'市場觀察',md:'總經','ai-bubble':'AI泡沫',
+    key:'關鍵報告',topic:'專題／手冊',pro:'個股分析',brief:'簡報',forecast:'預測時間軸',hub:'研究報告中心','free-shell':'免費殼'};
+  INIT.types.forEach(function(t){
+    h+='<tr><td title="'+t+'">'+(NAMES[t]||t)+'</td><td><select data-t="'+t+'">'+
+       INIT.styles.map(function(s){return '<option value="'+s+'">'+s+'</option>'}).join('')+'</select></td></tr>';
+  });
+  $('#asgBody').innerHTML=h;
+  document.querySelectorAll('#asgBody select').forEach(function(s){
+    var v=INIT.assign[s.dataset.t]||INIT.assign['*']; if(v)s.value=v;
+  });
+}
+
+/* ── 啟動 ── */
+function loadStyle(name){
+  return api('GET',EP.style(name)).then(function(j){
+    STYLE=j; ORIG=JSON.parse(JSON.stringify(j)); CURNAME=name;
+    fillPanel(); paint();
+  });
+}
+function boot(){
+  api('GET',EP.init).then(function(j){
+    INIT=j;
+    $('#styleSel').innerHTML=j.styles.map(function(s){return '<option>'+s+'</option>'}).join('');
+    $('#repSel').innerHTML=j.reports.map(function(r){
+      return '<option value="'+r.file+'" data-type="'+r.type+'" data-family="'+r.family+'">'+
+        r.file.replace('.html','')+'（'+r.kb+'KB）</option>'}).join('');
+    buildPanel(); buildAssign();
+    var pref=j.reports.find(function(r){return r.type==='mw'})||j.reports[0];
+    if(pref)$('#repSel').value=pref.file;
+    $('#prev').src=EP.lab($('#repSel').value);
+    return loadStyle(j.styles.indexOf('baseline.v0')>=0?'baseline.v0':j.styles[0]);
+  }).catch(function(e){toast('啟動失敗：'+e.message,1)});
+}
+
+if(location.protocol==='file:'){$('#filewarn').style.display='block'}
+else{
+  $('#app').style.display='';
+  $('#prev').addEventListener('load',function(){setTimeout(paint,300)});
+  $('#repSel').addEventListener('change',function(){$('#prev').src=EP.lab($('#repSel').value)});
+  document.querySelectorAll('#themeSeg button').forEach(function(b){b.onclick=function(){setTheme(b.dataset.th)}});
+  document.querySelectorAll('#sizeSeg button').forEach(function(b){b.onclick=function(){setSize(+b.dataset.sz)}});
+  document.querySelectorAll('.tabs button').forEach(function(b){b.onclick=function(){
+    document.querySelectorAll('.tabs button').forEach(function(x){x.classList.toggle('on',x===b)});
+    document.querySelectorAll('.pane').forEach(function(p){p.classList.toggle('on',p.id==='pane-'+b.dataset.tab)})}});
+  $('#btnOff').onclick=function(){OFF=!OFF;this.textContent=OFF?'看套用後':'原樣對照';this.classList.toggle('pri',OFF);paint()};
+  $('#styleSel').onchange=function(){loadStyle(this.value)};
+  $('#btnRevert').onclick=function(){STYLE=JSON.parse(JSON.stringify(ORIG));fillPanel();paint();toast('已還原')};
+  $('#btnSave').onclick=function(){
+    api('POST',EP.save(CURNAME),{style:STYLE}).then(function(){
+      ORIG=JSON.parse(JSON.stringify(STYLE));toast('已儲存 '+CURNAME)})};
+  $('#btnNew').onclick=function(){
+    var n=prompt('新樣式名稱（英數，例如 linear-dark）','');
+    if(!n)return;
+    var s=JSON.parse(JSON.stringify(STYLE));
+    s.meta=s.meta||{}; s.meta.name=n; s.meta.version='0.1.0'; s.meta.basedOn=CURNAME;
+    api('POST',EP.save(n),{style:s}).then(function(j){
+      INIT.styles=j.styles;
+      $('#styleSel').innerHTML=j.styles.map(function(x){return '<option>'+x+'</option>'}).join('');
+      $('#styleSel').value=j.name; buildAssign(); loadStyle(j.name); toast('已建立 '+j.name)})};
+  $('#btnDel').onclick=function(){
+    if(!confirm('刪除樣式 '+CURNAME+'？'))return;
+    api('POST',EP.del(CURNAME),{name:CURNAME}).then(function(j){
+      INIT.styles=j.styles;
+      $('#styleSel').innerHTML=j.styles.map(function(x){return '<option>'+x+'</option>'}).join('');
+      buildAssign(); loadStyle(j.styles[0]); toast('已刪除')})};
+  $('#btnSaveAsg').onclick=function(){
+    var a={'_comment':'報告類型 → 樣式名（Skill/tokens/<名>.json）'};
+    document.querySelectorAll('#asgBody select').forEach(function(s){a[s.dataset.t]=s.value});
+    a['*']=a['us_stock']||INIT.styles[0];
+    api('POST',EP.assign,a).then(function(j){INIT.assign=j.assign;toast('指派表已儲存')})};
+  $('#btnApply').onclick=function(){
+    var a={};document.querySelectorAll('#asgBody select').forEach(function(s){a[s.dataset.t]=s.value});
+    a['*']=a['us_stock']||INIT.styles[0];
+    $('#log').textContent='套用中…';
+    api('POST','/api/apply',{assign:a,out:$('#outName').value||'out',override:$('#ovr').checked})
+      .then(function(j){$('#log').textContent=j.outDir+'\n\n'+j.log.join('\n');toast('已輸出 16 份')})};
+  $('#ovr').onchange=paint;
+  if(CLOUD){
+    /* 雲端沒有本機檔案可寫，套用要回本機做 */
+    var CMD=[
+      'cd "G:\\Yoda x Claude"',
+      'python Skill\\yoda_tokens.py pull --token <CONSOLE_TOKEN>',
+      'python Skill\\yoda_tokens.py apply --assign Skill\\tokens\\assign.json --dir 視覺實驗室 --out-dir 視覺實驗室\\_demo\\out --override'
+    ].join('\n');
+    $('#pane-apply').innerHTML='<div class="hint">套用會把樣式寫進實際的報告檔，只能在<b>你自己的電腦</b>上做（雲端沒有那些檔案）。<br><br>'+
+      '在這裡改完按<b>儲存</b>（存進雲端樣式庫），回本機執行下面兩行，就會把雲端的樣式抓回來套上：</div>'+
+      '<div id="log"></div>';
+    $('#log').textContent=CMD;
+    $('#pane-apply').insertAdjacentHTML('beforeend',
+      '<div class="ctl wide" style="margin-top:10px"><label>強制優先</label><label style="color:#a9bdd2;font-size:11.5px">'+
+      '<input type="checkbox" id="ovr" checked> 預覽加 !important</label></div>');
+    document.querySelector('.tabs button[data-tab=apply]').textContent='套用說明';
+  }
+  boot();
+}
+</script></body></html>
