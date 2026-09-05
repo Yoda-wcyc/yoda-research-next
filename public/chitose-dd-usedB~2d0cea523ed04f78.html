@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <meta name="robots" content="noindex,nofollow">
-<title>中古B 盡職調查清單</title>
+<title>中古B 盡職調查與入居清單</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap">
@@ -164,6 +164,38 @@ footer.foot b{color:var(--ink-2)}
   .item{break-inside:avoid}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+.mi{border:1px solid var(--line-strong);border-radius:3px;margin-bottom:8px;background:var(--surface)}
+.mi.done{background:var(--ok-soft);border-color:var(--ok)}
+.mi-h{display:grid;grid-template-columns:auto 1fr auto;gap:11px;align-items:start;padding:11px 14px;cursor:pointer}
+.mi-h input{width:18px;height:18px;accent-color:var(--ok);margin-top:2px;flex:none;cursor:pointer}
+.mi-t{font-size:14px;font-weight:700;line-height:1.55}
+.mi.done .mi-t{text-decoration:line-through;opacity:.7}
+.mi-y{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:12.5px;
+  font-weight:600;color:var(--accent);white-space:nowrap;text-align:right}
+.mi-n{padding:0 14px 12px 43px;font-size:12.5px;line-height:1.75;color:var(--ink-2)}
+.mi-n b{color:var(--ink)}
+.mi-who{font-size:11px;color:var(--muted);display:block;margin-top:4px}
+.pri{font-family:'IBM Plex Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:.06em;
+  color:#fff;border-radius:2px;padding:2px 6px;margin-right:7px;vertical-align:2px}
+.pri.p急{background:var(--bad)} .pri.p高{background:var(--warn)}
+.pri.p中{background:var(--muted)} .pri.p低{background:var(--line-strong);color:var(--ink-2)}
+.budget{margin:14px 0 4px;padding:14px 16px;border-radius:3px;background:var(--surface-2);
+  border-left:3px solid var(--accent);font-size:13.5px;line-height:1.85}
+.budget b{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;
+  color:var(--accent);font-size:16px}
+.sup{margin-bottom:14px}
+.sup h4{margin:0 0 7px;font-size:12px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--accent);font-weight:700}
+.sup ul{margin:0;padding:0;list-style:none;display:grid;gap:1px;background:var(--line);
+  border:1px solid var(--line)}
+.sup li{background:var(--surface);padding:8px 12px;display:grid;
+  grid-template-columns:auto 1fr;gap:10px;align-items:start;font-size:13px;line-height:1.65}
+.sup li input{width:16px;height:16px;accent-color:var(--ok);margin-top:2px;cursor:pointer}
+.sup li.done{background:var(--ok-soft)}
+.sup li.done .sup-t{text-decoration:line-through;opacity:.65}
+.sup-t{font-weight:600}
+.sup-d{display:block;font-weight:400;color:var(--muted);font-size:11.5px;margin-top:1px;line-height:1.6}
 </style>
 </head>
 <body>
@@ -171,9 +203,9 @@ footer.foot b{color:var(--ink-2)}
 
 <header class="mast">
   <div class="mast-l">
-    <div class="eyebrow">盡職調查清單 · Due Diligence</div>
+    <div class="eyebrow">盡職調查 ＋ 入居清單 · Due Diligence &amp; Move-in</div>
     <h1>中古B　長都駅前1丁目</h1>
-    <p>下斡旋之前要查完的每一件事。勾選會自動存在這台裝置上，去日本可以邊看邊打勾。</p>
+    <p>A–E 是下斡旋之前要查完的每一件事，F 是買了之後要花的錢與要買的東西。勾選會自動存在這台裝置上，去日本可以邊看邊打勾。</p>
   </div>
   <div class="mast-r">
     <div class="prog"><div class="prog-bar"><i id="pbar"></i></div>
@@ -244,6 +276,30 @@ footer.foot b{color:var(--ink-2)}
   <h2><span class="n">E</span>階段三　下斡旋前的最後確認</h2>
   <p class="lede">錢還沒付出去之前，最後一次把關。<b>E-1 的特約條款是保命用的，沒有它不要簽。</b></p>
   <div id="stage3"></div>
+</section>
+
+<section class="card">
+  <h2><span class="n">F</span>入居準備　買了之後要花的錢</h2>
+  <p class="lede">前面 A–E 是<b>買不買</b>；這一段是<b>買了之後</b>。中古屋交屋不等於可以住——23 年的設備有一批壽命到了，而且日本的房子有些東西不附。</p>
+
+  <h3>F-1　需要找業者的（含預算）</h3>
+  <p class="lede">勾選你打算做的項目，下面會自動加總。<b>「急」的四項建議一次做完</b>，其餘可以分年。</p>
+  <div id="mi-pro"></div>
+  <div class="budget" id="mi-budget"></div>
+
+  <h3>F-2　入居前的專業清掃</h3>
+  <p class="lede"><b>趁空屋做最便宜也最徹底</b>——家具搬進去之後價格與效果都變差。</p>
+  <div id="mi-clean"></div>
+
+  <h3>F-3　清潔用品（自己買）</h3>
+  <p class="lede">附日本實際買得到的商品名，到當地藥妝店或 <b>ホーマック／DCM</b>（北海道的居家用品連鎖）直接對著買。</p>
+  <div id="mi-supply"></div>
+
+  <h3>F-4　基礎日常用品</h3>
+  <p class="lede">照時間順序排。<b>第一組是交屋當天沒有就會出事的</b>。</p>
+  <div id="mi-daily"></div>
+
+  <div class="note bad"><b>三個台灣人最常踩的雷：</b>① <b>日本中古屋常常不附照明器具</b>，交屋當天可能只有燈座 ② <b>垃圾袋要買自治體指定的</b>，用錯不收 ③ <b>冬胎不是選配</b>，北海道沒冬胎等於不能開車，而且入冬後會缺貨。</div>
 </section>
 
 <section class="card">
@@ -466,6 +522,193 @@ try{ state=JSON.parse(localStorage.getItem(KEY)||"{}")||{}; }catch(e){ state={};
 function save(){ try{ localStorage.setItem(KEY,JSON.stringify(state)); }catch(e){} }
 function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
 
+/* ── 階段四：入居準備 ───────────────────────────────── */
+var MOVEIN={
+/* 需要找業者的：yen 為概估區間（含機器＋工事），lo/hi 供預算加總 */
+pro:[
+ {id:"m1", pri:"急", t:"エコキュート／電気温水器 交換", who:"設備業者・電気工事店",
+  lo:250000, hi:600000,
+  note:"壽命 10–15 年，<b>2003 年裝的早已過期</b>。這是オール電化的心臟，壞掉當天就沒熱水。看屋時先問屋主換過沒——沒換過就直接把這筆列進預算。"},
+ {id:"m2", pri:"急", t:"蓄熱式暖房機（蓄暖）點檢／更換", who:"設備業者",
+  lo:300000, hi:1500000,
+  note:"北海道全電化住宅的暖房主力，壽命 15–20 年。一戸建通常 2–3 台，<b>全換是這份清單最大的一筆</b>。先請業者判斷還能撐幾年，能修就修。"},
+ {id:"m3", pri:"急", t:"排水管 高圧洗浄（全戸）", who:"水道業者",
+  lo:15000, hi:30000,
+  note:"<b>入居前一定要做。</b>23 年的油垢與毛髮堆積，不洗遲早堵。這筆最便宜、CP 值最高。"},
+ {id:"m4", pri:"高", t:"トイレ 交換（温水洗浄便座一体型）", who:"水道業者",
+  lo:150000, hi:300000,
+  note:"陶器本體可以撐很久，但<b>ウォシュレット 的電子部分壽命只有 7–10 年</b>。若只換便座約 ¥50,000–100,000，先看現況再決定。"},
+ {id:"m5", pri:"中", t:"浴槽／ユニットバス 更新", who:"リフォーム業者",
+  lo:150000, hi:1500000,
+  note:"只換浴槽 ¥150,000–350,000；<b>ユニットバス 整組更新 ¥800,000–1,500,000</b>。2003 年的還能用，多半是發黴與矽利康劣化——先做下一項就好。"},
+ {id:"m6", pri:"高", t:"浴室 コーキング（矽利康）打ち直し", who:"リフォーム業者",
+  lo:30000, hi:60000,
+  note:"<b>整份清單 CP 值最高的一項。</b>矽利康劣化會滲水進牆體，換掉之後浴室觀感跟防水一起解決，不用整組換。"},
+ {id:"m7", pri:"高", t:"住宅用火災警報器 全數更換", who:"自己或電気工事店",
+  lo:15000, hi:35000,
+  note:"<b>法定必裝</b>，電池與本體壽命 10 年——2003 年的絕對過期。¥3,000–5,000／個 × 5–7 個。自己換也可以。"},
+ {id:"m8", pri:"中", t:"分電盤（配電箱）更新 ＋ 動力200V 引込", who:"電気工事店",
+  lo:200000, hi:650000,
+  note:"分電盤壽命 20–30 年，已接近。<b>你開店本來就要引三相200V，兩件一起做比較省。</b>這筆同時屬於開店改裝預算，別重複計算。"},
+ {id:"m9", pri:"中", t:"24時間換気システム 清掃・部品交換", who:"設備業者",
+  lo:20000, hi:50000,
+  note:"2003 年建基法改正後的必備設備，濾網與馬達會積灰。<b>不整理會影響室內空氣與結露。</b>"},
+ {id:"m10", pri:"高", t:"凍結防止帯（水道管ヒーター）點檢／更換", who:"水道業者",
+  lo:20000, hi:50000,
+  note:"<b>北海道限定，而且不能省。</b>壞掉的話冬天水管會凍裂，那是十萬起跳的災難。入居第一個冬天前務必確認會動。"},
+ {id:"m11", pri:"中", t:"屋根・雪止め・スノーダクト 點檢", who:"屋根業者",
+  lo:30000, hi:80000,
+  note:"北海道的屋頂承雪重量大。<b>點檢比事後修便宜十倍</b>，而且落雪砸到人或車是責任問題。"},
+ {id:"m12", pri:"低", t:"洗面台 交換", who:"水道業者",
+  lo:100000, hi:250000,
+  note:"沒壞可以先不動。等其他大項做完、有餘裕再說。"},
+ {id:"m13", pri:"低", t:"窓（二重サッシ）パッキン 更新", who:"サッシ業者",
+  lo:30000, hi:100000,
+  note:"膠條劣化會漏冷風、增加暖房費。<b>先摸看看有沒有風</b>，有才做。"}
+],
+/* 入居前的專業清掃：一次性外包 */
+clean:[
+ {id:"c1", t:"ハウスクリーニング（全屋 137㎡）", lo:80000, hi:150000,
+  note:"入居前空屋狀態做最便宜也最徹底。家具搬進去之後再做，價格與效果都變差。"},
+ {id:"c2", t:"レンジフード・換気扇 分解洗浄", lo:15000, hi:25000,
+  note:"23 年的油垢自己刷不掉，交給業者。"},
+ {id:"c3", t:"エアコン 分解洗浄（每台）", lo:12000, hi:20000,
+  note:"有幾台算幾台。不洗會一直吹霉味。"},
+ {id:"c4", t:"害虫駆除（燻蒸）", lo:15000, hi:30000,
+  note:"空屋期間常有蟲。搬進去前做一次，之後就輕鬆。"}
+],
+/* 清潔用品：自己買，附日本實際買得到的商品名 */
+supply:[
+ {g:"油汙・廚房", items:[
+  ["マジックリン（油汚れ用）","花王，日本廚房油汙標準解"],
+  ["ウタマロクリーナー","萬用中性，牆面地板都能用，日本主婦神物"],
+  ["セスキ炭酸ソーダ","鹼性粉，對油汙極強又便宜，百圓店就有"],
+  ["重曹（小蘇打）","刷洗與除臭，跟セスキ搭配用"],
+  ["パイプユニッシュ","排水口通管，定期倒"],
+  ["ステンレス用クリーナー","水槽與檯面的水垢"]
+ ]},
+ {g:"地板", items:[
+  ["クイックルワイパー 乾式＋濕式","日本地板清潔的基本盤"],
+  ["フローリング用ワックス","木地板打蠟，入居前做一次"],
+  ["コードレス掃除機","北海道室內時間長，這個值得買好一點"],
+  ["スチームモップ","可選，除菌用"]
+ ]},
+ {g:"浴室・廁所", items:[
+  ["カビキラー","除黴，中古屋必備"],
+  ["防カビくん煙剤","<b>入居前先燻一次</b>，之後每 2 個月一次，防黴效果最好"],
+  ["クエン酸","水垢與尿垢，鹼性汙垢用酸中和"],
+  ["お風呂用中性洗剤",""],
+  ["トイレクイックル","擦完直接丟馬桶"],
+  ["排水口ネット","消耗品，多買"]
+ ]},
+ {g:"窗戶・北海道特有", items:[
+  ["ガラスクリーナー",""],
+  ["サッシ用ブラシ","窗軌溝槽的灰"],
+  ["<b>結露防止シート</b>","<b>北海道必買</b>，冬天窗戶結露會滴到發霉"],
+  ["<b>結露取りワイパー</b>","每天早上刮窗，這是北海道的日常"],
+  ["隙間テープ","擋縫隙冷風，便宜有效"]
+ ]},
+ {g:"全般・消耗品", items:[
+  ["アルコール除菌スプレー",""],
+  ["メラミンスポンジ（激落ちくん）","水垢神器，百圓店大包裝"],
+  ["マイクロファイバークロス","多買幾條分區用"],
+  ["ゴム手袋・バケツ",""],
+  ["<b>千歲市指定ゴミ袋</b>","<b>日本各自治體垃圾袋不通用</b>，一定要買當地指定的，否則不收"]
+ ]}
+],
+/* 基礎日常用品：分「當天」「第一週」「北海道特有」「行政」 */
+daily:[
+ {g:"入居當天就要有", items:[
+  ["<b>照明器具</b>","<b>⚠ 日本中古屋常常不附照明</b>——交屋當天可能是空的燈座。這是台灣人最常踩的雷，先確認附不附"],
+  ["カーテン ＋ カーテンレール","日本窗簾尺寸規格化，<b>要先量再買</b>；有些屋子連軌道都沒有"],
+  ["寝具（布団セット）","第一晚要睡"],
+  ["トイレットペーパー・ティッシュ・タオル",""],
+  ["最低限の食器・調理器具",""],
+  ["延長コード・電源タップ","日本插座數量通常比台灣少"]
+ ]},
+ {g:"第一週內", items:[
+  ["冷蔵庫・洗濯機・電子レンジ","中古行情 ¥80,000–150,000／新品 ¥200,000–350,000"],
+  ["炊飯器・電気ケトル",""],
+  ["掃除機",""],
+  ["ネット回線 開通","申請到開通常要 2–4 週，<b>越早申請越好</b>"]
+ ]},
+ {g:"北海道特有（第一個冬天前）", items:[
+  ["<b>除雪スコップ・ママさんダンプ</b>","<b>入冬前買，入冬後會缺貨</b>"],
+  ["雪かき用長靴・防寒手袋",""],
+  ["車用スノーブラシ・解氷スプレー",""],
+  ["<b>加湿器</b>","北海道冬天室內極乾，影響睡眠與喉嚨"],
+  ["タイヤ（スタッドレス）＋ 交換","<b>法規與保命問題，不是選配</b>。四輪約 ¥60,000–120,000"]
+ ]},
+ {g:"行政・生活基盤", items:[
+  ["<b>印鑑（實印・銀行印）</b>","<b>日本生活必需</b>，開戶、簽約都要"],
+  ["住民登録・マイナンバーカード",""],
+  ["銀行口座 開設",""],
+  ["電気・水道 開通手續","オール電化所以沒有瓦斯"],
+  ["火災保険・地震保険 加入","<b>要確認涵蓋雪災</b>"]
+ ]}
+]
+};
+
+function yenR(lo,hi){
+  var f=function(n){return "\u00a5"+n.toLocaleString("en-US");};
+  return (lo===hi)?f(lo):(f(lo)+"\u2013"+f(hi));
+}
+function renderMI(){
+  /* F-1 需要業者 */
+  var b1=document.getElementById("mi-pro");
+  if(b1) b1.innerHTML=MOVEIN.pro.map(function(x){
+    var d=!!state[x.id];
+    return "<div class='mi"+(d?" done":"")+"'><div class='mi-h'>"+
+      "<input type='checkbox' data-cb='"+x.id+"'"+(d?" checked":"")+">"+
+      "<div class='mi-t'><span class='pri p"+x.pri+"'>"+x.pri+"</span>"+esc(x.t)+
+        "<span class='mi-who'>"+esc(x.who)+"</span></div>"+
+      "<div class='mi-y'>"+yenR(x.lo,x.hi)+"</div></div>"+
+      "<div class='mi-n'>"+x.note+"</div></div>";
+  }).join("");
+
+  /* F-2 清掃 */
+  var b2=document.getElementById("mi-clean");
+  if(b2) b2.innerHTML=MOVEIN.clean.map(function(x){
+    var d=!!state[x.id];
+    return "<div class='mi"+(d?" done":"")+"'><div class='mi-h'>"+
+      "<input type='checkbox' data-cb='"+x.id+"'"+(d?" checked":"")+">"+
+      "<div class='mi-t'>"+esc(x.t)+"</div>"+
+      "<div class='mi-y'>"+yenR(x.lo,x.hi)+"</div></div>"+
+      "<div class='mi-n'>"+x.note+"</div></div>";
+  }).join("");
+
+  /* F-3 / F-4 清單型 */
+  function group(boxId,groups,prefix){
+    var box=document.getElementById(boxId); if(!box) return;
+    box.innerHTML=groups.map(function(g,gi){
+      return "<div class='sup'><h4>"+esc(g.g)+"</h4><ul>"+g.items.map(function(it,ii){
+        var id=prefix+gi+"_"+ii, d=!!state[id];
+        return "<li class='"+(d?"done":"")+"'><input type='checkbox' data-cb='"+id+"'"+(d?" checked":"")+">"+
+          "<span><span class='sup-t'>"+it[0]+"</span>"+
+          (it[1]?"<span class='sup-d'>"+it[1]+"</span>":"")+"</span></li>";
+      }).join("")+"</ul></div>";
+    }).join("");
+  }
+  group("mi-supply",MOVEIN.supply,"sup");
+  group("mi-daily",MOVEIN.daily,"day");
+
+  budgetMI();
+}
+function budgetMI(){
+  var box=document.getElementById("mi-budget"); if(!box) return;
+  var lo=0,hi=0,n=0, alo=0,ahi=0, ulo=0,uhi=0;
+  MOVEIN.pro.concat(MOVEIN.clean).forEach(function(x){
+    alo+=x.lo; ahi+=x.hi;
+    if(state[x.id]){ lo+=x.lo; hi+=x.hi; n++; }
+    if(x.pri==="\u6025"){ ulo+=x.lo; uhi+=x.hi; }
+  });
+  box.innerHTML=
+    "已勾選 <b>"+n+"</b> 項　預算 <b>"+yenR(lo,hi)+"</b><br>"+
+    "<span style='color:var(--muted);font-size:12.5px'>"+
+    "「急」的四項合計 "+yenR(ulo,uhi)+"　／　F-1＋F-2 全做 "+yenR(alo,ahi)+
+    "　（約 NT$"+Math.round(alo/47000)+"–"+Math.round(ahi/47000)+"萬）</span>";
+}
+
 var all=[];
 function render(listId,arr){
   var box=document.getElementById(listId); if(!box) return;
@@ -486,6 +729,7 @@ function render(listId,arr){
   }).join("");
 }
 ["stage1","stage2","stage3"].forEach(function(k){ render(k,ITEMS[k]); all=all.concat(ITEMS[k]); });
+renderMI();
 
 function tally(){
   var done=0,kd=0,kt=0;
@@ -505,7 +749,9 @@ document.addEventListener("click",function(e){
   var cb=e.target.closest?e.target.closest("input[data-cb]"):null;
   if(cb){
     state[cb.getAttribute("data-cb")]=cb.checked; save();
-    cb.closest(".item").classList.toggle("done",cb.checked); tally();
+    var host=cb.closest(".item")||cb.closest(".mi")||cb.closest("li");
+    if(host) host.classList.toggle("done",cb.checked);
+    tally(); budgetMI();
     e.stopPropagation(); return;
   }
   var h=e.target.closest?e.target.closest(".item-h"):null;
@@ -515,7 +761,7 @@ document.getElementById("btn-reset").addEventListener("click",function(){
   if(!confirm("清除所有勾選？這個動作無法復原。")) return;
   state={}; save();
   ["stage1","stage2","stage3"].forEach(function(k){ render(k,ITEMS[k]); });
-  tally();
+  renderMI(); tally();
 });
 tally();
 })();
