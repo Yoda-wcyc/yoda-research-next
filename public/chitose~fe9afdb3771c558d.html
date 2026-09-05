@@ -328,6 +328,26 @@ main.main{min-width:0;flex:1;padding:26px 26px 90px;max-width:1180px}
 }
 
 
+/* ── 02 品項 x 時段 ── */
+.daybar{display:grid;gap:1px;background:var(--line);border:1px solid var(--line)}
+.dp{background:var(--surface-2);display:grid;
+  grid-template-columns:auto minmax(58px,auto) minmax(94px,auto) minmax(104px,auto) 1fr;
+  gap:12px;align-items:baseline;padding:9px 13px;opacity:.5;cursor:pointer;
+  transition:background-color .14s}
+.dp:hover{opacity:.8}
+.dp input{accent-color:var(--accent);width:16px;height:16px;flex:none;cursor:pointer;
+  align-self:center}
+.dp.on{background:var(--surface);opacity:1;box-shadow:inset 3px 0 0 var(--accent)}
+.dp-l{font-weight:700;font-size:13.5px}
+.dp-t{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted)}
+.dp-v{font-family:'IBM Plex Mono',monospace;font-size:13.5px;font-weight:600;
+  font-variant-numeric:tabular-nums}
+.dp.on .dp-v{color:var(--accent)}
+.dp-d{font-size:12.5px;color:var(--ink-2);line-height:1.6}
+@media(max-width:640px){.dp{grid-template-columns:auto 1fr 1fr;gap:2px 10px}
+  .dp-d{grid-column:1/-1}.dp input{grid-row:1/3}}
+#menu-apply{text-align:left}
+
 /* ── 省錢開關 ── */
 .leverbox{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:10px}
 label.lever{display:grid;grid-template-columns:auto 1fr;gap:11px;align-items:start;
@@ -496,33 +516,34 @@ nav.sidenav a.off .nav-dot{background:var(--line)}
 
 <nav class="sidenav" id="nav">
   <div class="nav-brand">
-    <div class="nav-brand-title">千歲開店試算盤</div>
-    <div class="nav-brand-sub">▸ Chitose · Osatsu</div>
+    <div class="nav-brand-title" id="brand-t">千歲開店試算盤</div>
+    <div class="nav-brand-sub" id="brand-s">▸ Chitose · Osatsu</div>
   </div>
   <div class="nav-section-label">先讀</div>
   <a href="#sec-intro"><span class="nav-num">00</span><div class="nav-dot"></div>這是什麼</a>
   <div class="nav-section-label">你的輸入</div>
   <a href="#sec-you"><span class="nav-num">01</span><div class="nav-dot"></div>你的三個數字</a>
-  <a href="#sec-pick"><span class="nav-num">02</span><div class="nav-dot"></div>選一個方案</a>
+  <a href="#sec-menu"><span class="nav-num">02</span><div class="nav-dot"></div>賣什麼、幾點賣</a>
+  <a href="#sec-pick"><span class="nav-num">03</span><div class="nav-dot"></div>選一個方案</a>
   <div class="nav-section-label">結果</div>
-  <a href="#sec-hl"><span class="nav-num">03</span><div class="nav-dot"></div>判定</a>
-  <a href="#sec-save"><span class="nav-num">04</span><div class="nav-dot"></div>省錢開關</a>
+  <a href="#sec-hl"><span class="nav-num">04</span><div class="nav-dot"></div>判定</a>
+  <a href="#sec-save"><span class="nav-num">05</span><div class="nav-dot"></div>省錢開關</a>
   <div class="nav-section-label">財務細節</div>
-  <a href="#sec-be"><span class="nav-num">05</span><div class="nav-dot"></div>三條損益線</a>
-  <a href="#sec-fund"><span class="nav-num">06</span><div class="nav-dot"></div>資金結構</a>
-  <a href="#sec-cf"><span class="nav-num">07</span><div class="nav-dot"></div>12個月現金流</a>
-  <a href="#sec-y1"><span class="nav-num">08</span><div class="nav-dot"></div>第一年燒錢</a>
-  <a href="#sec-mx"><span class="nav-num">09</span><div class="nav-dot"></div>自有資金 × 營收情境</a>
+  <a href="#sec-be"><span class="nav-num">06</span><div class="nav-dot"></div>三條損益線</a>
+  <a href="#sec-fund"><span class="nav-num">07</span><div class="nav-dot"></div>資金結構</a>
+  <a href="#sec-cf"><span class="nav-num">08</span><div class="nav-dot"></div>12個月現金流</a>
+  <a href="#sec-y1"><span class="nav-num">09</span><div class="nav-dot"></div>第一年燒錢</a>
+  <a href="#sec-mx"><span class="nav-num">10</span><div class="nav-dot"></div>自有資金 × 營收情境</a>
   <div class="nav-section-label">建物與基地</div>
-  <a href="#sec-plan"><span class="nav-num">10</span><div class="nav-dot"></div>配置圖與平面圖</a>
-  <a href="#sec-site"><span class="nav-num">11</span><div class="nav-dot"></div>基地檢查</a>
+  <a href="#sec-plan"><span class="nav-num">11</span><div class="nav-dot"></div>配置圖與平面圖</a>
+  <a href="#sec-site"><span class="nav-num">12</span><div class="nav-dot"></div>基地檢查</a>
   <div class="nav-section-label">參考</div>
-  <a href="#sec-adv"><span class="nav-num">12</span><div class="nav-dot"></div>進階微調</a>
-  <a href="#sec-guide"><span class="nav-num">13</span><div class="nav-dot"></div>名詞表</a>
+  <a href="#sec-adv"><span class="nav-num">13</span><div class="nav-dot"></div>進階微調</a>
+  <a href="#sec-guide"><span class="nav-num">14</span><div class="nav-dot"></div>名詞表</a>
   <div class="izy-section">
     <div class="izy-badge">
       <div class="izy-badge-label">Yoda Research</div>
-      <div class="izy-badge-text">北海道千歲市長都<br>水煎包／牛肉鍋外帶店<br>開店可行性試算</div>
+      <div class="izy-badge-text" id="brand-b">北海道千歲市長都<br>水煎包／牛肉鍋外帶店<br>開店可行性試算</div>
     </div>
   </div>
 </nav>
@@ -530,7 +551,7 @@ nav.sidenav a.off .nav-dot{background:var(--line)}
 <main class="main">
 
 <header class="masthead">
-  <h1>千歲開店試算盤</h1>
+  <h1 id="mast-h1">千歲開店試算盤</h1>
   <p>算一件很具體的事：在北海道千歲市長都開一家水煎包／牛肉鍋外帶店，你的錢夠不夠、簽證過不過得了、賺不賺得回來。</p>
 </header>
 
@@ -620,8 +641,36 @@ nav.sidenav a.off .nav-dot{background:var(--line)}
   </div>
 </section>
 
+<section class="block" id="sec-menu">
+  <div class="block-head"><span class="sec-num">02</span><div><h2>賣什麼、幾點賣</h2>
+    <p>勾品項，算出你一天能開幾個小時、要幾個爐口、要不要請人、日商上限是多少</p></div></div>
+  <div class="block-body">
+    <p class="lede">日商不是你想填多少就填多少——<b>它是「你賣什麼」乘上「你開幾個小時」的結果</b>。這一段先把菜單決定的上限算出來，再回頭看 01 的日商假設合不合理。</p>
+    <div class="presets" id="menu-combos">
+      <button type="button" data-combo="am"><b>早餐＋午餐</b>6:30–14:00　一個人扛得住的那一種</button>
+      <button type="button" data-combo="bento" class="star"><b>午餐便當主力</b>11:00–20:30　工廠團訂＋回家順手帶</button>
+      <button type="button" data-combo="all"><b>全開</b>七樣、五個時段　一定要請人</button>
+    </div>
+    <div class="leverbox" id="menu-box" style="margin-top:14px"></div>
+    <h3 class="sub">一天長什麼樣子　<span style="font-weight:400;font-size:12.5px;color:var(--muted)">點一排＝開／關那個時段</span></h3>
+    <div class="daybar" id="menu-bar"></div>
+    <div class="kpis" style="margin-top:12px">
+      <div class="kpi"><span class="k">營業時數</span><span class="v num" id="mk-hours">—</span><span class="n" id="mk-parts">—</span></div>
+      <div class="kpi"><span class="k">日商上限</span><span class="v num" id="mk-daily">—</span><span class="n">滿載估計</span></div>
+      <div class="kpi"><span class="k">實際估計</span><span class="v num" id="mk-real">—</span><span class="n">上限 × 實際來客率</span></div>
+      <div class="kpi"><span class="k">人力時數</span><span class="v num" id="mk-labor">—</span><span class="n" id="mk-labor-n">含備料與收店</span></div>
+      <div class="kpi"><span class="k">追加人事費</span><span class="v num" id="mk-staff">—</span><span class="n">每月</span></div>
+      <div class="kpi"><span class="k">廚房設備</span><span class="v num" id="mk-equip">—</span><span class="n" id="mk-burner">—</span></div>
+    </div>
+    <div class="lv-sum" id="menu-sum">—</div>
+    <div id="menu-warn"></div>
+    <div class="presets" style="margin-top:12px;grid-template-columns:1fr">
+      <button type="button" id="menu-apply"><b>把這個組合套進試算 ▸</b>會改寫 01 的日商與 13 的廚房設備費，然後重算全部</button>
+    </div>
+  </div>
+</section>
 <section class="block" id="sec-pick">
-  <div class="block-head"><span class="sec-num">02</span><div><h2>選一個方案</h2>
+  <div class="block-head"><span class="sec-num">03</span><div><h2>選一個方案</h2>
     <p>按一顆就整組換掉，包含物件、建物、車庫與省錢開關</p></div></div>
   <div class="block-body">
     <div class="modeswitch" style="max-width:340px;margin-bottom:16px">
@@ -648,7 +697,7 @@ nav.sidenav a.off .nav-dot{background:var(--line)}
   </div>
 </section>
 <section class="block" id="sec-hl" data-state="warn">
-  <div class="block-head"><span class="sec-num">03</span><div><h2>判定摘要</h2>
+  <div class="block-head"><span class="sec-num">04</span><div><h2>判定摘要</h2>
     <p>你的錢、這個方案、這個營收假設放在一起，會發生什麼事</p></div></div>
   <div class="block-body">
     <span class="verdict-tag" id="v-tag">計算中</span>
@@ -673,20 +722,20 @@ nav.sidenav a.off .nav-dot{background:var(--line)}
   </div>
 </section>
 <section class="block" id="sec-save">
-  <div class="block-head"><span class="sec-num">04</span><div><h2>省錢開關</h2>
+  <div class="block-head"><span class="sec-num">05</span><div><h2>省錢開關</h2>
     <p>判定紅了就從這裡救。勾了立刻套用，底部的判定條會跟著翻牌</p></div></div>
   <div class="block-body"><div class="leverbox" id="levers"></div></div>
 </section>
 <section class="block" id="sec-be">
-  <div class="block-head"><span class="sec-num">05</span><div><h2>三條損益線</h2>
+  <div class="block-head"><span class="sec-num">06</span><div><h2>三條損益線</h2>
     <p>你的日商落在哪一段，決定這件事是生意還是負擔</p></div></div>
   <div class="block-body"><div class="lines" id="lines"></div></div>
 </section><section class="block" id="sec-fund">
-  <div class="block-head"><span class="sec-num">06</span><div><h2>資金結構</h2>
+  <div class="block-head"><span class="sec-num">07</span><div><h2>資金結構</h2>
     <p>總投資如何被自有與借款切開，以及每月要還多少</p></div></div>
   <div class="block-body"><div class="costgrid" id="costgrid"></div><div class="flags" id="fundflags"></div></div>
 </section><section class="block" id="sec-cf">
-  <div class="block-head"><span class="sec-num">07</span><div><h2>12個月現金流</h2>
+  <div class="block-head"><span class="sec-num">08</span><div><h2>12個月現金流</h2>
     <p>成熟期（第2–3年）。北海道的冬天在表上看得見</p></div></div>
   <div class="block-body">
     <svg class="chart" id="chart" viewBox="0 0 720 190" preserveAspectRatio="none" role="img" aria-label="12個月淨現金流"></svg>
@@ -702,15 +751,15 @@ nav.sidenav a.off .nav-dot{background:var(--line)}
     </div>
   </div>
 </section><section class="block" id="sec-y1">
-  <div class="block-head"><span class="sec-num">08</span><div><h2>第一年燒錢</h2>
+  <div class="block-head"><span class="sec-num">09</span><div><h2>第一年燒錢</h2>
     <p>運轉資金夠不夠撐過爬坡期</p></div></div>
   <div class="block-body"><div class="checks" id="year1"></div><div class="flags" id="y1flags"></div></div>
 </section><section class="block" id="sec-mx">
-  <div class="block-head"><span class="sec-num">09</span><div><h2>自有資金 × 營收情境</h2>
+  <div class="block-head"><span class="sec-num">10</span><div><h2>自有資金 × 營收情境</h2>
     <p>格內為年度餘裕。橘框是你目前的位置</p></div></div>
   <div class="block-body"><div class="scroll"><table class="matrix" id="matrix"></table></div><div class="flags" id="mxflags"></div></div>
 </section><section class="block" id="sec-plan">
-  <div class="block-head"><span class="sec-num">10</span><div><h2>配置圖與平面圖</h2>
+  <div class="block-head"><span class="sec-num">11</span><div><h2>配置圖與平面圖</h2>
     <p>依設定即時重畫。示意用，實際配置依基地形狀與法規</p></div></div>
   <div class="block-body">
     <div class="plans">
@@ -750,12 +799,12 @@ nav.sidenav a.off .nav-dot{background:var(--line)}
     </div>
   </div>
 </section><section class="block" id="sec-site">
-  <div class="block-head"><span class="sec-num">11</span><div><h2>基地檢查</h2>
+  <div class="block-head"><span class="sec-num">12</span><div><h2>基地檢查</h2>
     <p>停車位、居住比例、建蔽容積——買地前必須先算贏的幾件事</p></div></div>
   <div class="block-body"><div class="checks" id="checks"></div><div class="flags" id="checkflags"></div></div>
 </section>
 <details class="block" id="sec-adv">
-  <summary class="block-head"><span class="sec-num">12</span><div><h2>進階微調</h2>
+  <summary class="block-head"><span class="sec-num">13</span><div><h2>進階微調</h2>
     <p>土地單價、建物單價、固定費、稅率⋯⋯不確定就別動，預設值已經是合理推估<span class="collapse-hint">點此展開</span></p></div></summary>
   <div class="block-body">
     <div class="optgrid">
@@ -868,7 +917,7 @@ nav.sidenav a.off .nav-dot{background:var(--line)}
   </div>
 </details>
 <details class="block" id="sec-guide">
-  <summary class="block-head"><span class="sec-num">13</span><div><h2>名詞表</h2>
+  <summary class="block-head"><span class="sec-num">14</span><div><h2>名詞表</h2>
     <p>看到不懂的字回來查<span class="collapse-hint">點此展開</span></p></div></summary>
   <div class="block-body">
     <div class="deflist">
@@ -934,6 +983,25 @@ nav.sidenav a.off .nav-dot{background:var(--line)}
 "use strict";
 
 /* 地點：兩地的氣候、地價、季節性完全不同，切換會連動下面所有計算 */
+
+/* 依地點換標題與品牌字樣 */
+var LOCLABEL={
+  chitose:{t:"千歲開店試算盤", s:"▸ Chitose · Osatsu",
+    b:"北海道千歲市長都<br>水煎包／牛肉鍋外帶店<br>開店可行性試算",
+    p:"算一件很具體的事：在北海道千歲市長都開一家水煎包／牛肉鍋外帶店，你的錢夠不夠、簽證過不過得了、賺不賺得回來。"},
+  kumamoto:{t:"熊本開店試算盤", s:"▸ Kikuyo · Ozu",
+    b:"熊本県菊陽町・大津町<br>台式外帶店（TSMC 圈）<br>開店可行性試算",
+    p:"算一件很具體的事：在熊本菊陽・大津的 TSMC 圈開一家台式外帶店，你的錢夠不夠、簽證過不過得了、賺不賺得回來——而且那裡已經有同業了。"}
+};
+function applyLocLabels(){
+  var L2=LOCLABEL[LOC]||LOCLABEL.chitose, s;
+  if((s=$("brand-t"))) s.textContent=L2.t;
+  if((s=$("brand-s"))) s.textContent=L2.s;
+  if((s=$("brand-b"))) s.innerHTML=L2.b;
+  if((s=$("mast-h1"))) s.textContent=L2.t;
+  if((s=document.querySelector(".masthead p"))) s.textContent=L2.p;
+  document.title=L2.t;
+}
 var LOCATIONS={
   chitose:{
     name:"千歲（北海道・長都）",
@@ -954,10 +1022,10 @@ var LOCATIONS={
     SNOWM:[0,0,0,0,0,0,0,0,0,0,0,0], snowCost:0, snowM:0,
     SEASON:[1.00,0.98,1.02,0.98,1.00,0.95,0.92,1.05,0.98,1.00,1.05,1.12],
     utilS:128000, utilPeak:185000,
-    landUnit:95000, tax:820000, insul:"5", rh:false,
+    landUnit:78000, tax:820000, insul:"5", rh:false,
     snowRatio:0, winterStall:1.0,
     peakLabel:"酷暑（冷房）", peakHint:"7–9月　35℃ 的冷房費，冬天反而輕",
-    note:"沒有暖房、除雪、雪置場——初期省約 400–500 萬、年省約 57 萬。但地價更高（菊陽公示 ¥87,825/㎡、大津 ¥77,350/㎡），且已有多家台灣料理店。夏季酷暑會壓低熱食需求。"
+    note:"沒有暖房、除雪、雪置場——初期省約 400–500 萬、年省約 57 萬。2026 公示地價：菊陽町 ¥85,977/㎡（實勢取引均 ¥106,000）、大津町 ¥61,850/㎡（+11.52%）；幹道沿線住宅地實勢推估 ¥78,000/㎡（同一個町內可差 2 倍，實際要查同一丁目成交）。已知至少四家台灣料理店在營運，包括大津「花日」8:30 賣豆漿蛋餅。"
   }
 };
 var LOC="chitose";
@@ -965,6 +1033,199 @@ function L(){ return LOCATIONS[LOC]||LOCATIONS.chitose; }
 var SEASON=L().SEASON, WINTER=L().PEAK, SNOWM=L().SNOWM;
 var mode="new";
 var ACTIVE_PRESET=null;
+
+/* ══════════ 02 賣什麼、幾點賣 ══════════════════════════
+   品項 × 時段。時段是「你決定開不開」，品項決定「那個時段賣得動什麼」。
+   anchor=能撐起一個時段的主食；false 的只是加點（湯），不能單獨開店。 */
+var PARTS=[
+  {k:"m", label:"早餐", t:"06:30–10:00", h:3.5},
+  {k:"l", label:"午餐", t:"11:00–14:00", h:3.0},
+  {k:"t", label:"下午", t:"14:00–17:00", h:3.0},
+  {k:"d", label:"晚餐", t:"17:00–20:30", h:3.5},
+  {k:"n", label:"宵夜", t:"21:00–01:00", h:4.0}
+];
+/* 每小時來客推估（尖峰）。熊本三班制＋人口密度高，宵夜與午餐較好 */
+var FLOW={ chitose:{m:8,l:22,t:5,d:16,n:6}, kumamoto:{m:10,l:26,t:6,d:18,n:9} };
+/* 份量係數：同一樣東西，午餐買的份量比早餐大、比下午點心大。
+   meal:1 的品項本身已經是一份餐（便當・鍋・炸物・湯），不再乘。 */
+var BASKET={m:1.0,l:1.9,t:0.8,d:1.8,n:1.2};
+var SOLO_MAX=13;   /* 一個人一天的極限工時（日本個人飲食店的常態上限） */
+var DISHES=[
+ {id:"sjb", name:"水煎包", jp:"焼き小籠包", price:270, gm:.68, anchor:1, parts:["m","l","t","d"],
+  equip:380000, equipName:"業務用平底煎鍋 ×2 ＋ 蒸籠", burners:2, prep:3.0,
+  note:"最耐操的主力：四個時段都能賣，毛利最高，冷了也能復熱。<b>沒有它整張菜單會散掉。</b>備料時間也最長。",
+  loc:{}},
+ {id:"dan", name:"蛋餅", jp:"台湾式クレープ", price:250, gm:.70, anchor:1, parts:["m"],
+  equip:150000, equipName:"業務用鐵板", burners:1, prep:1.0,
+  note:"<b>只有早餐時段</b>。現做現吃、放涼就爛，撐不起其他時段。大津町的「花日」8:30 開就在賣這個。",
+  loc:{}},
+ {id:"bao", name:"肉包", jp:"肉まん", price:180, gm:.65, anchor:1, parts:["m","t","d"],
+  equip:120000, equipName:"追加蒸籠（可與水煎包共用爐）", burners:1, prep:1.5,
+  note:"日本人最熟悉、接受度最高的一樣。<b>下午的空檔靠它撐</b>，而且可以冷凍備貨。",
+  loc:{}},
+ {id:"mif", meal:1, name:"炒米粉", jp:"台湾焼きビーフン", price:600, gm:.62, anchor:1, parts:["l","d"],
+  equip:450000, equipName:"中華炒台（強火力）", burners:2, prep:1.0,
+  note:"<b>便當化的關鍵</b>——工廠午餐團訂就靠這種「一盒吃得飽」的主食。但要強火力炒台，設備不便宜。",
+  loc:{}},
+ {id:"sla", meal:1, name:"酸辣湯", jp:"サンラータン", price:350, gm:.72, anchor:0, parts:["l","d","n"],
+  equip:120000, equipName:"寸胴鍋 ＋ 保溫鍋", burners:1, prep:0.8,
+  note:"<b>配角，不能單獨開一個時段</b>——但它是加點率最高的一項，客單價的提升幾乎不花額外時間。冬天在千歲特別有用。",
+  loc:{}},
+ {id:"ksj", meal:1, name:"鹹酥雞", jp:"台湾唐揚げ", price:700, gm:.60, anchor:1, parts:["d","n"],
+  equip:550000, equipName:"業務用フライヤー ＋ 排氣強化", burners:0, prep:1.5,
+  note:"<b>宵夜時段的唯一支柱</b>，客單價也最高。代價是要獨立油炸區與強力排氣，設備最貴、油煙投訴風險最高。",
+  loc:{kumamoto:1.15}},
+ {id:"gyu", meal:1, name:"牛肉鍋", jp:"台湾牛肉鍋", price:1400, gm:.55, anchor:1, parts:["d"],
+  equip:280000, equipName:"寸胴 ＋ 卓上コンロ・容器庫存", burners:2, prep:2.5,
+  note:"客單價最高，但<b>只在冷的時候賣得動</b>。千歲冬天是主力；熊本一年只有 3–4 個月適合，其餘時間設備閒置。",
+  loc:{kumamoto:0.55}}
+];
+var COMBOS={
+  am:   {d:["sjb","dan","bao"],                      p:["m","l"],
+         t:"早餐＋午餐", s:"6:30–14:00　一個人扛得住的那一種"},
+  bento:{d:["sjb","bao","mif","sla"],                p:["l","d"],
+         t:"午餐便當主力", s:"11:00–20:30　工廠團訂＋回家順手帶"},
+  all:  {d:["sjb","dan","bao","mif","sla","ksj","gyu"], p:["m","l","t","d","n"],
+         t:"全開", s:"七樣全上、五個時段　一定要請人"}
+};
+var MENUSEL={sjb:1,dan:1,bao:1,mif:1,sla:1,ksj:0,gyu:0};
+var PARTSEL={m:1,l:1,t:0,d:1,n:0};
+var MENUCOMBO=null;
+
+function menuCalc(){
+  var picked=DISHES.filter(function(d){ return MENUSEL[d.id]; });
+  var flow=FLOW[LOC]||FLOW.chitose;
+  var byPart={}, active=[], openEmpty=[];
+  PARTS.forEach(function(p){
+    var ds=picked.filter(function(d){ return d.parts.indexOf(p.k)>=0; });
+    var anchors=ds.filter(function(d){ return d.anchor; });
+    var open=!!PARTSEL[p.k];
+    byPart[p.k]={ds:ds,anchors:anchors,open:open,live:false,cap:0,spend:0,gm:0,h:p.h};
+    if(!open) return;
+    if(!anchors.length){ openEmpty.push(p); return; }
+    /* 客單價＝最貴的主餐 ＋ 0.35×次項 ＋ 0.15×第三項（加點行為） */
+    var bk=BASKET[p.k]||1;
+    var ps=ds.map(function(d){ return d.price*(d.loc[LOC]||1)*(d.meal?1:bk); }).sort(function(a,b){return b-a;});
+    var spend=ps[0]+(ps[1]||0)*0.35+(ps[2]||0)*0.15;
+    var gm=ds.reduce(function(s,d){return s+d.gm;},0)/ds.length;
+    byPart[p.k].live=true; byPart[p.k].spend=spend; byPart[p.k].gm=gm;
+    byPart[p.k].cap=flow[p.k]*p.h*spend;
+    active.push(p);
+  });
+  /* 只有被實際開到的時段，它的品項才算在設備與備料裡 */
+  var used=picked.filter(function(d){
+    return d.parts.some(function(k){ return byPart[k] && byPart[k].live; });
+  });
+  var idle=picked.filter(function(d){ return used.indexOf(d)<0; });
+  var capTotal=active.reduce(function(s,p){ return s+byPart[p.k].cap; },0);
+  var real=capTotal*0.55;
+  var hours=active.reduce(function(s,p){ return s+p.h; },0);
+  var prep=used.reduce(function(s,d){ return s+d.prep; },0);
+  var labor=hours>0 ? prep+hours+1.5 : 0;
+  var equip=picked.reduce(function(s,d){ return s+d.equip; },0);
+  var burners=picked.reduce(function(s,d){ return s+d.burners; },0);
+  var extraH=Math.max(0,labor-SOLO_MAX);
+  var staff=Math.round(extraH*1150*26/1000)*1000;
+  var heads=labor>0?Math.max(1,Math.ceil(labor/SOLO_MAX)):0;
+  var gmAvg=capTotal>0?active.reduce(function(s,p){return s+byPart[p.k].gm*byPart[p.k].cap;},0)/capTotal:0;
+  return {picked:picked,used:used,idle:idle,byPart:byPart,active:active,openEmpty:openEmpty,
+          cap:capTotal,real:real,hours:hours,prep:prep,labor:labor,equip:equip,
+          burners:burners,staff:staff,extraH:extraH,heads:heads,gm:gmAvg};
+}
+
+function drawMenu(){
+  var box=document.getElementById("menu-box"); if(!box) return;
+  var m=menuCalc();
+  var $m=function(id){ return document.getElementById(id); };
+  var yn=function(n){ return "¥"+Math.round(n).toLocaleString("en-US"); };
+
+  box.innerHTML=DISHES.map(function(d){
+    var on=!!MENUSEL[d.id];
+    var pl=PARTS.filter(function(p){return d.parts.indexOf(p.k)>=0;}).map(function(p){
+      return (PARTSEL[p.k]?"<b>":"<span style='opacity:.45'>")+p.label+(PARTSEL[p.k]?"</b>":"</span>");
+    }).join("・");
+    var pf=d.loc[LOC];
+    var idle=on && m.idle.indexOf(d)>=0;
+    return "<label class='lever"+(on?" on":"")+(idle?" excl":"")+"'><input type='checkbox' data-dish='"+d.id+"'"+(on?" checked":"")+">"+
+      "<div class='lv-body'><div class='lv-name'>"+d.name+"　<span style='font-weight:400;color:var(--muted);font-size:12px'>"+d.jp+"</span>"+
+        (d.anchor?"":"　<span style='font-weight:400;color:var(--muted);font-size:11.5px'>· 配角</span>")+"</div>"+
+      "<div class='lv-nums'>時段 "+pl+"　售價 <b>¥"+d.price+"</b>　毛利 <b>"+Math.round(d.gm*100)+"%</b>　備料 <b>"+d.prep.toFixed(1)+"h</b></div>"+
+      "<div class='lv-note'>"+d.note+"</div>"+
+      "<div class='lv-cost'>設備："+d.equipName+"　¥"+d.equip.toLocaleString("en-US")+"　／　爐口 "+d.burners+"</div>"+
+      (idle?"<div class='lv-excl'>⚠ 它能賣的時段你都沒開——設備買了會閒置</div>":"")+
+      (pf?("<div class='"+(pf<1?"lv-excl":"lv-warn")+"'>"+(pf<1?"⚠ 在熊本這一項的需求只剩約 "+Math.round(pf*100)+"%":"↑ 在熊本這一項多約 "+Math.round((pf-1)*100)+"%（半導體廠三班制）")+"</div>"):"")+
+      "</div></label>";
+  }).join("");
+
+  var bar=$m("menu-bar");
+  if(bar){
+    bar.innerHTML=PARTS.map(function(p){
+      var b=m.byPart[p.k], open=!!PARTSEL[p.k];
+      var v,dd;
+      if(!open){ v="沒開"; dd=b.anchors.length?("開了可以賣："+b.anchors.map(function(d){return d.name;}).join("・")):"—"; }
+      else if(!b.anchors.length){ v="開了沒東西賣"; dd="這個時段沒有任何主食——要嘛關掉，要嘛加一個主食"; }
+      else { v=yn(b.cap); dd=b.ds.map(function(d){return d.name;}).join("・")+"　客單價 ¥"+Math.round(b.spend); }
+      return "<label class='dp"+(b.live?" on":"")+"'>"+
+        "<input type='checkbox' data-part='"+p.k+"'"+(open?" checked":"")+">"+
+        "<div class='dp-l'>"+p.label+"</div>"+
+        "<div class='dp-t'>"+p.t+"</div>"+
+        "<div class='dp-v'>"+v+"</div>"+
+        "<div class='dp-d'>"+dd+"</div></label>";
+    }).join("");
+  }
+
+  $m("mk-hours").textContent=m.hours.toFixed(1)+"h";
+  $m("mk-parts").textContent=m.active.length?m.active.map(function(p){return p.label;}).join("・"):"沒有任何時段";
+  $m("mk-daily").textContent=yn(m.cap);
+  $m("mk-real").textContent=yn(m.real);
+  $m("mk-labor").textContent=m.labor.toFixed(1)+"h";
+  $m("mk-labor-n").textContent=m.labor>0?("備料 "+m.prep.toFixed(1)+"h ＋ 顧店 "+m.hours.toFixed(1)+"h ＋ 收店 1.5h"):"沒開店";
+  $m("mk-staff").textContent=m.staff>0?("¥"+m.staff.toLocaleString("en-US")):"¥0";
+  $m("mk-equip").textContent="¥"+m.equip.toLocaleString("en-US");
+  $m("mk-burner").textContent="爐口 "+m.burners+" 口";
+
+  var sum;
+  if(!m.picked.length){ sum="<b>一樣都沒勾。</b>至少勾一項，不然這家店沒有東西可以賣。"; }
+  else if(!m.active.length){ sum="<b>一個時段都沒開。</b>上面那五排是可以點的——決定你幾點開門。"; }
+  else{
+    var need=$m("i-daily")?Number($m("i-daily").value||0):0;
+    sum=(m.real>=need
+      ? "<b>這個組合撐得起你現在設定的日商 "+yn(need)+"。</b>"
+      : "<b>實際估計 "+yn(m.real)+"，低於你設定的日商 "+yn(need)+"——差 "+yn(need-m.real)+"。</b>不是日商填太高，就是要再開一個時段。")+
+      "<br>開 <b>"+m.active.map(function(p){return p.label;}).join("・")+"</b> 共 <b>"+m.hours.toFixed(1)+"h</b>，"+
+      "平均毛利 <b>"+Math.round(m.gm*100)+"%</b>，一天要 <b>"+m.labor.toFixed(1)+"h</b> 人力 → <b>"+m.heads+" 個人</b>。";
+  }
+  $m("menu-sum").innerHTML=sum;
+
+  var w=[];
+  m.openEmpty.forEach(function(p){
+    w.push(["bad","<b>"+p.label+" 開了卻沒東西賣。</b>這個時段你勾的品項裡沒有任何主食（湯不算），等於白開門付水電。要嘛關掉它，要嘛加一個主食。"]);
+  });
+  if(m.idle.length) w.push(["warn","<b>"+m.idle.map(function(d){return d.name;}).join("、")+" 買了用不到。</b>它能賣的時段你都沒開，設備錢（¥"+m.idle.reduce(function(s,d){return s+d.equip;},0).toLocaleString("en-US")+"）會閒置。要嘛取消勾選，要嘛把對應的時段打開。"]);
+  if(m.labor>SOLO_MAX) w.push(["bad","<b>一個人做不完。</b>一天 "+m.labor.toFixed(1)+"h 超過一個人的極限 "+SOLO_MAX+"h（備料＋顧店＋收店）。多出來的 "+m.extraH.toFixed(1)+"h 要請人，每月約 ¥"+m.staff.toLocaleString("en-US")+"——<b>這筆錢預設沒有算進固定費</b>，套用之後要自己去 13 進階微調加上去。"]);
+  else if(m.labor>0) w.push(["ok","<b>一個人做得完</b>（"+m.labor.toFixed(1)+"h／天，在 "+SOLO_MAX+"h 以內）。這是外帶店最重要的一件事——人事費是唯一你能完全控制的大成本。"]);
+  if(m.burners>6) w.push(["warn","<b>爐口 "+m.burners+" 口，超過 52㎡ 廚房的現實。</b>業務用六口爐台是實務上限。要嘛砍品項，要嘛錯開時段共用爐（水煎包與肉包可以共用蒸籠）。"]);
+  if(PARTSEL.m && MENUSEL.dan && !MENUSEL.sjb && !MENUSEL.bao) w.push(["warn","<b>只靠蛋餅撐早餐很危險。</b>蛋餅現做現吃、沒辦法備貨，一個人一小時做不了幾份。早餐時段建議一定要有水煎包或肉包當骨幹。"]);
+  if(MENUSEL.ksj && (PARTSEL.d||PARTSEL.n)) w.push(["warn","<b>鹹酥雞的排氣要另外設計。</b>油炸的排氣量與氣味遠高於蒸煎，住宅區的鄰居投訴風險最高——這就是現場要確認的那一項。"]);
+  if(MENUSEL.gyu && LOC==="kumamoto") w.push(["bad","<b>牛肉鍋在熊本是錯的品項。</b>九州一年只有 3–4 個月冷到會想吃鍋，設備其餘時間閒置。同樣一筆 ¥280,000，在熊本拿去強化鹹酥雞或便當線更划算。"]);
+  if(PARTSEL.n && LOC==="chitose") w.push(["warn","<b>千歲的宵夜時段很薄。</b>−10℃ 的晚上沒有人會出門買鹹酥雞，這個時段在北海道的客流只有熊本的 2/3。宵夜線在熊本才成立。"]);
+  if(!PARTSEL.l) w.push(["bad","<b>沒開午餐。</b>工廠午餐團訂是這門生意最穩的一塊，整個營收假設建立在它上面——不開午餐等於放棄一半的日商。"]);
+  $m("menu-warn").innerHTML=w.map(function(x){
+    return "<div class='note "+x[0]+"' style='margin-top:10px'>"+x[1]+"</div>";
+  }).join("");
+
+  document.querySelectorAll("#menu-combos button").forEach(function(b){
+    b.classList.toggle("active", b.getAttribute("data-combo")===MENUCOMBO);
+  });
+  return m;
+}
+
+function setCombo(k){
+  var c=COMBOS[k]; if(!c) return;
+  DISHES.forEach(function(d){ MENUSEL[d.id]= c.d.indexOf(d.id)>=0 ? 1 : 0; });
+  PARTS.forEach(function(p){ PARTSEL[p.k]= c.p.indexOf(p.k)>=0 ? 1 : 0; });
+  MENUCOMBO=k; drawMenu();
+}
 
 var INSUL={5:{res:225000},6:{res:250000},7:{res:285000}};
 /* 高峰月水電＝地點基準 ＋ 斷熱等級加減（各地基準等級的調整為 0） */
@@ -1646,6 +1907,9 @@ function drawChange(m){
     tone="good"; say="<b>翻正了。</b>不過這是模型上的成立，真正的變數是你能不能做到 "+yen(m.daily)+" 的日商——那是需求問題，不是算式問題。";
   }else if(stateChanged && PREV.state==="ok"){
     tone="bad"; say="<b>從「活得下去」掉出來了。</b>剛才那個組合是可行的，這一改把它推出了安全區。";
+  }else if(LASTCHANGE.kind==="menu"){
+    tone=(dSlack>0?"good":"flat");
+    say="日商現在是<b>菜單算出來的</b>，不是你填的。要拉高它只有兩條路：<b>多開一個時段</b>（但要多一個人），或<b>拉高客單價</b>（加湯、做成便當）。設備費也已經跟著換成這組品項的實際需求。";
   }else if(LASTCHANGE.id==="i-daily"||LASTCHANGE.id==="r-daily"){
     tone=(dSlack>0?"good":"bad");
     say="日商是<b>假設，不是產能上限</b>——兩口業務用平底鍋的物理產能超過 ¥180,000／日。所以改這個數字不會讓門檻動，只會改變「你賭自己做得到多少」。"+
@@ -1667,7 +1931,7 @@ function drawChange(m){
   }else if(LASTCHANGE.kind==="loc"){
     tone=(dBE<0?"good":"flat");
     say=(LOC==="kumamoto")
-      ? "<b>換到熊本，成本結構整個變了。</b>沒有暖房、除雪、雪置場——同樣的土地還多出 2–3 個車位。但地價更高，而且<b>那裡已經有多家台灣料理店</b>：你不再是唯一的台灣味，差異化要靠「台式早餐＋便當外帶」這個他們沒做的時段。"
+      ? "<b>換到熊本，成本結構整個變了。</b>沒有暖房、除雪、雪置場——同樣的土地還多出 2–3 個車位，而且不用租月極（千歲一年 ¥162,000）。但<b>台灣料理店從 2025 年開始急速增加</b>，連台式早餐都有人做了（大津「花日」8:30 賣豆漿蛋餅）。<b>剩下的空缺是純外帶便當與宵夜，不是早餐。</b>"
       : "<b>換回千歲，冬天回來了。</b>暖房、除雪、雪置場全部要算，初期多約 400–500 萬、每年多約 57 萬。但換到的是：台灣料理幾乎零競爭，而且 −10℃ 讓熱食有不可替代性。";
   }else if(LASTCHANGE.kind==="preset"){
     say="換了一整組設定。所有省錢開關已重置，這是這個方案的<b>原始狀態</b>——接下來要省什麼，自己勾。";
@@ -1982,7 +2246,7 @@ function render(){
   $("k-slack").textContent=sign(m.slack);
 
   m.state=st;
-  drawChange(m); drawRead(m);
+  drawChange(m); drawRead(m); drawMenu(); applyLocLabels();
   $("sb-tag").textContent=tag;
   $("sb-total").textContent=yen(m.total);
   $("sb-be").textContent=yen(m.beYou);
@@ -2064,6 +2328,47 @@ document.querySelectorAll("input, select").forEach(function(el){
   el.addEventListener("input",function(){noteFieldChange(el);clearPreset();render();});
   el.addEventListener("change",function(){noteFieldChange(el);clearPreset();render();});
 });
+
+
+/* ── 02 賣什麼、幾點賣：wiring ── */
+(function(){
+  var box=document.getElementById("menu-box");
+  if(box) box.addEventListener("change",function(e){
+    var cb=e.target.closest?e.target.closest("input[data-dish]"):null;
+    if(!cb) return;
+    MENUSEL[cb.getAttribute("data-dish")]=cb.checked?1:0;
+    MENUCOMBO=null;
+    drawMenu();
+  });
+  var bar=document.getElementById("menu-bar");
+  if(bar) bar.addEventListener("change",function(e){
+    var cb=e.target.closest?e.target.closest("input[data-part]"):null;
+    if(!cb) return;
+    PARTSEL[cb.getAttribute("data-part")]=cb.checked?1:0;
+    MENUCOMBO=null;
+    drawMenu();
+  });
+  var cb2=document.getElementById("menu-combos");
+  if(cb2) cb2.addEventListener("click",function(e){
+    var b=e.target.closest?e.target.closest("button[data-combo]"):null;
+    if(b) setCombo(b.getAttribute("data-combo"));
+  });
+  var ap=document.getElementById("menu-apply");
+  if(ap) ap.addEventListener("click",function(){
+    var m=menuCalc();
+    if(!m.picked.length){ alert("先勾至少一個品項。"); return; }
+    var d=Math.max(25000,Math.min(160000,Math.round(m.real/1000)*1000));
+    var k=Math.max(0,m.equip);
+    $("i-daily").value=d; $("r-daily").value=d;
+    $("i-kitchen").value=k;
+    LASTCHANGE={label:"菜單組合",from:"—",
+      to:m.picked.map(function(x){return x.name;}).join("・")+"（日商 ¥"+d.toLocaleString("en-US")+"、設備 ¥"+k.toLocaleString("en-US")+"）",
+      kind:"menu",id:"menu"};
+    ACTIVE_PRESET=null;
+    render();
+    $("sec-hl").scrollIntoView({block:"start"});
+  });
+})();
 
 /* 判定捲出畫面時，底部浮出精簡判定條 */
 (function(){

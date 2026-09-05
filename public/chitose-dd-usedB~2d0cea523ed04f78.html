@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <meta name="robots" content="noindex,nofollow">
-<title>中古B 盡職調查與入居清單</title>
+<title>千歲・熊本　買房開店查核清單</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap">
@@ -196,6 +196,39 @@ footer.foot b{color:var(--ink-2)}
 .sup li.done .sup-t{text-decoration:line-through;opacity:.65}
 .sup-t{font-weight:600}
 .sup-d{display:block;font-weight:400;color:var(--muted);font-size:11.5px;margin-top:1px;line-height:1.6}
+
+/* ── 地點切換 ───────────────────────────────── */
+.locwrap{margin-bottom:22px}
+.lochead{font-family:'Noto Serif TC',Georgia,serif;font-size:19px;font-weight:700;margin:0 0 4px}
+.locsub{font-size:13px;color:var(--muted);margin:0 0 13px}
+.locpick{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.locpick button{display:block;width:100%;text-align:left;cursor:pointer;font-family:inherit;
+  background:var(--surface-2);color:var(--ink);border:2px solid var(--line-strong);
+  border-radius:3px;padding:14px 16px;transition:background-color .15s ease}
+.locpick button:hover{border-color:var(--accent)}
+.locpick button b{display:block;font-size:19px;font-weight:700;letter-spacing:.02em;
+  font-family:'Noto Serif TC',Georgia,serif;margin-bottom:2px}
+.locpick button span{display:block;font-size:12.5px;color:var(--muted);
+  font-family:'IBM Plex Mono',monospace;margin-bottom:7px}
+.locpick button em{display:block;font-style:normal;font-size:12.5px;line-height:1.75;color:var(--ink-2)}
+.locpick button.on{border-color:var(--accent);background:var(--accent-soft);
+  box-shadow:inset 0 0 0 1px var(--accent)}
+.locpick button.on b{color:var(--accent-2)}
+.locpick button.on em{color:var(--ink)}
+.locbadge{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:11px;
+  font-weight:600;letter-spacing:.06em;color:var(--accent);border:1px solid var(--accent);
+  border-radius:2px;padding:2px 8px;margin-left:9px;vertical-align:3px}
+.vs{display:grid;grid-template-columns:1fr;gap:1px;background:var(--line);
+  border:1px solid var(--line);margin-top:14px;font-size:13px}
+.vs .vsr{background:var(--surface);display:grid;grid-template-columns:minmax(96px,.8fr) 1fr 1fr;gap:1px}
+.vs .vsr>div{background:var(--surface);padding:8px 12px;line-height:1.7}
+.vs .vsr.h>div{background:var(--surface-2);font-weight:700;font-size:12px;
+  letter-spacing:.05em;color:var(--muted)}
+.vs .vsk{color:var(--muted);font-size:12.5px}
+.vs .hit{color:var(--ok);font-weight:600}
+.vs .miss{color:var(--bad)}
+@media(max-width:620px){.vs .vsr{grid-template-columns:1fr}.vs .vsr.h{display:none}
+  .vs .vsk{background:var(--surface-2)!important;font-weight:700;color:var(--ink)}}
 </style>
 </head>
 <body>
@@ -204,8 +237,8 @@ footer.foot b{color:var(--ink-2)}
 <header class="mast">
   <div class="mast-l">
     <div class="eyebrow">盡職調查 ＋ 入居清單 · Due Diligence &amp; Move-in</div>
-    <h1>中古B　長都駅前1丁目</h1>
-    <p>A–E 是下斡旋之前要查完的每一件事，F 是買了之後要花的錢與要買的東西。勾選會自動存在這台裝置上，去日本可以邊看邊打勾。</p>
+    <h1>買房開店　查核清單<span class="locbadge" id="loc-badge">千歲</span></h1>
+    <p>A–E 是下斡旋之前要查完的每一件事，F 是買了之後要花的錢與要買的東西。<b>千歲和熊本是兩份不同的清單</b>——不下雪的地方，要查的東西完全不一樣。勾選會自動存在這台裝置上，去日本可以邊看邊打勾。</p>
   </div>
   <div class="mast-r">
     <div class="prog"><div class="prog-bar"><i id="pbar"></i></div>
@@ -215,60 +248,39 @@ footer.foot b{color:var(--ink-2)}
   </div>
 </header>
 
-<section class="card">
-  <h2><span class="n">A</span>物件事實</h2>
-  <div class="facts">
-    <div class="fact"><span class="k">所在</span><span class="v">千歲市 長都駅前1丁目</span></div>
-    <div class="fact"><span class="k">價格</span><span class="v">¥28,400,000</span><span class="s">≈ NT$604萬</span></div>
-    <div class="fact"><span class="k">交通</span><span class="v">JR千歲線 長都駅 徒歩7分</span></div>
-    <div class="fact"><span class="k">土地</span><span class="v">252.44㎡</span><span class="s">約 76.4 坪</span></div>
-    <div class="fact"><span class="k">建物</span><span class="v">137.62㎡</span><span class="s">約 41.6 坪</span></div>
-    <div class="fact"><span class="k">格局</span><span class="v">2LDK</span><span class="s">隔間少＝好改店舖</span></div>
-    <div class="fact"><span class="k">屋齡</span><span class="v">2003年12月築</span><span class="s">23年・新耐震</span></div>
-    <div class="fact"><span class="k">設備</span><span class="v">オール電化</span><span class="s">⚠ 見 C-2</span></div>
+<section class="card locwrap">
+  <div class="lochead">查哪一邊？</div>
+  <p class="locsub">兩地的清單各自獨立，勾選也分開存。下面整頁的內容都會跟著換。</p>
+  <div class="locpick" id="locpick">
+    <button type="button" data-loc="chitose">
+      <b>千歲</b><span>北海道・千歲市長都</span>
+      <em>要查：除雪路線・凍結・冬季電費・雪置場<br>台灣料理零競爭　客源賭 Rapidus</em></button>
+    <button type="button" data-loc="kumamoto">
+      <b>熊本</b><span>菊陽町・大津町（TSMC 圈）</span>
+      <em>要查：活斷層・白蟻・LP瓦斯・台風・地下水條例<br>不下雪　但台灣料理店已經一堆</em></button>
   </div>
-  <div class="note ok"><b>先講這物件的三個優點：</b>① 2003年築＝耐震與斷熱都在好世代（1981年新耐震之後、2000年基準之後）② 2LDK 卻有 137.62㎡＝隔間少、大空間，切出獨立廚房容易 ③ 長都駅徒歩7分，西側工廠地帶與ちとせモール都在生活圈內。</div>
+  <div class="vs" id="locvs"></div>
 </section>
 
 <section class="card">
-  <h2><span class="n">B</span>我先幫你算出來的兩個問題</h2>
+  <h2><span class="n">A</span>物件事實</h2>
+  <div id="blk-a"></div>
+</section>
 
-  <h3>B-1　停車位不夠，除非私家車停外面</h3>
-  <div class="calc">土地 252.44㎡
-  − 建物 footprint（2階建て推估）      約 75㎡
-  − 雪置場（敷地 15%，北海道必留）     約 38㎡
-  − 玄關動線                           約 20㎡
-  ─────────────────────────────────
-  可停車面積                          約 119㎡
-       ↓ 每台含通路約 21㎡
-  夏季 5 台 ／ 冬季 4 台（積雪後約 72%）
-
-  你有 3 台私家車：
-    停自家露天 → 客用冬季剩 1 台   ✗ 外帶店不可能靠 1 個車位活
-    租月極     → 客用冬季 4 台     ○ 一年約 ¥162,000</div>
-  <div class="note bad"><b>結論：這個物件成立的前提是「私家車全部租月極」。</b>看屋時務必實地確認能停幾台、雪堆去哪，並問清楚附近月極停車場的空位與行情。</div>
-
-  <h3>B-2　價格可能偏高，這是你的議價材料</h3>
-  <div class="calc">土地 252.44㎡ × 長都實勢推估 ¥48,000/㎡  ≈ ¥12,100,000
-  （長都駅 公示地價 ¥41,133/㎡，實勢通常高於公示）
-
-  ¥28,400,000 − ¥12,100,000 = ¥16,300,000  ← 這是建物被算的價
-                ÷ 137.62㎡ = 約 ¥118,000/㎡
-
-  但：木造 23 年，新築同級約 ¥200,000–250,000/㎡，
-      23 年後合理殘存約 20–30% → ¥40,000–75,000/㎡</div>
-  <div class="note warn"><b>建物部分看起來高了 ¥600–1,000萬。</b>三種可能：① 屋況特別好或有大規模翻修 ② 「長都駅前」的立地溢價 ③ 就是開高等你殺。<b>看屋時要問到答案，這決定你能砍多少。</b>（此為推估，須以實際謄本、固定資產評價證明與同區成交比對為準）</div>
+<section class="card">
+  <h2><span class="n">B</span>我先幫你算出來的問題</h2>
+  <div id="blk-b"></div>
 </section>
 
 <section class="card">
   <h2><span class="n">C</span>階段一　不用出國，先在台灣查完</h2>
-  <p class="lede">這一階段有<b>四個一票否決項目</b>。任何一項不過，就不用飛日本了——先做這個，省一趟機票。</p>
+  <p class="lede" id="lede1"></p>
   <div id="stage1"></div>
 </section>
 
 <section class="card">
-  <h2><span class="n">D</span>階段二　現地看屋（去兩次，冬夏各一）</h2>
-  <p class="lede">只看夏天會被騙。<b>11月或1月一定要去一次</b>，那才是這門生意真正的考場。</p>
+  <h2><span class="n">D</span>階段二　現地看屋（去兩次）</h2>
+  <p class="lede" id="lede2"></p>
   <div id="stage2"></div>
 </section>
 
@@ -280,10 +292,10 @@ footer.foot b{color:var(--ink-2)}
 
 <section class="card">
   <h2><span class="n">F</span>入居準備　買了之後要花的錢</h2>
-  <p class="lede">前面 A–E 是<b>買不買</b>；這一段是<b>買了之後</b>。中古屋交屋不等於可以住——23 年的設備有一批壽命到了，而且日本的房子有些東西不附。</p>
+  <p class="lede">前面 A–E 是<b>買不買</b>；這一段是<b>買了之後</b>。中古屋交屋不等於可以住——有一批設備壽命到了，而且日本的房子有些東西不附。</p>
 
   <h3>F-1　需要找業者的（含預算）</h3>
-  <p class="lede">勾選你打算做的項目，下面會自動加總。<b>「急」的四項建議一次做完</b>，其餘可以分年。</p>
+  <p class="lede">勾選你打算做的項目，下面會自動加總。<b>標「急」的建議一次做完</b>，其餘可以分年。</p>
   <div id="mi-pro"></div>
   <div class="budget" id="mi-budget"></div>
 
@@ -292,66 +304,37 @@ footer.foot b{color:var(--ink-2)}
   <div id="mi-clean"></div>
 
   <h3>F-3　清潔用品（自己買）</h3>
-  <p class="lede">附日本實際買得到的商品名，到當地藥妝店或 <b>ホーマック／DCM</b>（北海道的居家用品連鎖）直接對著買。</p>
+  <p class="lede" id="mi-sup-lede"></p>
   <div id="mi-supply"></div>
 
   <h3>F-4　基礎日常用品</h3>
   <p class="lede">照時間順序排。<b>第一組是交屋當天沒有就會出事的</b>。</p>
   <div id="mi-daily"></div>
 
-  <div class="note bad"><b>三個台灣人最常踩的雷：</b>① <b>日本中古屋常常不附照明器具</b>，交屋當天可能只有燈座 ② <b>垃圾袋要買自治體指定的</b>，用錯不收 ③ <b>冬胎不是選配</b>，北海道沒冬胎等於不能開車，而且入冬後會缺貨。</div>
+  <div class="note bad" id="mi-traps"></div>
 </section>
 
 <section class="card">
-  <h2><span class="n">F</span>問問題的對象與怎麼問</h2>
-  <div class="whotbl">
-    <table>
-      <thead><tr><th>要查什麼</th><th>找誰</th><th>怎麼問</th></tr></thead>
-      <tbody>
-        <tr><td>用途地域・建蔽容積</td><td>千歲市役所<br>都市計画課</td><td>線上先查「ちとせまるごとマップ」，再電話確認。也可申請「用途地域等証明」</td></tr>
-        <tr><td>飲食店營業許可的可行性</td><td>千歲市<br>保健所</td><td><b>帶平面圖去做「事前相談」</b>。這是免費的，而且是全流程最重要的一次會面</td></tr>
-        <tr><td>消防設備要求</td><td>千歲市<br>消防本部</td><td>說明「1樓要做飲食店、樓上住人」，問需要哪些設備與屆出</td></tr>
-        <tr><td>固定資產稅（店舖化後）</td><td>千歲市役所<br>稅務課</td><td>問住宅用地特例會不會失效、居住比例怎麼算</td></tr>
-        <tr><td>除雪路線等級</td><td>千歲市役所<br>建設課</td><td>問這條路是不是優先除雪路線、幾點會除到</td></tr>
-        <tr><td>重要土地等調査法</td><td>內閣府 指定區域圖</td><td>北千歲駐屯地在附近，先確認有無落在注視／特別注視區域</td></tr>
-        <tr><td>電力容量與動力引込</td><td>北海道電力</td><td>問現況契約容量、增設三相200V的可行性與費用</td></tr>
-        <tr><td>上下水道</td><td>千歲市 水道局</td><td>確認公共下水道已接、口徑夠不夠營業用</td></tr>
-        <tr><td>物件本身的一切</td><td>不動產仲介</td><td>要求提供：謄本、公図、固定資產評價證明、去年一整年水電實績、修繕履歷</td></tr>
-        <tr><td>簽證可行性</td><td>行政書士</td><td><b>這是你真正的第一步</b>，費用約 ¥30,000–50,000</td></tr>
-      </tbody>
-    </table>
-  </div>
+  <h2><span class="n">G</span>問問題的對象與怎麼問</h2>
+  <div class="whotbl" id="blk-g"></div>
 </section>
 
 <section class="card">
-  <h2><span class="n">G</span>如果全部通過，錢長這樣</h2>
-  <div class="whotbl">
-    <table>
-      <thead><tr><th>項目</th><th style="text-align:right">金額</th><th style="text-align:right">台幣</th></tr></thead>
-      <tbody>
-        <tr><td>物件價格</td><td class="num">¥28,400,000</td><td class="num">604萬</td></tr>
-        <tr><td>取得諸費用（仲介・登記・不動產取得稅・保險）</td><td class="num">¥2,000,000</td><td class="num">43萬</td></tr>
-        <tr><td>改裝工事（住居／營業區劃・廚房・排氣・グリストラップ）</td><td class="num">¥7,900,000</td><td class="num">168萬</td></tr>
-        <tr><td>廚房設備（中古混用）</td><td class="num">¥2,100,000</td><td class="num">45萬</td></tr>
-        <tr><td>運轉資金（第一年燒錢）</td><td class="num">¥4,500,000</td><td class="num">96萬</td></tr>
-      </tbody>
-      <tfoot><tr><td><b>合計</b></td><td class="num"><b>¥44,900,000</b></td><td class="num"><b>955萬</b></td></tr></tfoot>
-    </table>
-  </div>
-  <div class="note ok">以你現金 NT$500萬＋可貸上限 NT$600萬 計，<b>這個方案的錢湊得出來</b>（借 NT$455萬，在安全區間內）。日商門檻約 ¥67,000–68,000。<br>
-  <a href="./chitose~fe9afdb3771c558d.html">→ 回試算盤按「中古B」預設看完整數字</a></div>
-  <div class="note warn"><b>但別忘了簽證那一關：</b>總投資 ¥44,900,000 已跨過 経営・管理 的 ¥30,000,000 資本金門檻，但資本金必須<b>真的投入事業並保全通帳全履歷</b>，否則會被認定為「見せ金」。</div>
+  <h2><span class="n">H</span>如果全部通過，錢長這樣</h2>
+  <div class="whotbl" id="blk-h"></div>
+  <div id="blk-h2"></div>
 </section>
 
 <footer class="foot">
-  <b>使用說明。</b>勾選狀態存在你這台裝置的瀏覽器裡，換裝置或清除瀏覽資料會消失。可用瀏覽器的列印功能存成 PDF 帶著走。<br>
-  <b>限制。</b>本清單的價格分析、停車位試算、建物殘值推估均為<b>依公開資訊所做的推估</b>，非鑑價。物件資訊擷取自公開掛牌（2026年8月），在庫與價格隨時變動。用途地域、保健所與消防要求須逐案向千歲市役所、保健所、消防署確認。<b>本清單為規劃用工具，不構成法律、稅務或投資建議。</b>
+  <b>使用說明。</b>勾選狀態存在你這台裝置的瀏覽器裡（<b>千歲與熊本分開存</b>），換裝置或清除瀏覽資料會消失。可用瀏覽器的列印功能存成 PDF 帶著走。<br>
+  <b>限制。</b>本清單的價格分析、停車位試算、建物殘值推估均為<b>依公開資訊所做的推估</b>，非鑑價。物件資訊擷取自公開掛牌（千歲 2026年8月／熊本 2026年9月），在庫與價格隨時變動。用途地域、保健所與消防要求須逐案向當地市役所・町役場、保健所、消防署確認。<b>本清單為規劃用工具，不構成法律、稅務或投資建議。</b>
 </footer>
 </div>
-
 <script>
-/* 盡職調查項目。kill=一票否決；why=為什麼重要；fail=不合格會怎樣 */
-var ITEMS = {
+/* 資料：兩地各一份。kill=一票否決；why=為什麼重要；fail=不合格會怎樣 */
+var DD={chitose:{},kumamoto:{}};
+
+DD.chitose.items = {
 stage1: [
  {id:"s1a", kill:1, t:"用途地域是什麼？能不能開飲食店？",
   who:"千歲市役所 都市計画課 ／ ちとせまるごとマップ",
@@ -515,15 +498,7 @@ stage3: [
 ]
 };
 
-(function(){
-"use strict";
-var KEY="chitose-dd-usedB-v1", state={};
-try{ state=JSON.parse(localStorage.getItem(KEY)||"{}")||{}; }catch(e){ state={}; }
-function save(){ try{ localStorage.setItem(KEY,JSON.stringify(state)); }catch(e){} }
-function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
-
-/* ── 階段四：入居準備 ───────────────────────────────── */
-var MOVEIN={
+DD.chitose.mi = {
 /* 需要找業者的：yen 為概估區間（含機器＋工事），lo/hi 供預算加總 */
 pro:[
  {id:"m1", pri:"急", t:"エコキュート／電気温水器 交換", who:"設備業者・電気工事店",
@@ -649,14 +624,489 @@ daily:[
 ]
 };
 
+/* ── 千歲：靜態區塊 ─────────────────────────── */
+DD.chitose.name="千歲";
+DD.chitose.title="中古B　長都駅前1丁目";
+DD.chitose.lede1="這一階段有<b>四個一票否決項目</b>。任何一項不過，就不用飛日本了——先做這個，省一趟機票。";
+DD.chitose.lede2="只看夏天會被騙。<b>11月或1月一定要去一次</b>，那才是這門生意真正的考場。";
+DD.chitose.supLede="附日本實際買得到的商品名，到當地藥妝店或 <b>ホーマック／DCM</b>（北海道的居家用品連鎖）直接對著買。";
+DD.chitose.traps="<b>三個台灣人最常踩的雷：</b>① <b>日本中古屋常常不附照明器具</b>，交屋當天可能只有燈座 ② <b>垃圾袋要買自治體指定的</b>，用錯不收 ③ <b>冬胎不是選配</b>，北海道沒冬胎等於不能開車，而且入冬後會缺貨。";
+
+DD.chitose.a=
+"<div class='facts'>"+
+"<div class='fact'><span class='k'>所在</span><span class='v'>千歲市 長都駅前1丁目</span></div>"+
+"<div class='fact'><span class='k'>價格</span><span class='v'>¥28,400,000</span><span class='s'>≈ NT$604萬</span></div>"+
+"<div class='fact'><span class='k'>交通</span><span class='v'>JR千歲線 長都駅 徒歩7分</span></div>"+
+"<div class='fact'><span class='k'>土地</span><span class='v'>252.44㎡</span><span class='s'>約 76.4 坪</span></div>"+
+"<div class='fact'><span class='k'>建物</span><span class='v'>137.62㎡</span><span class='s'>約 41.6 坪</span></div>"+
+"<div class='fact'><span class='k'>格局</span><span class='v'>2LDK</span><span class='s'>隔間少＝好改店舖</span></div>"+
+"<div class='fact'><span class='k'>屋齡</span><span class='v'>2003年12月築</span><span class='s'>23年・新耐震</span></div>"+
+"<div class='fact'><span class='k'>設備</span><span class='v'>オール電化</span><span class='s'>⚠ 見 D-1</span></div>"+
+"</div>"+
+"<div class='note ok'><b>先講這物件的三個優點：</b>① 2003年築＝耐震與斷熱都在好世代（1981年新耐震之後、2000年基準之後）② 2LDK 卻有 137.62㎡＝隔間少、大空間，切出獨立廚房容易 ③ 長都駅徒歩7分，西側工廠地帶與ちとせモール都在生活圈內。</div>";
+
+DD.chitose.b=
+"<h3>B-1　停車位不夠，除非私家車停外面</h3>"+
+"<div class='calc'>土地 252.44㎡\n"+
+"− 建物 footprint（2階建て推估）      約 75㎡\n"+
+"− 雪置場（敷地 15%，北海道必留）     約 38㎡\n"+
+"− 玄關動線                           約 20㎡\n"+
+"─────────────────────────────────\n"+
+"可停車面積                          約 119㎡\n"+
+"     ↓ 每台含通路約 21㎡\n"+
+"夏季 5 台 ／ 冬季 4 台（積雪後約 72%）\n\n"+
+"你有 3 台私家車：\n"+
+"  停自家露天 → 客用冬季剩 1 台   ✗ 外帶店不可能靠 1 個車位活\n"+
+"  租月極     → 客用冬季 4 台     ○ 一年約 ¥162,000</div>"+
+"<div class='note bad'><b>結論：這個物件成立的前提是「私家車全部租月極」。</b>看屋時務必實地確認能停幾台、雪堆去哪，並問清楚附近月極停車場的空位與行情。</div>"+
+"<h3>B-2　價格可能偏高，這是你的議價材料</h3>"+
+"<div class='calc'>土地 252.44㎡ × 長都實勢推估 ¥48,000/㎡  ≈ ¥12,100,000\n"+
+"（長都駅 公示地價 ¥41,133/㎡，實勢通常高於公示）\n\n"+
+"¥28,400,000 − ¥12,100,000 = ¥16,300,000  ← 這是建物被算的價\n"+
+"              ÷ 137.62㎡ = 約 ¥118,000/㎡\n\n"+
+"但：木造 23 年，新築同級約 ¥200,000–250,000/㎡，\n"+
+"    23 年後合理殘存約 20–30% → ¥40,000–75,000/㎡</div>"+
+"<div class='note warn'><b>建物部分看起來高了 ¥600–1,000萬。</b>三種可能：① 屋況特別好或有大規模翻修 ② 「長都駅前」的立地溢價 ③ 就是開高等你殺。<b>看屋時要問到答案，這決定你能砍多少。</b>（此為推估，須以實際謄本、固定資產評價證明與同區成交比對為準）</div>";
+
+DD.chitose.g=
+"<table><thead><tr><th>要查什麼</th><th>找誰</th><th>怎麼問</th></tr></thead><tbody>"+
+"<tr><td>用途地域・建蔽容積</td><td>千歲市役所<br>都市計画課</td><td>線上先查「ちとせまるごとマップ」，再電話確認。也可申請「用途地域等証明」</td></tr>"+
+"<tr><td>飲食店營業許可的可行性</td><td>千歲市<br>保健所</td><td><b>帶平面圖去做「事前相談」</b>。這是免費的，而且是全流程最重要的一次會面</td></tr>"+
+"<tr><td>消防設備要求</td><td>千歲市<br>消防本部</td><td>說明「1樓要做飲食店、樓上住人」，問需要哪些設備與屆出</td></tr>"+
+"<tr><td>固定資產稅（店舖化後）</td><td>千歲市役所<br>稅務課</td><td>問住宅用地特例會不會失效、居住比例怎麼算</td></tr>"+
+"<tr><td>除雪路線等級</td><td>千歲市役所<br>建設課</td><td>問這條路是不是優先除雪路線、幾點會除到</td></tr>"+
+"<tr><td>重要土地等調査法</td><td>內閣府 指定區域圖</td><td>北千歲駐屯地在附近，先確認有無落在注視／特別注視區域</td></tr>"+
+"<tr><td>電力容量與動力引込</td><td>北海道電力</td><td>問現況契約容量、增設三相200V的可行性與費用</td></tr>"+
+"<tr><td>上下水道</td><td>千歲市 水道局</td><td>確認公共下水道已接、口徑夠不夠營業用</td></tr>"+
+"<tr><td>物件本身的一切</td><td>不動產仲介</td><td>要求提供：謄本、公図、固定資產評價證明、去年一整年水電實績、修繕履歷</td></tr>"+
+"<tr><td>簽證可行性</td><td>行政書士</td><td><b>這是你真正的第一步</b>，費用約 ¥30,000–50,000</td></tr>"+
+"</tbody></table>";
+
+DD.chitose.h=
+"<table><thead><tr><th>項目</th><th style='text-align:right'>金額</th><th style='text-align:right'>台幣</th></tr></thead><tbody>"+
+"<tr><td>物件價格</td><td class='num'>¥28,400,000</td><td class='num'>604萬</td></tr>"+
+"<tr><td>取得諸費用（仲介・登記・不動產取得稅・保險）</td><td class='num'>¥2,000,000</td><td class='num'>43萬</td></tr>"+
+"<tr><td>改裝工事（住居／營業區劃・廚房・排氣・グリストラップ）</td><td class='num'>¥7,900,000</td><td class='num'>168萬</td></tr>"+
+"<tr><td>廚房設備（中古混用）</td><td class='num'>¥2,100,000</td><td class='num'>45萬</td></tr>"+
+"<tr><td>運轉資金（第一年燒錢）</td><td class='num'>¥4,500,000</td><td class='num'>96萬</td></tr>"+
+"</tbody><tfoot><tr><td><b>合計</b></td><td class='num'><b>¥44,900,000</b></td><td class='num'><b>955萬</b></td></tr></tfoot></table>";
+
+DD.chitose.h2=
+"<div class='note ok'>以你現金 NT$500萬＋可貸上限 NT$600萬 計，<b>這個方案的錢湊得出來</b>（借 NT$455萬，在安全區間內）。日商門檻約 ¥67,000–68,000。<br>"+
+"<a href='./chitose~fe9afdb3771c558d.html'>→ 回試算盤按「中古B」預設看完整數字</a></div>"+
+"<div class='note warn'><b>但別忘了簽證那一關：</b>總投資 ¥44,900,000 已跨過 経営・管理 的 ¥30,000,000 資本金門檻，但資本金必須<b>真的投入事業並保全通帳全履歷</b>，否則會被認定為「見せ金」。</div>";
+
+/* ══ 熊本（菊陽町・大津町）══════════════════════ */
+DD.kumamoto.name="熊本";
+DD.kumamoto.title="菊陽・大津　TSMC 圈";
+DD.kumamoto.lede1="這一階段有<b>四個一票否決項目</b>，其中兩個是熊本才有的：<b>活斷層</b>與<b>下水道</b>。任何一項不過，就不用飛日本了。";
+DD.kumamoto.lede2="千歲要去看冬天，熊本要去看<b>夏天（7–8月）</b>——35℃ 加濕度，外帶食物的保存與客人願不願意在外面等，都是那時候才知道。第二趟建議 6 月梅雨，看漏水與發霉。";
+DD.kumamoto.supLede="附日本實際買得到的商品名，到當地藥妝店或 <b>ナフコ／グッデイ</b>（九州的居家用品連鎖）直接對著買。<b>九州的重點是除濕與防蟲，不是除雪。</b>";
+DD.kumamoto.traps="<b>四個台灣人在熊本最常踩的雷：</b>① <b>日本中古屋常常不附照明器具</b>，交屋當天可能只有燈座 ② <b>垃圾袋要買菊陽町／大津町指定的</b>，用錯不收 ③ <b>郊區常是 LP瓦斯（プロパン），單價是都市瓦斯的 1.5–2 倍</b>，開飲食店差很多，看屋一定要問是哪一種 ④ <b>地震保險只能跟火災保險綁著買</b>——這裡是 2016 年熊本地震的震央帶，不保等於裸奔。";
+
+DD.kumamoto.a=
+"<div class='facts'>"+
+"<div class='fact'><span class='k'>參考物件</span><span class='v'>菊陽町 大字久保田</span><span class='s'>2026/09 掛牌</span></div>"+
+"<div class='fact'><span class='k'>價格</span><span class='v'>¥32,900,000</span><span class='s'>≈ NT$700萬</span></div>"+
+"<div class='fact'><span class='k'>停車</span><span class='v'>6 台可能</span><span class='s'>掛牌明載</span></div>"+
+"<div class='fact'><span class='k'>土地</span><span class='v'>275.99㎡</span><span class='s'>約 83.5 坪</span></div>"+
+"<div class='fact'><span class='k'>建物</span><span class='v'>109.39㎡</span><span class='s'>約 33.1 坪</span></div>"+
+"<div class='fact'><span class='k'>格局</span><span class='v'>4SLDK</span><span class='s'>隔間多＝改店較難</span></div>"+
+"<div class='fact'><span class='k'>屋齡</span><span class='v'>築 5 年</span><span class='s'>2016年地震之後蓋的</span></div>"+
+"<div class='fact'><span class='k'>設備</span><span class='v'>要問瓦斯種類</span><span class='s'>⚠ 見 D-1</span></div>"+
+"</div>"+
+"<div class='note warn'><b>先講熊本市場的真相：熊本沒有便宜的中古屋。</b>我把菊陽町現在掛牌的中古一戸建全部撈過一遍，價格帶是 <b>¥2,800萬–4,800萬</b>，而且大多是<b>築 2–5 年</b>的次新屋，土地只有 120–210㎡。千歲那件 252㎡ 只要 ¥2,840萬——同樣的錢在菊陽只買得到更小的地。<b>TSMC 溢價是真的，而且它先反映在土地上。</b></div>"+
+"<div class='note ok'><b>但這件的三個優點很硬：</b>① <b>停車 6 台，而且不用留雪置場</b>——千歲那件冬天只剩 4 台還得把私家車租出去，這裡直接解決 ② 築 5 年＝<b>2016 年熊本地震之後蓋的</b>，耐震規格與施工品質有那場地震當背書 ③ 土地 275.99㎡ 比千歲那件還大。<br><b>代價是：4SLDK 隔間多，要切出獨立店舖比 2LDK 難很多</b>（見 D-4）。</div>";
+
+DD.kumamoto.b=
+"<h3>B-1　不下雪，停車位問題自己消失了</h3>"+
+"<p class='lede'>這是「熊本不下雪」在錢上的第一個具體好處，而且不小。</p>"+
+"<div class='calc'>土地 275.99㎡\n"+
+"− 建物 footprint（2階建て推估）      約 60㎡\n"+
+"− 玄關動線                           約 20㎡\n"+
+"− 雪置場                             <b>0㎡</b>  ← 千歲要留敷地 15%（約 38㎡）\n"+
+"─────────────────────────────────\n"+
+"可停車面積                          約 196㎡\n"+
+"     ↓ 每台含通路約 21㎡\n"+
+"全年 約 9 台（掛牌保守寫 6 台）\n\n"+
+"你有 3 台私家車，全部停自家：\n"+
+"  千歲  → 客用冬季剩 1 台，非租月極不可（一年 ¥162,000）\n"+
+"  熊本  → 客用全年仍有 3–6 台，<b>月極租金 ¥0</b></div>"+
+"<div class='note ok'><b>光是停車這一項，熊本一年就少花 ¥162,000（NT$3.4萬），而且客用車位還比較多。</b>加上不用做ロードヒーティング（融雪，約 ¥180萬）、不用高規格斷熱、冬季電費不會暴衝——<b>不下雪的好處主要不在「舒服」，在這幾筆固定成本上。</b></div>"+
+
+"<h3>B-2　這裡要查的不是房子，是土地在哪一段</h3>"+
+"<p class='lede'>千歲的問題是「建物被算太貴」，熊本反過來——<b>建物很新，問題在土地單價落差極大</b>。</p>"+
+"<div class='calc'>菊陽町 公示地價平均      ¥85,977/㎡\n"+
+"菊陽町 實勢取引平均      ¥106,000/㎡（坪 35.2萬）\n"+
+"大津町 公示地價平均      ¥61,850/㎡  （前年比 +11.52%）\n"+
+"大津町 住宅地            ¥50,700–59,000/㎡\n"+
+"大津町 商業地（駅400m）  ¥136,000/㎡ ← 同一個町，差 2.7 倍\n\n"+
+"反推這件：\n"+
+"  建物 109.39㎡ × 築5年殘值 ¥165,000/㎡  ≈ ¥18,000,000\n"+
+"  ¥32,900,000 − ¥18,000,000 = ¥14,900,000  ← 土地\n"+
+"                ÷ 275.99㎡ = 約 ¥54,000/㎡\n\n"+
+"  比菊陽町公示均價 ¥85,977 低了 37%</div>"+
+"<div class='note warn'><b>這個落差不是折扣，是位置。</b>菊陽町的公示均價被光の森・津久礼那一段拉高，久保田在町的外圍。<b>所以熊本版最重要的一課是：不要看「菊陽町均價」，要看你那一塊地所在的那一段。</b>同一個町裡土地單價可以差 2 倍以上，這比建物殘值重要得多。<br><b>看屋前先做這件事：</b>把候選物件的地址丟進土地綜合情報系統（國土交通省），看<b>同一丁目</b>近三年的實際成交，不要用町的平均值談價。</div>"+
+
+"<h3>B-3　競爭者已經在了，這是熊本和千歲最大的差別</h3>"+
+"<p class='lede'>千歲的台灣料理是零競爭；熊本從 2025 年開始<b>台灣料理店急速增加</b>，而且已經有人做你想做的那一塊。</p>"+
+"<div class='calc'>已確認在營運的（2026/09）：\n\n"+
+"  其中之一（そのなかのいち）  菊陽町 · 2024/08 開業\n"+
+"      台灣料理＋台灣甜點，午餐生意\n\n"+
+"  花日（ハナビ）              大津町 · 台灣風早餐咖啡\n"+
+"      <b>8:30 開店，賣豆漿與蛋餅</b>  ← 這就是你原本想做的早餐時段\n\n"+
+"  NIU! Taiwanese Beef Noodles 大津町 · 台灣牛肉麵\n\n"+
+"  街角饅頭店 吉祥天            台灣點心・包子類\n\n"+
+"  熊本市中心還有更多（豆花、牛肉麵、台灣雜貨）</div>"+
+"<div class='note bad'><b>我之前跟你說「台式早餐是熊本沒人做的空缺」——這句話現在不成立了。</b>大津町的花日 8:30 開，賣的就是豆漿蛋餅。<br><b>剩下的空缺變成兩塊，而且比較窄：</b>① <b>純外帶＋便當</b>——現有這幾家都是內用咖啡店或餐廳型態，沒有人做「工廠午餐團訂＋下班順手帶」 ② <b>宵夜鹹酥雞</b>——目前沒看到有人做，而半導體廠是三班制。<br><b>D-9 要你親自去這三家吃一輪</b>，算客單價、看幾點滿、看是誰在吃。這一項比任何法規都更決定你要不要來熊本。</div>";
+
+DD.kumamoto.items = {
+stage1: [
+ {id:"k1a", kill:1, t:"用途地域是什麼？能不能開飲食店？",
+  who:"菊陽町 都市計画課 ／ 大津町 都市計画課（都市計画図・総括図）",
+  why:"這是整件事的第一道門。用途地域決定你能不能在這棟房子裡賣吃的、能開多大。<b>菊陽町近年因 TSMC 陸續把新區域編入市街化区域，圖資更新很快，網路上找到的舊圖不可信。</b>",
+  ok:"第一種住居／第二種住居／準住居／近隣商業／<b>準工業</b>＝寬鬆。準工業地域對飲食店幾乎無面積限制，是最好的一種",
+  fail:"若是<b>第一種低層住居専用地域</b>，店舖只能 ≤50㎡ 且 <總樓地板1/2。若在<b>市街化調整区域</b>，原則不可用途變更，這物件直接出局。"},
+ {id:"k1b", kill:1, t:"是市街化区域嗎？地目是宅地嗎？",
+  who:"謄本 ／ 町役場 都市計画課",
+  why:"菊陽町與大津町有大片農地，<b>TSMC 周邊很多掛牌土地原本是田・畑</b>。市街化調整区域原則不可增改建與用途變更；地目若是農地，還要過農地法第5條許可。",
+  ok:"市街化区域 ＋ 地目「宅地」",
+  fail:"調整区域或農地＝<b>這物件不能改成店舖</b>。農地轉用許可可能要半年以上，且外國法人取得農地極困難。直接出局。"},
+ {id:"k1c", kill:1, t:"★ 離活斷層多遠？2016 年熊本地震的被災履歷？",
+  who:"熊本県 ハザードマップ ／ 地震本部（布田川・日奈久断層帯）／ 町役場 ／ 仲介",
+  why:"<b>這是熊本才有、千歲完全沒有的一項。</b>布田川斷層帶從阿蘇外輪山西側延伸到宇土半島，2016 年熊本地震就是它動的。益城町、西原村在斷層正上方，<b>菊陽町與大津町就在旁邊</b>。而且 2016 年之後，日奈久斷層南段被指出「應力重新分配」，風險反而升高。",
+  ok:"不在斷層正上方；<b>2016 年當時的被災程度與修補紀錄有書面</b>（罹災証明・修繕履歷）；築 5 年的物件則是地震後新建，較單純",
+  fail:"<b>買到「表面修好、基礎有損傷」的房子是熊本最大的地雷。</b>2016 年之前的中古屋，沒有罹災証明與修繕履歷就不要碰。另外注意：官方液狀化圖在 2016 年被證實有落差——高風險區沒事、低風險區反而災情慘重，所以<b>不能只看圖，要看實際地盤調查報告</b>。"},
+ {id:"k1d", kill:1, t:"公共下水道接了嗎？還是淨化槽？",
+  who:"菊陽町／大津町 上下水道課 ／ 仲介",
+  why:"飲食店排水要接下水道並裝油脂分離槽。<b>菊陽・大津的郊區有相當比例還是合併淨化槽</b>，不像千歲市區。",
+  ok:"公共下水道已接",
+  fail:"淨化槽＝營業用要換更大的（¥100–200萬），而且維護費每年 ¥5–8萬。<b>這一筆很容易被漏掉，會直接吃掉你的改裝預算。</b>"},
+ {id:"k1e", t:"熊本県地下水保全条例：要不要申報？",
+  who:"熊本県 環境立県推進課 ／ 管轄保健所",
+  why:"<b>這也是熊本獨有的。</b>熊本地區（熊本市・菊陽町・大津町等 11 市町村）的自來水幾乎 100% 來自地下水，縣與町都有地下水保全條例。飲食店若使用井水、或排水含指定化學物質，須事前申報。",
+  ok:"用自來水、無指定化學物質＝一般飲食店通常無須特別申報，但<b>要書面確認過</b>",
+  fail:"若物件是井水，除了條例申報，保健所還會要求每年水質檢驗。<b>井水物件建議直接放棄。</b>"},
+ {id:"k1f", t:"洪水浸水想定・土砂災害警戒區域？",
+  who:"熊本県／町 ハザードマップ",
+  why:"白川與其支流流經此區，九州的集中豪雨（線状降水帯）年年上新聞。飲食店泡水一次就是全毀。",
+  ok:"不在浸水想定區域，或想定水深 <0.5m",
+  fail:"浸水區＝火災保險的水災特約保費會明顯變貴，且營業中斷風險高。<b>這一項在北海道幾乎不用考慮，在九州是必查。</b>"},
+ {id:"k1g", t:"建蔽率／容積率是多少？現況有沒有超建？",
+  who:"謄本 ／ 都市計画課",
+  why:"若現況已超建（既存不適格），改裝與融資都會出問題。",
+  ok:"建蔽 60%／容積 200%，且現況在範圍內",
+  fail:"既存不適格的物件，銀行融資與用途變更都可能卡住。"},
+ {id:"k1h", t:"前面道路寬度？是不是 TSMC 通勤的塞車路線？",
+  who:"謄本・公図 ／ 現地 ／ 町役場",
+  why:"消防與保健所都會看接道。<b>但熊本還有一層：TSMC 進駐後，縣道 337 號等通勤幹線早晚嚴重壅塞。</b>塞車對外帶店是雙面刃——車多但停不下來。",
+  ok:"幅員 4m 以上，且<b>有能安全左轉進場的出入口</b>（不是塞在對向車道等左轉）",
+  fail:"接道不足會卡住營業許可；出入口設在塞車路段的對向側，客人不會為了外帶迴轉。"},
+ {id:"k1i", t:"現況的固定資產稅是多少？改成店舖後會變多少？",
+  who:"仲介（固定資產評價證明）＋ 町役場 稅務課",
+  why:"住宅用地特例（土地稅額 1/6）在店舖化後可能失效。<b>熊本的地價還在漲，評價額會逐年往上，這一筆只會變大不會變小。</b>",
+  ok:"居住部分 ≥ 總樓地板 1/2，特例保留",
+  fail:"109.39㎡ 裡要切 52㎡ 給店舖＝居住只剩 52%，<b>比千歲那件（62%）更貼近 1/2 的紅線</b>，一定要書面確認算法。"},
+ {id:"k1j", t:"要求仲介提供：謄本、公図、固定資產評價證明、修繕履歷、罹災証明",
+  who:"不動產仲介",
+  why:"沒有這些文件，上面每一項都只是口頭說法。<b>熊本要多要一份：2016 年的罹災証明。</b>",
+  ok:"全部拿到紙本或 PDF",
+  fail:"仲介不願提供＝警訊。<b>TSMC 熱潮下賣方市場，仲介態度普遍強硬，但這不是你讓步的理由。</b>"}
+],
+stage2: [
+ {id:"k2a", kill:1, t:"★ 瓦斯是都市瓦斯還是 LP瓦斯？去年一整年的水電瓦斯明細",
+  who:"仲介 → 屋主",
+  why:"<b>這是熊本版取代千歲「冬季電費」的那一題。</b>菊陽・大津的郊區有相當比例是 LP瓦斯（プロパン），<b>單價是都市瓦斯的 1.5–2 倍</b>。飲食店是用瓦斯大戶，這個差異一年可以是六位數日圓。",
+  ok:"都市瓦斯，或已知 LP 的實際單價並算進固定成本",
+  fail:"<b>只給你「平均」或「大概」就是紅旗。</b>LP瓦斯還有一個陷阱：容器與配管常是瓦斯公司的財產，換供應商要付解約金。看屋時要問清楚「配管是誰的」。"},
+ {id:"k2b", kill:1, t:"能不能引三相200V動力電？容量夠嗎？費用多少？",
+  who:"九州電力 ／ 電氣工事店",
+  why:"營業用冷凍庫、製麵機、排氣設備需要動力電。",
+  ok:"可增設，費用在 ¥200,000–500,000 內",
+  fail:"若引込困難或費用暴增，改裝預算要大幅上修。<b>九州電力在 TSMC 周邊的電力工事排程可能很滿，要問等待時間。</b>"},
+ {id:"k2c", t:"給湯能力夠營業用嗎？熱水器幾年了？",
+  who:"現場確認 ／ 仲介",
+  why:"家用熱水器供不上飲食店的洗滌需求。築 5 年的機器還在壽命內，但能力不一定夠。",
+  ok:"能力足夠，或已知更新費用並列入預算",
+  fail:"<b>熊本比千歲有利的一點：不用蓄熱式暖房機。</b>千歲那件光是蓄暖更新就可能 ¥30–150萬，這裡完全不用。"},
+ {id:"k2d", kill:1, t:"★ 4SLDK 的格局，能不能切出「住居與營業完全分離」？",
+  who:"帶設計師或工務店一起看 ／ 保健所事前相談",
+  why:"保健所要求家用廚房不可兼作營業廚房，兩區必須物理分離、各自有出入口。",
+  ok:"現況格局能切出獨立 52㎡ 店舖＋獨立出入口",
+  fail:"<b>這是熊本這件最弱的一環。</b>千歲那件是 137.62㎡ 的 2LDK（隔間少、好切）；這件是 109.39㎡ 的 4SLDK——<b>面積小 21%、隔間多一倍</b>。拆隔間會碰到承重牆，成本與可行性都比千歲差。<b>如果你要走熊本，優先找「LDK 大、房間少」的物件，不要看到便宜就衝。</b>"},
+ {id:"k2e", t:"排氣管道能不能拉到室外？路徑在哪？",
+  who:"工務店 ／ 現場",
+  why:"廚房排氣（含煎炸與鹹酥雞）需要獨立管道通到室外，且不能影響鄰居。<b>九州夏天窗戶開得多，油煙投訴風險比北海道高。</b>",
+  ok:"有可行路徑，出風口遠離鄰家窗戶與曬衣場",
+  fail:"排氣做不好＝鄰居投訴。這是「不要省」的項目之一。"},
+ {id:"k2f", t:"屋外有沒有空間裝油脂分離槽（グリストラップ）？",
+  who:"現場",
+  why:"飲食店排水必備。",
+  ok:"屋外有 1–2㎡ 可施工空間且能接下水道",
+  fail:"沒空間就要在屋內做，動線與成本都變差。"},
+ {id:"k2g", kill:1, t:"★ 白蟻：有沒有被害？防蟻處理的保證還在嗎？",
+  who:"現場 ／ 仲介（防蟻施工証明）／ 白蟻業者調查",
+  why:"<b>這是九州取代北海道「凍融破壞」的那一題，而且嚴重得多。</b>北海道白蟻風險低到可以忽略；九州是日本白蟻最活躍的地區之一。日本新築的防蟻處理<b>保證期通常只有 5 年</b>——這件正好築 5 年，<b>保證要嘛剛過期、要嘛即將到期</b>。",
+  ok:"有防蟻施工証明、保證仍在期內，或已編列重新施工預算",
+  fail:"白蟻調查費約 ¥10,000（多數業者事後委託會退還）。<b>買之前花一萬日圓，比買之後花一百萬修基礎划算太多。</b>床下有沒有蟻道、木部有沒有中空音，一定要親眼看或請業者看。"},
+ {id:"k2h", kill:1, t:"★ 平日中午去 JASM／菊陽工業團地 周邊，看有沒有午餐人流",
+  who:"你自己，站在那裡看",
+  why:"B2B 午餐團訂是這門生意最穩的一塊。",
+  ok:"看得到人、看得到現有的便當車或食堂在做生意",
+  fail:"<b>熊本這一項有個千歲沒有的陷阱：JASM 廠內有員工食堂，而且規模很大。</b>不要假設 1,700 名員工中午都會出來。真正要看的是<b>周邊協力廠商、營建工人、通勤族</b>，不是 JASM 本體。若中午沒人在外面吃，B2B 這條線就不成立。"},
+ {id:"k2i", kill:1, t:"★ 競合実査：去吃「其中之一」「花日」「NIU!」各一次",
+  who:"你自己，帶著計算機",
+  why:"<b>千歲沒有這一項，因為千歲沒有競爭者。熊本有，而且花日賣的就是豆漿蛋餅。</b>",
+  ok:"算得出：客單價、幾點滿座、客人是台灣人還是日本人、日本人接受度如何、有沒有做外帶",
+  fail:"<b>如果你去了發現「他們做得比我想的好」，那答案就是熊本不要做同一件事。</b>剩下的空缺是純外帶便當與宵夜鹹酥雞，不是早餐。這一趟的結論可能直接改寫你的整個菜單。"},
+ {id:"k2j", t:"建物狀態：裂縫、基礎、傾斜（地震帶）",
+  who:"現場 ／ 建物檢查（ホームインスペクション）",
+  why:"築 5 年很新，但熊本在地震帶上，而且九州的白蟻與濕氣對木造不友善。",
+  ok:"無漏水痕、無明顯裂縫、基礎無階梯狀裂痕、床無傾斜",
+  fail:"建議花 ¥50,000–100,000 請專業做建物檢查。<b>在熊本，檢查要特別指定「基礎與床下」。</b>"},
+ {id:"k2k", t:"實地數車位：真的停得下 6 台嗎？出入好不好？",
+  who:"現場",
+  why:"掛牌寫 6 台，但實際受出入口位置與鄰地影響。<b>好消息是不用留雪置場，這一項在熊本輕鬆很多。</b>",
+  ok:"客用至少 3 台，且客人不用倒車出主要道路",
+  fail:"停車在熊本不太可能成為 deal-breaker，但出入口設計不良一樣會勸退客人。"},
+ {id:"k2l", kill:1, t:"★ 夏天那一趟：7–8 月去，35℃ 加濕度是什麼感覺",
+  who:"你自己，7 月或 8 月",
+  why:"<b>千歲要去看冬天，熊本要去看夏天。</b>九州夏天 35℃ 以上、濕度極高。這對外帶店有三個直接影響：食物保存、客人願不願意在外面等、以及你的冷房電費。",
+  ok:"店門口有遮蔭或可設遮陽；食物在常溫下的安全時間你心裡有數；冷氣容量夠",
+  fail:"<b>這一趟是熊本版最重要的實地驗證。</b>另外建議第二趟排在 6 月梅雨——那時候才看得到漏水痕與發霉。<b>看了夏天還想做，才是真的想做。</b>"}
+],
+stage3: [
+ {id:"k3a", kill:1, t:"★ 契約書加入「取得不到飲食店營業許可時無條件解約」特約",
+  who:"仲介 ／ 司法書士",
+  why:"你買這棟房子的唯一理由是開店。如果最後開不成，這筆錢不能被套住。",
+  ok:"白紙解約條款寫進契約，手付金全額退還",
+  fail:"<b>沒有這一條不要簽。</b><b>熊本現在是賣方市場，仲介可能會說「加了條件別的買家會搶先」——這是壓力話術，不是理由。</b>"},
+ {id:"k3b", kill:1, t:"保健所事前相談：帶著改裝平面圖去談過了嗎？",
+  who:"熊本県 菊池保健所（管轄菊陽町・大津町）",
+  why:"這是免費的，而且是全流程最重要的一次會面——他們會直接告訴你這個格局行不行。<b>注意：菊陽町與大津町屬熊本県管轄，不是熊本市保健所。</b>",
+  ok:"保健所口頭確認「照這個圖做應該可以」",
+  fail:"沒談過就簽約，等於賭運氣。<b>務必在下斡旋之前談。</b>"},
+ {id:"k3c", t:"消防確認：需要哪些設備？要辦哪些屆出？",
+  who:"管轄消防本部（菊池広域連合）",
+  why:"住宅＋飲食店＝複合用途防火對象物，設備要求與純住宅不同。",
+  ok:"清單拿到手，費用列進改裝預算",
+  fail:"事後才發現要裝自動火災報知設備，預算會爆。"},
+ {id:"k3d", t:"融資特約：台灣端的資金如果沒到位，能不能解約？",
+  who:"仲介",
+  why:"你的資金來自台灣的房產增貸，核貸有不確定性。",
+  ok:"融資特約寫進契約",
+  fail:"資金沒下來卻不能解約，手付金會被沒收。"},
+ {id:"k3e", t:"契約不適合責任（瑕疵擔保）的範圍與期間？",
+  who:"仲介 ／ 司法書士",
+  why:"中古屋交屋後才發現漏水、白蟻、設備故障，誰負責。<b>在九州，「白蟻」這三個字一定要寫進去。</b>",
+  ok:"至少涵蓋雨漏・<b>白蟻</b>・主要設備，期間 3 個月以上",
+  fail:"「現況有姿有姿」（現況交付、免責）代表所有問題你自己吞。"},
+ {id:"k3f", t:"改裝工事：至少拿三家工務店的正式見積",
+  who:"在地工務店",
+  why:"我試算的 ¥7,200,000 是推估，實際可能差 ±15%。<b>熊本另有一個變數：TSMC 帶動的建設熱潮讓工班很滿、工資上漲</b>，見積可能比全國行情高。",
+  ok:"三家見積，項目可比對，且問清楚<b>能不能排得進工期</b>",
+  fail:"只拿一家等於沒有議價。在熊本還要多問一句：什麼時候能開工。"},
+ {id:"k3g", kill:1, t:"★ 行政書士的経営・管理可行性判定",
+  who:"日本行政書士（費用約 ¥30,000–50,000）",
+  why:"就算房子完美，簽證過不了也是零。",
+  ok:"行政書士判定「以這個規模與計畫，有機會通過」",
+  fail:"<b>這關沒過，上面全部不用做。</b>嚴格說這一項應該排在最前面——先花 ¥50,000 問清楚，再花 ¥3,290 萬買房。"},
+ {id:"k3h", t:"法人設立與銀行帳戶：確認開得了戶",
+  who:"日本司法書士 ／ 銀行",
+  why:"資本金要匯進法人帳戶，但非居住者代表的法人開戶常被拒。",
+  ok:"確認有可行路徑（在住協力者掛董事，或先取得在留資格）",
+  fail:"開不了戶＝資本金匯不進去＝整條線停住。"},
+ {id:"k3i", t:"台灣端：房產增貸的正式核貸額度下來了嗎？",
+  who:"台灣的銀行",
+  why:"整個資金結構建立在「可貸上限」這個數字上，那是最容易高估的一格。<b>熊本比千歲貴 NT$87萬，這一格的餘裕更小。</b>",
+  ok:"銀行給出書面核貸額度",
+  fail:"口頭試算與實際核貸常有落差。<b>核貸下來之前不要下斡旋。</b>"}
+]
+};
+
+DD.kumamoto.mi = {
+pro:[
+ {id:"km1", pri:"急", t:"エアコン 全室設置／更新", who:"家電量販・電気工事店",
+  lo:120000, hi:500000,
+  note:"<b>這是熊本清單的第一名，千歲根本不需要。</b>九州夏天 35℃ 以上，冷氣不是舒適品是必需品。中古屋常常只有客廳有、或機器已經 10 年。<b>店舖側還要另外算商用冷氣</b>（未含在此）。台數多的話這筆會膨脹得很快。"},
+ {id:"km2", pri:"急", t:"シロアリ 防蟻処理（5年保証つき）", who:"白蟻専門業者",
+  lo:80000, hi:200000,
+  note:"<b>九州必做，北海道不用。</b>日本新築的防蟻保證通常只有 5 年——這件正好築 5 年，<b>保證要嘛剛過期、要嘛即將到期</b>。行情約 10㎡ ¥10,000–30,000，全戶約 ¥8–20萬。先花 ¥10,000 請業者調查（多數業者後續委託會退調查費），有蟻道再談駆除。"},
+ {id:"km3", pri:"急", t:"給湯器 交換（ガス給湯器 ／ エコキュート）", who:"設備業者",
+  lo:150000, hi:500000,
+  note:"築 5 年的話還在壽命內，<b>但要確認能力夠不夠營業用</b>。ガス給湯器比エコキュート便宜（¥15–30萬 vs ¥25–60萬）。<b>先問清楚是都市瓦斯還是 LP</b>——LP 的單價會讓熱水成本翻倍。"},
+ {id:"km4", pri:"急", t:"排水管 高圧洗浄（全戸）", who:"清掃・水道業者",
+  lo:15000, hi:30000,
+  note:"<b>入居前一定要做，最便宜、CP 值最高。</b>而且九州濕熱，排水管的生物膜長得比北海道快。"},
+ {id:"km5", pri:"高", t:"網戸 張替え・追加", who:"サッシ店・DIY",
+  lo:15000, hi:40000,
+  note:"<b>九州的蟲比北海道多一個量級</b>（ムカデ、ゴキブリ、蚊）。破一個洞就前功盡棄。夏天要開窗通風就一定要有完好的紗窗，這筆很小但不能省。"},
+ {id:"km6", pri:"高", t:"トイレ 交換（温水洗浄便座一体型）", who:"設備業者",
+  lo:150000, hi:300000,
+  note:"陶器耐用，但<b>ウォシュレット 的電子部分只有 7–10 年</b>。築 5 年的話可以先不換，先確認能不能正常運作。"},
+ {id:"km7", pri:"高", t:"浴室 コーキング打ち直し・防カビ処理", who:"リフォーム業者",
+  lo:30000, hi:60000,
+  note:"<b>整份清單 CP 值最高的一項。</b>九州濕度高，發霉速度遠快於北海道——同樣的房子在熊本，浴室矽利康的壽命大概只有北海道的一半。不用整組換浴室就解決滲水與觀感。"},
+ {id:"km8", pri:"高", t:"住宅用火災警報器 點檢／更換", who:"消防設備業者・DIY",
+  lo:15000, hi:35000,
+  note:"<b>法定必裝</b>，壽命 10 年。築 5 年的話還有效，但要逐個按測試鈕確認。"},
+ {id:"km9", pri:"高", t:"台風対策：雨戸・シャッター／飛散防止フィルム", who:"サッシ店",
+  lo:50000, hi:300000,
+  note:"<b>九州特有，北海道完全不需要。</b>颱風直撲九州是每年的事。沒有雨戸的窗戶至少要貼飛散防止膜；面向主風向的大片玻璃建議加シャッター。<b>店舖側的玻璃門更要做</b>——破一次的損失遠超過這筆。"},
+ {id:"km10", pri:"中", t:"分電盤更新 ＋ 動力200V 引込", who:"電気工事店",
+  lo:200000, hi:650000,
+  note:"<b>你開店本來就要引動力電，一起做比較省。</b>注意別跟改裝預算重複計算。九州電力在 TSMC 周邊的工事排程可能很滿，要提早申請。"},
+ {id:"km11", pri:"中", t:"屋根・雨樋 點檢（台風＋降灰）", who:"屋根業者",
+  lo:30000, hi:80000,
+  note:"九州的屋頂要對付兩件北海道沒有的事：<b>颱風</b>與<b>阿蘇山的降灰</b>。火山灰堆在雨樋裡遇水會結塊、堵塞、增重。菊陽・大津在阿蘇西側，降灰要看風向但並非罕見。"},
+ {id:"km12", pri:"中", t:"24時間換気システム 清掃・部品交換", who:"設備業者",
+  lo:20000, hi:50000,
+  note:"2003年以降的建物法定必裝。九州濕度高，換氣不良直接等於發霉，比北海道更關鍵。"},
+ {id:"km13", pri:"中", t:"ユニットバス／浴槽 更新", who:"リフォーム業者",
+  lo:150000, hi:1500000,
+  note:"只換浴槽 ¥15–30萬；整組ユニットバス更新 ¥60–150萬。<b>築 5 年通常不用換</b>，先做上面的コーキング＋防霉就好。"},
+ {id:"km14", pri:"低", t:"洗面台 交換", who:"設備業者",
+  lo:100000, hi:250000,
+  note:"壽命 10–20 年。築 5 年不急，但如果要做店舖的手洗設備，可以一起發包比較便宜。"}
+],
+clean:[
+ {id:"kc1", t:"ハウスクリーニング（空室・109㎡ 前後）", lo:70000, hi:130000,
+  note:"<b>趁空屋做最便宜也最徹底。</b>九州的中古屋要特別指定「カビ対策」，這是北海道業者不會主動做的項目。"},
+ {id:"kc2", t:"レンジフード・換気扇 分解洗浄", lo:15000, hi:25000,
+  note:"住居側的廚房。店舖側的排氣設備是另外的工程，不在這裡。"},
+ {id:"kc3", t:"エアコン 分解洗浄（每台）", lo:12000, hi:20000,
+  note:"<b>熊本的冷氣台數比北海道多，這一項要乘以台數。</b>九州的冷氣內部黴菌問題嚴重，沒洗過就開＝把黴吹進屋裡。"},
+ {id:"kc4", t:"害虫駆除（ゴキブリ・ムカデ・蟻）", lo:15000, hi:35000,
+  note:"<b>入居前空屋時做效果最好。</b>九州的ムカデ（蜈蚣）會從排水口與牆縫進來，這在北海道幾乎不是問題。做過一次可以撐一季。"}
+],
+supply:[
+ {g:"油汙・廚房", items:[
+  ["マジックリン（油汚れ用）","廚房油汙標準解，日本每一家藥妝店都有"],
+  ["ウタマロクリーナー","中性・全能型，牆面地板都能用"],
+  ["セスキ炭酸ソーダ","泡水噴瓶自製，對油汙比小蘇打強"],
+  ["重曹（小蘇打）","鍋具焦垢・除臭"],
+  ["パイプユニッシュ","排水管，配合 F-1 的高圧洗浄使用"]
+ ]},
+ {g:"地板", items:[
+  ["クイックルワイパー ＋ 替換布","乾濕兩用，日本住宅地板的標配"],
+  ["フローリング用ワックス","入居前打一次，之後好清理"]
+ ]},
+ {g:"浴室・廁所（九州要加強）", items:[
+  ["カビキラー","<b>九州的黴長得比北海道快得多</b>，這罐會用得很兇"],
+  ["<b>防カビくん煙剤</b>","<b>入居前先燻一次，之後每 2 個月一次</b>。九州建議把頻率拉高"],
+  ["クエン酸","水垢・皂垢"],
+  ["トイレクイックル","擦完直接丟"]
+ ]},
+ {g:"★ 梅雨・夏（九州特有，北海道用不到）", items:[
+  ["<b>除湿剤（水とりぞうさん）</b>","<b>衣櫃・鞋櫃・押入必放</b>。梅雨季一個月就滿一盒"],
+  ["押入れ用 除湿シート","棉被下墊著，防發霉"],
+  ["除湿機 ／ サーキュレーター","梅雨季衣服晾不乾，這是生活品質問題"],
+  ["<b>ムカデ用 忌避剤・粉剤</b>","<b>沿著房子外牆與排水口撒</b>。蜈蚣咬到會腫很久"],
+  ["蚊取り線香・虫よけスプレー","室外作業與倒垃圾時用"],
+  ["防虫剤（衣類用）","九州的蟲害季節長"]
+ ]},
+ {g:"全般", items:[
+  ["メラミンスポンジ","水垢・牆面污漬，便宜好用"],
+  ["<b>菊陽町／大津町 指定ゴミ袋</b>","<b>用錯不收</b>。超市與便利商店都有賣，先確認你住哪一町"]
+ ]}
+],
+daily:[
+ {g:"入居當天（沒有就會出事）", items:[
+  ["<b>照明器具</b>","<b>日本中古屋常常不附照明</b>，交屋當天可能只有燈座——第一晚沒燈"],
+  ["カーテン ＋ カーテンレール","窗簾也常常不附。<b>九州建議選遮光＋隔熱的，夏天差很多</b>"],
+  ["寝具一式","棉被枕頭。九州夏天要準備涼感墊"],
+  ["延長コード・電源タップ","插座位置永遠不對"],
+  ["トイレットペーパー・ゴミ袋","第一天就要用"]
+ ]},
+ {g:"第一週", items:[
+  ["冷蔵庫・洗濯機・電子レンジ","住居用。店舖用的是另一筆設備預算"],
+  ["ネット回線 申込","<b>要 2–4 週</b>，簽約後馬上辦。TSMC 進駐後當地工事需求大，可能更久"],
+  ["掃除機","<b>降灰時期會用到</b>"],
+  ["物干し竿・ハンガー",""]
+ ]},
+ {g:"★ 九州特有（北海道那份沒有）", items:[
+  ["<b>扇風機 ／ サーキュレーター</b>","冷氣輔助，電費差很多"],
+  ["<b>除湿機</b>","<b>梅雨季的必需品</b>，不是奢侈品"],
+  ["<b>台風備蓄：水・カセットコンロ・モバイルバッテリー・懐中電灯</b>","<b>九州每年都會停電</b>。颱風季前備好，不要等預報才去買——會缺貨"],
+  ["養生テープ","颱風前貼窗戶。<b>颱風接近時全縣賣光，平時就要囤</b>"],
+  ["ハザードマップ（紙本）","浸水・土砂・避難所位置。町役場免費索取"],
+  ["ゴキブリ対策（ブラックキャップ等）","入居當週就佈設"]
+ ]},
+ {g:"行政・生活基盤", items:[
+  ["<b>印鑑（實印・銀行印）</b>","<b>日本生活必需</b>，開戶、簽約都要"],
+  ["住民登録・マイナンバーカード","菊陽町役場／大津町役場"],
+  ["銀行口座 開設","肥後銀行・熊本銀行 等在地行庫"],
+  ["電気・<b>ガス</b>・水道 開通手續","<b>熊本有瓦斯（千歲那件是全電化沒有）</b>。LP 的話要跟瓦斯公司簽約，問清楚配管歸屬"],
+  ["火災保険 ＋ <b>地震保険</b> 加入","<b>地震保險只能跟火災保險綁著買，熊本必保</b>。另要確認風水害（颱風・水災）有涵蓋"]
+ ]}
+]
+};
+
+DD.kumamoto.g=
+"<table><thead><tr><th>要查什麼</th><th>找誰</th><th>怎麼問</th></tr></thead><tbody>"+
+"<tr><td>用途地域・建蔽容積</td><td>菊陽町／大津町<br>都市計画課</td><td>索取最新「都市計画図（総括図）」。<b>市街化区域近年一直在擴，網路舊圖不可信</b></td></tr>"+
+"<tr><td>飲食店營業許可的可行性</td><td><b>熊本県 菊池保健所</b></td><td><b>帶平面圖去做「事前相談」</b>，免費。注意不是熊本市保健所</td></tr>"+
+"<tr><td>消防設備要求</td><td>菊池広域連合<br>消防本部</td><td>說明「1樓要做飲食店、樓上住人」，問需要哪些設備與屆出</td></tr>"+
+"<tr><td><b>活斷層・地震被災履歷</b></td><td>熊本県ハザードマップ<br>地震本部／仲介</td><td>查布田川・日奈久斷層帶的位置；向仲介索取 2016 年罹災証明與修繕履歷</td></tr>"+
+"<tr><td><b>地下水保全条例</b></td><td>熊本県 環境立県推進課</td><td>問飲食店的排水與（若有）井水使用要不要申報</td></tr>"+
+"<tr><td>浸水・土砂災害</td><td>町役場 防災担当</td><td>索取紙本ハザードマップ，確認想定水深與避難所</td></tr>"+
+"<tr><td>固定資產稅（店舖化後）</td><td>町役場 稅務課</td><td>問住宅用地特例會不會失效、居住比例怎麼算</td></tr>"+
+"<tr><td>電力容量與動力引込</td><td>九州電力</td><td>問現況契約容量、增設三相200V的費用<b>與等待時間</b></td></tr>"+
+"<tr><td>上下水道・<b>瓦斯種類</b></td><td>町 上下水道課<br>／仲介</td><td>確認下水道已接；<b>問是都市瓦斯還是 LP，配管是誰的財產</b></td></tr>"+
+"<tr><td>白蟻</td><td>在地白蟻業者</td><td>調查費約 ¥10,000，多數業者後續委託會退還</td></tr>"+
+"<tr><td>土地實勢價格</td><td>國土交通省<br>土地綜合情報系統</td><td><b>查「同一丁目」近三年成交，不要用町的平均值</b>——同町內可差 2 倍</td></tr>"+
+"<tr><td>簽證可行性</td><td>行政書士</td><td><b>這是你真正的第一步</b>，費用約 ¥30,000–50,000</td></tr>"+
+"</tbody></table>";
+
+DD.kumamoto.h=
+"<table><thead><tr><th>項目</th><th style='text-align:right'>金額</th><th style='text-align:right'>台幣</th></tr></thead><tbody>"+
+"<tr><td>物件價格（菊陽 久保田 參考件）</td><td class='num'>¥32,900,000</td><td class='num'>700萬</td></tr>"+
+"<tr><td>取得諸費用（仲介・登記・不動產取得稅・保險）</td><td class='num'>¥2,300,000</td><td class='num'>49萬</td></tr>"+
+"<tr><td>改裝工事（區劃・廚房・排氣・グリストラップ）</td><td class='num'>¥7,200,000</td><td class='num'>153萬</td></tr>"+
+"<tr><td>廚房設備（中古混用）</td><td class='num'>¥2,100,000</td><td class='num'>45萬</td></tr>"+
+"<tr><td>運轉資金（第一年燒錢）</td><td class='num'>¥4,500,000</td><td class='num'>96萬</td></tr>"+
+"</tbody><tfoot><tr><td><b>合計</b></td><td class='num'><b>¥49,000,000</b></td><td class='num'><b>1,043萬</b></td></tr></tfoot></table>";
+
+DD.kumamoto.h2=
+"<div class='note warn'><b>熊本比千歲貴 NT$88萬，而且貴的地方不是房子，是土地。</b>以你現金 NT$500萬＋可貸上限 NT$600萬 計，要借 NT$543萬——<b>還在可貸範圍內，但餘裕只剩 NT$57萬</b>（千歲那件剩 NT$145萬）。改裝一超支就見底。<br>"+
+"改裝比千歲少 NT$15萬，是因為<b>不用做ロードヒーティング、不用高規格斷熱</b>；但這點省下的錢，被土地貴掉的 NT$96萬整個吃掉還不夠。<br>"+
+"<a href='./chitose~fe9afdb3771c558d.html'>→ 回試算盤按「熊本」看完整數字</a></div>"+
+"<div class='note bad'><b>熊本真正的風險不在錢，在競爭。</b>千歲是零競爭但客源要賭 Rapidus；熊本是客源已經在那裡（台灣人 1,400 人以上、JASM 已量產），<b>但台灣料理店從 2025 年開始急速增加，連台式早餐都有人做了</b>。你要用貴 NT$88萬的成本，去打一個已經有四家以上同業的市場。<br><b>D-9 的競合実査比這整張表都重要。</b></div>"+
+"<div class='note warn'><b>簽證那一關兩邊一樣：</b>總投資已跨過 経営・管理 的 ¥30,000,000 資本金門檻，但資本金必須<b>真的投入事業並保全通帳全履歷</b>，否則會被認定為「見せ金」。</div>";
+
+/* ── 兩地對照表 ─────────────────────────────── */
+var VS=[
+ ["參考物件","¥2,840萬 · 土地252㎡ · 建137㎡ · 2LDK · 築23年","¥3,290萬 · 土地276㎡ · 建109㎡ · 4SLDK · 築5年"],
+ ["土地單價","實勢推估 ¥48,000/㎡","菊陽實勢均 ¥106,000/㎡<br><span class='vsk'>但同町內差 2 倍，這件反推約 ¥54,000</span>"],
+ ["總投資","<span class='hit'>NT$955萬</span>","<span class='miss'>NT$1,043萬</span>（貴 88萬）"],
+ ["停車","<span class='miss'>冬季客用剩 4 台</span><br><span class='vsk'>私家車須租月極 ¥162,000/年</span>","<span class='hit'>全年 6 台以上，月極 ¥0</span><br><span class='vsk'>不用留雪置場</span>"],
+ ["格局好不好改店","<span class='hit'>2LDK · 137㎡ 隔間少</span>","<span class='miss'>4SLDK · 109㎡ 隔間多</span>"],
+ ["競爭者","<span class='hit'>台灣料理 0 家</span>","<span class='miss'>已知 4 家以上</span><br><span class='vsk'>大津「花日」8:30 賣豆漿蛋餅</span>"],
+ ["客源","<span class='miss'>賭 Rapidus 蓋不蓋得起來</span>","<span class='hit'>台灣人 1,400+ 已在<br>JASM 已量產</span>"],
+ ["天氣風險","冬天 −10℃、除雪、凍結、冬季電費暴衝","夏天 35℃＋濕、梅雨發霉、颱風停電、白蟻"],
+ ["地質風險","<span class='hit'>低</span>","<span class='miss'>布田川・日奈久斷層帶<br>2016 熊本地震震央區</span>"],
+ ["額外固定成本","融雪 ¥180萬・高斷熱・月極停車","冷氣・防蟻 5 年一次・地震保險"]
+];
+
+(function(){
+"use strict";
+var LOC="chitose", state={}, all=[];
+try{ LOC=localStorage.getItem("dd-loc")||"chitose"; }catch(e){}
+if(!DD[LOC]) LOC="chitose";
+function D(){ return DD[LOC]; }
+function key(){ return "dd-usedB-v2-"+LOC; }
+function load(){ try{ state=JSON.parse(localStorage.getItem(key())||"{}")||{}; }catch(e){ state={}; } }
+function save(){ try{ localStorage.setItem(key(),JSON.stringify(state)); }catch(e){} }
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+function set(id,html){ var el=document.getElementById(id); if(el) el.innerHTML=html; }
+
 function yenR(lo,hi){
-  var f=function(n){return "\u00a5"+n.toLocaleString("en-US");};
-  return (lo===hi)?f(lo):(f(lo)+"\u2013"+f(hi));
+  var f=function(n){return "¥"+n.toLocaleString("en-US");};
+  return (lo===hi)?f(lo):(f(lo)+"–"+f(hi));
 }
 function renderMI(){
-  /* F-1 需要業者 */
-  var b1=document.getElementById("mi-pro");
-  if(b1) b1.innerHTML=MOVEIN.pro.map(function(x){
+  var MI=D().mi;
+  set("mi-pro", MI.pro.map(function(x){
     var d=!!state[x.id];
     return "<div class='mi"+(d?" done":"")+"'><div class='mi-h'>"+
       "<input type='checkbox' data-cb='"+x.id+"'"+(d?" checked":"")+">"+
@@ -664,55 +1114,46 @@ function renderMI(){
         "<span class='mi-who'>"+esc(x.who)+"</span></div>"+
       "<div class='mi-y'>"+yenR(x.lo,x.hi)+"</div></div>"+
       "<div class='mi-n'>"+x.note+"</div></div>";
-  }).join("");
-
-  /* F-2 清掃 */
-  var b2=document.getElementById("mi-clean");
-  if(b2) b2.innerHTML=MOVEIN.clean.map(function(x){
+  }).join(""));
+  set("mi-clean", MI.clean.map(function(x){
     var d=!!state[x.id];
     return "<div class='mi"+(d?" done":"")+"'><div class='mi-h'>"+
       "<input type='checkbox' data-cb='"+x.id+"'"+(d?" checked":"")+">"+
       "<div class='mi-t'>"+esc(x.t)+"</div>"+
       "<div class='mi-y'>"+yenR(x.lo,x.hi)+"</div></div>"+
       "<div class='mi-n'>"+x.note+"</div></div>";
-  }).join("");
-
-  /* F-3 / F-4 清單型 */
+  }).join(""));
   function group(boxId,groups,prefix){
-    var box=document.getElementById(boxId); if(!box) return;
-    box.innerHTML=groups.map(function(g,gi){
+    set(boxId, groups.map(function(g,gi){
       return "<div class='sup'><h4>"+esc(g.g)+"</h4><ul>"+g.items.map(function(it,ii){
-        var id=prefix+gi+"_"+ii, d=!!state[id];
+        var id=LOC.charAt(0)+prefix+gi+"_"+ii, d=!!state[id];
         return "<li class='"+(d?"done":"")+"'><input type='checkbox' data-cb='"+id+"'"+(d?" checked":"")+">"+
           "<span><span class='sup-t'>"+it[0]+"</span>"+
           (it[1]?"<span class='sup-d'>"+it[1]+"</span>":"")+"</span></li>";
       }).join("")+"</ul></div>";
-    }).join("");
+    }).join(""));
   }
-  group("mi-supply",MOVEIN.supply,"sup");
-  group("mi-daily",MOVEIN.daily,"day");
-
+  group("mi-supply",MI.supply,"sup");
+  group("mi-daily",MI.daily,"day");
   budgetMI();
 }
 function budgetMI(){
   var box=document.getElementById("mi-budget"); if(!box) return;
-  var lo=0,hi=0,n=0, alo=0,ahi=0, ulo=0,uhi=0;
-  MOVEIN.pro.concat(MOVEIN.clean).forEach(function(x){
+  var MI=D(), lo=0,hi=0,n=0, alo=0,ahi=0, ulo=0,uhi=0, un=0;
+  MI.mi.pro.concat(MI.mi.clean).forEach(function(x){
     alo+=x.lo; ahi+=x.hi;
     if(state[x.id]){ lo+=x.lo; hi+=x.hi; n++; }
-    if(x.pri==="\u6025"){ ulo+=x.lo; uhi+=x.hi; }
+    if(x.pri==="急"){ ulo+=x.lo; uhi+=x.hi; un++; }
   });
   box.innerHTML=
     "已勾選 <b>"+n+"</b> 項　預算 <b>"+yenR(lo,hi)+"</b><br>"+
     "<span style='color:var(--muted);font-size:12.5px'>"+
-    "「急」的四項合計 "+yenR(ulo,uhi)+"　／　F-1＋F-2 全做 "+yenR(alo,ahi)+
+    "「急」的 "+un+" 項合計 "+yenR(ulo,uhi)+"　／　F-1＋F-2 全做 "+yenR(alo,ahi)+
     "　（約 NT$"+Math.round(alo/47000)+"–"+Math.round(ahi/47000)+"萬）</span>";
 }
 
-var all=[];
 function render(listId,arr){
-  var box=document.getElementById(listId); if(!box) return;
-  box.innerHTML=arr.map(function(it){
+  set(listId, arr.map(function(it){
     var done=!!state[it.id];
     return "<div class='item"+(it.kill?" kill":"")+(done?" done":"")+"' data-id='"+it.id+"'>"+
       "<div class='item-h'>"+
@@ -726,10 +1167,8 @@ function render(listId,arr){
         "<dt>什麼算過關</dt><dd>"+it.ok+"</dd>"+
         "<dt>不過關會怎樣</dt><dd class='failtxt'>"+it.fail+"</dd>"+
       "</dl></div></div>";
-  }).join("");
+  }).join(""));
 }
-["stage1","stage2","stage3"].forEach(function(k){ render(k,ITEMS[k]); all=all.concat(ITEMS[k]); });
-renderMI();
 
 function tally(){
   var done=0,kd=0,kt=0;
@@ -745,6 +1184,40 @@ function tally(){
   document.getElementById("killbox").classList.toggle("done",kd===kt&&kt>0);
 }
 
+function drawVS(){
+  var box=document.getElementById("locvs"); if(!box) return;
+  var hi=function(w){ return LOC===w?" style='background:var(--accent-soft)'":""; };
+  box.innerHTML="<div class='vsr h'><div>比較項目</div><div"+hi("chitose")+">千歲</div><div"+hi("kumamoto")+">熊本</div></div>"+
+    VS.map(function(r){
+      return "<div class='vsr'><div class='vsk'>"+r[0]+"</div>"+
+        "<div"+hi("chitose")+">"+r[1]+"</div><div"+hi("kumamoto")+">"+r[2]+"</div></div>";
+    }).join("");
+}
+
+function applyLoc(){
+  var d=D();
+  load(); all=[];
+  document.getElementById("loc-badge").textContent=d.name;
+  document.title=d.name+"　買房開店查核清單";
+  Array.prototype.forEach.call(document.querySelectorAll("#locpick button"),function(b){
+    b.classList.toggle("on", b.getAttribute("data-loc")===LOC);
+  });
+  set("blk-a",d.a); set("blk-b",d.b); set("blk-g",d.g); set("blk-h",d.h); set("blk-h2",d.h2);
+  set("lede1",d.lede1); set("lede2",d.lede2);
+  set("mi-sup-lede",d.supLede); set("mi-traps",d.traps);
+  ["stage1","stage2","stage3"].forEach(function(k){ render(k,d.items[k]); all=all.concat(d.items[k]); });
+  renderMI(); drawVS(); tally();
+}
+
+document.getElementById("locpick").addEventListener("click",function(e){
+  var b=e.target.closest?e.target.closest("button[data-loc]"):null;
+  if(!b) return;
+  var v=b.getAttribute("data-loc");
+  if(v===LOC||!DD[v]) return;
+  LOC=v; try{ localStorage.setItem("dd-loc",LOC); }catch(err){}
+  applyLoc();
+});
+
 document.addEventListener("click",function(e){
   var cb=e.target.closest?e.target.closest("input[data-cb]"):null;
   if(cb){
@@ -758,14 +1231,12 @@ document.addEventListener("click",function(e){
   if(h) h.parentNode.classList.toggle("open");
 });
 document.getElementById("btn-reset").addEventListener("click",function(){
-  if(!confirm("清除所有勾選？這個動作無法復原。")) return;
-  state={}; save();
-  ["stage1","stage2","stage3"].forEach(function(k){ render(k,ITEMS[k]); });
-  renderMI(); tally();
+  if(!confirm("清除「"+D().name+"」的所有勾選？這個動作無法復原。")) return;
+  state={}; save(); applyLoc();
 });
-tally();
+
+applyLoc();
 })();
 
 </script>
-</body>
-</html>
+</body></html>
