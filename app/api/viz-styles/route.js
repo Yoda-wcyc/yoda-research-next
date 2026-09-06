@@ -1,5 +1,5 @@
 import { get, put, del, list } from '@vercel/blob';
-import { reportIdFromPath } from '../../../lib/blob';
+import { readIndex } from '../../../lib/report-index';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -35,18 +35,18 @@ async function readJson(name) {
     return null;
   }
 }
-async function names() {
-  try {
-    const { blobs } = await list({ prefix: PREFIX });
-    return blobs
-      .map((b) => (b.pathname.match(/^viz-styles\/([^/]+)\.json$/) || [])[1])   // 不含 _history/ 底下的
-      .filter(Boolean)
-      .filter((n) => n !== 'assign')
-      .sort();
-  } catch (e) {
-    return [];
-  }
+// 一次 list('viz-') 同時拿到樣式庫與樣本（兩個前綴共用一次進階操作）
+async function listViz() {
+  try { const { blobs } = await list({ prefix: 'viz-' }); return blobs || []; } catch (e) { return []; }
 }
+function namesFrom(blobs) {
+  return blobs
+    .map((b) => (b.pathname.match(/^viz-styles\/([^/]+)\.json$/) || [])[1])   // 不含 _history/ 底下的
+    .filter(Boolean)
+    .filter((n) => n !== 'assign')
+    .sort();
+}
+async function names() { return namesFrom(await listViz()); }
 
 // GET ?k=…                 → { styles:[名], assign:{}, reports:[樣本], types:[], typeFamily:{} }
 // GET ?k=…&name=<樣式>      → 該樣式 JSON
@@ -70,20 +70,17 @@ export async function GET(req) {
     if (!j) return J({ error: '找不到樣式 ' + name }, 404);
     return J(j);
   }
-  const [styles, assign] = await Promise.all([names(), readJson('assign')]);
+  const [vizBlobs, assign] = await Promise.all([listViz(), readJson('assign')]);
+  const styles = namesFrom(vizBlobs);
   let reports = [];
-  try {   // ① 已發佈的付費報告（reports/ 前綴）——線上真貨，不用上傳
-    const { blobs } = await list({ prefix: 'reports/' });
-    reports = blobs
-      .map((b) => { const id = reportIdFromPath(b.pathname); return id ? { file: id, kind: 'published', kb: Math.round((b.size || 0) / 1024) } : null; })
-      .filter(Boolean);
+  try {   // ① 已發佈的付費報告——讀 reports/_index.json（簡單操作），不 list()
+    const idx = await readIndex();
+    reports = idx.entries.map((e) => ({ file: e.reportId, kind: 'published', kb: Math.round((e.size || 0) / 1024) }));
   } catch (e) {}
-  try {   // ② 手動上傳的樣本（沒發佈成付費的類型：總經／AI泡沫／專題…）
-    const { blobs } = await list({ prefix: 'viz-samples/' });
-    reports = reports.concat(blobs
-      .map((b) => { const f = (b.pathname.match(/^viz-samples\/(.+)$/) || [])[1]; return f ? { file: f, kind: 'sample', kb: Math.round((b.size || 0) / 1024) } : null; })
-      .filter(Boolean));
-  } catch (e) {}
+  // ② 手動上傳的樣本（沒發佈成付費的類型：總經／AI泡沫／專題…）——同一次 list 的結果
+  reports = reports.concat(vizBlobs
+    .map((b) => { const f = (b.pathname.match(/^viz-samples\/(.+)$/) || [])[1]; return f ? { file: f, kind: 'sample', kb: Math.round((b.size || 0) / 1024) } : null; })
+    .filter(Boolean));
   reports.sort((a, b) => b.file.localeCompare(a.file));   // 新日期在前
   const TYPE_FAMILY = {
     us_stock: 'fmfb', tw_stock: 'fmfb', mw: 'fmfb', hub: 'fmfb',

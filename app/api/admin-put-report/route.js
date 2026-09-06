@@ -1,6 +1,7 @@
 import { blobPath } from '../../../lib/blob';
 import { J, preflight } from '../../../lib/cors';
 import { put } from '@vercel/blob';
+import { upsertIndex } from '../../../lib/report-index';
 import { gunzipSync } from 'zlib';
 
 export const runtime = 'nodejs';
@@ -52,7 +53,9 @@ export async function POST(req) {
       allowOverwrite: true,
       cacheControlMaxAge: 60, // 同路徑覆寫後，邊緣快取最多 60 秒就換新版（預設一個月，改版會卡舊檔）
     });
-    return J({ ok: true, reportId: name, url: res.url });
+    let indexed = true;
+    try { await upsertIndex(name, html.length); } catch (e) { indexed = false; }   // 索引壞了不擋上傳；清單會自癒重建
+    return J({ ok: true, reportId: name, url: res.url, indexed });
   } catch (e) {
     return J({ ok: false, error: 'Blob 上傳失敗：' + String((e && e.message) || e) });
   }

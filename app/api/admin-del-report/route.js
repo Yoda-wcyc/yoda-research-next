@@ -1,6 +1,7 @@
 import { blobPath } from '../../../lib/blob';
 import { J, preflight } from '../../../lib/cors';
 import { del, list } from '@vercel/blob';
+import { removeIndex } from '../../../lib/report-index';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,6 +18,7 @@ export async function POST(req) {
     const { blobs } = await list({ prefix: blobPath(reportId) });
     let n = 0;
     for (const b of (blobs || [])) { await del(b.url); n++; }
+    try { await removeIndex(reportId); } catch (e) {}
     return J({ ok: true, reportId, deleted: n });
   } catch (e) { return J({ ok: false, error: String((e && e.message) || e) }); }
 }

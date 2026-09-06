@@ -1,7 +1,6 @@
 import { verifyJwt } from '../../../lib/jwt';
-import { reportIdFromPath } from '../../../lib/blob';
 import { J, preflight } from '../../../lib/cors';
-import { list } from '@vercel/blob';
+import { readIndex } from '../../../lib/report-index';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,15 +16,11 @@ export async function POST(req) {
   if (!payload) return J({ ok: true, auth: false, error: '請重新登入' });
 
   let reports = [];
-  try {
-    const { blobs } = await list({ prefix: 'reports/' });
-    const seen = {};
-    for (const b of (blobs || [])) {
-      const id = reportIdFromPath(b.pathname);
-      if (!id || seen[id]) continue;
-      if (/^免費[_-]/.test(id)) continue; // 免費殼檔不進會員「我的付費報告」清單
-      seen[id] = 1;
-      reports.push({ reportId: id, uploadedAt: b.uploadedAt });
+  try {   // 2026-09-06：讀 reports/_index.json，不再 list()（進階操作額度曾爆掉）
+    const idx = await readIndex();
+    for (const e of idx.entries) {
+      if (/^免費[_-]/.test(e.reportId)) continue; // 免費殼檔不進會員「我的付費報告」清單
+      reports.push({ reportId: e.reportId, uploadedAt: e.uploadedAt });
     }
     reports.sort((a, b) => {
       const da = (a.reportId.match(/(\d{8})/) || ['', '0'])[1];

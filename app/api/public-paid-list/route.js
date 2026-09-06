@@ -1,6 +1,5 @@
-import { reportIdFromPath } from '../../../lib/blob';
-import { J, preflight } from '../../../lib/cors';
-import { list } from '@vercel/blob';
+import { J, preflight, CORS } from '../../../lib/cors';
+import { readIndex } from '../../../lib/report-index';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -23,20 +22,20 @@ function catOf(id) {
 }
 
 // 公開：付費報告清單（只回 檔名/日期/分類·不含內容·免登入）→ 給 archive「付費版」用。
+// 2026-09-06：改讀 reports/_index.json（簡單操作），不再每個訪客 list() 一次（進階操作，Hobby 每月只有 2,000 次，
+// 曾因此整個 Blob 被停用一個月）。回應加 CDN 快取 5 分鐘，同一分鐘一千個訪客也只打一次 Blob。
 async function handle() {
   let reports = [];
   try {
-    const { blobs } = await list({ prefix: 'reports/' });
-    const seen = {};
-    for (const b of (blobs || [])) {
-      const id = reportIdFromPath(b.pathname);
-      if (!id || seen[id]) continue;
-      seen[id] = 1;
-      reports.push({ file: id + '.html', reportId: id, date: dateOf(id), cat: catOf(id), paid: true, drive: true, summary: '', uploadedAt: b.uploadedAt });
+    const idx = await readIndex();
+    for (const e of idx.entries) {
+      const id = e.reportId;
+      reports.push({ file: id + '.html', reportId: id, date: dateOf(id), cat: catOf(id), paid: true, drive: true, summary: '', uploadedAt: e.uploadedAt });
     }
     reports.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.reportId).localeCompare(String(a.reportId)));
   } catch (e) {}
-  return J({ ok: true, reports });
+  return Response.json({ ok: true, reports }, { status: 200,
+    headers: { ...CORS, 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600' } });
 }
 export async function GET() { return handle(); }
 export async function POST() { return handle(); }
