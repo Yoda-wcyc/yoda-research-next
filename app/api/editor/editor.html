@@ -1,0 +1,335 @@
+<!doctype html><html lang="zh-TW"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Yoda 報告編輯器</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:#0b0f16;color:#c9d6e4;font:13px/1.6 -apple-system,BlinkMacSystemFont,'PingFang TC','Microsoft JhengHei','Noto Sans TC',sans-serif;overflow:hidden;display:flex;flex-direction:column}
+a{color:#8fa6bd}
+button{font:600 12px/1 inherit;padding:7px 10px;border-radius:5px;border:1px solid #263242;background:#16202e;color:#c9d6e4;cursor:pointer;white-space:nowrap}
+button:hover{background:#1d2b3d;border-color:#33465c}
+button.pri{background:#1b3a5c;border-color:#2f6fb5;color:#dbe8f6}
+button.ok{background:#12281d;border-color:#255a3c;color:#8ae0b0}
+button.danger{border-color:#5a2630;color:#ff8a8a}
+button:disabled{opacity:.4;cursor:default}
+select,input[type=text]{background:#131a25;color:#c9d6e4;border:1px solid #263242;border-radius:5px;padding:5px 7px;font:inherit;font-size:12px}
+/* 頁籤列 */
+.tabs{display:flex;align-items:center;gap:4px;padding:8px 10px 0;background:#0e131c;border-bottom:1px solid #1e2836;flex-wrap:wrap}
+.tabs .t{display:flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid #1e2836;border-bottom:0;border-radius:7px 7px 0 0;background:#0b0f16;color:#7f93a8;cursor:pointer;max-width:260px}
+.tabs .t.on{background:#131a25;color:#e6eef8;border-color:#2f6fb5}
+.tabs .t .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tabs .t .x{opacity:.5;font-size:11px}.tabs .t .x:hover{opacity:1;color:#ff8a8a}
+.tabs .t .pend{font:700 10px/1 ui-monospace,monospace;background:#3a1f26;color:#ff9a9a;border-radius:9px;padding:2px 6px}
+.tabs .add{margin-left:2px}
+.tabs .brand{margin-left:auto;font-size:12px;color:#5f7286}
+/* 工具列 */
+.bar{display:flex;gap:8px;align-items:center;padding:8px 12px;background:#0b0f16;border-bottom:1px solid #1e2836;flex-wrap:wrap}
+.bar .pill{font:700 11px/1 ui-monospace,monospace;padding:5px 8px;border-radius:5px;background:#131a25;border:1px solid #263242;color:#a9bdd2}
+.bar .pill b{color:#e6eef8}
+.bar .sp{flex:1}
+/* 雙欄 */
+.panes{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:0;min-height:0}
+.pane{display:flex;flex-direction:column;min-width:0;border-right:1px solid #1e2836}
+.pane:last-child{border-right:0}
+.pane .hd{padding:6px 12px;font:800 11px/1 inherit;letter-spacing:.06em;border-bottom:1px solid #1e2836}
+.pane.orig .hd{background:#1a2230;color:#9fb3c8}
+.pane.edit .hd{background:#12281d;color:#8ae0b0}
+.pane iframe{flex:1;width:100%;border:0;background:#080b10}
+.empty{flex:1;display:flex;align-items:center;justify-content:center;color:#5f7286;flex-direction:column;gap:12px;padding:30px;text-align:center;line-height:1.8}
+.empty label.up{border:1px dashed #33465c;border-radius:8px;padding:22px 30px;cursor:pointer;color:#a9bdd2}
+.empty label.up:hover{border-color:#2f6fb5;color:#dbe8f6}
+/* 點擊即編的面板（蓋在右欄下方） */
+.ed{position:absolute;left:0;right:0;bottom:0;background:#0e131c;border-top:2px solid #2f6fb5;padding:10px 12px;display:none;box-shadow:0 -8px 24px rgba(0,0,0,.4)}
+.ed.on{display:block}
+.ed .lb{font:700 10.5px/1 ui-monospace,monospace;color:#5f7286;letter-spacing:.08em;margin-bottom:6px}
+.ed textarea{width:100%;min-height:76px;background:#0b0f16;color:#e6eef8;border:1px solid #263242;border-radius:5px;padding:8px;font:14px/1.7 inherit;resize:vertical}
+.ed input[type=text]{width:100%;margin-top:6px}
+.ed .row{display:flex;gap:6px;margin-top:8px;align-items:center}
+.ed .row .sp{flex:1;font-size:11px;color:#5f7286}
+.pane.edit{position:relative}
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#16283d;border:1px solid #2f6fb5;color:#dbe8f6;padding:9px 16px;border-radius:6px;font-size:12.5px;z-index:99;display:none;max-width:80vw}
+#toast.bad{background:#2a1519;border-color:#7a3040;color:#ffbcbc}
+.warnbox{background:#2a1519;border:1px solid #7a3040;color:#ffbcbc;padding:11px 13px;border-radius:6px;margin:14px;font-size:12.5px;line-height:1.7}
+code{font:11.5px ui-monospace,Consolas,monospace;background:#131a25;padding:1px 5px;border-radius:3px;color:#a9d0f0}
+</style></head><body>
+
+<div id="filewarn" class="warnbox" style="display:none">這頁要從 Vercel 開：<code>https://yoda-research-next.vercel.app/api/editor?k=…</code>（跟主控台同一把鑰匙）。</div>
+
+<div class="tabs" id="tabs"></div>
+<div class="bar" id="bar">
+  <button id="btnOpen">從雲端開啟…</button>
+  <select id="cloudSel" style="max-width:280px"></select>
+  <label><button type="button" onclick="document.getElementById('fileIn').click()">上傳原稿</button></label>
+  <input type="file" id="fileIn" accept=".html,.htm" style="display:none">
+  <span class="pill" id="pMarks">—</span>
+  <span class="sp"></span>
+  <button id="btnApproveAll" class="ok">全部認可</button>
+  <button id="btnDownload">下載編輯後 HTML</button>
+  <button id="btnSave" class="pri">儲存</button>
+  <button id="btnDel" class="danger">刪除此文件</button>
+</div>
+
+<div class="panes">
+  <div class="pane orig"><div class="hd">原稿（唯讀・對照基準）</div><div id="origHost" class="empty"></div></div>
+  <div class="pane edit"><div class="hd">編輯（點任一段落即可修改）</div><div id="editHost" class="empty"></div>
+    <div class="ed" id="ed">
+      <div class="lb" id="edLb">段落</div>
+      <textarea id="edText"></textarea>
+      <input type="text" id="edInst" placeholder="給 Claude 的指示（可留空：例如「改成因果鍊寫法」「壓到 60 字」「口語一點」）">
+      <div class="row">
+        <button id="edApply" class="pri">直接套用</button>
+        <button id="edAI">用 Claude 改</button>
+        <button id="edCancel">取消</button>
+        <span class="sp" id="edStat"></span>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   多頁籤智慧報告編輯器
+   資料模型：一份文件＝原稿 HTML（只寫一次）＋ marks[]（每一處修改：段落索引 idx、改前 before、改後 after、approved）
+   右欄不整份存：開啟時把 marks 套回原稿。段落索引＝兩個 iframe 用同一套規則走文件順序編號，天生對齊。
+   ═══════════════════════════════════════════════════════════════════ */
+var $=function(s){return document.querySelector(s)};
+var KEY=new URLSearchParams(location.search).get('k')||'';
+var EP={docs:'/api/editor-docs?k='+encodeURIComponent(KEY), ai:'/api/editor-ai?k='+encodeURIComponent(KEY)};
+var TABS=[], CUR=-1, tmrSave=null, SYNC_LOCK=false;
+var OFFLINE=(location.protocol==='file:');   /* 雙擊本機開＝離線模式：手動改、標記、認可、下載；沒有 Claude 與雲端 */
+
+function toast(m,bad){var t=$('#toast');t.textContent=m;t.className=bad?'bad':'';t.style.display='block';clearTimeout(t._t);t._t=setTimeout(function(){t.style.display='none'},bad?5000:1800)}
+function api(m,u,b,gz){
+  var h={'Content-Type':'application/json'}, body=b?JSON.stringify(b):undefined;
+  var p=Promise.resolve(body);
+  if(gz&&body&&window.CompressionStream){ h={'Content-Type':'application/octet-stream','x-yoda-encoding':'gzip'};
+    p=new Response(new Blob([body]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer(); }
+  return p.then(function(bb){return fetch(u,{method:m,headers:h,body:bb})}).then(function(r){return r.json()})
+   .then(function(j){if(j&&j.error){toast(String(j.error).slice(0,300),1);throw new Error(j.error)}return j});
+}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+/* ── 段落編號規則（兩欄共用）：有直接文字的元素，依文件順序 ── */
+var SKIP={SCRIPT:1,STYLE:1,NOSCRIPT:1,TEXTAREA:1,BUTTON:1,SELECT:1,OPTION:1,SVG:1,CANVAS:1};
+function hasText(el){for(var i=0;i<el.childNodes.length;i++){var n=el.childNodes[i];if(n.nodeType===3&&/\S/.test(n.nodeValue))return true}return false}
+function indexBlocks(doc){
+  var all=doc.body.querySelectorAll('*'), n=0;
+  for(var i=0;i<all.length;i++){var el=all[i]; if(SKIP[el.tagName])continue; if(el.closest&&el.closest('nav,.controls-bar,.share-bar,#yoda-share'))continue;
+    if(!hasText(el))continue; el.setAttribute('data-yeb',n++);}
+  return n;
+}
+/* ── 注入到 iframe 的樣式：diff 標記（沿用校稿標記的紅慢閃） ── */
+var MARK_CSS='.yeb-mark{position:relative;outline:2px solid rgba(255,80,80,.85);outline-offset:2px;border-radius:3px;animation:yebBlink 1.6s ease-in-out infinite}'+
+ '@keyframes yebBlink{0%,100%{outline-color:rgba(255,80,80,.85)}50%{outline-color:rgba(255,80,80,.25)}}'+
+ '.yeb-del{background:rgba(255,80,80,.22);text-decoration:line-through;color:#ff9a9a;padding:0 2px;border-radius:2px}'+
+ '.yeb-ins{background:rgba(80,220,140,.22);color:#9af0c0;padding:0 2px;border-radius:2px}'+
+ '.yeb-ok{position:absolute;top:-10px;right:-10px;z-index:9999;font:700 11px/1 -apple-system,sans-serif;background:#1f7a4a;color:#fff;border:0;border-radius:11px;padding:4px 8px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.4)}'+
+ '.yeb-ok:hover{background:#2a9a5f}'+
+ '[data-yeb]{cursor:text}[data-yeb]:hover{outline:1px dashed rgba(127,159,198,.7);outline-offset:2px}'+
+ '.yeb-emark{outline:2px solid #ff3b3b;outline-offset:2px;animation:yebBlink 1.6s ease-in-out infinite}';
+var ORIG_CSS='body *{pointer-events:none!important}html,body{pointer-events:auto!important}';
+
+/* ── 字元級 diff（LCS），中文逐字、英數逐詞 ── */
+function tokens(s){return s.match(/[A-Za-z0-9_.%+\-]+|\s+|[\s\S]/g)||[]}
+function diff(a,b){
+  var A=tokens(a),B=tokens(b),n=A.length,m=B.length;
+  if(n*m>4e6){return [['del',a],['ins',b]]}   /* 太長就整段換 */
+  var L=[];for(var i=0;i<=n;i++){L.push(new Int32Array(m+1))}
+  for(var i=n-1;i>=0;i--)for(var j=m-1;j>=0;j--)L[i][j]=A[i]===B[j]?L[i+1][j+1]+1:Math.max(L[i+1][j],L[i][j+1]);
+  var out=[],i=0,j=0;
+  function push(t,s){if(out.length&&out[out.length-1][0]===t)out[out.length-1][1]+=s;else out.push([t,s])}
+  while(i<n&&j<m){ if(A[i]===B[j]){push('eq',A[i]);i++;j++} else if(L[i+1][j]>=L[i][j+1]){push('del',A[i]);i++} else {push('ins',B[j]);j++} }
+  while(i<n)push('del',A[i++]); while(j<m)push('ins',B[j++]);
+  return out;
+}
+function diffHtml(a,b){return diff(a,b).map(function(x){return x[0]==='eq'?esc(x[1]):'<span class="yeb-'+x[0]+'">'+esc(x[1])+'</span>'}).join('')}
+
+/* ── 分頁 ── */
+function tab(){return TABS[CUR]||null}
+function renderTabs(){
+  var h='';
+  TABS.forEach(function(t,i){
+    var pend=t.marks.filter(function(m){return !m.approved}).length;
+    h+='<div class="t'+(i===CUR?' on':'')+'" data-i="'+i+'"><span class="n">'+esc(t.name||'（空白）')+'</span>'+(pend?'<span class="pend">'+pend+'</span>':'')+'<span class="x" data-x="'+i+'">✕</span></div>';
+  });
+  h+='<button class="add" id="tabAdd">＋ 分頁</button><span class="brand"><a href="/api/console?k='+encodeURIComponent(KEY)+'">主控台</a> · <a href="/api/viz?k='+encodeURIComponent(KEY)+'">視覺控制台</a></span>';
+  $('#tabs').innerHTML=h;
+  document.querySelectorAll('#tabs .t').forEach(function(e){e.onclick=function(ev){if(ev.target.dataset.x!==undefined){closeTab(+ev.target.dataset.x);return}switchTab(+e.dataset.i)}});
+  $('#tabAdd').onclick=function(){TABS.push({name:'',slug:'',orig:'',marks:[],loaded:false});switchTab(TABS.length-1)};
+  try{localStorage.setItem('yeb-tabs',JSON.stringify(TABS.map(function(t){return t.slug})))}catch(e){}
+}
+function closeTab(i){ if(TABS.length<=1){TABS[0]={name:'',slug:'',orig:'',marks:[],loaded:false};switchTab(0);return} TABS.splice(i,1); switchTab(Math.min(CUR,TABS.length-1)); }
+function switchTab(i){ CUR=i; renderTabs(); mountPanes(); }
+
+/* ── 掛載雙欄 ── */
+function mountPanes(){
+  var t=tab(); closeEd();
+  var oh=$('#origHost'), eh=$('#editHost');
+  if(!t||!t.orig){
+    oh.className='empty'; eh.className='empty';
+    oh.innerHTML='<label class="up" onclick="document.getElementById(\'fileIn\').click()">上傳原稿 HTML<br><span style="font-size:11px;color:#5f7286">'+(OFFLINE?'也可以上傳之前「下載編輯後」的檔，標記會原樣回來':'或用上方「從雲端開啟」')+'</span></label>';
+    eh.innerHTML='<div>右側會同步顯示同一份報告<br>點任一段落就能改</div>';
+    $('#pMarks').textContent='—'; return;
+  }
+  oh.className=''; eh.className='';
+  oh.innerHTML='<iframe id="ifO" sandbox="allow-same-origin allow-scripts"></iframe>';
+  eh.innerHTML='<iframe id="ifE" sandbox="allow-same-origin allow-scripts"></iframe>';
+  var fO=$('#ifO'), fE=$('#ifE');
+  fO.srcdoc=t.orig; fE.srcdoc=t.orig;
+  var ready=0; function done(){ if(++ready<2)return; setupPanes(); }
+  fO.onload=done; fE.onload=done;
+}
+function setupPanes(){
+  var t=tab(), dO=$('#ifO').contentDocument, dE=$('#ifE').contentDocument;
+  if(!dO||!dE||!dO.body||!dE.body)return;
+  function css(d,txt){var s=d.createElement('style');s.textContent=txt;d.head.appendChild(s)}
+  css(dO,ORIG_CSS+MARK_CSS); css(dE,MARK_CSS);
+  var nO=indexBlocks(dO), nE=indexBlocks(dE);
+  t.blocks=nE;
+  /* 套回 marks */
+  t.marks.forEach(function(m){paintMark(dE,m)});
+  /* 點擊即編 */
+  dE.body.addEventListener('click',function(ev){
+    var ok=ev.target.closest&&ev.target.closest('.yeb-ok'); if(ok){approve(ok.getAttribute('data-mark'));ev.preventDefault();ev.stopPropagation();return}
+    var el=ev.target.closest&&ev.target.closest('[data-yeb]'); if(!el)return;
+    ev.preventDefault(); ev.stopPropagation(); openEd(el);
+  },true);
+  /* 同步滾動：以「視窗最上緣的段落」對齊 */
+  var wO=$('#ifO').contentWindow, wE=$('#ifE').contentWindow;
+  function sync(from,to){
+    if(SYNC_LOCK)return; SYNC_LOCK=true;
+    try{
+      var fd=from.document, td=to.document, top=null;
+      var els=fd.querySelectorAll('[data-yeb]');
+      for(var i=0;i<els.length;i++){var r=els[i].getBoundingClientRect(); if(r.bottom>0){top=els[i];break}}
+      if(top){ var idx=top.getAttribute('data-yeb'), tgt=td.querySelector('[data-yeb="'+idx+'"]');
+        if(tgt){ var off=top.getBoundingClientRect().top; to.scrollTo(0, tgt.getBoundingClientRect().top + to.scrollY - off); }
+      } else { var r1=fd.documentElement, r2=td.documentElement; to.scrollTo(0,(from.scrollY/(r1.scrollHeight-from.innerHeight||1))*(r2.scrollHeight-to.innerHeight)); }
+    }finally{ setTimeout(function(){SYNC_LOCK=false},30) }
+  }
+  wO.addEventListener('scroll',function(){sync(wO,wE)},{passive:true});
+  wE.addEventListener('scroll',function(){sync(wE,wO)},{passive:true});
+  updPill();
+  if(nO!==nE) toast('兩欄段落數不同（'+nO+'/'+nE+'），對齊可能偏移',1);
+}
+function updPill(){var t=tab(); if(!t)return; var pend=t.marks.filter(function(m){return !m.approved}).length;
+  $('#pMarks').innerHTML='段落 <b>'+(t.blocks||0)+'</b> · 修改 <b>'+t.marks.length+'</b> · 待認可 <b>'+pend+'</b>'; renderTabs();}
+
+/* ── 標記：畫、認可 ── */
+function paintMark(d,m){
+  var el=d.querySelector('[data-yeb="'+m.idx+'"]'); if(!el)return;
+  if(m.approved){ el.innerHTML=esc(m.after); el.classList.remove('yeb-mark'); return; }
+  el.classList.add('yeb-mark');
+  el.innerHTML=diffHtml(m.before,m.after)+'<button class="yeb-ok" data-mark="'+m.id+'" title="認可這一處修改（標記消失、版本確定）">✓ 認可</button>';
+}
+function approve(id){
+  var t=tab(), m=t.marks.find(function(x){return x.id===id}); if(!m)return;
+  m.approved=true; m.approvedAt=new Date().toISOString();
+  paintMark($('#ifE').contentDocument,m); updPill(); saveSoon();
+}
+function applyEdit(el,after,note){
+  var t=tab(), idx=el.getAttribute('data-yeb'), before=el.textContent.replace(/✓ 認可$/,'');
+  var old=t.marks.find(function(x){return x.idx===idx});
+  if(old){ before=old.before; t.marks.splice(t.marks.indexOf(old),1); }   /* 同一段再改：before 維持最初原稿 */
+  if(after===before){ if(old){el.innerHTML=esc(before);el.classList.remove('yeb-mark')} updPill(); saveSoon(); return; }
+  var m={id:'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), idx:idx, tag:el.tagName.toLowerCase(), before:before, after:after, approved:false, at:new Date().toISOString(), note:note||''};
+  t.marks.push(m); paintMark($('#ifE').contentDocument,m); updPill(); saveSoon();
+}
+
+/* ── 點擊即編面板 ── */
+var ED_EL=null;
+function openEd(el){
+  ED_EL=el; var t=tab(), idx=el.getAttribute('data-yeb');
+  var m=t.marks.find(function(x){return x.idx===idx});
+  $('#edLb').textContent='段落 #'+idx+' 〈'+el.tagName.toLowerCase()+'〉'+(m?(m.approved?' · 已認可':' · 待認可'):'');
+  $('#edText').value=m?m.after:el.textContent; $('#edInst').value=''; $('#edStat').textContent='';
+  $('#ed').classList.add('on'); $('#edText').focus();
+}
+function closeEd(){$('#ed').classList.remove('on');ED_EL=null}
+$('#edCancel').onclick=closeEd;
+$('#edApply').onclick=function(){ if(!ED_EL)return; applyEdit(ED_EL,$('#edText').value,'手動'); closeEd(); };
+$('#edAI').onclick=function(){
+  if(!ED_EL)return; var t=tab(), el=ED_EL, idx=el.getAttribute('data-yeb'), d=$('#ifE').contentDocument;
+  var prev=d.querySelector('[data-yeb="'+(idx-1)+'"]'), next=d.querySelector('[data-yeb="'+(+idx+1)+'"]');
+  $('#edStat').textContent='Claude 處理中…'; $('#edAI').disabled=true;
+  api('POST',EP.ai,{text:$('#edText').value, instruction:$('#edInst').value, tag:el.tagName.toLowerCase(), doc:t.name,
+                    context:{prev:prev?prev.textContent.slice(0,300):'', next:next?next.textContent.slice(0,300):''}})
+   .then(function(j){ $('#edAI').disabled=false; if(!j.text){$('#edStat').textContent='沒有回傳';return}
+     applyEdit(el,j.text,'Claude：'+($('#edInst').value||'優化')); closeEd(); toast('已套用，右側紅框處待你認可'); })
+   .catch(function(){ $('#edAI').disabled=false; $('#edStat').textContent='失敗'; });
+};
+
+/* ── 儲存／載入 ── */
+function saveSoon(){clearTimeout(tmrSave);tmrSave=setTimeout(save,600)}
+function save(){ var t=tab(); if(!t||!t.slug)return;
+  if(OFFLINE){ try{localStorage.setItem('yeb-doc-'+t.slug,JSON.stringify({name:t.name,marks:t.marks,orig:t.orig}))}catch(e){toast('本機儲存失敗（檔案太大，請用下載保存進度）',1);return} toast('已存到這台電腦的瀏覽器'); return; }
+  api('POST',EP.docs+'&name='+encodeURIComponent(t.slug)+'&part=state',{state:{name:t.name,marks:t.marks}}).then(function(){toast('已儲存')}); }
+$('#btnSave').onclick=save;
+$('#btnApproveAll').onclick=function(){var t=tab(); if(!t)return; var d=$('#ifE').contentDocument;
+  t.marks.forEach(function(m){if(!m.approved){m.approved=true;m.approvedAt=new Date().toISOString();paintMark(d,m)}}); updPill(); save();};
+$('#btnDel').onclick=function(){var t=tab(); if(!t||!t.slug||!confirm('刪除雲端文件「'+t.name+'」？'))return;
+  api('POST',EP.docs+'&name='+encodeURIComponent(t.slug)+'&del=1').then(function(){toast('已刪除');closeTab(CUR);loadCloudList()});};
+$('#btnDownload').onclick=function(){
+  var t=tab(); if(!t||!t.orig)return;
+  /* 匯出：認可的＝乾淨文字；未認可的＝新文字＋紅慢閃校稿標記（editmark 慣例，交付前要關） */
+  var d=new DOMParser().parseFromString(t.orig,'text/html'); indexBlocks(d);
+  var st=d.createElement('style'); st.textContent=MARK_CSS.split('.yeb-ok').join('.yeb-ok-x'); d.head.appendChild(st);
+  t.marks.forEach(function(m){var el=d.querySelector('[data-yeb="'+m.idx+'"]'); if(!el)return; el.textContent=m.after; if(!m.approved)el.classList.add('yeb-emark');});
+  d.querySelectorAll('[data-yeb]').forEach(function(e){e.removeAttribute('data-yeb')});
+  /* 進度隨檔案走：把 marks 藏在檔尾，上傳回編輯器時原樣還原（複製到另一台電腦也能接著改） */
+  var keep=d.createElement('script'); keep.type='application/json'; keep.id='yeb-marks';
+  keep.textContent=JSON.stringify({name:t.name,marks:t.marks}).split('</').join('<\\/'); d.body.appendChild(keep);
+  var html='<!doctype html>\n'+d.documentElement.outerHTML;
+  var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html'})); a.download=(t.name||'report')+'.edited.html'; a.click();
+};
+$('#fileIn').onchange=function(){
+  var f=this.files[0]; if(!f)return; var rd=new FileReader();
+  rd.onload=function(){ var html=String(rd.result), name=f.name.replace(/\.edited\.html$|\.html?$/i,''), t=tab(), marks=[];
+    if(!t){TABS.push({name:'',slug:'',orig:'',marks:[]});CUR=TABS.length-1;t=tab()}
+    /* 這是編輯器匯出的檔？把原稿與標記還原回來 */
+    var mm=html.match(/<script type="application\/json" id="yeb-marks">([\s\S]*?)<\/script>/);
+    if(mm){ try{ var saved=JSON.parse(mm[1].split('<\\/').join('</')); marks=saved.marks||[]; name=saved.name||name;
+        var d=new DOMParser().parseFromString(html,'text/html'); d.getElementById('yeb-marks').remove();
+        d.querySelectorAll('.yeb-emark').forEach(function(e){e.classList.remove('yeb-emark')});
+        indexBlocks(d); marks.forEach(function(k){var el=d.querySelector('[data-yeb="'+k.idx+'"]'); if(el)el.textContent=k.before;});
+        d.querySelectorAll('[data-yeb]').forEach(function(e){e.removeAttribute('data-yeb')});
+        html='<!doctype html>\n'+d.documentElement.outerHTML; toast('已還原 '+marks.length+' 處標記'); }catch(e){} }
+    t.name=name; t.slug=name; t.orig=html; t.marks=marks; t.loaded=true; renderTabs(); mountPanes();
+    if(OFFLINE){ save(); return; }
+    toast('上傳到雲端中…'); api('POST',EP.docs+'&name='+encodeURIComponent(name)+'&part=original',{html:html,name:name},true)
+      .then(function(){ if(marks.length)return save(); }).then(function(){toast('原稿已存雲端');loadCloudList()}); };
+  rd.readAsText(f,'utf-8'); this.value='';
+};
+function loadCloudList(){ return api('GET',EP.docs).then(function(j){
+  $('#cloudSel').innerHTML='<option value="">— 雲端文件 —</option>'+(j.docs||[]).map(function(d){return '<option value="'+esc(d.slug)+'">'+esc(d.slug)+'（'+d.kb+'KB）</option>'}).join(''); return j.docs||[]; }); }
+function openCloud(slug, intoNew){
+  if(!slug)return;
+  var t=tab(); if(intoNew||!t||t.orig){TABS.push({name:'',slug:'',orig:'',marks:[]});CUR=TABS.length-1;t=tab()}
+  toast('載入 '+slug+'…');
+  Promise.all([fetch(EP.docs+'&name='+encodeURIComponent(slug)+'&part=original').then(function(r){return r.text()}),
+               api('GET',EP.docs+'&name='+encodeURIComponent(slug)+'&part=state')])
+   .then(function(r){ t.orig=r[0]; t.slug=slug; t.name=r[1].name||slug; t.marks=r[1].marks||[]; t.loaded=true; renderTabs(); mountPanes(); });
+}
+$('#btnOpen').onclick=function(){openCloud($('#cloudSel').value,false)};
+$('#cloudSel').onchange=function(){openCloud(this.value,false)};
+
+/* ── 啟動：至少三個分頁；記得上次開的 ── */
+if(OFFLINE){
+  ['#btnOpen','#cloudSel','#btnDel','#edAI','#edInst'].forEach(function(q){var e=$(q); if(e)e.style.display='none'});
+  var keys=[]; try{for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i); if(k.indexOf('yeb-doc-')===0)keys.push(k.slice(8))}}catch(e){}
+  keys.slice(0,3).forEach(function(slug){ try{var d=JSON.parse(localStorage.getItem('yeb-doc-'+slug)); TABS.push({name:d.name,slug:slug,orig:d.orig,marks:d.marks||[],loaded:true})}catch(e){} });
+  while(TABS.length<3)TABS.push({name:'',slug:'',orig:'',marks:[]});
+  switchTab(0); setTimeout(function(){toast('離線模式：手動改、標記、認可、下載都可以；「用 Claude 改」與雲端要從 Vercel 開')},400);
+}
+else{
+  var remembered=[]; try{remembered=JSON.parse(localStorage.getItem('yeb-tabs')||'[]')}catch(e){}
+  while(TABS.length<3)TABS.push({name:'',slug:'',orig:'',marks:[]});
+  switchTab(0);
+  loadCloudList().then(function(docs){
+    var have={}; docs.forEach(function(d){have[d.slug]=1});
+    remembered.filter(function(s){return s&&have[s]}).slice(0,3).forEach(function(s,i){CUR=i;openCloud(s,false)});
+    if(remembered.length)setTimeout(function(){switchTab(0)},300);
+  });
+}
+</script></body></html>
