@@ -29,8 +29,7 @@ async function readJson(name) {
   try {
     const r = await get(PREFIX + name + '.json', { access: 'private' });
     if (!r) return null;
-    const txt = typeof r.text === 'function' ? await r.text() : String(r.body || '');
-    return JSON.parse(txt);
+    return JSON.parse(await new Response(r.stream).text());   // get() 回 { stream }
   } catch (e) {
     return null;
   }

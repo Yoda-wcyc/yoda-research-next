@@ -41,7 +41,7 @@ export async function GET(req) {
     try { r = await get(PREFIX + name, { access: 'private' }); } catch (e) { r = null; }
     if (!r) { try { r = await get(blobPath(name), { access: 'private' }); } catch (e) { r = null; } }   // 已發佈的付費報告
     if (!r) return new Response('找不到：' + name, { status: 404 });
-    const html = typeof r.text === 'function' ? await r.text() : String(r.body || '');
+    const html = await new Response(r.stream).text();   // get() 回 { stream }
     return new Response(html, {
       headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
     });
