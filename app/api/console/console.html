@@ -1945,6 +1945,11 @@ function twTime(v){
 }
 /* 排序用的時間戳；沒有或解析不了回 0（排到最後）*/
 function upTs(v){ if(!v) return 0; var d=new Date(v); return isNaN(d.getTime())?0:d.getTime(); }
+/* 檔名裡的報告日期（排序的唯一依據 · Yoda 2026-09-04 指定）。
+   取 reportId 最後一組 8 位數字：付費_美股分析_20260904 → 20260904。
+   為什麼不用上傳時間：補傳、重傳、改版都會讓上傳時間亂跳，畫面順序就跟檔名日期對不上；
+   讀者與 Yoda 認的是「報告是哪一天的」，不是「什麼時候傳的」。取不到日期回 0（排最後）。*/
+function nameDate(id){ var m=String(id||'').match(/\d{8}/g); return m?parseInt(m[m.length-1],10):0; }
 /* reportId → 好讀短標題（去付費_前綴、底線轉空白）*/
 function prettyPaidTitle(id){ return String(id).replace(/\.html?$/i,'').replace(/^付費[_-]?/,'').replace(/_/g,' '); }
 /* Drive 付費檔清單：直接列出所有付費檔，每筆自帶【寄通知】（不靠 reports.json 比對）*/
@@ -1954,9 +1959,11 @@ function renderPaidFiles(pd){
   if(pd&&pd.ok===false){ box.innerHTML='<tr><td colspan="5"><div class="empty">讀取失敗：'+escH(pd.error||'unknown action（GAS 可能尚未部署新版本）')+'</div></td></tr>'; return; }
   if(!paidFiles.length){ box.innerHTML='<tr><td colspan="5"><div class="empty">Drive 目前沒有付費檔</div></td></tr>'; return; }
   box.innerHTML=paidFiles.slice().sort(function(a,b){
-    var ta=upTs(a.updated), tb=upTs(b.updated);
-    if(ta!==tb) return tb-ta;                                      // 最後更新（實際上傳時間）降序：新→舊
-    return String(b.reportId).localeCompare(String(a.reportId));   // 沒有時間戳才退回 reportId 降序
+    var da=nameDate(a.reportId), db=nameDate(b.reportId);
+    if(da!==db) return db-da;                                      // ① 檔名日期降序：新→舊
+    var r=String(b.reportId).localeCompare(String(a.reportId));
+    if(r!==0) return r;                                            // ② 同一天：reportId 降序，順序固定
+    return upTs(b.updated)-upTs(a.updated);                        // ③ 最後才看上傳時間
   }).map(function(x){
     var up=twTime(x.updated);
     var sc=x.sentCount||0, at=(x.activeTotal!=null?x.activeTotal:0), un=(x.unsentCount!=null?x.unsentCount:Math.max(0,at-sc));
