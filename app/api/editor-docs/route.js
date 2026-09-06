@@ -56,9 +56,9 @@ export async function GET(req) {
       }
       return J({ docs: Object.values(docs).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) });
     }
-    if (part === 'original') {
-      const html = await readText(PREFIX + slug + '/original.html');
-      if (html === null) return new Response('找不到原稿：' + slug, { status: 404 });
+    if (part === 'original' || part === 'final') {
+      const html = await readText(PREFIX + slug + '/' + part + '.html');
+      if (html === null) return new Response('找不到' + (part === 'final' ? '定稿' : '原稿') + '：' + slug, { status: 404 });
       return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } });
     }
     const txt = await readText(PREFIX + slug + '/state.json');
@@ -97,6 +97,12 @@ export async function POST(req) {
       const state = { slug, name: body.name || slug, updatedAt: new Date().toISOString(), marks: [] };
       await put(PREFIX + slug + '/state.json', JSON.stringify(state), { ...OPTS, contentType: 'application/json; charset=utf-8' });
       return J({ ok: true, slug, bytes: html.length });
+    }
+    if (part === 'final') {   // 雲端定稿：先存 Blob，回本機 `python Skill/yoda_tokens.py publish <slug>` 落地（存 reports\ → 閘門 → 推 Blob）
+      const html = String(body.html || '');
+      if (!html) return J({ error: '缺少 html' }, 400);
+      await put(PREFIX + slug + '/final.html', html, { ...OPTS, contentType: 'text/html; charset=utf-8' });
+      return J({ ok: true, slug, bytes: html.length, next: 'python "G:\\Yoda x Claude\\Skill\\yoda_tokens.py" publish --token <CONSOLE_TOKEN> ' + slug });
     }
     const state = body.state || body;
     state.slug = slug; state.updatedAt = new Date().toISOString();

@@ -72,6 +72,13 @@ select,input[type=text]{background:#131a25;color:#c9d6e4;border:1px solid #26324
 .cnode.over-after{box-shadow:0 3px 0 0 #2f6fb5}
 .cnode.moved>.row .ttl::after{content:' ↕';color:#ffc37a}
 .cv .empty2{color:#5f7286;padding:30px;text-align:center;line-height:1.8}
+#ruleDlg{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:98}
+#ruleDlg.on{display:flex}
+#ruleDlg .box{background:#0e131c;border:1px solid #2f6fb5;border-radius:8px;padding:16px;width:520px;max-width:92vw}
+#ruleDlg h3{margin:0 0 10px;font-size:14px;color:#e6eef8}
+#ruleDlg label{display:block;margin:8px 0 4px;font-size:11.5px;color:#7f93a8}
+#ruleDlg input[type=text],#ruleDlg textarea{width:100%;background:#0b0f16;color:#e6eef8;border:1px solid #263242;border-radius:5px;padding:7px;font:13px/1.6 inherit}
+#ruleDlg .row{display:flex;gap:6px;margin-top:12px;justify-content:flex-end}
 #toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#16283d;border:1px solid #2f6fb5;color:#dbe8f6;padding:9px 16px;border-radius:6px;font-size:12.5px;z-index:99;display:none;max-width:80vw}
 #toast.bad{background:#2a1519;border-color:#7a3040;color:#ffbcbc}
 .warnbox{background:#2a1519;border:1px solid #7a3040;color:#ffbcbc;padding:11px 13px;border-radius:6px;margin:14px;font-size:12.5px;line-height:1.7}
@@ -92,7 +99,7 @@ code{font:11.5px ui-monospace,Consolas,monospace;background:#131a25;padding:1px 
   <input type="file" id="fileIn" accept=".html,.htm" style="display:none">
   <span class="pill" id="pMarks">—</span>
   <span class="sp"></span>
-  <button id="btnApproveAll" class="ok">全部認可</button>
+  <button id="btnReview">AI 先審一輪</button><button id="btnApproveAll" class="ok">全部認可</button>
   <button id="btnDownload">下載編輯後 HTML</button>
   <button id="btnSave" class="pri">儲存</button>
   <button id="btnDel" class="danger">刪除此文件</button>
@@ -116,6 +123,11 @@ code{font:11.5px ui-monospace,Consolas,monospace;background:#131a25;padding:1px 
       <label style="display:block;margin:6px 0"><input type="checkbox" id="oCarry" checked> 把進度藏進檔尾（複製到另一台電腦上傳回來可接著改）</label>
       <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap"><button id="oDownload" class="pri">下載這份</button><button id="oDownloadAll">下載所有分頁</button><button id="oSave">存雲端／本機進度</button></div>
       <div id="oStat" class="hint" style="margin-top:12px"></div>
+      <div class="lb" style="font:700 11px/1 ui-monospace,monospace;color:#5f7286;letter-spacing:.08em;margin:22px 0 10px">定稿發佈（跑閘門 → 存進 reports\ → 推 Blob）</div>
+      <label style="display:block;margin:6px 0">報告類型　<select id="pKind"><option value="paid">付費（付費_ 前綴）</option><option value="free">免費（免費_ 前綴）</option></select></label>
+      <label style="display:block;margin:6px 0"><input type="checkbox" id="pForce"> spec_check 有 FAIL 也硬推（平常不要勾）</label>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button id="pGo" class="pri">定稿發佈</button><span class="hint" id="pStat">本機工作台需要 token_server 在跑（python Skill\token_server.py）；雲端版會先把定稿存到雲端，再回本機一行指令落地</span></div>
+      <pre id="pLog" style="white-space:pre-wrap;font:11px/1.6 ui-monospace,Consolas,monospace;color:#8fa6bd;background:#0b0f16;border:1px solid #1e2836;border-radius:5px;padding:9px;max-height:260px;overflow:auto;margin-top:9px;display:none"></pre>
     </div>
   </div>
   <div class="pane orig"><div class="hd">原稿（唯讀・對照基準）</div><div id="origHost" class="empty"></div></div>
@@ -133,6 +145,12 @@ code{font:11.5px ui-monospace,Consolas,monospace;background:#131a25;padding:1px 
     </div>
   </div>
 </div>
+<div id="ruleDlg"><div class="box"><h3>把這個改法變成規則</h3>
+  <label>規則種類</label><select id="rlType" style="width:100%"><option value="replace">用字替換（匯入時自動換掉，綠色標記）</option><option value="ban">禁用詞（spec_check 擋；匯入時標旗待改）</option><option value="writing">寫法規則（Claude 改段落時遵守）</option></select>
+  <div id="rlPair"><label>原本</label><input type="text" id="rlFrom"><label>改成</label><input type="text" id="rlTo"></div>
+  <div id="rlText" style="display:none"><label>規則（一句話）</label><textarea id="rlWriting" rows="3"></textarea></div>
+  <label>備註（選填）</label><input type="text" id="rlNote">
+  <div class="row"><button id="rlCancel">取消</button><button id="rlSave" class="pri">存成規則</button></div></div></div>
 <div id="toast"></div>
 
 <script>
@@ -143,7 +161,12 @@ code{font:11.5px ui-monospace,Consolas,monospace;background:#131a25;padding:1px 
    ═══════════════════════════════════════════════════════════════════ */
 var $=function(s){return document.querySelector(s)};
 var KEY=new URLSearchParams(location.search).get('k')||'';
-var EP={docs:'/api/editor-docs?k='+encodeURIComponent(KEY), ai:'/api/editor-ai?k='+encodeURIComponent(KEY)};
+var EP={docs:'/api/editor-docs?k='+encodeURIComponent(KEY), ai:'/api/editor-ai?k='+encodeURIComponent(KEY), rules:'/api/editor-rules?k='+encodeURIComponent(KEY)};
+var LOCAL='http://localhost:8777';   /* 本機 token_server：規則、定稿發佈（file:// 開的工作台也能打，伺服器有開 CORS） */
+var RULES={replace:[],ban:[],writing:[]}, LOCAL_UP=false;
+function rulesUrl(){ return OFFLINE? LOCAL+'/api/rules' : EP.rules; }
+function loadRules(){ return fetch(rulesUrl()).then(function(r){return r.json()}).then(function(j){ RULES={replace:j.replace||[],ban:j.ban||[],writing:j.writing||[]}; if(OFFLINE)LOCAL_UP=true; return RULES; }).catch(function(){ return RULES; }); }
+function saveRules(){ return fetch(rulesUrl(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(RULES)}).then(function(r){return r.json()}); }
 var TABS=[], CUR=-1, tmrSave=null, SYNC_LOCK=false;
 var OFFLINE=(location.protocol==='file:');
 var MODE='editor';   /* 'canvas' | 'editor' */
@@ -180,6 +203,11 @@ var MARK_CSS='.yeb-mark{position:relative;outline:2px solid rgba(255,80,80,.85);
  '.yeb-ins{background:rgba(80,220,140,.22);color:#9af0c0;padding:0 2px;border-radius:2px}'+
  '.yeb-ok{position:absolute;top:-10px;right:-10px;z-index:9999;font:700 11px/1 -apple-system,sans-serif;background:#1f7a4a;color:#fff;border:0;border-radius:11px;padding:4px 8px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.4)}'+
  '.yeb-ok:hover{background:#2a9a5f}'+
+ '.yeb-no{position:absolute;top:-10px;right:64px;z-index:9999;font:700 11px/1 -apple-system,sans-serif;background:#5a2630;color:#ffbcbc;border:0;border-radius:11px;padding:4px 8px;cursor:pointer}'+
+ '.yeb-rule{position:absolute;top:-10px;right:120px;z-index:9999;font:700 11px/1 -apple-system,sans-serif;background:#2a3a55;color:#cfe0ff;border:0;border-radius:11px;padding:4px 8px;cursor:pointer}'+
+ '.yeb-note{display:block;font:11px/1.4 -apple-system,sans-serif;color:#ffc37a;margin-top:4px}'+
+ '.yeb-auto{outline:2px solid rgba(80,220,140,.7);outline-offset:2px;border-radius:3px}'+
+ '.yeb-auto .yeb-ok{background:#1f6a4a}'+
  '[data-yeb]{cursor:text}[data-yeb]:hover{outline:1px dashed rgba(127,159,198,.7);outline-offset:2px}'+
  '.yeb-emark{outline:2px solid #ff3b3b;outline-offset:2px;animation:yebBlink 1.6s ease-in-out infinite}';
 var ORIG_CSS='body{user-select:text}';   /* 唯讀靠事件攔截（見 setupPanes），不用 pointer-events：那會讓滾輪捲不動內層容器 */
@@ -247,11 +275,14 @@ function setupPanes(){
   /* 套回 marks */
   t.marks.forEach(function(m){paintMark(dE,m)});
   replayMoves(dE, t.moves||[]);
+  autofix(t, dE);
   if(t.style)applyStyleTo(dE, t.style);
   if(MODE==='canvas')renderCanvas(); if(MODE==='style')renderStyleTab(); if(MODE==='output')renderOutTab();
   /* 點擊即編 */
   dE.body.addEventListener('click',function(ev){
     var ok=ev.target.closest&&ev.target.closest('.yeb-ok'); if(ok){approve(ok.getAttribute('data-mark'));ev.preventDefault();ev.stopPropagation();return}
+    var no=ev.target.closest&&ev.target.closest('.yeb-no'); if(no){reject(no.getAttribute('data-mark'));ev.preventDefault();ev.stopPropagation();return}
+    var ru=ev.target.closest&&ev.target.closest('.yeb-rule'); if(ru){openRuleDlg(ru.getAttribute('data-mark'));ev.preventDefault();ev.stopPropagation();return}
     var el=ev.target.closest&&ev.target.closest('[data-yeb]'); if(!el)return;
     ev.preventDefault(); ev.stopPropagation(); openEd(el);
   },true);
@@ -294,13 +325,28 @@ function updPill(){var t=tab(); if(!t)return; var pend=t.marks.filter(function(m
 /* ── 標記：畫、認可 ── */
 function paintMark(d,m){
   var el=d.querySelector('[data-yeb="'+m.idx+'"]'); if(!el)return;
-  if(m.approved){ el.innerHTML=esc(m.after); el.classList.remove('yeb-mark'); return; }
+  el.classList.remove('yeb-mark','yeb-auto');
+  if(m.approved&&m.auto&&!m.seen){   /* 匯入時自動修：綠框，預設已認可；✕ 退回 */
+    el.classList.add('yeb-auto');
+    el.innerHTML=diffHtml(m.before,m.after)+'<button class="yeb-no" data-mark="'+m.id+'" title="退回這個自動修改">✕ 退回</button><button class="yeb-ok" data-mark="'+m.id+'" title="知道了，隱藏綠框">✓</button>'+(m.note?'<span class="yeb-note">'+esc(m.note)+'</span>':'');
+    return;
+  }
+  if(m.approved){ el.innerHTML=esc(m.after); return; }
   el.classList.add('yeb-mark');
-  el.innerHTML=diffHtml(m.before,m.after)+'<button class="yeb-ok" data-mark="'+m.id+'" title="認可這一處修改（標記消失、版本確定）">✓ 認可</button>';
+  el.innerHTML=diffHtml(m.before,m.after)+
+    '<button class="yeb-rule" data-mark="'+m.id+'" title="把這個改法存成規則，以後自動">規則</button>'+
+    '<button class="yeb-no" data-mark="'+m.id+'" title="退回：恢復原文、拿掉標記">✕ 退回</button>'+
+    '<button class="yeb-ok" data-mark="'+m.id+'" title="認可這一處修改（標記消失、版本確定）">✓ 認可</button>'+
+    (m.note?'<span class="yeb-note">'+esc(m.note)+'</span>':'');
+}
+function reject(id){
+  var t=tab(), m=t.marks.find(function(x){return x.id===id}); if(!m)return;
+  var el=$('#ifE').contentDocument.querySelector('[data-yeb="'+m.idx+'"]'); if(el){el.innerHTML=esc(m.before);el.classList.remove('yeb-mark','yeb-auto')}
+  t.marks.splice(t.marks.indexOf(m),1); updPill(); saveSoon();
 }
 function approve(id){
   var t=tab(), m=t.marks.find(function(x){return x.id===id}); if(!m)return;
-  m.approved=true; m.approvedAt=new Date().toISOString();
+  m.approved=true; m.seen=true; m.approvedAt=new Date().toISOString();
   paintMark($('#ifE').contentDocument,m); updPill(); saveSoon();
 }
 function applyEdit(el,after,note){
@@ -311,6 +357,75 @@ function applyEdit(el,after,note){
   var m={id:'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), idx:idx, tag:el.tagName.toLowerCase(), before:before, after:after, approved:false, at:new Date().toISOString(), note:note||''};
   t.marks.push(m); paintMark($('#ifE').contentDocument,m); updPill(); saveSoon();
 }
+
+/* ── B：匯入自動修 —— 不需要判斷的修正不經人（綠框、預設已認可、可退回）；禁用詞只標旗 ── */
+function autofix(t, d){
+  if(t.autofixed)return; t.autofixed=true;
+  var done={}; (t.marks||[]).forEach(function(m){done[m.idx]=1});
+  var made=0, flagged=0;
+  d.querySelectorAll('[data-yeb]').forEach(function(el){
+    var idx=el.getAttribute('data-yeb'); if(done[idx])return;
+    var before=el.textContent, after=before, notes=[];
+    RULES.replace.forEach(function(r){ if(r.from&&after.indexOf(r.from)>=0){ after=after.split(r.from).join(r.to||''); notes.push('「'+r.from+'」→「'+(r.to||'')+'」'); } });
+    if(after!==before){ var m={id:'a'+Date.now().toString(36)+(made++), idx:idx, tag:el.tagName.toLowerCase(), before:before, after:after, approved:true, auto:true, at:new Date().toISOString(), note:'自動修：'+notes.join('、')}; t.marks.push(m); paintMark(d,m); return; }
+    var hit=RULES.ban.map(function(b){return typeof b==='string'?b:b.word}).filter(function(w){return w&&before.indexOf(w)>=0});
+    if(hit.length){ var f={id:'f'+Date.now().toString(36)+(flagged++), idx:idx, tag:el.tagName.toLowerCase(), before:before, after:before, approved:false, at:new Date().toISOString(), note:'禁用詞：'+hit.join('、')+'（請改寫）'}; t.marks.push(f); paintMark(d,f); }
+  });
+  if(made||flagged){ updPill(); saveSoon(); toast('匯入自動修 '+made+' 處（綠框）'+(flagged?'、禁用詞標旗 '+flagged+' 處':'')); }
+}
+/* ── B：變成規則 ── */
+var RULE_MARK=null;
+function openRuleDlg(id){
+  var t=tab(), m=t.marks.find(function(x){return x.id===id}); if(!m)return; RULE_MARK=m;
+  var dl=diff(m.before,m.after), from=dl.filter(function(x){return x[0]==='del'}).map(function(x){return x[1]}).join('').trim(), to=dl.filter(function(x){return x[0]==='ins'}).map(function(x){return x[1]}).join('').trim();
+  $('#rlType').value='replace'; $('#rlFrom').value=from; $('#rlTo').value=to; $('#rlWriting').value=(m.note||'').replace(/^(Claude：|AI審：)/,''); $('#rlNote').value='';
+  $('#rlType').onchange(); $('#ruleDlg').classList.add('on');
+}
+$('#rlType').onchange=function(){ var v=$('#rlType').value; $('#rlPair').style.display=v==='writing'?'none':''; $('#rlTo').parentNode.style.display=''; if(v==='ban')$('#rlTo').style.display='none'; else $('#rlTo').style.display=''; $('#rlText').style.display=v==='writing'?'':'none'; };
+$('#rlCancel').onclick=function(){$('#ruleDlg').classList.remove('on')};
+$('#rlSave').onclick=function(){
+  var v=$('#rlType').value, at=new Date().toISOString(), note=$('#rlNote').value;
+  if(v==='replace'){ if(!$('#rlFrom').value){toast('「原本」不能空',1);return} RULES.replace.push({from:$('#rlFrom').value,to:$('#rlTo').value,note:note,at:at}); }
+  else if(v==='ban'){ if(!$('#rlFrom').value){toast('「原本」不能空',1);return} RULES.ban.push({word:$('#rlFrom').value,note:note,at:at}); }
+  else { if(!$('#rlWriting').value.trim()){toast('規則不能空',1);return} RULES.writing.push({text:$('#rlWriting').value.trim(),note:note,at:at}); }
+  saveRules().then(function(j){ $('#ruleDlg').classList.remove('on'); toast('規則已存（替換 '+RULES.replace.length+' · 禁用 '+RULES.ban.length+' · 寫法 '+RULES.writing.length+'）'); })
+    .catch(function(){ toast(OFFLINE?'存不進去：本機 token_server 沒開':'存規則失敗',1); });
+};
+/* ── C：AI 先審一輪 —— 發現變成待認可標記（附改好的版本），你只按 ✓ ✗ ── */
+$('#btnReview').onclick=function(){
+  var t=tab(); if(!t||!t.orig)return; if(OFFLINE){toast('離線模式沒有 Claude；從 Vercel 開這頁',1);return}
+  var d=$('#ifE').contentDocument, done={}; (t.marks||[]).forEach(function(m){done[m.idx]=1});
+  var blocks=[].map.call(d.querySelectorAll('[data-yeb]'),function(el){return {idx:el.getAttribute('data-yeb'),tag:el.tagName.toLowerCase(),text:el.textContent.trim()}}).filter(function(b){return b.text.length>=12&&!done[b.idx]});
+  if(!blocks.length){toast('沒有可審的段落');return}
+  var chunks=[]; for(var i=0;i<blocks.length;i+=90)chunks.push(blocks.slice(i,i+90));
+  var chars=blocks.reduce(function(a,b){return a+b.text.length},0);
+  if(!confirm('送 '+blocks.length+' 段（約 '+Math.round(chars/1000)+' 千字，分 '+chunks.length+' 批）給 Claude 先審一輪？'))return;
+  var total=0, btn=this; btn.disabled=true;
+  (function next(i){
+    if(i>=chunks.length){ btn.disabled=false; updPill(); saveSoon(); toast('AI 審完：'+total+' 處待你認可'); return; }
+    toast('Claude 審第 '+(i+1)+'/'+chunks.length+' 批…');
+    api('POST',EP.ai,{mode:'review',doc:t.name,part:i+1,blocks:chunks[i]}).then(function(j){
+      (j.findings||[]).forEach(function(f){ var el=d.querySelector('[data-yeb="'+f.idx+'"]'); if(!el||done[f.idx])return; done[f.idx]=1;
+        var before=el.textContent, after=(f.proposal&&f.proposal.trim())||before;
+        var m={id:'r'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), idx:String(f.idx), tag:el.tagName.toLowerCase(), before:before, after:after, approved:false, at:new Date().toISOString(), note:'AI審：'+(f.issue||'')};
+        t.marks.push(m); paintMark(d,m); total++; });
+      next(i+1);
+    }).catch(function(){ btn.disabled=false; toast('第 '+(i+1)+' 批失敗，已停',1); });
+  })(0);
+};
+/* ── ④ 定稿發佈：閘門 → reports\ → Blob（本機 token_server 做）；雲端版先存定稿再回本機落地 ── */
+$('#pGo').onclick=function(){
+  var t=tab(); if(!t||!t.orig)return;
+  var pend=(t.marks||[]).filter(function(m){return !m.approved}).length;
+  if(pend&&!confirm('還有 '+pend+' 處未認可，視同全部認可後發佈？'))return;
+  var html=exportHtml(t,{withStyle:$('#oStyle').checked,keepMarks:false,carry:false}), log=$('#pLog'); log.style.display=''; log.textContent='發佈中…';
+  var kind=$('#pKind').value, force=$('#pForce').checked;
+  var go = OFFLINE
+    ? fetch(LOCAL+'/api/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:t.name,html:html,kind:kind,force:force})}).then(function(r){return r.json()})
+    : api('POST',EP.docs+'&name='+encodeURIComponent(t.slug||t.name)+'&part=final',{html:html},true).then(function(j){ return {ok:true,message:'定稿已存雲端（'+Math.round(j.bytes/1024)+'KB）。回本機執行：\n'+j.next+'\n（存 reports\\ → 閘門 → 推 Blob）'} });
+  go.then(function(r){ log.textContent=(r.message||'')+(r.gate?'\n\n── spec_check ──\n'+r.gate.log:''); toast(r.ok?'定稿流程完成':'定稿未完成，看紀錄',!r.ok); })
+    .catch(function(e){ log.textContent='失敗：'+(OFFLINE?'本機 token_server 沒開（python Skill\\token_server.py）':e.message); });
+};
 
 /* ── 點擊即編面板 ── */
 var ED_EL=null;
@@ -521,12 +636,12 @@ if(OFFLINE){
   var keys=[]; try{for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i); if(k.indexOf('yeb-doc-')===0)keys.push(k.slice(8))}}catch(e){}
   keys.slice(0,3).forEach(function(slug){ try{var d=JSON.parse(localStorage.getItem('yeb-doc-'+slug)); TABS.push({name:d.name,slug:slug,orig:d.orig,marks:d.marks||[],moves:d.moves||[],gists:d.gists||{},style:d.style||'',loaded:true})}catch(e){} });
   while(TABS.length<3)TABS.push({name:'',slug:'',orig:'',marks:[]});
-  switchTab(0); try{setMode(localStorage.getItem('yeb-mode')||'editor')}catch(e){} setTimeout(function(){toast('離線模式：手動改、標記、認可、下載都可以；「用 Claude 改」與雲端要從 Vercel 開')},400);
+  loadRules(); switchTab(0); try{setMode(localStorage.getItem('yeb-mode')||'editor')}catch(e){} setTimeout(function(){toast('離線模式：手動改、標記、認可、下載都可以；「用 Claude 改」與雲端要從 Vercel 開')},400);
 }
 else{
   var remembered=[]; try{remembered=JSON.parse(localStorage.getItem('yeb-tabs')||'[]')}catch(e){}
   while(TABS.length<3)TABS.push({name:'',slug:'',orig:'',marks:[]});
-  switchTab(0); try{setMode(localStorage.getItem('yeb-mode')||'editor')}catch(e){}
+  loadRules(); switchTab(0); try{setMode(localStorage.getItem('yeb-mode')||'editor')}catch(e){}
   loadCloudList().then(function(docs){
     var have={}; docs.forEach(function(d){have[d.slug]=1});
     remembered.filter(function(s){return s&&have[s]}).slice(0,3).forEach(function(s,i){CUR=i;openCloud(s,false)});
