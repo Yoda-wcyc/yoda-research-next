@@ -52,6 +52,7 @@ body.dragging iframe{pointer-events:none}
 .ed{position:absolute;left:0;right:0;bottom:0;background:#0e131c;border-top:2px solid #2f6fb5;padding:10px 12px;display:none;box-shadow:0 -8px 24px rgba(0,0,0,.4)}
 .ed.on{display:block}
 .ed .lb{font:700 10.5px/1 ui-monospace,monospace;color:#5f7286;letter-spacing:.08em;margin-bottom:6px}
+.ed .fldlb{font-size:11.5px;color:#7f9fc6;margin:8px 0 3px}
 .ed textarea{width:100%;min-height:76px;background:#0b0f16;color:#e6eef8;border:1px solid #263242;border-radius:5px;padding:8px;font:14px/1.7 inherit;resize:vertical}
 .ed input[type=text]{width:100%;margin-top:6px}
 .ed .row{display:flex;gap:6px;margin-top:8px;align-items:center}
@@ -158,11 +159,13 @@ code{font:11.5px ui-monospace,Consolas,monospace;background:#131a25;padding:1px 
   <div class="pane edit"><div class="hd"><span id="hdE">編輯（點任一段落即可修改）</span><span class="wc" id="wcE"></span></div><div id="editHost" class="empty"></div>
     <div class="ed" id="ed">
       <div class="lb" id="edLb">段落</div>
+      <div class="fldlb">① 段落內文（自己改就改這裡，改完按「直接套用」）</div>
       <textarea id="edText"></textarea>
-      <input type="text" id="edInst" placeholder="給 Claude 的指示（可留空：例如「改成因果鍊寫法」「壓到 60 字」「口語一點」）">
+      <div class="fldlb">② 給 Claude 的指示（不要打在上面那格）——例如「縮短到 50 字」「口語一點」「改成因果鍊寫法」</div>
+      <input type="text" id="edInst" placeholder="縮短到 50 字 / 口語一點 / 改成因果鍊寫法（留空＝依規範優化）">
       <div class="row">
-        <button id="edApply" class="pri">直接套用</button>
-        <button id="edAI">交給 Claude 修改</button>
+        <button id="edApply" class="pri">直接套用（用上面①的內文）</button>
+        <button id="edAI">交給 Claude 修改（照②的指示）</button>
         <button id="edCancel">取消</button>
         <span class="sp" id="edStat"></span>
       </div>
@@ -547,11 +550,12 @@ $('#pGo').onclick=function(){
 
 /* ── 點擊即編面板 ── */
 var ED_EL=null;
+var ED_ORIG='';
 function openEd(el){
   ED_EL=el; var t=tab(), idx=el.getAttribute('data-yeb');
   var m=t.marks.find(function(x){return x.idx===idx});
   $('#edLb').textContent='段落 #'+idx+' 〈'+el.tagName.toLowerCase()+'〉'+(m?(m.approved?' · 已認可':' · 待認可'):'');
-  $('#edText').value=m?m.after:el.textContent; $('#edInst').value=''; $('#edStat').textContent='';
+  $('#edText').value=m?m.after:el.textContent; ED_ORIG=$('#edText').value; $('#edInst').value=''; $('#edStat').textContent='';
   $('#ed').classList.add('on'); $('#edText').focus();
 }
 function closeEd(){$('#ed').classList.remove('on');ED_EL=null}
@@ -560,11 +564,18 @@ $('#edApply').onclick=function(){ if(!ED_EL)return; applyEdit(ED_EL,$('#edText')
 $('#edAI').onclick=function(){
   if(!ED_EL)return; var t=tab(), el=ED_EL, idx=el.getAttribute('data-yeb'), d=$('#ifE').contentDocument;
   var prev=d.querySelector('[data-yeb="'+(idx-1)+'"]'), next=d.querySelector('[data-yeb="'+(+idx+1)+'"]');
-  $('#edStat').textContent='Claude 處理中…'; $('#edAI').disabled=true;
-  api('POST',aiUrl(),{text:$('#edText').value, instruction:$('#edInst').value, tag:el.tagName.toLowerCase(), doc:t.name,
+  /* 指示打進內文框：原本會把那句指示送去潤飾，整段內容被吃掉。認出來，當成指示、改原文 */
+  var body=$('#edText').value, inst=$('#edInst').value, note='';
+  if(body!==ED_ORIG && !inst.trim() && body.trim().length<=60 && ED_ORIG.length>=body.trim().length*2){
+    inst=body.trim(); body=ED_ORIG; $('#edInst').value=inst; $('#edText').value=ED_ORIG;
+    note='（把你在內文框打的「'+inst.slice(0,20)+'」當成指示，改的是原本那段）';
+    toast('你把指示打在內文框了，我當成指示處理'+note,1);
+  }
+  $('#edStat').textContent='Claude 處理中…'+note; $('#edAI').disabled=true;
+  api('POST',aiUrl(),{text:body, instruction:inst, tag:el.tagName.toLowerCase(), doc:t.name,
                     context:{prev:prev?prev.textContent.slice(0,300):'', next:next?next.textContent.slice(0,300):''}})
    .then(function(j){ $('#edAI').disabled=false; if(!j.text){$('#edStat').textContent='沒有回傳';return}
-     applyEdit(el,j.text,'Claude：'+($('#edInst').value||'優化')); closeEd();
+     applyEdit(el,j.text,'Claude：'+(inst||'優化')); closeEd();
      toast('已套用到右側預覽（'+({api:'金鑰直打',cli:'本機 Claude',cloud:'雲端'}[j.engine]||'Claude')+'）· 紅框處待你認可'); })
    .catch(function(e){ $('#edAI').disabled=false;
      var msg=String(e&&e.message||e);
