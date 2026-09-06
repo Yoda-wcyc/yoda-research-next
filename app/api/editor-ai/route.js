@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { EDITOR_SYSTEM } from '../../../lib/editor-rules';
+import { EDITOR_SYSTEM, OUTLINE_SYSTEM, REVIEW_SYSTEM } from '../../../lib/editor-rules';
 import { readRules } from '../editor-rules/route';
 
 export const runtime = 'nodejs';
@@ -12,23 +12,8 @@ export const maxDuration = 180;
 //   outline      架構畫布：整份大綱 → 每節一句核心脈絡（JSON）
 //   review       AI 先審一輪：一批段落 → 該改的地方＋改好的版本（JSON），工作台變成待認可標記
 // 系統提示＝Yoda 寫作規範句子層（固定 → cache_control）＋「變成規則」累積的 writing 規則（每次讀）。
+// 三段提示詞正本在 Skill/rules/editor_prompts.md，lib/editor-rules.js 由 sync-console 生成——不要直接改 .js。
 // 模型 claude-opus-5；refusal 走 server-side fallback。
-const OUTLINE_SYSTEM = `你是 Yoda Research 的報告結構分析師。使用者給你一份財經報告的大綱：每個節點有編號、層級、標題、內容節錄。
-任務：替每個節點寫一句「核心脈絡」——這一節在整份報告的論證裡扮演什麼角色、講了什麼判斷（不是複述標題）。
-要求：繁體中文（台灣用語）、每句 12～40 字、有立場、不加套話；數字與代號原樣保留；不給操作建議。
-只回傳 JSON 物件：{"<編號>":"<一句脈絡>", ...}，不要任何其他文字、不要 markdown 圍欄。`;
-
-const REVIEW_SYSTEM = `你是 Yoda Research 的審稿官，要一次扮演三個視角：
-(1) 審稿官：照下面的寫作規範逐條看——因果鍊、口語、禁用詞、一個數字一個家、不給操作建議、禁單日論斷。
-(2) 讀者視角：付了月費的訂閱者讀這段，會不會看不懂、會不會跳過、哪句像廢話。
-(3) 內部一致：同一批段落裡數字或方向互相打架、同一件事講兩次。
-使用者給你一批段落（編號＋標籤＋原文）。只挑「真的該改」的段落，最多 12 處，依嚴重度排序；小毛病略過。
-每處給：編號、一句問題（≤40 字，說清楚違反哪條或讀者哪裡卡住）、改好的整段（保留所有數字／代號／日期原值；不能改就留空字串）。
-只回傳 JSON 陣列：[{"idx":"<編號>","issue":"<問題>","proposal":"<改好的整段或空字串>"}]，不要其他文字、不要 markdown 圍欄。
-
-以下是寫作規範（同時適用於你的判斷與你的改寫）：
-`;
-
 function J(o, status = 200) {
   return new Response(JSON.stringify(o), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
 }
