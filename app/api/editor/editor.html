@@ -565,6 +565,8 @@ $('#pGo').onclick=function(){
   if(pend&&!confirm('還有 '+pend+' 處未認可，視同全部認可後發佈？'))return;
   var html=exportHtml(t,{withStyle:$('#oStyle').checked,keepMarks:false,carry:false}), log=$('#pLog'); log.style.display=''; log.textContent='發佈中…';
   var kind=$('#pKind').value, force=$('#pForce').checked;
+  /* 會員專區是照檔名裡的日期排序、照開頭分類的：名字不合規會沉到清單最底下、歸進「其他」 */
+  if(!/\d{8}/.test(t.name) && !confirm('檔名「'+t.name+'」沒有日期（YYYYMMDD）。\n\n會員專區照檔名排序與分類，這份會排到清單最後一名、分類歸「其他」。\n\n還是要發佈嗎？'))return;
   var go = OFFLINE
     ? fetch(LOCAL+'/api/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:t.name,html:html,kind:kind,force:force})}).then(function(r){return r.json()})
     : api('POST',EP.docs+'&name='+encodeURIComponent(t.slug||t.name)+'&part=final',{html:html},true).then(function(j){ return {ok:true,message:'定稿已存雲端（'+Math.round(j.bytes/1024)+'KB）。回本機執行：\n'+j.next+'\n（存 reports\\ → 閘門 → 推 Blob）'} });
