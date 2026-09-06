@@ -1,13 +1,15 @@
 import { get, put, del, list } from '@vercel/blob';
+import { reportIdFromPath } from '../../../lib/blob';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 // 視覺控制台的樣式庫（雲端側）。以 CONSOLE_TOKEN 保護，跟主控台同一把鑰匙。
 //
-// 樣式存在 Blob：viz-styles/<name>.json；指派表是 viz-styles/assign.json。
-// 本機那份正本在 Skill/tokens/，兩邊用 `python Skill/yoda_tokens.py pull|push` 同步。
-// 真正把樣式寫進報告檔（apply）只能在本機做——雲端沒有那些 HTML。
+// ★ 這裡（Vercel Blob）是樣式庫的唯一正本（2026-09-06 Yoda 定：跟主控台並列，桌機／筆電都從這裡拉）。
+//   viz-styles/<name>.json；指派表 viz-styles/assign.json；每次存檔留 _history/<name>/<時間>.json 最近 20 版。
+//   本機 Skill/tokens/ 只是工作副本：出報告／apply 前 `python Skill/yoda_tokens.py pull --token …`。
+//   預覽對象＝Blob 上已發佈的付費報告（reports/）＋手動上傳的樣本（viz-samples/）。
 const PREFIX = 'viz-styles/';
 
 function auth(req) {
@@ -37,7 +39,7 @@ async function names() {
   try {
     const { blobs } = await list({ prefix: PREFIX });
     return blobs
-      .map((b) => (b.pathname.match(/^viz-styles\/(.+)\.json$/) || [])[1])
+      .map((b) => (b.pathname.match(/^viz-styles\/([^/]+)\.json$/) || [])[1])   // 不含 _history/ 底下的
       .filter(Boolean)
       .filter((n) => n !== 'assign')
       .sort();
@@ -52,6 +54,17 @@ export async function GET(req) {
   if (!auth(req)) return new Response('Not found', { status: 404 });
   const u = new URL(req.url);
   const name = u.searchParams.get('name');
+  if (name && u.searchParams.get('history')) {
+    try {
+      const { blobs } = await list({ prefix: PREFIX + '_history/' + safe(name) + '/' });
+      return J({ name: safe(name), versions: blobs.map((b) => ({ at: b.pathname.split('/').pop().replace('.json', ''), kb: Math.round((b.size || 0) / 1024) })).sort((a, b) => b.at.localeCompare(a.at)) });
+    } catch (e) { return J({ name: safe(name), versions: [] }); }
+  }
+  if (name && u.searchParams.get('at')) {
+    const j = await readJson('_history/' + safe(name) + '/' + u.searchParams.get('at').replace(/[^\w-]/g, ''));
+    if (!j) return J({ error: '沒有這一版' }, 404);
+    return J(j);
+  }
   if (name) {
     const j = await readJson(safe(name));
     if (!j) return J({ error: '找不到樣式 ' + name }, 404);
@@ -59,16 +72,19 @@ export async function GET(req) {
   }
   const [styles, assign] = await Promise.all([names(), readJson('assign')]);
   let reports = [];
-  try {
-    const { blobs } = await list({ prefix: 'viz-samples/' });
+  try {   // ① 已發佈的付費報告（reports/ 前綴）——線上真貨，不用上傳
+    const { blobs } = await list({ prefix: 'reports/' });
     reports = blobs
-      .map((b) => {
-        const f = (b.pathname.match(/^viz-samples\/(.+)$/) || [])[1];
-        return f ? { file: f, kb: Math.round((b.size || 0) / 1024) } : null;
-      })
-      .filter(Boolean)
-      .sort((a, b) => a.file.localeCompare(b.file));
+      .map((b) => { const id = reportIdFromPath(b.pathname); return id ? { file: id, kind: 'published', kb: Math.round((b.size || 0) / 1024) } : null; })
+      .filter(Boolean);
   } catch (e) {}
+  try {   // ② 手動上傳的樣本（沒發佈成付費的類型：總經／AI泡沫／專題…）
+    const { blobs } = await list({ prefix: 'viz-samples/' });
+    reports = reports.concat(blobs
+      .map((b) => { const f = (b.pathname.match(/^viz-samples\/(.+)$/) || [])[1]; return f ? { file: f, kind: 'sample', kb: Math.round((b.size || 0) / 1024) } : null; })
+      .filter(Boolean));
+  } catch (e) {}
+  reports.sort((a, b) => b.file.localeCompare(a.file));   // 新日期在前
   const TYPE_FAMILY = {
     us_stock: 'fmfb', tw_stock: 'fmfb', mw: 'fmfb', hub: 'fmfb',
     md: 'apple', 'ai-bubble': 'apple', pro: 'apple', topic: 'apple',
@@ -81,7 +97,8 @@ export async function GET(req) {
     ['免費殼', 'free-shell'], ['免費_', 'free-shell'],
   ];
   reports = reports.map((r) => {
-    const hit = PREF.find(([p]) => r.file.startsWith(p));
+    const bare = r.file.replace(/^付費_/, '');            // 付費_美股分析_… → 美股分析
+    const hit = PREF.find(([p]) => bare.startsWith(p));
     const type = hit ? hit[1] : 'unknown';
     return { ...r, type, family: TYPE_FAMILY[type] || 'fmfb' };
   });
@@ -114,8 +131,16 @@ export async function POST(req) {
     data.meta = data.meta || {};
     if (!data.meta.name) data.meta.name = name;
   }
-  await put(PREFIX + name + '.json', JSON.stringify(data, null, 2), {
-    access: 'private', contentType: 'application/json; charset=utf-8', addRandomSuffix: false, allowOverwrite: true, cacheControlMaxAge: 60,
-  });
+  const body_ = JSON.stringify(data, null, 2);
+  const opts = { access: 'private', contentType: 'application/json; charset=utf-8', addRandomSuffix: false, allowOverwrite: true, cacheControlMaxAge: 60 };
+  await put(PREFIX + name + '.json', body_, opts);
+  // 歷史版本：Blob 沒有 git，自己留最近 20 版，可退回
+  try {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    await put(PREFIX + '_history/' + name + '/' + stamp + '.json', body_, opts);
+    const { blobs } = await list({ prefix: PREFIX + '_history/' + name + '/' });
+    const old = blobs.map((b) => b.pathname).sort().slice(0, -20);
+    if (old.length) await del(old);
+  } catch (e) {}
   return J(isAssign ? { ok: true, assign: data } : { ok: true, name, styles: await names() });
 }

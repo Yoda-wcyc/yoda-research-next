@@ -391,7 +391,8 @@ function boot(){
     INIT=j;
     $('#styleSel').innerHTML=j.styles.map(function(s){return '<option>'+s+'</option>'}).join('');
     $('#repSel').innerHTML=j.reports.map(function(r){
-      var label=r.type==='specimen'?'★ 元素總覽（每個拉桿控制什麼）':r.file.replace('.html','')+'（'+r.kb+'KB）';
+      var label=r.type==='specimen'?'★ 元素總覽（每個拉桿控制什麼）':
+        (r.kind==='published'?'● ':(r.kind==='sample'?'○ ':''))+r.file.replace('.html','')+'（'+r.kb+'KB）';
       return '<option value="'+r.file+'" data-type="'+r.type+'" data-family="'+r.family+'">'+label+'</option>'}).join('');
     buildPanel(); buildAssign();
     var pref=j.reports.find(function(r){return r.type==='specimen'})||j.reports.find(function(r){return r.type==='mw'})||j.reports[0];
@@ -459,6 +460,9 @@ else{
       '<div class="ctl wide" style="margin-top:10px"><label>強制優先</label><label style="color:#a9bdd2;font-size:11.5px">'+
       '<input type="checkbox" id="ovr" checked> 預覽加 !important</label></div>');
     document.querySelector('.tabs button[data-tab=apply]').textContent='套用說明';
+    /* 跟主控台並列：同一把鑰匙互連 */
+    $('.hd h1').insertAdjacentHTML('afterend','<div class="hint" style="margin:-4px 0 8px"><a href="/api/console?k='+encodeURIComponent(KEY)+'" style="color:#8fa6bd">← 主控台</a>　·　樣式庫正本在這裡（Vercel），本機出報告前 pull</div>');
+    $('#repSel').title='● 已發佈的付費報告（線上真貨）　○ 手動上傳的樣本';
   }
   boot();
 }

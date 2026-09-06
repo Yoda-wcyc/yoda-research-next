@@ -1,5 +1,6 @@
 import { get, put, list, del } from '@vercel/blob';
 import { gunzipSync } from 'zlib';
+import { blobPath } from '../../../lib/blob';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,8 +37,10 @@ export async function GET(req) {
     }
   }
   try {
-    const r = await get(PREFIX + name, { access: 'private' });
-    if (!r) return new Response('樣本不存在：' + name, { status: 404 });
+    let r = null;
+    try { r = await get(PREFIX + name, { access: 'private' }); } catch (e) { r = null; }
+    if (!r) { try { r = await get(blobPath(name), { access: 'private' }); } catch (e) { r = null; } }   // 已發佈的付費報告
+    if (!r) return new Response('找不到：' + name, { status: 404 });
     const html = typeof r.text === 'function' ? await r.text() : String(r.body || '');
     return new Response(html, {
       headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
