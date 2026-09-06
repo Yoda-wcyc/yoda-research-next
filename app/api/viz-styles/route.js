@@ -94,10 +94,10 @@ export async function GET(req) {
     ['美股分析', 'us_stock'], ['台股分析', 'tw_stock'], ['付費_市場觀察', 'mw'], ['市場觀察', 'mw'],
     ['總經', 'md'], ['AI泡沫', 'ai-bubble'], ['關鍵報告', 'key'], ['專題研究', 'topic'], ['使用手冊', 'topic'],
     ['簡報', 'brief'], ['個股分析', 'pro'], ['Yoda預測', 'forecast'], ['Yoda 研究報告中心', 'hub'],
-    ['免費殼', 'free-shell'], ['免費_', 'free-shell'],
+    ['免費殼', 'free-shell'],
   ];
   reports = reports.map((r) => {
-    const bare = r.file.replace(/^付費_/, '');            // 付費_美股分析_… → 美股分析
+    const bare = r.file.replace(/^(付費_|免費_)/, '');     // 付費_美股分析_… / 免費_總經_… → 美股分析 / 總經
     const hit = PREF.find(([p]) => bare.startsWith(p));
     const type = hit ? hit[1] : 'unknown';
     return { ...r, type, family: TYPE_FAMILY[type] || 'fmfb' };
@@ -112,6 +112,10 @@ export async function GET(req) {
 // POST ?k=…&name=<樣式>&del=1      → 刪除
 export async function POST(req) {
   if (!auth(req)) return new Response('Not found', { status: 404 });
+  try { return await post_(req); }
+  catch (e) { return J({ error: '存檔失敗：' + String((e && e.stack) || e).slice(0, 600) }, 500); }   // 寧可大聲壞掉
+}
+async function post_(req) {
   const u = new URL(req.url);
   const name = safe(u.searchParams.get('name'));
   if (!name) return J({ error: '缺少 name' }, 400);

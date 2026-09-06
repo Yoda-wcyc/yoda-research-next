@@ -51,6 +51,10 @@ export async function GET(req) {
 }
 
 export async function POST(req) {
+  try { return await post_(req); }
+  catch (e) { return J({ ok: false, error: '上傳失敗：' + String((e && e.stack) || e).slice(0, 600) }, 500); }
+}
+async function post_(req) {
   let body = {};
   try {
     if ((req.headers.get('x-yoda-encoding') || '').toLowerCase() === 'gzip') {
