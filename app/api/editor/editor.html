@@ -138,8 +138,7 @@ code{font:11.5px ui-monospace,Consolas,monospace;background:#131a25;padding:1px 
     <select id="cloudSel"></select>
     <button type="button" id="btnImport" onclick="document.getElementById('fileIn').click()" title="從硬碟挑一個 HTML 檔匯入（也可以是之前「下載編輯後」的檔，標記會回來）">匯入</button>
     <input type="file" id="fileIn" accept=".html,.htm" style="display:none">
-    <select id="localSel" style="display:none" title="直接從 reports 夾或視覺實驗室挑一份，不用開檔案對話框"></select>
-    <select id="resumeSel" style="display:none" title="上次改到一半的進度（存在這台電腦的瀏覽器）"></select>
+    <select id="resumeSel" style="display:none;max-width:118px" title="上次改到一半的進度（存在這台電腦的瀏覽器）；選了就接回那份"></select>
     <button id="btnDel" class="danger" title="刪除雲端文件">刪</button>
   </div>
   <div class="grp grp-edit"><span class="gl">編輯</span>
@@ -919,8 +918,8 @@ function renderResume(){
   var sel=$('#resumeSel'), docs=savedDocs().filter(function(d){return edits(d)&&d.orig});
   if(!sel)return;
   if(!docs.length){ sel.style.display='none'; return; }
-  var h='<option value="">接續上次…（'+docs.length+' 份改到一半）</option>';
-  docs.forEach(function(d){ h+='<option value="'+esc(d.slug)+'">'+esc(d.name)+'　'+edits(d)+' 處'+(d.at?'　'+esc(d.at.slice(5,16).replace('T',' ')):'')+'</option>'; });
+  var h='<option value="">接續（'+docs.length+'）</option>';
+  docs.forEach(function(d){ h+='<option value="'+esc(d.slug)+'" title="'+esc(d.name)+'　'+edits(d)+' 處　'+esc((d.at||'').slice(5,16).replace('T',' '))+'">'+esc(d.name.length>14?d.name.slice(0,13)+'…':d.name)+'（'+edits(d)+'）</option>'; });
   h+='<option value="__clear__">— 清掉全部進度 —</option>';
   sel.innerHTML=h; sel.style.display='';
 }
@@ -952,7 +951,7 @@ function useHtml(name, html){
   renderTabs(); mountPanes(); save(true); toast('已開啟「'+name+'」');
 }
 function loadLocalList(){
-  if(!OFFLINE)return;
+  if(!OFFLINE||!$('#localSel'))return;   /* 這個下拉已移除；伺服器的 /api/local-list 仍在（?load= 與測試用得到） */
   fetch(LOCAL+'/api/local-list').then(function(r){return r.json()}).then(function(j){
     var sel=$('#localSel'), fs=j.files||[]; if(!sel||!fs.length)return;
     var h='<option value="">從本機挑一份…（'+fs.length+' 份）</option>';
@@ -960,7 +959,7 @@ function loadLocalList(){
     sel.innerHTML=h; sel.style.display='';
   }).catch(function(){});
 }
-$('#localSel').onchange=function(){
+if($('#localSel'))$('#localSel').onchange=function(){
   var v=this.value; this.selectedIndex=0; if(!v)return;
   var i=v.indexOf('/'), folder=v.slice(0,i), file=v.slice(i+1);
   toast('讀取中…');
