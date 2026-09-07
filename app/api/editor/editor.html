@@ -118,7 +118,13 @@ body.dragging iframe{pointer-events:none}
 .cnode.over-before{box-shadow:0 -3px 0 0 #2f6fb5}
 .cnode.over-after{box-shadow:0 3px 0 0 #2f6fb5}
 .cnode.moved>.row .ttl::after{content:' ↕';color:#ffc37a}
-.cnode.sel>.row{background:#16283d;border-radius:7px}
+.cnode.sel{outline:2px solid #7fb0ff;outline-offset:1px;border-radius:8px}
+.cnode.sel>.row{background:#1d3550;border-radius:7px}
+.cnode.sel>.row .ttl{color:#fff}
+@keyframes cvPulse{0%{box-shadow:0 0 0 0 rgba(127,176,255,.65)}100%{box-shadow:0 0 0 12px rgba(127,176,255,0)}}
+.cnode.pulse{animation:cvPulse 1.1s ease-out 2}
+.cvcrumb{padding:6px 10px;font-size:11.5px;color:#9fb3c8;background:#101826;border-bottom:1px solid #1e2836;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cvcrumb b{color:#e6eef8}.cvcrumb .sep{color:#5f7286;padding:0 6px}
 .cnode .cx{margin-left:auto;flex:0 0 auto;font:700 12px/1 -apple-system,sans-serif;color:#5f7286;cursor:pointer;padding:3px 6px;border-radius:4px;margin-top:1px}
 .cnode .tg+.cx{margin-left:0}
 .cnode .cx:hover{color:#ff9a9a;background:#3a1c22}
@@ -175,7 +181,8 @@ code{font:11.5px ui-monospace,Consolas,monospace;background:#131a25;padding:1px 
 
 <div class="panes">
   <div class="pane canvas" id="canvasPane" style="display:none"><div class="hd" style="background:#1a2230;color:#9fb3c8">架構畫布（拖拉節點重排，放下就回寫到右側報告）</div>
-    <div class="cv-bar"><button id="cvAI">用 Claude 萃取脈絡</button><button id="cvReset">重設結構</button><button id="cvCollapse">全部收合</button><span class="hint" id="cvStat"></span></div>
+    <div class="cv-bar"><button id="cvAI">用 Claude 萃取脈絡</button><button id="cvClean" title="清掉沒有內容的空殼：空標頭、空的圖框、空段落">清掉空殼</button><button id="cvReset">重設結構</button><button id="cvCollapse">全部收合</button><span class="hint" id="cvStat"></span></div>
+    <div class="cvcrumb" id="cvCrumb">點右邊任一段，這裡會顯示它在架構裡的位置</div>
     <div class="cv" id="cv"><div class="empty2">先上傳或開啟一份報告</div></div>
   </div>
   <div class="pane canvas" id="stylePane" style="display:none"><div class="hd" style="background:#2a2415;color:#e0c070">視覺模組（選一套樣式套到這份報告，右側即時看）</div>
@@ -421,7 +428,7 @@ function setupPanes(){
   t.blocks=indexBlocks(dE);
   /* 套回 marks */
   t.marks.forEach(function(m){paintMark(dE,m)});
-  replayMoves(dE, t.moves||[]); replayBlockDels(dE, t.bdel||[]);
+  replayMoves(dE, t.moves||[]); replayBlockDels(dE, t.bdel||[]); if(t.clean)removeEmptyShells(dE);
   autofix(t, dE);
   if(t.style)applyStyleTo(dE, t.style);
   if(MODE==='canvas')renderCanvas(); if(MODE==='style')renderStyleTab(); if(MODE==='output')renderOutTab();
@@ -435,7 +442,7 @@ function setupPanes(){
       var t2=ev.target;
       if(t2&&t2.nodeType===1&&t2!==dE.body&&t2!==dE.documentElement&&!t2.closest('.yeb-selbar')){
         ev.preventDefault(); ev.stopPropagation();
-        selectBlock(t2); closeEd();
+        selectBlock(t2); echoLeft(t2); closeEd();
         toast('已選取這一塊（沒有文字可編輯）· 用右上角 ✕ 刪掉，或按 ⌃ 擴大選取範圍');
       }
       return;
@@ -513,10 +520,10 @@ function updWords(){
 }
 
 /* ── 復原：每個會改文件狀態的動作前先快照（marks／moves／style），復原＝退回上一個快照再重掛 ── */
-function snap(){ var t=tab(); if(!t)return; t.undo=t.undo||[]; t.undo.push(JSON.stringify({marks:t.marks||[],moves:t.moves||[],bdel:t.bdel||[],style:t.style||''})); if(t.undo.length>30)t.undo.shift(); updUndo(); }
+function snap(){ var t=tab(); if(!t)return; t.undo=t.undo||[]; t.undo.push(JSON.stringify({marks:t.marks||[],moves:t.moves||[],bdel:t.bdel||[],clean:!!t.clean,style:t.style||''})); if(t.undo.length>30)t.undo.shift(); updUndo(); }
 function updUndo(){ var t=tab(), b=$('#btnUndo'); if(!b)return; var k=t&&(t.undo||[]).length; b.disabled=!k; b.textContent='↶ 復原'+(k?'（'+k+'）':''); }
 function undo(){ var t=tab(); if(!t||!(t.undo||[]).length){toast('沒有可復原的動作');return}
-  var st=JSON.parse(t.undo.pop()); t.marks=st.marks; t.moves=st.moves; t.bdel=st.bdel||[]; t.style=st.style; t.autofixed=true;   /* 復原後不再自動修一次 */
+  var st=JSON.parse(t.undo.pop()); t.marks=st.marks; t.moves=st.moves; t.bdel=st.bdel||[]; t.clean=!!st.clean; t.style=st.style; t.autofixed=true;   /* 復原後不再自動修一次 */
   var sc=0; try{sc=$('#ifE').contentDocument.documentElement.scrollTop}catch(e){}
   closeEd(); mountPanes(); setTimeout(function(){ try{$('#ifE').contentDocument.documentElement.scrollTop=sc}catch(e){} },600);
   updUndo(); saveSoon(); toast('已復原上一步'); }
@@ -1022,7 +1029,7 @@ function selectBlock(el){
       ev.preventDefault(); ev.stopPropagation();
       if(b.className==='up'){
         var p=SEL_EL&&SEL_EL.parentElement;
-        if(p&&p!==d.body&&p!==d.documentElement){ selectBlock(p); toast('選取範圍擴大到外一層（'+(p.textContent||'').trim().length+' 字）'); }
+        if(p&&p!==d.body&&p!==d.documentElement){ selectBlock(p); echoLeft(p); toast('選取範圍擴大到外一層（'+(p.textContent||'').trim().length+' 字）'); }
         else toast('已經是最外層了',1);
         return;
       }
@@ -1059,6 +1066,35 @@ function anchorOf(el){
   var up=0, x=probe; while(x&&x!==el){ up++; x=x.parentElement; }
   return {idx:probe.getAttribute('data-yeb'), up:up, path:pathOf(el)};
 }
+function emptyShells(d){
+  var cand=[].filter.call(d.body.querySelectorAll('.section,.sec-head,.sec-body,.ascii-fig,pre,p,figure,table,li,.dtree,.item,.box,.card'),function(el){
+    if(el.closest('nav,.share-bar,.controls-bar,.tablet-hint,#yeb-marks'))return false;
+    if((el.textContent||'').replace(/[\s\u00a0]/g,'').length)return false;      /* 有字就不是空殼 */
+    if(el.querySelector('img,svg,canvas,video,input,button,iframe'))return false; /* 有圖或控制項也不算 */
+    return true;
+  });
+  return cand.filter(function(el){ return !cand.some(function(o){return o!==el&&o.contains(el)}); });   /* 只留最外層 */
+}
+function removeEmptyShells(d){
+  var els=emptyShells(d), k=0;
+  els.forEach(function(el){ if(el.parentNode){ el.parentNode.removeChild(el); k++; } });
+  return k;
+}
+$('#cvClean').onclick=function(){
+  var t=tab(), d=$('#ifE')&&$('#ifE').contentDocument; if(!t||!d)return;
+  var els=emptyShells(d);
+  if(!els.length){ toast('沒有找到空殼'); return; }
+  var kinds={}; els.forEach(function(el){ var k=el.tagName.toLowerCase()+(el.className?('.'+String(el.className).split(' ')[0]):''); kinds[k]=(kinds[k]||0)+1; });
+  var list=Object.keys(kinds).map(function(k){return k+' ×'+kinds[k]}).join('、');
+  ask('清掉 '+els.length+' 個沒有內容的空殼？\n\n'+list+'\n\n（空標頭、空的圖框、空段落；有文字或有圖的都不會動。按「復原」可以還原）','清掉')
+    .then(function(y){
+      if(!y)return;
+      snap(); t.clean=true;
+      var k=removeEmptyShells(d);
+      renderCanvas(); updPill(); saveSoon();
+      toast('已清掉 '+k+' 個空殼 · 按「復原」可還原');
+    });
+};
 function replayBlockDels(d,list){
   (list||[]).forEach(function(a){
     var el=null;
@@ -1084,15 +1120,22 @@ function echoLeft(el){
       setTimeout(function(){o.classList.remove('yeb-flash')},1700); }
   }catch(e){}
   if(MODE!=='canvas')return;
-  var us=unitsOf($('#ifE').contentDocument), hit=null;
-  us.forEach(function(u){ if(u.nodes.some(function(nd){return nd===el||(nd.contains&&nd.contains(el))})){ if(!hit||u.level>=hit.level)hit=u; } });
+  var us=unitsOf($('#ifE').contentDocument), path=[];
+  us.forEach(function(u){ if(u.nodes.some(function(nd){return nd===el||(nd.contains&&nd.contains(el))}))path.push(u); });
+  path.sort(function(a,b){return a.level-b.level});
+  var hit=path[path.length-1];
+  var crumb=$('#cvCrumb');
+  if(crumb){ crumb.innerHTML = path.length
+      ? path.map(function(u){return '<b>'+esc(u.title.slice(0,26))+'</b>'}).join('<span class="sep">›</span>')
+      : '這一塊不屬於任何章節（可能是頁首／頁尾或掛在章外面的內容）'; }
   if(!hit)return;
   var cv=$('#cv'), node=cv.querySelector('.cnode[data-key="'+hit.key.replace(/"/g,'\\"')+'"]');
-  cv.querySelectorAll('.cnode.sel').forEach(function(x){x.classList.remove('sel')});
+  cv.querySelectorAll('.cnode.sel,.cnode.pulse').forEach(function(x){x.classList.remove('sel','pulse')});
   if(!node)return;
   var p=node.parentElement;                       /* 收合起來的話先展開，不然選了也看不到 */
   while(p&&p!==cv){ if(p.classList&&p.classList.contains('cnode'))p.classList.remove('collapsed'); p=p.parentElement; }
-  node.classList.add('sel');
+  node.classList.add('sel'); void node.offsetWidth; node.classList.add('pulse');
+  setTimeout(function(){node.classList.remove('pulse')},2400);
   var r=node.getBoundingClientRect(), rc=cv.getBoundingClientRect();
   if(r.top<rc.top+8||r.bottom>rc.bottom-8) cv.scrollTop += (r.top-rc.top) - cv.clientHeight/3;
 }
@@ -1288,7 +1331,7 @@ if($('#localSel'))$('#localSel').onchange=function(){
 /* ── 儲存／載入 ── */
 function saveSoon(){clearTimeout(tmrSave);tmrSave=setTimeout(function(){save(true)},600)}   /* 自動存檔安靜做，不要蓋掉剛剛那句提示 */
 function save(silent){ var t=tab(); if(!t||!t.slug)return;
-  if(OFFLINE){ try{localStorage.setItem('yeb-doc-'+t.slug,JSON.stringify({name:t.name,marks:t.marks,moves:t.moves||[],bdel:t.bdel||[],gists:t.gists||{},style:t.style||'',orig:t.orig,at:new Date().toISOString()}))}catch(e){toast('本機儲存失敗：這台電腦的瀏覽器只給 5MB，開太多份大報告會滿。請用「下載編輯後 HTML」保存進度',1);return} if(!silent)toast('已存到這台電腦的瀏覽器'); return; }
+  if(OFFLINE){ try{localStorage.setItem('yeb-doc-'+t.slug,JSON.stringify({name:t.name,marks:t.marks,moves:t.moves||[],bdel:t.bdel||[],clean:!!t.clean,gists:t.gists||{},style:t.style||'',orig:t.orig,at:new Date().toISOString()}))}catch(e){toast('本機儲存失敗：這台電腦的瀏覽器只給 5MB，開太多份大報告會滿。請用「下載編輯後 HTML」保存進度',1);return} if(!silent)toast('已存到這台電腦的瀏覽器'); return; }
   api('POST',EP.docs+'&name='+encodeURIComponent(t.slug)+'&part=state',{state:{name:t.name,marks:t.marks,moves:t.moves||[],bdel:t.bdel||[],gists:t.gists||{},style:t.style||''}}).then(function(){if(!silent)toast('已儲存')}); }
 $('#btnSave').onclick=function(){save()};
 /* 儲存到檔案：寫進 reports\，當作工作檔；要上線還是走 ④ 的定稿發佈（有閘門＋上傳） */
@@ -1329,7 +1372,7 @@ function exportHtml(t, opts){
   var st=d.createElement('style'); st.textContent=MARK_CSS.split('.yeb-ok').join('.yeb-ok-x'); d.head.appendChild(st);
   t.marks.forEach(function(m){var el=d.querySelector('[data-yeb="'+m.idx+'"]'); if(!el)return; el.innerHTML=withInline(m.after, m.beforeHtml||el.innerHTML); if(!m.approved&&opts.keepMarks)el.classList.add('yeb-emark');});
   var origOrder=unitsOf(d).filter(function(u){return u.level<=2}).map(function(u){return u.key});
-  replayMoves(d, t.moves||[]); replayBlockDels(d, t.bdel||[]);
+  replayMoves(d, t.moves||[]); replayBlockDels(d, t.bdel||[]); if(t.clean)removeEmptyShells(d);
   d.querySelectorAll('[data-yeb]').forEach(function(e){e.removeAttribute('data-yeb')});
   /* 進度隨檔案走：把 marks 藏在檔尾，上傳回編輯器時原樣還原（複製到另一台電腦也能接著改） */
   if(opts.withStyle&&t.style){ var st=styleByName(t.style); if(st){ var old=d.getElementById('yoda-tokens'); if(old)old.remove();
