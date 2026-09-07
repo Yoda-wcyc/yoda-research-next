@@ -141,10 +141,9 @@ code{font:11.5px ui-monospace,Consolas,monospace;background:#131a25;padding:1px 
 <div class="bar" id="bar">
   <span class="brandmini" title="Yoda 報告工作台">Yoda</span>
   <div class="grp grp-mode" id="modes"><span class="gl">步驟</span>
-    <button data-mode="canvas" title="① 架構畫布：章節脈絡、搬動、刪除">①架構</button>
-    <button data-mode="editor" class="on" title="② 編輯細節：逐段改字、標記、認可">②編輯</button>
-    <button data-mode="style" title="③ 視覺模組：套一套樣式">③視覺</button>
-    <button data-mode="output" title="④ 輸出：下載、存檔、定稿發佈">④輸出</button>
+    <button data-mode="canvas" class="on" title="① 架構：左邊看章節脈絡，右邊直接改字">①架構</button>
+    <button data-mode="style" title="② 視覺模組：套一套樣式">②視覺</button>
+    <button data-mode="output" title="③ 輸出：下載、存檔、定稿發佈">③輸出</button>
   </div>
   <div class="grp grp-open"><span class="gl">開檔</span>
     <button id="btnOpen" title="從雲端開啟已上傳的文件">雲端</button>
@@ -250,7 +249,7 @@ function loadRules(){ return fetch(rulesUrl()).then(function(r){return r.json()}
 function saveRules(){ return fetch(rulesUrl(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(RULES)}).then(function(r){return r.json()}); }
 var TABS=[], CUR=-1, tmrSave=null, SYNC_LOCK=false;
 var OFFLINE=(location.protocol==='file:')||/^(localhost|127\.0\.0\.1):8777$/.test(location.host);   /* 本機模式：雙擊開的檔，或本機伺服器供的頁（http://localhost:8777/workbench）——兩種開法行為要一樣 */
-var MODE='editor';   /* 'canvas' | 'editor' | 'style' | 'output' */
+var MODE='canvas';   /* 'canvas' | 'style' | 'output'（editor 步驟已取消，右欄照樣點了就能改） */
 var LAYOUT='split';  /* split 左右 | right 右側全幅 | fit 左右＋把報告整份縮進欄寬（報告多半固定 1200px 寬） */
 function setLayout(l){ LAYOUT=l; document.body.classList.toggle('layout-right',l==='right');
   var seg=document.querySelectorAll('#layoutSeg button'); if(seg.length)seg.forEach(function(b){b.classList.toggle('on',b.dataset.l===l)});
@@ -331,6 +330,11 @@ var MARK_CSS='.yeb-mark{position:relative;outline:2px solid rgba(255,80,80,.85);
  '.yeb-auto .yeb-ok{background:#1f6a4a}'+
  '[data-yeb]{cursor:text}[data-yeb]:hover{outline:1px dashed rgba(127,159,198,.7);outline-offset:2px}'+
  '.yeb-emark{outline:2px solid #ff3b3b;outline-offset:2px;animation:yebBlink 1.6s ease-in-out infinite}'+
+ '.yeb-sel{outline:2px dashed #7fb0ff!important;outline-offset:3px;background:rgba(47,111,181,.10)}'+
+ '.yeb-selbar{position:fixed;z-index:100000;display:none;gap:6px;font:700 11px/1 -apple-system,sans-serif}'+
+ '.yeb-selbar button{font:inherit;border:0;border-radius:11px;padding:5px 10px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.45)}'+
+ '.yeb-selbar .up{background:#1b3a5c;color:#dbe8f6}'+
+ '.yeb-selbar .del{background:#7a1f2c;color:#ffdede}'+
  '.yeb-flash{outline:3px solid #2f6fb5;outline-offset:3px;border-radius:4px;animation:yebFlash 1.6s ease-out 1}@keyframes yebFlash{0%{outline-color:#7fb0ff;background:rgba(47,111,181,.18)}100%{outline-color:transparent;background:transparent}}';
 var HIDE_HINT='.tablet-hint{display:none!important}';   /* 手機提示遮罩在工作台裡只會擋路：左欄唯讀關不掉、又會被算進段落數 */
 var ORIG_CSS='body{user-select:text}'+HIDE_HINT;   /* 唯讀靠事件攔截（見 setupPanes），不用 pointer-events：那會讓滾輪捲不動內層容器 */
@@ -388,30 +392,27 @@ function mountPanes(){
     renderOutTab(); renderCanvas(); if(typeof renderStyleTab==='function')renderStyleTab(); return;
   }
   oh.className=''; eh.className='';
-  oh.innerHTML='<iframe id="ifO" sandbox="allow-same-origin allow-scripts"></iframe>';
+  oh.innerHTML='';                    /* 原稿對照欄已取消：不再掛第二份 iframe，大報告少載一次 */
   eh.innerHTML='<iframe id="ifE" sandbox="allow-same-origin allow-scripts"></iframe>';
-  var fO=$('#ifO'), fE=$('#ifE');
-  fO.srcdoc=t.orig; fE.srcdoc=t.orig;
-  var ready=0; function done(){ if(++ready<2)return; setupPanes(); }
-  fO.onload=done; fE.onload=done;
+  var fE=$('#ifE');
+  fE.srcdoc=t.orig;
+  fE.onload=function(){ setupPanes(); };
 }
 function setupPanes(){
-  var t=tab(), dO=$('#ifO').contentDocument, dE=$('#ifE').contentDocument;
-  if(!dO||!dE||!dO.body||!dE.body)return;
+  var t=tab(), fO=$('#ifO'), dO=fO&&fO.contentDocument, dE=$('#ifE').contentDocument;
+  if(!dE||!dE.body)return;
   function css(d,txt){var s=d.createElement('style');s.textContent=txt;d.head.appendChild(s)}
-  css(dO,ORIG_CSS+MARK_CSS); css(dE,MARK_CSS+HIDE_HINT);
-  /* 原稿唯讀：擋掉會改變頁面的互動，但滾動、選字照常 */
-  ['click','mousedown','mouseup','dblclick','keydown','keypress','contextmenu','input','submit','touchstart'].forEach(function(t){
-    dO.addEventListener(t,function(e){e.preventDefault();e.stopPropagation()},true)});
-  dO.addEventListener('click',function(e){   /* 唯讀不是壞掉：講清楚要去哪改 */
-    var el=e.target&&e.target.closest&&e.target.closest('[data-yeb]');
-    toast(el?'左欄是原稿對照（唯讀）。要改請點右欄同一段':'左欄是原稿，唯讀');
-  },true);
-  var nO=indexBlocks(dO), nE=indexBlocks(dE);
-  t.blocks=nE;
+  css(dE,MARK_CSS+HIDE_HINT);
+  if(dO&&dO.body){   /* 原稿對照欄已取消；萬一日後又掛回來，這段仍然管用 */
+    css(dO,ORIG_CSS+MARK_CSS);
+    ['click','mousedown','mouseup','dblclick','keydown','keypress','contextmenu','input','submit','touchstart'].forEach(function(t){
+      dO.addEventListener(t,function(e){e.preventDefault();e.stopPropagation()},true)});
+    indexBlocks(dO);
+  }
+  t.blocks=indexBlocks(dE);
   /* 套回 marks */
   t.marks.forEach(function(m){paintMark(dE,m)});
-  replayMoves(dE, t.moves||[]);
+  replayMoves(dE, t.moves||[]); replayBlockDels(dE, t.bdel||[]);
   autofix(t, dE);
   if(t.style)applyStyleTo(dE, t.style);
   if(MODE==='canvas')renderCanvas(); if(MODE==='style')renderStyleTab(); if(MODE==='output')renderOutTab();
@@ -421,40 +422,42 @@ function setupPanes(){
     var no=ev.target.closest&&ev.target.closest('.yeb-no'); if(no){reject(no.getAttribute('data-mark'));ev.preventDefault();ev.stopPropagation();return}
     var ru=ev.target.closest&&ev.target.closest('.yeb-rule'); if(ru){openRuleDlg(ru.getAttribute('data-mark'));ev.preventDefault();ev.stopPropagation();return}
     var el=ev.target.closest&&ev.target.closest('[data-yeb]'); if(!el)return;
-    ev.preventDefault(); ev.stopPropagation(); echoLeft(el); openEd(el);
+    ev.preventDefault(); ev.stopPropagation(); selectBlock(el); echoLeft(el); openEd(el);
   },true);
-  /* 同步滾動：以「視窗最上緣的段落」對齊 */
-  var wO=$('#ifO').contentWindow, wE=$('#ifE').contentWindow;
-  function scrollerOf(el,win){ var d=win.document, x=el.parentElement;
-    while(x&&x!==d.body&&x!==d.documentElement){ var cs=win.getComputedStyle(x);
-      if(/(auto|scroll)/.test(cs.overflowY)&&x.scrollHeight>x.clientHeight+2)return x; x=x.parentElement } return null; }
-  function sync(from,to){
-    if(SYNC_LOCK)return; SYNC_LOCK=true;
-    try{
-      var fd=from.document, td=to.document, top=null;
-      var els=fd.querySelectorAll('[data-yeb]');
-      function pinned(el){ var x=el, w=fd.defaultView; while(x&&x!==fd.body){ var ps=w.getComputedStyle(x).position; if(ps==='fixed'||ps==='sticky')return true; x=x.parentElement } return false; }
-      for(var i=0;i<els.length;i++){var r=els[i].getBoundingClientRect(); if(r.height>0&&r.bottom>0&&!pinned(els[i])){top=els[i];break}}
-      if(!top)return;
-      var idx=top.getAttribute('data-yeb'), tgt=td.querySelector('[data-yeb="'+idx+'"]'); if(!tgt)return;
-      var delta=tgt.getBoundingClientRect().top - top.getBoundingClientRect().top;   /* 目標段落要往上移多少才跟來源同高 */
-      if(Math.abs(delta)<1)return;
-      var sc=scrollerOf(tgt,to); if(sc) sc.scrollTop+=delta; else to.scrollBy(0,delta);
-    }finally{ setTimeout(function(){SYNC_LOCK=false},40) }
+  if(dO&&dO.body){   /* 兩欄同步捲動：只有原稿欄存在時才需要 */
+    /* 同步滾動：以「視窗最上緣的段落」對齊 */
+    var wO=$('#ifO').contentWindow, wE=$('#ifE').contentWindow;
+    function scrollerOf(el,win){ var d=win.document, x=el.parentElement;
+      while(x&&x!==d.body&&x!==d.documentElement){ var cs=win.getComputedStyle(x);
+        if(/(auto|scroll)/.test(cs.overflowY)&&x.scrollHeight>x.clientHeight+2)return x; x=x.parentElement } return null; }
+    function sync(from,to){
+      if(SYNC_LOCK)return; SYNC_LOCK=true;
+      try{
+        var fd=from.document, td=to.document, top=null;
+        var els=fd.querySelectorAll('[data-yeb]');
+        function pinned(el){ var x=el, w=fd.defaultView; while(x&&x!==fd.body){ var ps=w.getComputedStyle(x).position; if(ps==='fixed'||ps==='sticky')return true; x=x.parentElement } return false; }
+        for(var i=0;i<els.length;i++){var r=els[i].getBoundingClientRect(); if(r.height>0&&r.bottom>0&&!pinned(els[i])){top=els[i];break}}
+        if(!top)return;
+        var idx=top.getAttribute('data-yeb'), tgt=td.querySelector('[data-yeb="'+idx+'"]'); if(!tgt)return;
+        var delta=tgt.getBoundingClientRect().top - top.getBoundingClientRect().top;   /* 目標段落要往上移多少才跟來源同高 */
+        if(Math.abs(delta)<1)return;
+        var sc=scrollerOf(tgt,to); if(sc) sc.scrollTop+=delta; else to.scrollBy(0,delta);
+      }finally{ setTimeout(function(){SYNC_LOCK=false},40) }
+    }
+    /* scroll 不冒泡，但捕獲階段在 document 上收得到「任何容器」的捲動 */
+    var lead='E';   /* 最後互動的那一欄主導：它捲、另一欄跟 */
+    dO.addEventListener('scroll',function(){lead='O';sync(wO,wE)},true);
+    dE.addEventListener('scroll',function(){lead='E';sync(wE,wO)},true);
+    ['wheel','touchstart','mousedown','keydown'].forEach(function(t){
+      dO.addEventListener(t,function(){lead='O'},{capture:true,passive:true});
+      dE.addEventListener(t,function(){lead='E'},{capture:true,passive:true}); });
+    /* 保險：有些環境（背景分頁、某些 iframe）scroll 事件不派發，用輪詢補正；沒偏差時 sync 立刻返回，幾乎零成本 */
+    if(t._syncTimer)clearInterval(t._syncTimer);
+    t._syncTimer=setInterval(function(){ try{ if(!dO.defaultView||!dE.defaultView){clearInterval(t._syncTimer);return}
+      if(lead==='E')sync(wE,wO); else sync(wO,wE); }catch(e){} },200);
   }
-  /* scroll 不冒泡，但捕獲階段在 document 上收得到「任何容器」的捲動 */
-  var lead='E';   /* 最後互動的那一欄主導：它捲、另一欄跟 */
-  dO.addEventListener('scroll',function(){lead='O';sync(wO,wE)},true);
-  dE.addEventListener('scroll',function(){lead='E';sync(wE,wO)},true);
-  ['wheel','touchstart','mousedown','keydown'].forEach(function(t){
-    dO.addEventListener(t,function(){lead='O'},{capture:true,passive:true});
-    dE.addEventListener(t,function(){lead='E'},{capture:true,passive:true}); });
-  /* 保險：有些環境（背景分頁、某些 iframe）scroll 事件不派發，用輪詢補正；沒偏差時 sync 立刻返回，幾乎零成本 */
-  if(t._syncTimer)clearInterval(t._syncTimer);
-  t._syncTimer=setInterval(function(){ try{ if(!dO.defaultView||!dE.defaultView){clearInterval(t._syncTimer);return}
-    if(lead==='E')sync(wE,wO); else sync(wO,wE); }catch(e){} },200);
   updPill(); fitFrames();
-  if(nO!==nE) toast('兩欄段落數不同（'+nO+'/'+nE+'），對齊可能偏移',1);
+
 }
 /* 字數：中文一字一字算，連續英數算一個字；nav／控制列／腳本不算 */
 function countChars(str){ var t=String(str||'').replace(/\s+/g,''); var lat=(t.match(/[A-Za-z0-9]+/g)||[]).length; return lat+t.replace(/[A-Za-z0-9]+/g,'').length; }
@@ -492,10 +495,10 @@ function updWords(){
 }
 
 /* ── 復原：每個會改文件狀態的動作前先快照（marks／moves／style），復原＝退回上一個快照再重掛 ── */
-function snap(){ var t=tab(); if(!t)return; t.undo=t.undo||[]; t.undo.push(JSON.stringify({marks:t.marks||[],moves:t.moves||[],style:t.style||''})); if(t.undo.length>30)t.undo.shift(); updUndo(); }
+function snap(){ var t=tab(); if(!t)return; t.undo=t.undo||[]; t.undo.push(JSON.stringify({marks:t.marks||[],moves:t.moves||[],bdel:t.bdel||[],style:t.style||''})); if(t.undo.length>30)t.undo.shift(); updUndo(); }
 function updUndo(){ var t=tab(), b=$('#btnUndo'); if(!b)return; var k=t&&(t.undo||[]).length; b.disabled=!k; b.textContent='↶ 復原'+(k?'（'+k+'）':''); }
 function undo(){ var t=tab(); if(!t||!(t.undo||[]).length){toast('沒有可復原的動作');return}
-  var st=JSON.parse(t.undo.pop()); t.marks=st.marks; t.moves=st.moves; t.style=st.style; t.autofixed=true;   /* 復原後不再自動修一次 */
+  var st=JSON.parse(t.undo.pop()); t.marks=st.marks; t.moves=st.moves; t.bdel=st.bdel||[]; t.style=st.style; t.autofixed=true;   /* 復原後不再自動修一次 */
   var sc=0; try{sc=$('#ifE').contentDocument.documentElement.scrollTop}catch(e){}
   closeEd(); mountPanes(); setTimeout(function(){ try{$('#ifE').contentDocument.documentElement.scrollTop=sc}catch(e){} },600);
   updUndo(); saveSoon(); toast('已復原上一步'); }
@@ -710,6 +713,16 @@ $('#edAI').onclick=function(){
 var CH_TITLE_SEL='.section-title,.sec-head,.section-header,h1,h2';
 var CARD_SEL='.item,.box,.card,.rv-row,.rv-end,.rv-sub,.hl-box,.us-tf,.tf,.panel,.block,.sec-block,.summary,.kv,.alertbox,.ladder-grid,figure,table,.fig,.ascii-fig,.dtree,.gl,.glossary,.cat-card,.chip-tbl,.viz,.env-regime,.rv-snapshot,.cards,.grid';
 var CARD_TITLE_SEL='h2,h3,h4,.item-hdr,.rv-title,.us-tf-cap,.cap,.card-name,.box-title,.title,.hd,[class*="-title"],[class*="-cap"],[class*="-hdr"],[class*="-head"],th';
+/* 章底下真正的小標：先照這些抓「節」，抓得到就不用猜卡片（猜出來的常是表格欄名、資料殘塊）*/
+var SUB_HEAD_SEL='.syn-h,.rv-h,.blk-h,.cat-title,.card-title,.item-title,.box-title,.op-h,.sub-h,.hl-h,.fig-cap,.dtree-h,.gl-h,h3,h4,h5';
+function junkTitle(t){   /* 只有欄名或一坨資料，不算節 */
+  t=(t||'').trim();
+  if(!t)return true;
+  if(t.length<=6 && /^(ETF|代碼|個股|板塊|Ticker|名稱|項目|指標|數值|日期|排名|類別)$/i.test(t))return true;
+  if(/^[\{\[\"]/.test(t))return true;                 /* {"tail": 20 ... 這種 JSON 殘塊 */
+  if(/^[\d\s.,%+\-]+$/.test(t))return true;            /* 純數字 */
+  return false;
+}
 function txt(el){return (el?el.textContent:'').replace(/\s+/g,' ').trim()}
 function chapterTitle(el){
   var q=function(sel){return el.querySelector?el.querySelector(sel):null};
@@ -751,6 +764,34 @@ function chapterUnits(d){
 }
 function cardUnits(chapter){
   var cards=[], seen=[];
+  /* ① 先找真正的小標：一個小標＝一節，範圍＝小標所在的區塊（或小標＋後續兄弟到下一個小標）*/
+  var heads=[];
+  chapter.nodes.forEach(function(root){
+    if(!root.querySelectorAll)return;
+    [].forEach.call(root.querySelectorAll(SUB_HEAD_SEL),function(h){
+      if(h.closest('nav'))return;
+      if(h.closest&&h.closest('.section-header,.section-title,.sec-head'))return;   /* 只排除章標題本身；錨點常常就是整個章容器，拿它比對會把全章小標都排掉 */
+      if(h.matches&&h.matches(CH_TITLE_SEL))return;
+      var t=txt(h); if(junkTitle(t)||t.length>60)return;
+      heads.push(h);
+    });
+  });
+  if(heads.length){
+    var used=[];
+    heads.forEach(function(h){
+      var box=h.parentElement;                       /* 小標的容器就是這一節 */
+      while(box&&box!==document.body&&txt(box).length<txt(h).length+20&&box.parentElement)box=box.parentElement;
+      if(!box)box=h;
+      if(used.some(function(o){return o===box||o.contains(box)}))return;
+      used.push(box);
+      cards.push({el:box,title:txt(h).slice(0,40),paras:textBlocks(box).length});
+    });
+    if(cards.length>=2){
+      cards.sort(function(a,b){return a.el.compareDocumentPosition(b.el)&Node.DOCUMENT_POSITION_FOLLOWING?-1:1});
+      return cards;
+    }
+    cards=[];   /* 只抓到一個＝這章沒有真正的小標，走原本的卡片判斷 */
+  }
   chapter.nodes.forEach(function(root){
     var cands=[].slice.call(root.querySelectorAll(CARD_SEL));
     if(root.matches&&root.matches(CARD_SEL)&&root!==chapter.anchor)cands.unshift(root);
@@ -771,7 +812,10 @@ function cardUnits(chapter){
   }
   seen.forEach(function(el){
     var t=el.querySelector(CARD_TITLE_SEL), title=txt(t).slice(0,40)||txt(el).slice(0,28);
-    cards.push({el:el,title:title,paras:textBlocks(el).length});
+    var paras=textBlocks(el).length;
+    if(junkTitle(title)&&paras<2)return;              /* 表格欄名／資料殘塊不當節 */
+    if(junkTitle(title))title=txt(el).slice(0,30);
+    cards.push({el:el,title:title,paras:paras});
   });
   cards.sort(function(a,b){return a.el.compareDocumentPosition(b.el)&Node.DOCUMENT_POSITION_FOLLOWING?-1:1});
   return cards;
@@ -842,6 +886,88 @@ function renderCanvas(){
     var cx=el.querySelector(':scope > .row > .cx'); if(cx)cx.onclick=function(ev){ev.stopPropagation(); ev.preventDefault(); doDelete(el.dataset.key)};
   });
 }
+/* 選取一個區塊：右上角浮出「擴大／刪除」，刪的就是框起來的那一塊 */
+var SEL_EL=null, SELX=null;
+function pathOf(el){   /* 用子節點序號記路徑：沒有 data-yeb 的容器也記得住 */
+  var p=[], x=el, d=el.ownerDocument;
+  while(x&&x!==d.body){ var i=0, y=x; while((y=y.previousElementSibling))i++; p.unshift(i); x=x.parentElement; }
+  return p.join('/');
+}
+function byPath(d,path){
+  var x=d.body, parts=String(path||'').split('/');
+  for(var i=0;i<parts.length;i++){ if(!x||!x.children)return null; x=x.children[+parts[i]]; }
+  return x||null;
+}
+function hideSel(){ if(SEL_EL)SEL_EL.classList.remove('yeb-sel'); SEL_EL=null; if(SELX)SELX.style.display='none'; }
+function placeSel(){
+  if(!SEL_EL||!SELX)return;
+  var r=SEL_EL.getBoundingClientRect(), h=(SEL_EL.ownerDocument.defaultView||{}).innerHeight||0;
+  if(r.bottom<0||r.top>h){ SELX.style.display='none'; return; }
+  SELX.style.display='flex';
+  SELX.style.top=Math.max(2,r.top-13)+'px';
+  SELX.style.left=Math.max(4,r.right-150)+'px';
+}
+function selectBlock(el){
+  if(!el)return; var d=el.ownerDocument;
+  if(!SELX||SELX.ownerDocument!==d){
+    SELX=d.createElement('div'); SELX.className='yeb-selbar'; SELX.setAttribute('data-audit-skip','1');
+    SELX.innerHTML='<button class="up" type="button">⌃ 擴大</button><button class="del" type="button">✕ 刪除</button>';
+    d.body.appendChild(SELX);
+    SELX.addEventListener('click',function(ev){
+      var b=ev.target&&ev.target.closest&&ev.target.closest('button'); if(!b)return;
+      ev.preventDefault(); ev.stopPropagation();
+      if(b.className==='up'){
+        var p=SEL_EL&&SEL_EL.parentElement;
+        if(p&&p!==d.body&&p!==d.documentElement){ selectBlock(p); toast('選取範圍擴大到外一層（'+(p.textContent||'').trim().length+' 字）'); }
+        else toast('已經是最外層了',1);
+        return;
+      }
+      delBlock(SEL_EL);
+    },true);
+    d.addEventListener('scroll',placeSel,true);
+    if(d.defaultView)d.defaultView.addEventListener('resize',placeSel);
+  }
+  if(SEL_EL)SEL_EL.classList.remove('yeb-sel');
+  SEL_EL=el; el.classList.add('yeb-sel'); placeSel();
+}
+function delBlock(el){
+  if(!el)return;
+  var t=tab(), path=pathOf(el), words=(el.textContent||'').trim();
+  ask('把框起來的這一塊從報告裡刪掉？\n\n「'+words.slice(0,60)+(words.length>60?'…':'')+'」\n\n共 '+words.length+' 字。按「復原」可以找回。','刪掉')
+    .then(function(y){
+      if(!y)return;
+      snap();
+      t.bdel=t.bdel||[]; t.bdel.push(anchorOf(el));
+      var inside={}; [].forEach.call(el.querySelectorAll('[data-yeb]'),function(x){inside[x.getAttribute('data-yeb')]=1});
+      if(el.getAttribute&&el.getAttribute('data-yeb'))inside[el.getAttribute('data-yeb')]=1;
+      var dropped=(t.marks||[]).filter(function(m){return inside[m.idx]}).length;
+      t.marks=(t.marks||[]).filter(function(m){return !inside[m.idx]});
+      hideSel(); if(el.parentNode)el.parentNode.removeChild(el);
+      closeEd(); updPill(); renderCanvas(); saveSoon();
+      toast('已刪掉這一塊'+(dropped?'（含 '+dropped+' 處修改）':'')+' · 按「復原」可找回');
+    });
+}
+function anchorOf(el){
+  /* 用段落編號定位：先找這塊裡第一個有編號的元素，再記「從它往上幾層才是這一塊」。
+     匯出時是重新解析原始檔（沒跑過報告自己的腳本），子節點路徑會對不上，編號才對得上。 */
+  var probe=(el.getAttribute&&el.getAttribute('data-yeb')!=null)?el:el.querySelector('[data-yeb]');
+  if(!probe)return {path:pathOf(el)};
+  var up=0, x=probe; while(x&&x!==el){ up++; x=x.parentElement; }
+  return {idx:probe.getAttribute('data-yeb'), up:up, path:pathOf(el)};
+}
+function replayBlockDels(d,list){
+  (list||[]).forEach(function(a){
+    var el=null;
+    if(typeof a==='string'){ el=byPath(d,a); }
+    else if(a&&a.idx!=null){
+      el=d.querySelector('[data-yeb="'+a.idx+'"]');
+      for(var i=0;i<(a.up||0)&&el;i++)el=el.parentElement;
+      if(!el&&a.path)el=byPath(d,a.path);
+    } else if(a&&a.path){ el=byPath(d,a.path); }
+    if(el&&el.parentNode&&el!==d.body)el.parentNode.removeChild(el);
+  });
+}
+
 /* 點右邊的段落 → 左邊跟著反應：架構模式選起它所屬的章／節；編輯模式左欄原稿同一段閃一下 */
 function echoLeft(el){
   if(!el)return;
@@ -984,14 +1110,14 @@ function savedDocs(){
   var out=[]; try{
     for(var i=0;i<localStorage.length;i++){ var k=localStorage.key(i); if(k.indexOf('yeb-doc-')!==0)continue;
       try{ var d=JSON.parse(localStorage.getItem(k));
-        out.push({slug:k.slice(8), name:d.name||k.slice(8), orig:d.orig||'', marks:d.marks||[], moves:d.moves||[], dels:d.dels||[],
+        out.push({slug:k.slice(8), name:d.name||k.slice(8), orig:d.orig||'', marks:d.marks||[], moves:d.moves||[], bdel:d.bdel||[], dels:d.dels||[],
                   gists:d.gists||{}, style:d.style||'', at:d.at||''});
       }catch(e){}
     }
   }catch(e){}
   return out.sort(function(a,b){return (b.at||'').localeCompare(a.at||'')});
 }
-function edits(d){ return (d.marks||[]).length+(d.moves||[]).length+(d.dels||[]).length; }
+function edits(d){ return (d.marks||[]).length+(d.moves||[]).length+(d.bdel||[]).length+(d.dels||[]).length; }
 function cleanStale(){
   savedDocs().forEach(function(d){ if(!edits(d)){ try{localStorage.removeItem('yeb-doc-'+d.slug)}catch(e){} } });
 }
@@ -1020,7 +1146,7 @@ $('#resumeSel').onchange=function(){
   if(t&&t.orig){ var empty=-1; TABS.forEach(function(x,i){ if(empty<0&&!x.orig)empty=i });
     if(empty>=0)CUR=empty; else if(TABS.length<5){TABS.push({name:'',slug:'',orig:'',marks:[]});CUR=TABS.length-1;}
     else {toast('五份都開滿了，先關掉一份',1);return;} t=tab(); }
-  t.name=d.name; t.slug=d.slug; t.orig=d.orig; t.marks=d.marks; t.moves=d.moves; t.dels=d.dels; t.gists=d.gists; t.style=d.style; t.loaded=true;
+  t.name=d.name; t.slug=d.slug; t.orig=d.orig; t.marks=d.marks; t.moves=d.moves; t.bdel=d.bdel||[]; t.dels=d.dels; t.gists=d.gists; t.style=d.style; t.loaded=true;
   renderTabs(); mountPanes(); toast('已接回「'+d.name+'」（'+edits(d)+' 處）');
 };
 
@@ -1031,7 +1157,7 @@ function useHtml(name, html){
     if(empty>=0)CUR=empty; else if(TABS.length<5){ TABS.push({name:'',slug:'',orig:'',marks:[]}); CUR=TABS.length-1; }
     else { toast('五份都開滿了，先關掉一份',1); return; } t=tab(); }
   if(!t){ TABS.push({name:'',slug:'',orig:'',marks:[]}); CUR=TABS.length-1; t=tab(); }
-  t.name=name; t.slug=name; t.orig=html; t.marks=[]; t.moves=[]; t.dels=[]; t.gists={}; t.style=''; t.loaded=true;
+  t.name=name; t.slug=name; t.orig=html; t.marks=[]; t.moves=[]; t.bdel=[]; t.dels=[]; t.gists={}; t.style=''; t.loaded=true;
   renderTabs(); mountPanes(); save(true); toast('已開啟「'+name+'」');
 }
 function loadLocalList(){
@@ -1055,8 +1181,8 @@ if($('#localSel'))$('#localSel').onchange=function(){
 /* ── 儲存／載入 ── */
 function saveSoon(){clearTimeout(tmrSave);tmrSave=setTimeout(function(){save(true)},600)}   /* 自動存檔安靜做，不要蓋掉剛剛那句提示 */
 function save(silent){ var t=tab(); if(!t||!t.slug)return;
-  if(OFFLINE){ try{localStorage.setItem('yeb-doc-'+t.slug,JSON.stringify({name:t.name,marks:t.marks,moves:t.moves||[],gists:t.gists||{},style:t.style||'',orig:t.orig,at:new Date().toISOString()}))}catch(e){toast('本機儲存失敗：這台電腦的瀏覽器只給 5MB，開太多份大報告會滿。請用「下載編輯後 HTML」保存進度',1);return} if(!silent)toast('已存到這台電腦的瀏覽器'); return; }
-  api('POST',EP.docs+'&name='+encodeURIComponent(t.slug)+'&part=state',{state:{name:t.name,marks:t.marks,moves:t.moves||[],gists:t.gists||{},style:t.style||''}}).then(function(){if(!silent)toast('已儲存')}); }
+  if(OFFLINE){ try{localStorage.setItem('yeb-doc-'+t.slug,JSON.stringify({name:t.name,marks:t.marks,moves:t.moves||[],bdel:t.bdel||[],gists:t.gists||{},style:t.style||'',orig:t.orig,at:new Date().toISOString()}))}catch(e){toast('本機儲存失敗：這台電腦的瀏覽器只給 5MB，開太多份大報告會滿。請用「下載編輯後 HTML」保存進度',1);return} if(!silent)toast('已存到這台電腦的瀏覽器'); return; }
+  api('POST',EP.docs+'&name='+encodeURIComponent(t.slug)+'&part=state',{state:{name:t.name,marks:t.marks,moves:t.moves||[],bdel:t.bdel||[],gists:t.gists||{},style:t.style||''}}).then(function(){if(!silent)toast('已儲存')}); }
 $('#btnSave').onclick=function(){save()};
 /* 儲存到檔案：寫進 reports\，當作工作檔；要上線還是走 ④ 的定稿發佈（有閘門＋上傳） */
 $('#btnFile').onclick=function(){
@@ -1096,13 +1222,13 @@ function exportHtml(t, opts){
   var st=d.createElement('style'); st.textContent=MARK_CSS.split('.yeb-ok').join('.yeb-ok-x'); d.head.appendChild(st);
   t.marks.forEach(function(m){var el=d.querySelector('[data-yeb="'+m.idx+'"]'); if(!el)return; el.innerHTML=withInline(m.after, m.beforeHtml||el.innerHTML); if(!m.approved&&opts.keepMarks)el.classList.add('yeb-emark');});
   var origOrder=unitsOf(d).filter(function(u){return u.level<=2}).map(function(u){return u.key});
-  replayMoves(d, t.moves||[]);
+  replayMoves(d, t.moves||[]); replayBlockDels(d, t.bdel||[]);
   d.querySelectorAll('[data-yeb]').forEach(function(e){e.removeAttribute('data-yeb')});
   /* 進度隨檔案走：把 marks 藏在檔尾，上傳回編輯器時原樣還原（複製到另一台電腦也能接著改） */
   if(opts.withStyle&&t.style){ var st=styleByName(t.style); if(st){ var old=d.getElementById('yoda-tokens'); if(old)old.remove();
     var sty=d.createElement('style'); sty.id='yoda-tokens'; sty.setAttribute('data-style',t.style); sty.textContent=cssFor(d,st); d.head.appendChild(sty); } }
   if(opts.carry){ var keep=d.createElement('script'); keep.type='application/json'; keep.id='yeb-marks';
-  keep.textContent=JSON.stringify({name:t.name,marks:t.marks,moves:t.moves||[],gists:t.gists||{},style:t.style||'',origOrder:origOrder}).split('</').join('<\\/'); d.body.appendChild(keep); }
+  keep.textContent=JSON.stringify({name:t.name,marks:t.marks,moves:t.moves||[],bdel:t.bdel||[],gists:t.gists||{},style:t.style||'',origOrder:origOrder}).split('</').join('<\\/'); d.body.appendChild(keep); }
   return '<!doctype html>\n'+d.documentElement.outerHTML;
 }
 function downloadTab(t, opts, quiet){ if(!t||!t.orig)return; var html=exportHtml(t,opts);
@@ -1116,7 +1242,7 @@ $('#oDownloadAll').onclick=function(){ var o=outOpts(), k=0; TABS.forEach(functi
   toast('已送出 '+k+' 份下載。沒看到檔就查瀏覽器的下載設定'); };
 $('#oSave').onclick=function(){ save(); };
 function renderOutTab(){ var t=tab(); var pend=t?(t.marks||[]).filter(function(m){return !m.approved}).length:0;
-  $('#oStat').innerHTML = t&&t.orig ? '這份：修改 <b>'+(t.marks||[]).length+'</b> 處（待認可 <b>'+pend+'</b>）· 章節搬動 <b>'+(t.moves||[]).filter(function(m){return m.pos!=='del'}).length+'</b> 次 · 刪除區塊 <b>'+(t.moves||[]).filter(function(m){return m.pos==='del'}).length+'</b> 個 · 視覺模組 <b>'+(t.style||'（無）')+'</b><br>字數 <b>'+fmtN(curWords())+'</b>（原稿 '+fmtN(origWords(t))+'；含收合內容全文 '+fmtN(curAllWords())+'）<br>所有分頁：'+TABS.filter(function(x){return x.orig}).length+' 份已匯入' : '先匯入一份報告'; }
+  $('#oStat').innerHTML = t&&t.orig ? '這份：修改 <b>'+(t.marks||[]).length+'</b> 處（待認可 <b>'+pend+'</b>）· 章節搬動 <b>'+(t.moves||[]).filter(function(m){return m.pos!=='del'}).length+'</b> 次 · 刪除區塊 <b>'+((t.bdel||[]).length+(t.moves||[]).filter(function(m){return m.pos==='del'}).length)+'</b> 個 · 視覺模組 <b>'+(t.style||'（無）')+'</b><br>字數 <b>'+fmtN(curWords())+'</b>（原稿 '+fmtN(origWords(t))+'；含收合內容全文 '+fmtN(curAllWords())+'）<br>所有分頁：'+TABS.filter(function(x){return x.orig}).length+' 份已匯入' : '先匯入一份報告'; }
 
 /* ═══ ③ 視覺模組：樣式來源＝雲端 /api/viz-styles，離線＝內嵌在檔尾的 yeb-styles；套用＝render＋接管，跟視覺控制台同一支 renderer ═══ */
 var STYLES={}, STYLE_NAMES=[];
@@ -1181,7 +1307,7 @@ function openCloud(slug, intoNew){
   toast('載入 '+slug+'…');
   Promise.all([fetch(EP.docs+'&name='+encodeURIComponent(slug)+'&part=original').then(function(r){return r.text()}),
                api('GET',EP.docs+'&name='+encodeURIComponent(slug)+'&part=state')])
-   .then(function(r){ t.orig=r[0]; t.slug=slug; t.name=r[1].name||slug; t.marks=r[1].marks||[]; t.moves=r[1].moves||[]; t.gists=r[1].gists||{}; t.style=r[1].style||''; t.loaded=true; renderTabs(); mountPanes(); });
+   .then(function(r){ t.orig=r[0]; t.slug=slug; t.name=r[1].name||slug; t.marks=r[1].marks||[]; t.moves=r[1].moves||[]; t.bdel=r[1].bdel||[]; t.gists=r[1].gists||{}; t.style=r[1].style||''; t.loaded=true; renderTabs(); mountPanes(); });
 }
 $('#btnOpen').onclick=function(){openCloud($('#cloudSel').value,false)};
 $('#cloudSel').onchange=function(){openCloud(this.value,false)};
@@ -1192,12 +1318,12 @@ if(OFFLINE){
   cleanStale();          /* 上次只是匯入沒動過的，開場就清掉——重開不該還躺著別份報告 */
   renderResume();        /* 真的改過的收進「接續上次」，要不要接由 Yoda 決定 */
   while(TABS.length<2)TABS.push({name:'',slug:'',orig:'',marks:[]});
-  loadRules(); loadLocalList(); switchTab(0); try{setMode(localStorage.getItem('yeb-mode')||'editor')}catch(e){} pingServer(); setInterval(pingServer, 20000);
+  loadRules(); loadLocalList(); switchTab(0); try{var _m=localStorage.getItem('yeb-mode'); setMode(_m==='style'||_m==='output'?_m:'canvas')}catch(e){setMode('canvas')} pingServer(); setInterval(pingServer, 20000);
 }
 else{
   var remembered=[]; try{remembered=JSON.parse(localStorage.getItem('yeb-tabs')||'[]')}catch(e){}
   while(TABS.length<2)TABS.push({name:'',slug:'',orig:'',marks:[]});
-  loadRules(); switchTab(0); try{setMode(localStorage.getItem('yeb-mode')||'editor')}catch(e){}
+  loadRules(); switchTab(0); try{var _m2=localStorage.getItem('yeb-mode'); setMode(_m2==='style'||_m2==='output'?_m2:'canvas')}catch(e){setMode('canvas')}
   loadCloudList().then(function(docs){
     var have={}; docs.forEach(function(d){have[d.slug]=1});
     remembered.filter(function(s){return s&&have[s]}).slice(0,3).forEach(function(s,i){CUR=i;openCloud(s,false)});
