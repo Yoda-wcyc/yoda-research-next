@@ -67,6 +67,10 @@ body.dragging iframe{pointer-events:none}
 /* 點擊即編的面板（蓋在右欄下方） */
 .ed{position:absolute;left:0;right:0;bottom:0;background:#0e131c;border-top:2px solid #2f6fb5;padding:10px 12px;display:none;box-shadow:0 -8px 24px rgba(0,0,0,.4)}
 .ed.on{display:block}
+/* 確認框：之前只寫了 class="modal" 卻沒有這條規則 → 框是隱形的，按了像沒反應（2026-09-07 修） */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:100000;padding:24px}
+.modal.on{display:flex}
+.modal .ed{position:static;display:block;width:520px;max-width:92vw;border:1px solid #2f6fb5;border-top:2px solid #2f6fb5;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
 .ed .lb{font:700 10.5px/1 ui-monospace,monospace;color:#5f7286;letter-spacing:.08em;margin-bottom:6px}
 .ed .fldlb{font-size:11.5px;color:#7f9fc6;margin:8px 0 3px}
 .ed textarea{width:100%;min-height:76px;background:#0b0f16;color:#e6eef8;border:1px solid #263242;border-radius:5px;padding:8px;font:14px/1.7 inherit;resize:vertical}
@@ -100,6 +104,8 @@ body.dragging iframe{pointer-events:none}
 .cnode.lv1>.row .ttl{font-size:14px}
 .cnode.lv1>.row .lv{background:#1b3a5c;color:#cfe0ff;border-color:#2f6fb5}
 .cnode.lv2>.row .lv{background:#1f2a1f;color:#9fd8b0;border-color:#2c4a34}
+.cnode.lv3>.row .lv{background:#241f2c;color:#c3b0d8;border-color:#3d3350}
+.cnode.lv3>.row .ttl{font-size:12px;color:#b9c7d6;font-weight:500}
 .cnode>.row{display:flex;align-items:flex-start;gap:8px;padding:7px 10px;cursor:grab}
 .cnode>.row:active{cursor:grabbing}
 .cnode .lv{font:700 10px/1 ui-monospace,monospace;color:#5f7286;background:#131a25;border:1px solid #263242;border-radius:4px;padding:3px 5px;margin-top:2px;flex:0 0 auto}
@@ -206,6 +212,8 @@ code{font:11.5px ui-monospace,Consolas,monospace;background:#131a25;padding:1px 
         <button id="edApply" class="pri">直接套用（用上面①的內文）</button>
         <button id="edAI">交給 Claude 修改（照②的指示）</button>
         <select id="edQuick" title="常用指令：選了直接送去改" style="max-width:210px"></select>
+        <button id="edUp" title="把選取範圍往外擴一層（可以一路擴到整張卡片）">⌃ 擴大選取</button>
+        <button id="edDel" class="danger" title="把框起來的這一塊整個從報告裡刪掉">✕ 刪除這一塊</button>
         <button id="edCancel">取消</button>
         <span class="sp" id="edStat"></span>
       </div>
@@ -331,8 +339,9 @@ var MARK_CSS='.yeb-mark{position:relative;outline:2px solid rgba(255,80,80,.85);
  '[data-yeb]{cursor:text}[data-yeb]:hover{outline:1px dashed rgba(127,159,198,.7);outline-offset:2px}'+
  '.yeb-emark{outline:2px solid #ff3b3b;outline-offset:2px;animation:yebBlink 1.6s ease-in-out infinite}'+
  '.yeb-sel{outline:2px dashed #7fb0ff!important;outline-offset:3px;background:rgba(47,111,181,.10)}'+
- '.yeb-selbar{position:fixed;z-index:100000;display:none;gap:6px;font:700 11px/1 -apple-system,sans-serif}'+
- '.yeb-selbar button{font:inherit;border:0;border-radius:11px;padding:5px 10px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.45)}'+
+ '.yeb-selbar{position:fixed!important;z-index:2147483000!important;display:none;gap:6px;font:700 11px/1 -apple-system,sans-serif;white-space:nowrap;pointer-events:auto!important}'+
+ '.yeb-selbar.on{display:flex!important}'+
+ '.yeb-selbar button{font:inherit!important;position:static!important;border:0!important;border-radius:11px!important;padding:5px 10px!important;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.45);opacity:1!important;visibility:visible!important;width:auto!important;height:auto!important;margin:0!important}'+
  '.yeb-selbar .up{background:#1b3a5c;color:#dbe8f6}'+
  '.yeb-selbar .del{background:#7a1f2c;color:#ffdede}'+
  '.yeb-flash{outline:3px solid #2f6fb5;outline-offset:3px;border-radius:4px;animation:yebFlash 1.6s ease-out 1}@keyframes yebFlash{0%{outline-color:#7fb0ff;background:rgba(47,111,181,.18)}100%{outline-color:transparent;background:transparent}}';
@@ -674,6 +683,13 @@ function openEd(el){
 }
 function closeEd(){$('#ed').classList.remove('on');ED_EL=null}
 $('#edCancel').onclick=closeEd;
+$('#edUp').onclick=function(){
+  var el=SEL_EL||ED_EL; if(!el){toast('先點一段',1);return}
+  var p=el.parentElement, d=el.ownerDocument;
+  if(p&&p!==d.body&&p!==d.documentElement){ selectBlock(p); toast('選取範圍擴大到外一層（'+(p.textContent||'').trim().length+' 字）'); }
+  else toast('已經是最外層了',1);
+};
+$('#edDel').onclick=function(){ var el=SEL_EL||ED_EL; if(!el){toast('先點一段',1);return} delBlock(el); };
 $('#edApply').onclick=function(){ if(!ED_EL)return;
   var v=$('#edText').value;
   /* 同樣的陷阱：指示打在內文框又按了直接套用，整段會被那句話取代 */
@@ -820,6 +836,32 @@ function cardUnits(chapter){
   cards.sort(function(a,b){return a.el.compareDocumentPosition(b.el)&Node.DOCUMENT_POSITION_FOLLOWING?-1:1});
   return cards;
 }
+var PART_SEL='table,figure,.ascii-fig,.dtree,.chip-tbl,.viz,.kv,.ladder-grid,.cards,.grid,ul,ol,pre,blockquote,.hl-box,.alertbox,.rv-row,.op-tbl,.env-regime';
+function partLabel(el){
+  var cap=el.querySelector&&el.querySelector('caption,figcaption,th,.cap,.fig-cap,.hd');
+  var t=(cap?txt(cap):'')||txt(el);
+  t=t.replace(/\s+/g,' ').trim();
+  var tag=el.tagName.toLowerCase();
+  var kind=tag==='table'?'表':(tag==='ul'||tag==='ol')?'清單':(tag==='pre'?'圖':(/ascii-fig|dtree|viz|figure/.test(el.className+' '+tag)?'圖':'塊'));
+  if(tag==='table'){ var rows=el.querySelectorAll('tr').length; return '表｜'+t.slice(0,22)+'（'+rows+' 列）'; }
+  if(tag==='ul'||tag==='ol'){ return '清單｜'+t.slice(0,22)+'（'+el.children.length+' 項）'; }
+  return kind+'｜'+t.slice(0,26);
+}
+function partUnits(sec){
+  var out=[], seen=[];
+  if(!sec||!sec.querySelectorAll)return out;
+  [].forEach.call(sec.querySelectorAll(PART_SEL),function(el){
+    if(el.closest('nav'))return;
+    if(seen.some(function(o){return o.contains(el)}))return;      /* 只取最外層 */
+    if(txt(el).length<12)return;
+    seen.push(el);
+  });
+  if(!seen.length){   /* 這個節本身就是一張表／一段長內容：改用它的直接子區塊當第三層 */
+    [].forEach.call(sec.children,function(c){ if(txt(c).length>=16&&seen.length<12)seen.push(c); });
+  }
+  seen.slice(0,12).forEach(function(el){ out.push({el:el,title:partLabel(el),paras:textBlocks(el).length}); });
+  return out;
+}
 function unitsOf(d){
   var units=[], dup={};
   chapterUnits(d).forEach(function(ch){
@@ -831,6 +873,11 @@ function unitsOf(d){
     cardUnits(ch).forEach(function(c){
       var b2=k+'>節:'+c.title.slice(0,30), k2=b2+':'+(d2[b2]=(d2[b2]||0)+1);
       units.push({key:k2,level:2,title:c.title,nodes:[c.el],cont:c.el,anchor:c.el,snippet:txt(c.el).slice(c.title.length,c.title.length+500),parent:k,paras:c.paras});
+      var d3={};
+      partUnits(c.el).forEach(function(pt){
+        var b3=k2+'>塊:'+pt.title.slice(0,26), k3=b3+':'+(d3[b3]=(d3[b3]||0)+1);
+        units.push({key:k3,level:3,title:pt.title,nodes:[pt.el],cont:pt.el,anchor:pt.el,snippet:txt(pt.el).slice(0,300),parent:k2,paras:pt.paras});
+      });
     });
     u.paras=ch.nodes.reduce(function(a,nd){return a+(nd.querySelectorAll?textBlocks(nd).length:0)},0);
   });
@@ -865,12 +912,14 @@ function renderCanvas(){
   var dE=$('#ifE')&&$('#ifE').contentDocument; if(!dE||!dE.body){host.innerHTML='<div class="empty2">報告載入中…</div>';return}
   var units=unitsOf(dE), root=treeOf(units), movedKeys={}; (t.moves||[]).forEach(function(m){if(m.pos!=='del')movedKeys[m.key]=1});
   var dels=(t.moves||[]).filter(function(m){return m.pos==='del'});
-  var LV={1:'章',2:'節'};
+  var LV={1:'章',2:'節',3:'塊'};
   function li(u){ var g=(t.gists||{})[u.key];
-    return '<li class="cnode lv'+u.level+(movedKeys[u.key]?' moved':'')+'" data-key="'+esc(u.key)+'" draggable="true"><div class="row"><span class="lv">'+LV[u.level]+'</span><div style="min-width:0;flex:1"><div class="ttl">'+esc(u.title)+'</div>'+(g?'<div class="gist">'+esc(g)+'</div>':'')+'<div class="meta">'+(u.level===1?(u.children.length+' 節 · '):'')+(u.paras?u.paras+' 段':'')+'</div></div>'+(u.children.length?'<span class="tg" title="收合／展開">▾ '+u.children.length+'</span>':'')+'<span class="cx" title="從報告裡刪掉這個區塊（可復原）">✕</span></div>'+(u.children.length?'<ul>'+u.children.map(li).join('')+'</ul>':'')+'</li>'; }
+    return '<li class="cnode lv'+u.level+(u.level===2&&u.children.length?' collapsed':'')+(movedKeys[u.key]?' moved':'')+'" data-key="'+esc(u.key)+'" draggable="true"><div class="row"><span class="lv">'+LV[u.level]+'</span><div style="min-width:0;flex:1"><div class="ttl">'+esc(u.title)+'</div>'+(g?'<div class="gist">'+esc(g)+'</div>':'')+'<div class="meta">'+(u.level===1?(u.children.length+' 節 · '):'')+(u.paras?u.paras+' 段':'')+'</div></div>'+(u.children.length?'<span class="tg" title="收合／展開">▾ '+u.children.length+'</span>':'')+'<span class="cx" title="從報告裡刪掉這個區塊（可復原）">✕</span></div>'+(u.children.length?'<ul>'+u.children.map(li).join('')+'</ul>':'')+'</li>'; }
   host.innerHTML=root.children.length?'<ul>'+root.children.map(li).join('')+'</ul>':'<div class="empty2">這份報告抓不到章節（沒有 nav、.section、#sec-*、h1/h2）</div>';
-  var n1=units.filter(function(u){return u.level===1}).length, n2=units.length-n1;
-  $('#cvStat').textContent='章 '+n1+' · 節 '+n2+' · 已搬動 '+Object.keys(movedKeys).length+(dels.length?' · 已刪除 '+dels.length:'')+(Object.keys(t.gists||{}).length?' · 脈絡 '+Object.keys(t.gists).length:'');
+  var n1=units.filter(function(u){return u.level===1}).length,
+      n2=units.filter(function(u){return u.level===2}).length,
+      n3=units.filter(function(u){return u.level===3}).length;
+  $('#cvStat').textContent='章 '+n1+' · 節 '+n2+' · 塊 '+n3+' · 已搬動 '+Object.keys(movedKeys).length+(dels.length?' · 已刪除 '+dels.length:'')+(Object.keys(t.gists||{}).length?' · 脈絡 '+Object.keys(t.gists).length:'');
   $('#cvStat').title=dels.length?'已刪除（按「復原」或「重設結構」可找回）：'+dels.map(function(m){return m.title||m.key}).join('、'):'';
   host.querySelectorAll('.cnode').forEach(function(el){
     el.addEventListener('dragstart',function(ev){ if(ev.target.closest('.cnode')!==el)return; DRAG=el.dataset.key; el.classList.add('drag'); ev.dataTransfer.effectAllowed='move'; try{ev.dataTransfer.setData('text/plain',DRAG)}catch(e){} ev.stopPropagation(); });
@@ -898,13 +947,15 @@ function byPath(d,path){
   for(var i=0;i<parts.length;i++){ if(!x||!x.children)return null; x=x.children[+parts[i]]; }
   return x||null;
 }
-function hideSel(){ if(SEL_EL)SEL_EL.classList.remove('yeb-sel'); SEL_EL=null; if(SELX)SELX.style.display='none'; }
+function hideSel(){ if(SEL_EL)SEL_EL.classList.remove('yeb-sel'); SEL_EL=null; if(SELX)SELX.classList.remove('on'); }
 function placeSel(){
   if(!SEL_EL||!SELX)return;
-  var r=SEL_EL.getBoundingClientRect(), h=(SEL_EL.ownerDocument.defaultView||{}).innerHeight||0;
-  if(r.bottom<0||r.top>h){ SELX.style.display='none'; return; }
-  SELX.style.display='flex';
-  SELX.style.top=Math.max(2,r.top-13)+'px';
+  var d=SEL_EL.ownerDocument, w=d.defaultView||{};
+  var r=SEL_EL.getBoundingClientRect(), vh=w.innerHeight||d.documentElement.clientHeight||0;
+  /* 視窗座標＋固定定位：報告內部有自己的捲動容器時也對得準。不做隱藏判斷，只把位置夾在畫面內 */
+  SELX.classList.add('on');
+  var top=r.top-13; if(top<2)top=Math.min(r.bottom-26, r.top+6); if(vh&&top>vh-30)top=vh-30;
+  SELX.style.top=Math.max(2,top)+'px';
   SELX.style.left=Math.max(4,r.right-150)+'px';
 }
 function selectBlock(el){
@@ -925,7 +976,7 @@ function selectBlock(el){
       delBlock(SEL_EL);
     },true);
     d.addEventListener('scroll',placeSel,true);
-    if(d.defaultView)d.defaultView.addEventListener('resize',placeSel);
+    if(d.defaultView){d.defaultView.addEventListener('resize',placeSel); d.defaultView.addEventListener('scroll',placeSel,true);}
   }
   if(SEL_EL)SEL_EL.classList.remove('yeb-sel');
   SEL_EL=el; el.classList.add('yeb-sel'); placeSel();
