@@ -152,9 +152,6 @@ code{font:11.5px ui-monospace,Consolas,monospace;background:#131a25;padding:1px 
     <button id="btnFile" title="把目前這份寫成 reports\ 裡的 HTML 檔（同名舊檔會先備份）；不跑閘門、不上傳">存成檔案</button>
     <button id="btnDownload" title="下載成 .edited.html">下載</button>
   </div>
-  <div class="grp grp-view"><span class="gl">版面</span>
-    <div class="seg" id="layoutSeg" title="版面"><button data-l="split" class="on">左右</button><button data-l="right">只看右</button><button data-l="fit">全幅</button></div>
-  </div>
   <span class="pill" id="pMarks">—</span>
   <span class="sp"></span>
 </div>
@@ -239,7 +236,7 @@ var OFFLINE=(location.protocol==='file:')||/^(localhost|127\.0\.0\.1):8777$/.tes
 var MODE='editor';   /* 'canvas' | 'editor' | 'style' | 'output' */
 var LAYOUT='split';  /* split 左右 | right 右側全幅 | fit 左右＋把報告整份縮進欄寬（報告多半固定 1200px 寬） */
 function setLayout(l){ LAYOUT=l; document.body.classList.toggle('layout-right',l==='right');
-  document.querySelectorAll('#layoutSeg button').forEach(function(b){b.classList.toggle('on',b.dataset.l===l)});
+  var seg=document.querySelectorAll('#layoutSeg button'); if(seg.length)seg.forEach(function(b){b.classList.toggle('on',b.dataset.l===l)});
   try{localStorage.setItem('yeb-layout',l)}catch(e){} setTimeout(fitFrames,50); }
 function fitFrames(){
   ['ifO','ifE'].forEach(function(id){ var f=$('#'+id); if(!f)return; var host=f.parentElement; f.style.cssText='';
@@ -843,7 +840,7 @@ $('#cvAI').onclick=function(){
    .catch(function(){ $('#cvAI').disabled=false; $('#cvStat').textContent='失敗'; });
 };
 document.querySelectorAll('#modes button').forEach(function(b){b.onclick=function(){setMode(b.dataset.mode)}});
-document.querySelectorAll('#layoutSeg button').forEach(function(b){b.onclick=function(){setLayout(b.dataset.l)}});
+document.querySelectorAll('#layoutSeg button').forEach(function(b){b.onclick=function(){setLayout(b.dataset.l)}});   /* 版面切換鈕已移除；這行留著不影響 */
 (function(){ var sp=$('#split'), drag=false;
   sp.addEventListener('mousedown',function(e){drag=true; sp.classList.add('on'); document.body.classList.add('dragging'); e.preventDefault()});
   window.addEventListener('mousemove',function(e){ if(!drag)return; var r=document.querySelector('.panes').getBoundingClientRect();
@@ -852,7 +849,8 @@ document.querySelectorAll('#layoutSeg button').forEach(function(b){b.onclick=fun
     try{localStorage.setItem('yeb-leftw', document.documentElement.style.getPropertyValue('--leftw'))}catch(e){} });
   try{ var w=localStorage.getItem('yeb-leftw'); if(w)document.documentElement.style.setProperty('--leftw',w); }catch(e){}
 })();
-try{ var _l=localStorage.getItem('yeb-layout'); if(_l)setLayout(_l); }catch(e){}
+setLayout('split');   /* 版面固定左右對照：切換鈕拿掉了，別讓上次存的 right／fit 把人鎖在單欄 */
+try{ localStorage.removeItem('yeb-layout'); }catch(e){}
 
 /* ── 快速指令：常用的那幾句存進規則檔（兩台電腦跟著 rules 同步），選了就直接送去改 ── */
 var QUICK_SEED=['縮短到 50 字','口語一點，別用書面語','改成因果鍊寫法（A→B→C）','把結論放到第一句','刪掉贅字，意思不要變','數字後面補上它代表什麼'];
