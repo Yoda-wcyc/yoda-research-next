@@ -168,6 +168,7 @@ code{font:11.5px ui-monospace,Consolas,monospace;background:#131a25;padding:1px 
       <div class="row">
         <button id="edApply" class="pri">直接套用（用上面①的內文）</button>
         <button id="edAI">交給 Claude 修改（照②的指示）</button>
+        <select id="edQuick" title="常用指令：選了直接送去改" style="max-width:210px"></select>
         <button id="edCancel">取消</button>
         <span class="sp" id="edStat"></span>
       </div>
@@ -180,6 +181,13 @@ code{font:11.5px ui-monospace,Consolas,monospace;background:#131a25;padding:1px 
   <div id="rlText" style="display:none"><label>規則（一句話）</label><textarea id="rlWriting" rows="3"></textarea></div>
   <label>備註（選填）</label><input type="text" id="rlNote">
   <div class="row"><button id="rlCancel">取消</button><button id="rlSave" class="pri">存成規則</button></div></div></div>
+<div id="srvbar" style="display:none;position:fixed;left:0;right:0;top:0;z-index:99999;background:#5a2630;color:#ffdede;
+     font:13px/1.6 -apple-system,'Noto Sans TC',sans-serif;padding:9px 14px;box-shadow:0 2px 10px rgba(0,0,0,.4)">
+  <b>本機伺服器沒開</b>——規則、Claude、定稿發佈都會失敗。
+  最快的作法：雙擊 <code style="background:#00000044;padding:1px 5px;border-radius:4px">G:\Yoda x Claude\Skill\開工作台.cmd</code>；
+  排程也會在五分鐘內自動把它拉起來。
+  <button id="srvRetry" style="margin-left:10px;font:inherit;background:#ffdede;color:#5a2630;border:0;border-radius:6px;padding:3px 12px;cursor:pointer">重試</button>
+</div>
 <div id="toast"></div>
 
 <script>
@@ -193,9 +201,9 @@ var KEY=new URLSearchParams(location.search).get('k')||'';
 var EP={docs:'/api/editor-docs?k='+encodeURIComponent(KEY), ai:'/api/editor-ai?k='+encodeURIComponent(KEY), rules:'/api/editor-rules?k='+encodeURIComponent(KEY)};
 var LOCAL='http://localhost:8777';
 function aiUrl(){ return OFFLINE ? LOCAL+'/api/ai' : EP.ai; }   /* 本機工作台：Claude 請求打本機 token_server（金鑰在伺服器，不進網頁）；別在載入當下判斷，OFFLINE 宣告在後面 */   /* 本機 token_server：規則、定稿發佈（file:// 開的工作台也能打，伺服器有開 CORS） */
-var RULES={replace:[],ban:[],writing:[]}, LOCAL_UP=false;
+var RULES={replace:[],ban:[],writing:[],quick:[]}, LOCAL_UP=false;
 function rulesUrl(){ return OFFLINE? LOCAL+'/api/rules' : EP.rules; }
-function loadRules(){ return fetch(rulesUrl()).then(function(r){return r.json()}).then(function(j){ RULES={replace:j.replace||[],ban:j.ban||[],writing:j.writing||[]}; if(OFFLINE)LOCAL_UP=true; return RULES; }).catch(function(){ return RULES; }); }
+function loadRules(){ return fetch(rulesUrl()).then(function(r){return r.json()}).then(function(j){ RULES={replace:j.replace||[],ban:j.ban||[],writing:j.writing||[],quick:j.quick||[]}; renderQuick(); if(OFFLINE)LOCAL_UP=true; return RULES; }).catch(function(){ return RULES; }); }
 function saveRules(){ return fetch(rulesUrl(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(RULES)}).then(function(r){return r.json()}); }
 var TABS=[], CUR=-1, tmrSave=null, SYNC_LOCK=false;
 var OFFLINE=(location.protocol==='file:')||/^(localhost|127\.0\.0\.1):8777$/.test(location.host);   /* 本機模式：雙擊開的檔，或本機伺服器供的頁（http://localhost:8777/workbench）——兩種開法行為要一樣 */
@@ -585,6 +593,7 @@ function openEd(el){
   var rich=[].filter.call(el.querySelectorAll(INLINE_SEL),function(x){return (x.textContent||'').trim().length>=2});
   $('#edWarn').style.display=rich.length?'':'none';
   $('#edWarn').textContent=rich.length?('這段裡有 '+rich.length+' 處格式（粗體／連結等）。改寫後我會把「原字沒被改掉」的那幾處自動接回來，被改掉的就會變純文字；按「✕ 退回」可以完整還原。'):'';
+  renderQuick();
   $('#ed').classList.add('on'); $('#edText').focus();
 }
 function closeEd(){$('#ed').classList.remove('on');ED_EL=null}
@@ -613,7 +622,7 @@ $('#edAI').onclick=function(){
      toast('已套用到右側預覽（'+({api:'金鑰直打',cli:'本機 Claude',cloud:'雲端'}[j.engine]||'Claude')+'）· 紅框處待你認可'); })
    .catch(function(e){ $('#edAI').disabled=false;
      var msg=String(e&&e.message||e);
-     if(/Failed to fetch|NetworkError/i.test(msg)) msg=OFFLINE?'連不到本機伺服器：先跑 python Skill\\token_server.py':'連不到雲端';
+     if(/Failed to fetch|NetworkError/i.test(msg)) msg=OFFLINE?'連不到本機伺服器。最快：雙擊 G:\\Yoda x Claude\\Skill\\開工作台.cmd（排程也會在五分鐘內自動拉起）':'連不到雲端';
      $('#edStat').textContent=msg; $('#edStat').style.color='#ff9a9a'; $('#edStat').style.whiteSpace='pre-wrap'; });
 };
 
@@ -816,6 +825,52 @@ document.querySelectorAll('#layoutSeg button').forEach(function(b){b.onclick=fun
 })();
 try{ var _l=localStorage.getItem('yeb-layout'); if(_l)setLayout(_l); }catch(e){}
 
+/* ── 快速指令：常用的那幾句存進規則檔（兩台電腦跟著 rules 同步），選了就直接送去改 ── */
+var QUICK_SEED=['縮短到 50 字','口語一點，別用書面語','改成因果鍊寫法（A→B→C）','把結論放到第一句','刪掉贅字，意思不要變','數字後面補上它代表什麼'];
+function quickList(){ var q=(RULES.quick||[]).filter(function(x){return x&&String(x).trim()}); return q.length?q:QUICK_SEED; }
+function renderQuick(){
+  var sel=$('#edQuick'); if(!sel)return;
+  var h='<option value="">快速指令…</option>';
+  quickList().forEach(function(q,i){ h+='<option value="i'+i+'">'+esc(q)+'</option>'; });
+  h+='<option value="__add__">＋ 新增一句指令…</option><option value="__del__">— 刪掉某一句 —</option>';
+  sel.innerHTML=h;
+}
+function saveQuick(){ RULES.quick=quickList(); return saveRules().then(function(){renderQuick()}).catch(function(){renderQuick()}); }
+$('#edQuick').onchange=function(){
+  var v=this.value; this.selectedIndex=0; if(!v)return;
+  if(v==='__add__'){
+    var t=prompt('新增一句常用指令（例如：縮短到 50 字 / 把結論放第一句）');
+    if(!t||!t.trim())return;
+    RULES.quick=quickList().concat([t.trim()]); saveQuick(); toast('已加入快速指令：'+t.trim()); return;
+  }
+  if(v==='__del__'){
+    var list=quickList(), msg=list.map(function(q,i){return (i+1)+'. '+q}).join(String.fromCharCode(10));
+    var k=prompt('要刪哪一句？輸入編號：'+String.fromCharCode(10)+String.fromCharCode(10)+msg);
+    var i=parseInt(k,10); if(!i||i<1||i>list.length)return;
+    var gone=list[i-1]; RULES.quick=list.filter(function(_,j){return j!==i-1}); saveQuick(); toast('已刪掉：'+gone); return;
+  }
+  var idx=parseInt(v.slice(1),10), inst=quickList()[idx]; if(!inst)return;
+  if(!ED_EL){toast('先點一段要改的內容',1);return}
+  $('#edInst').value=inst;        /* 選了就直接送出，不用再按一次 */
+  $('#edAI').click();
+};
+
+/* ── 本機伺服器活著沒：連不到就掛常駐橫幅，別讓人對著一句話發呆 ── */
+function pingServer(){
+  if(!OFFLINE)return Promise.resolve(false);
+  return fetch(LOCAL+'/api/ping',{cache:'no-store'}).then(function(r){return r.json()}).then(function(j){
+    LOCAL_UP=true; $('#srvbar').style.display='none'; document.body.style.paddingTop='';
+    if(!j.consoleToken&&!SRV_WARNED){ SRV_WARNED=true; toast('本機伺服器沒有 CONSOLE_TOKEN，雲端那條後路會失敗（本機 Claude 仍可用）',1); }
+    return true;
+  }).catch(function(){
+    LOCAL_UP=false; $('#srvbar').style.display=''; document.body.style.paddingTop=$('#srvbar').offsetHeight+'px';
+    return false;
+  });
+}
+var SRV_WARNED=false;
+$('#srvRetry').onclick=function(){ var b=this; b.disabled=true; b.textContent='檢查中…';
+  pingServer().then(function(up){ b.disabled=false; b.textContent='重試'; if(up)toast('連上了'); else toast('還是連不到——雙擊 開工作台.cmd 最快',1); }); };
+
 /* ── 上次的進度：有改過的才留，開場不自動掛回來 ── */
 function savedDocs(){
   var out=[]; try{
@@ -1004,7 +1059,7 @@ if(OFFLINE){
   cleanStale();          /* 上次只是匯入沒動過的，開場就清掉——重開不該還躺著別份報告 */
   renderResume();        /* 真的改過的收進「接續上次」，要不要接由 Yoda 決定 */
   while(TABS.length<3)TABS.push({name:'',slug:'',orig:'',marks:[]});
-  loadRules(); loadLocalList(); switchTab(0); try{setMode(localStorage.getItem('yeb-mode')||'editor')}catch(e){} fetch(LOCAL+'/api/ping').then(function(r){return r.json()}).then(function(j){LOCAL_UP=true; if(!j.consoleToken)toast('本機伺服器沒有 CONSOLE_TOKEN，「交給 Claude 修改」會失敗（設環境變數或 Skill\\.console_token）',1)}).catch(function(){toast('本機伺服器沒開：規則、Claude、定稿發佈都用不了（python Skill\\token_server.py）',1)});
+  loadRules(); loadLocalList(); switchTab(0); try{setMode(localStorage.getItem('yeb-mode')||'editor')}catch(e){} pingServer(); setInterval(pingServer, 20000);
 }
 else{
   var remembered=[]; try{remembered=JSON.parse(localStorage.getItem('yeb-tabs')||'[]')}catch(e){}
