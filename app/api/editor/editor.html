@@ -226,6 +226,11 @@ code{font:11.5px ui-monospace,Consolas,monospace;background:#131a25;padding:1px 
   排程也會在五分鐘內自動把它拉起來。
   <button id="srvRetry" style="margin-left:10px;font:inherit;background:#ffdede;color:#5a2630;border:0;border-radius:6px;padding:3px 12px;cursor:pointer">重試</button>
 </div>
+<div class="modal" id="askDlg"><div class="ed" style="max-width:520px">
+  <div class="lb">請確認</div>
+  <div id="askMsg" style="white-space:pre-wrap;line-height:1.7;font-size:13px;color:#dbe8f6;margin:6px 0 12px"></div>
+  <div class="row"><button id="askOk" class="pri">確定</button><button id="askNo">取消</button></div>
+</div></div>
 <div id="toast"></div>
 
 <script>
@@ -274,6 +279,22 @@ function setMode(m){ MODE=m; document.querySelectorAll('#modes button[data-mode]
   try{updWords()}catch(e){}
   try{localStorage.setItem('yeb-mode',m)}catch(e){} if(m==='canvas')renderCanvas(); if(m==='style')renderStyleTab(); if(m==='output')renderOutTab(); }   /* 雙擊本機開＝離線模式：手動改、標記、認可、下載；沒有 Claude 與雲端 */
 
+/* 頁面內建的確認框：不用瀏覽器原生 confirm。原生的一旦被使用者勾掉「不要再顯示」，
+   之後每次都直接回 false，按鈕看起來就像壞掉（2026-09-07 Yoda 的畫布 ✕ 就是這樣）。 */
+function ask(msg, okLabel){
+  return new Promise(function(res){
+    var d=$('#askDlg'), ok=$('#askOk'), no=$('#askNo');
+    $('#askMsg').textContent=msg; ok.textContent=okLabel||'確定';
+    d.classList.add('on');
+    function done(v){ d.classList.remove('on'); ok.onclick=null; no.onclick=null;
+      document.removeEventListener('keydown',key,true); res(v); }
+    function key(e){ if(e.key==='Escape'){e.preventDefault();e.stopPropagation();done(false)}
+                     else if(e.key==='Enter'){e.preventDefault();e.stopPropagation();done(true)} }
+    ok.onclick=function(){done(true)}; no.onclick=function(){done(false)};
+    document.addEventListener('keydown',key,true);
+    setTimeout(function(){try{ok.focus()}catch(e){}},30);
+  });
+}
 function toast(m,bad){var t=$('#toast');t.textContent=m;t.className=bad?'bad':'';t.style.display='block';clearTimeout(t._t);t._t=setTimeout(function(){t.style.display='none'},bad?5000:1800)}
 function api(m,u,b,gz){
   var h={'Content-Type':'application/json'}, body=b?JSON.stringify(b):undefined;
@@ -346,7 +367,11 @@ function renderTabs(){
   try{localStorage.setItem('yeb-tabs',JSON.stringify(TABS.map(function(t){return t.slug})))}catch(e){}
 }
 function closeTab(i){ var x=TABS[i];
-  if(x&&x.orig&&((x.marks||[]).length||(x.moves||[]).length)&&!confirm('關掉「'+(x.name||'這份')+'」？\n\n這份有 '+(x.marks||[]).length+' 處修改、'+(x.moves||[]).length+' 次結構調整。\n（進度有存在這台電腦的瀏覽器，重新匯入同一份可以接回）'))return;
+  if(x&&x.orig&&((x.marks||[]).length||(x.moves||[]).length)){
+    ask('關掉「'+(x.name||'這份')+'」？\n\n這份有 '+(x.marks||[]).length+' 處修改、'+(x.moves||[]).length+' 次結構調整。\n（進度有存在這台電腦的瀏覽器，重新匯入同一份可以接回）','關掉')
+      .then(function(y){ if(y){ x.marks=[]; x.moves=[]; closeTab(i); } });
+    return;
+  }
   if(x&&x.slug&&!((x.marks||[]).length||(x.moves||[]).length||(x.dels||[]).length)){ try{localStorage.removeItem('yeb-doc-'+x.slug)}catch(e){} }   /* 沒動過就別留到下次 */
   if(TABS.length<=1){TABS[0]={name:'',slug:'',orig:'',marks:[],loaded:false};switchTab(0);return} TABS.splice(i,1); switchTab(Math.min(CUR,TABS.length-1)); }
 function switchTab(i){ CUR=i; renderTabs(); mountPanes(); }
@@ -396,7 +421,7 @@ function setupPanes(){
     var no=ev.target.closest&&ev.target.closest('.yeb-no'); if(no){reject(no.getAttribute('data-mark'));ev.preventDefault();ev.stopPropagation();return}
     var ru=ev.target.closest&&ev.target.closest('.yeb-rule'); if(ru){openRuleDlg(ru.getAttribute('data-mark'));ev.preventDefault();ev.stopPropagation();return}
     var el=ev.target.closest&&ev.target.closest('[data-yeb]'); if(!el)return;
-    ev.preventDefault(); ev.stopPropagation(); openEd(el);
+    ev.preventDefault(); ev.stopPropagation(); echoLeft(el); openEd(el);
   },true);
   /* 同步滾動：以「視窗最上緣的段落」對齊 */
   var wO=$('#ifO').contentWindow, wE=$('#ifE').contentWindow;
@@ -585,8 +610,11 @@ $('#btnReview').onclick=function(){
   if(!blocks.length){toast('沒有可審的段落');return}
   var chunks=[]; for(var i=0;i<blocks.length;i+=90)chunks.push(blocks.slice(i,i+90));
   var chars=blocks.reduce(function(a,b){return a+b.text.length},0);
-  if(!confirm('送 '+blocks.length+' 段（約 '+Math.round(chars/1000)+' 千字，分 '+chunks.length+' 批）給 Claude 先審一輪？'))return;
-  var total=0, bad=0, eng='', btn=this; btn.disabled=true; snap();
+  var btn=this;
+  ask('送 '+blocks.length+' 段（約 '+Math.round(chars/1000)+' 千字，分 '+chunks.length+' 批）給 Claude 先審一輪？','開始審')
+    .then(function(y){ if(y)runReview(); });
+  function runReview(){
+  var total=0, bad=0, eng=''; btn.disabled=true; snap();
   (function next(i){
     if(i>=chunks.length){ btn.disabled=false; updPill(); saveSoon();
       toast('AI 審完（'+(eng==='cli'?'本機 Claude':eng||'Claude')+'）：'+total+' 處待你認可'+(bad?'；有 '+bad+' 批格式對不上':''), bad?1:0); return; }
@@ -604,21 +632,27 @@ $('#btnReview').onclick=function(){
       eng=j.engine||eng; next(i+1);
     }).catch(function(e){ btn.disabled=false; toast('第 '+(i+1)+' 批失敗，已停：'+(e&&e.message||''),1); });
   })(0);
+  }
 };
 /* ── ④ 定稿發佈：閘門 → reports\ → Blob（本機 token_server 做）；雲端版先存定稿再回本機落地 ── */
 $('#pGo').onclick=function(){
   var t=tab(); if(!t||!t.orig)return;
   var pend=(t.marks||[]).filter(function(m){return !m.approved}).length;
-  if(pend&&!confirm('還有 '+pend+' 處未認可，視同全部認可後發佈？'))return;
+  var t=tab();
+  ask((pend?('還有 '+pend+' 處未認可，視同全部認可後發佈。\n\n'):'')+
+      (!/\d{8}/.test(t.name)?('檔名「'+t.name+'」沒有日期（YYYYMMDD）——會員專區照檔名排序分類，這份會排到最後一名、歸「其他」。\n\n'):'')+
+      '確定要定稿發佈「'+t.name+'」？（跑閘門 → 存進 reports → 推 Blob 上線）','定稿發佈')
+    .then(function(y){ if(y)doPublish(); });
+  function doPublish(){
   var html=exportHtml(t,{withStyle:$('#oStyle').checked,keepMarks:false,carry:false}), log=$('#pLog'); log.style.display=''; log.textContent='發佈中…';
   var kind=$('#pKind').value, force=$('#pForce').checked;
   /* 會員專區是照檔名裡的日期排序、照開頭分類的：名字不合規會沉到清單最底下、歸進「其他」 */
-  if(!/\d{8}/.test(t.name) && !confirm('檔名「'+t.name+'」沒有日期（YYYYMMDD）。\n\n會員專區照檔名排序與分類，這份會排到清單最後一名、分類歸「其他」。\n\n還是要發佈嗎？'))return;
   var go = OFFLINE
     ? fetch(LOCAL+'/api/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:t.name,html:html,kind:kind,force:force})}).then(function(r){return r.json()})
     : api('POST',EP.docs+'&name='+encodeURIComponent(t.slug||t.name)+'&part=final',{html:html},true).then(function(j){ return {ok:true,message:'定稿已存雲端（'+Math.round(j.bytes/1024)+'KB）。回本機執行：\n'+j.next+'\n（存 reports\\ → 閘門 → 推 Blob）'} });
   go.then(function(r){ log.textContent=(r.message||'')+(r.gate?'\n\n── spec_check ──\n'+r.gate.log:''); toast(r.ok?'定稿流程完成':'定稿未完成，看紀錄',!r.ok); })
     .catch(function(e){ log.textContent='失敗：'+(OFFLINE?'本機 token_server 沒開（python Skill\\token_server.py）':e.message); });
+  }
 };
 
 /* ── 點擊即編面板 ── */
@@ -640,8 +674,12 @@ $('#edCancel').onclick=closeEd;
 $('#edApply').onclick=function(){ if(!ED_EL)return;
   var v=$('#edText').value;
   /* 同樣的陷阱：指示打在內文框又按了直接套用，整段會被那句話取代 */
-  if(v!==ED_ORIG && v.trim().length<=60 && ED_ORIG.length>=v.trim().length*2 &&
-     !confirm('要把整段（'+ED_ORIG.length+' 字）換成這 '+v.trim().length+' 字嗎？\n\n「'+v.trim().slice(0,40)+'」\n\n如果這是給 Claude 的指示，請按取消，改打在下面②那格再按「交給 Claude 修改」。'))return;
+  if(v!==ED_ORIG && v.trim().length<=60 && ED_ORIG.length>=v.trim().length*2){
+    var el0=ED_EL;
+    ask('要把整段（'+ED_ORIG.length+' 字）換成這 '+v.trim().length+' 字嗎？\n\n「'+v.trim().slice(0,40)+'」\n\n如果這是給 Claude 的指示，請按取消，改打在下面②那格再按「交給 Claude 修改」。','換掉')
+      .then(function(y){ if(y){ applyEdit(el0,v,'手動'); closeEd(); } });
+    return;
+  }
   applyEdit(ED_EL,v,'手動'); closeEd(); };
 $('#edAI').onclick=function(){
   if(!ED_EL)return; var t=tab(), el=ED_EL, idx=el.getAttribute('data-yeb'), d=$('#ifE').contentDocument;
@@ -804,6 +842,31 @@ function renderCanvas(){
     var cx=el.querySelector(':scope > .row > .cx'); if(cx)cx.onclick=function(ev){ev.stopPropagation(); ev.preventDefault(); doDelete(el.dataset.key)};
   });
 }
+/* 點右邊的段落 → 左邊跟著反應：架構模式選起它所屬的章／節；編輯模式左欄原稿同一段閃一下 */
+function echoLeft(el){
+  if(!el)return;
+  var idx=el.getAttribute('data-yeb');
+  try{   /* 左欄原稿：捲到同一段並閃 */
+    var dO=$('#ifO').contentDocument, o=dO&&dO.querySelector('[data-yeb="'+idx+'"]');
+    if(o){ scrollInto($('#ifO').contentWindow, o);
+      dO.querySelectorAll('.yeb-flash').forEach(function(x){x.classList.remove('yeb-flash')});
+      void o.offsetWidth; o.classList.add('yeb-flash');
+      setTimeout(function(){o.classList.remove('yeb-flash')},1700); }
+  }catch(e){}
+  if(MODE!=='canvas')return;
+  var us=unitsOf($('#ifE').contentDocument), hit=null;
+  us.forEach(function(u){ if(u.nodes.some(function(nd){return nd===el||(nd.contains&&nd.contains(el))})){ if(!hit||u.level>=hit.level)hit=u; } });
+  if(!hit)return;
+  var cv=$('#cv'), node=cv.querySelector('.cnode[data-key="'+hit.key.replace(/"/g,'\\"')+'"]');
+  cv.querySelectorAll('.cnode.sel').forEach(function(x){x.classList.remove('sel')});
+  if(!node)return;
+  var p=node.parentElement;                       /* 收合起來的話先展開，不然選了也看不到 */
+  while(p&&p!==cv){ if(p.classList&&p.classList.contains('cnode'))p.classList.remove('collapsed'); p=p.parentElement; }
+  node.classList.add('sel');
+  var r=node.getBoundingClientRect(), rc=cv.getBoundingClientRect();
+  if(r.top<rc.top+8||r.bottom>rc.bottom-8) cv.scrollTop += (r.top-rc.top) - cv.clientHeight/3;
+}
+
 /* 點左邊的章／節 → 右欄捲到那裡並閃一下 */
 function jumpTo(key){
   var dE=$('#ifE').contentDocument, wE=$('#ifE').contentWindow, us=unitsOf(dE), u=us.filter(function(x){return x.key===key})[0]; if(!u)return;
@@ -825,7 +888,9 @@ function doMove(key,target,pos){
 function doDelete(key){
   var t=tab(), dE=$('#ifE').contentDocument, us=unitsOf(dE), u=us.filter(function(x){return x.key===key})[0]; if(!u)return;
   var kids=us.filter(function(x){return x.parent===key}).length;
-  if(!confirm('把這個'+(u.level===1?'章':'節')+'從報告裡刪掉？\n\n「'+u.title.slice(0,40)+'」'+(kids?'（連同底下 '+kids+' 節）':'')+'\n\n按「復原」可以找回。'))return;
+  ask('把這個'+(u.level===1?'章':'節')+'從報告裡刪掉？\n\n「'+u.title.slice(0,40)+'」'+(kids?'（連同底下 '+kids+' 節）':'')+'\n\n按「復原」可以找回。','刪掉')
+    .then(function(y){ if(y)go(); });
+  function go(){
   snap();
   var kept=[], dropped=0;
   (t.marks||[]).forEach(function(m){ var el=dE.querySelector('[data-yeb="'+m.idx+'"]'); if(el&&u.nodes.some(function(nd){return nd===el||nd.contains(el)}))dropped++; else kept.push(m); });
@@ -834,8 +899,11 @@ function doDelete(key){
   t.moves=t.moves||[]; t.moves.push({key:key,pos:'del',title:u.title.slice(0,40),level:u.level,at:new Date().toISOString()});
   closeEd(); renderCanvas(); updPill(); saveSoon();
   toast('已刪掉「'+u.title.slice(0,18)+'」'+(u.level===1?'整章':'')+(dropped?'（含 '+dropped+' 處修改）':'')+' · 按「復原」可找回');
+  }
 }
-$('#cvReset').onclick=function(){ var t=tab(); if(!t||!(t.moves||[]).length||!confirm('把章節順序與刪掉的區塊都還原成原稿？（文字修改不受影響）'))return; snap(); t.moves=[]; mountPanes(); saveSoon(); };
+$('#cvReset').onclick=function(){ var t=tab(); if(!t||!(t.moves||[]).length)return;
+  ask('把章節順序與刪掉的區塊都還原成原稿？（文字修改不受影響）','還原').then(function(y){
+    if(!y)return; snap(); t.moves=[]; mountPanes(); saveSoon(); }); };
 function updCollapseBtn(){ var b=$('#cvCollapse'), all=$('#cv').querySelectorAll('.cnode');
   var anyClosed=[].some.call(all,function(e){return e.classList.contains('collapsed')&&e.querySelector(':scope>ul')});
   b.textContent=anyClosed?'全部展開':'全部收合'; }
@@ -941,9 +1009,11 @@ $('#resumeSel').onchange=function(){
   var v=this.value; this.selectedIndex=0; if(!v)return;
   if(v==='__clear__'){
     var docs=savedDocs().filter(function(d){return edits(d)});
-    if(!confirm('清掉這台電腦上 '+docs.length+' 份未完成的編輯進度？\n\n（報告原檔不會動，只是這裡的標記與結構調整會消失）'))return;
-    docs.forEach(function(d){ try{localStorage.removeItem('yeb-doc-'+d.slug)}catch(e){} });
-    renderResume(); toast('已清掉'); return;
+    ask('清掉這台電腦上 '+docs.length+' 份未完成的編輯進度？\n\n（報告原檔不會動，只是這裡的標記與結構調整會消失）','清掉').then(function(y){
+      if(!y)return;
+      docs.forEach(function(d){ try{localStorage.removeItem('yeb-doc-'+d.slug)}catch(e){} });
+      renderResume(); toast('已清掉'); });
+    return;
   }
   var d=savedDocs().filter(function(x){return x.slug===v})[0]; if(!d)return;
   var t=tab();
@@ -994,25 +1064,31 @@ $('#btnFile').onclick=function(){
   if(!OFFLINE){toast('這是本機功能：雲端版請用「下載這份」',1);return}
   var o=outOpts(), pend=(t.marks||[]).filter(function(m){return !m.approved}).length;
   var note=(o.keepMarks&&pend)?('　·　含 '+pend+' 處未認可的紅框標記'):'';
-  if(!confirm('把這份存成檔案？'+String.fromCharCode(10)+String.fromCharCode(10)+
-              'reports'+String.fromCharCode(92)+t.name+'.html'+String.fromCharCode(10)+
-              '同名舊檔會先備份到 _prev'+String.fromCharCode(92)+note+String.fromCharCode(10)+String.fromCharCode(10)+
-              '（這只是存檔：不跑閘門、不上傳。要上線請用 ④ 定稿發佈）'))return;
-  var btn=this; btn.disabled=true; var old=btn.textContent; btn.textContent='存檔中…';
+  var btn=this;
+  ask('把這份存成檔案？'+String.fromCharCode(10)+String.fromCharCode(10)+
+      'reports'+String.fromCharCode(92)+t.name+'.html'+String.fromCharCode(10)+
+      '同名舊檔會先備份到 _prev'+String.fromCharCode(92)+note+String.fromCharCode(10)+String.fromCharCode(10)+
+      '（這只是存檔：不跑閘門、不上傳。要上線請用 ④ 定稿發佈）','存檔')
+    .then(function(y){ if(y)doSave(); });
+  function doSave(){
+  btn.disabled=true; var old=btn.textContent; btn.textContent='存檔中…';
   fetch(LOCAL+'/api/save-file',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({name:t.name, html:exportHtml(t,o)})})
     .then(function(r){return r.json()})
     .then(function(j){ btn.disabled=false; btn.textContent=old; toast(j.message||'存好了', !j.ok); })
     .catch(function(){ btn.disabled=false; btn.textContent=old; pingServer(); toast('存不進去：本機伺服器沒開',1); });
+  }
 };
 $('#btnApproveAll').onclick=function(){var t=tab(); if(!t)return;
   var pend=(t.marks||[]).filter(function(m){return !m.approved}).length;
   if(!pend){toast('沒有待認可的修改');return}
-  if(!confirm('把 '+pend+' 處待認可的修改全部認可？\n\n認可後紅框消失、以新版本為準（可按復原退一步）。'))return;
+  ask('把 '+pend+' 處待認可的修改全部認可？\n\n認可後紅框消失、以新版本為準（可按復原退一步）。','全部認可').then(function(y){
+    if(!y)return;
   snap(); var d=$('#ifE').contentDocument;
-  t.marks.forEach(function(m){if(!m.approved){m.approved=true;m.approvedAt=new Date().toISOString();paintMark(d,m)}}); updPill(); save();};
-$('#btnDel').onclick=function(){var t=tab(); if(!t||!t.slug||!confirm('刪除雲端文件「'+t.name+'」？'))return;
-  api('POST',EP.docs+'&name='+encodeURIComponent(t.slug)+'&del=1').then(function(){toast('已刪除');closeTab(CUR);loadCloudList()});};
+  t.marks.forEach(function(m){if(!m.approved){m.approved=true;m.approvedAt=new Date().toISOString();paintMark(d,m)}}); updPill(); save(); });};
+$('#btnDel').onclick=function(){var t=tab(); if(!t||!t.slug)return;
+  ask('刪除雲端文件「'+t.name+'」？','刪除').then(function(y){ if(!y)return;
+    api('POST',EP.docs+'&name='+encodeURIComponent(t.slug)+'&del=1').then(function(){toast('已刪除');closeTab(CUR);loadCloudList()}); });};
 function exportHtml(t, opts){
   opts=opts||{withStyle:true,keepMarks:true,carry:true};
   /* 匯出：認可的＝乾淨文字；未認可的＝新文字＋紅慢閃校稿標記（editmark 慣例，交付前要關） */
