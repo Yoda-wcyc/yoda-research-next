@@ -14,9 +14,9 @@ button.danger{border-color:#5a2630;color:#ff8a8a}
 button:disabled{opacity:.4;cursor:default}
 select,input[type=text]{background:#131a25;color:#c9d6e4;border:1px solid #263242;border-radius:5px;padding:5px 7px;font:inherit;font-size:12px}
 /* 頁籤列 */
-.tabs{display:flex;align-items:flex-end;gap:4px;padding:0;background:transparent;border-bottom:0;flex-wrap:nowrap;
+.tabs{display:flex;align-items:center;gap:3px;padding:0;background:transparent;border-bottom:0;flex-wrap:nowrap;
      flex:1;min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
-.tabs .t{flex:0 0 auto}
+
 .tabs .t{display:flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid #1e2836;border-bottom:0;border-radius:7px 7px 0 0;background:#0b0f16;color:#7f93a8;cursor:pointer;max-width:260px}
 .tabs .t.on{background:#131a25;color:#e6eef8;border-color:#2f6fb5}
 .tabs .t .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -25,7 +25,7 @@ select,input[type=text]{background:#131a25;color:#c9d6e4;border:1px solid #26324
 .tabs .add{margin-left:2px}
 .tabs .brand{margin-left:auto;font-size:12px;color:#5f7286}
 /* 工具列 */
-.modes{border-bottom:1px solid #1e2836}
+
 .bar{display:flex;gap:6px;align-items:center;padding:5px 8px;background:#0b0f16;border-bottom:1px solid #1e2836;
      flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
 .bar button{padding:5px 8px}
@@ -40,7 +40,7 @@ select,input[type=text]{background:#131a25;color:#c9d6e4;border:1px solid #26324
 .grp-save{background:#0d1e15;border-color:#1f4433;color:#8ae0b0}
 .grp-view{background:#12161d;border-color:#28313d;color:#a9bdd2}
 .grp-open>.gl{color:#5b86b8}.grp-edit>.gl{color:#a3853c}.grp-save>.gl{color:#3f8a63}
-.bar .pill{font:700 11px/1 ui-monospace,monospace;padding:5px 8px;border-radius:5px;background:#131a25;border:1px solid #263242;color:#a9bdd2}
+.bar .pill{font:700 11px/1 ui-monospace,monospace;padding:5px 8px;border-radius:5px;background:#131a25;border:1px solid #263242;color:#a9bdd2;white-space:nowrap;flex:0 0 auto}
 .bar .pill b{color:#e6eef8}
 .bar .sp{flex:1}
 /* 雙欄 */
@@ -75,12 +75,19 @@ body.dragging iframe{pointer-events:none}
 .ed .row .sp{flex:1;font-size:11px;color:#5f7286}
 .pane.edit{position:relative}
 /* 頂層模式 */
-.modes{display:flex;gap:0;padding:4px 10px 0;background:#0e131c;align-items:flex-end;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}
-.modes .ttl{align-self:center;font-weight:800;color:#e6eef8;margin-right:8px;font-size:13px;white-space:nowrap;flex:0 0 auto}
-.modes>button{flex:0 0 auto}
-.modes .sepv{width:1px;align-self:stretch;background:#1e2836;margin:4px 8px 0}
-.modes button{border-radius:6px 6px 0 0;border-bottom:0;padding:9px 16px;font-size:13px;color:#7f93a8;background:#0b0f16}
-.modes button.on{background:#131a25;color:#e6eef8;border-color:#2f6fb5}
+.brandmini{font:800 12px/1 inherit;color:#8ea6c0;flex:0 0 auto;padding-right:2px}
+.grp-mode{background:#101826;border-color:#2f4a6a;color:#bcd6f2}
+.grp-mode>.gl{color:#5b86b8}
+.grp-mode button{font-size:12.5px;padding:5px 9px}
+.grp-mode button.on{background:#1b3a5c;color:#fff;box-shadow:inset 0 0 0 1px #2f6fb5}
+/* 文件分頁：紅底紅字，跟功能鈕一眼分開（Yoda 2026-09-07 指定） */
+.grp-doc{background:#1e1013;border-color:#5a2630;color:#ffb0b0;flex:1 1 auto;min-width:0;overflow:hidden}
+.grp-doc>.gl{color:#b06a72}
+.grp-doc .tabs .t{flex:0 0 auto;display:flex;align-items:center;gap:5px;padding:4px 8px;border:1px solid #5a2630;border-radius:5px;
+     background:#2a151a;color:#d99b9b;max-width:150px;font-size:12px}
+.grp-doc .tabs .t.on{background:#3f1d24;color:#ffdede;border-color:#a1454f}
+.grp-doc .tabs .add{padding:4px 7px;color:#ffb0b0;border-color:#5a2630;position:sticky;left:0;background:#1e1013;z-index:2;flex:0 0 auto}
+.grp-doc .tabs .brand{margin-left:auto;font-size:11px;color:#8a5a60;padding-left:6px;flex:0 0 auto}
 /* 架構畫布 */
 .pane.canvas{background:#0b0f16}
 .cv-bar{display:flex;gap:6px;align-items:center;padding:8px 12px;border-bottom:1px solid #1e2836;flex-wrap:wrap}
@@ -131,8 +138,14 @@ code{font:11.5px ui-monospace,Consolas,monospace;background:#131a25;padding:1px 
 </head><body>
 
 
-<div class="modes" id="modes"><span class="ttl">Yoda 報告工作台</span><button data-mode="canvas">① 架構畫布</button><button data-mode="editor" class="on">② 編輯細節</button><button data-mode="style">③ 視覺模組</button><button data-mode="output">④ 輸出</button><span class="sepv"></span><div class="tabs" id="tabs"></div></div>
 <div class="bar" id="bar">
+  <span class="brandmini" title="Yoda 報告工作台">Yoda</span>
+  <div class="grp grp-mode" id="modes"><span class="gl">步驟</span>
+    <button data-mode="canvas" title="① 架構畫布：章節脈絡、搬動、刪除">①架構</button>
+    <button data-mode="editor" class="on" title="② 編輯細節：逐段改字、標記、認可">②編輯</button>
+    <button data-mode="style" title="③ 視覺模組：套一套樣式">③視覺</button>
+    <button data-mode="output" title="④ 輸出：下載、存檔、定稿發佈">④輸出</button>
+  </div>
   <div class="grp grp-open"><span class="gl">開檔</span>
     <button id="btnOpen" title="從雲端開啟已上傳的文件">雲端</button>
     <select id="cloudSel"></select>
@@ -152,7 +165,7 @@ code{font:11.5px ui-monospace,Consolas,monospace;background:#131a25;padding:1px 
     <button id="btnDownload" title="下載成 .edited.html">下載</button>
   </div>
   <span class="pill" id="pMarks">—</span>
-  <span class="sp"></span>
+  <div class="grp grp-doc"><span class="gl">文件</span><div class="tabs" id="tabs"></div></div>
 </div>
 
 <div class="panes">
@@ -254,7 +267,7 @@ function scrollInto(win, el){   /* 只捲 iframe 自己（或它內部的容器�
     while(x&&x!==d.body&&x!==d.documentElement){ var cs=win.getComputedStyle(x); if(/(auto|scroll)/.test(cs.overflowY)&&x.scrollHeight>x.clientHeight+2){sc=x;break} x=x.parentElement }
     var top=el.getBoundingClientRect().top; if(sc) sc.scrollTop+= top - sc.getBoundingClientRect().top - 12; else win.scrollBy(0, top-12); }catch(e){}
 }
-function setMode(m){ MODE=m; document.querySelectorAll('#modes>button[data-mode]').forEach(function(b){b.classList.toggle('on',b.dataset.mode===m)});
+function setMode(m){ MODE=m; document.querySelectorAll('#modes button[data-mode]').forEach(function(b){b.classList.toggle('on',b.dataset.mode===m)});
   $('#canvasPane').style.display = m==='canvas'?'':'none'; $('#stylePane').style.display = m==='style'?'':'none'; $('#outPane').style.display = m==='output'?'':'none';
   document.querySelector('.pane.orig').style.display = m==='editor'?'':'none';
   $('#hdE').textContent = {canvas:'報告（畫布回寫的結果即時顯示）',editor:'編輯（點任一段落即可修改）',style:'報告（套上樣式的樣子）',output:'報告（將要輸出的樣子）'}[m];   /* 只換文字，別動旁邊的字數 */
@@ -319,12 +332,12 @@ function diffHtml(a,b){return diff(a,b).map(function(x){return x[0]==='eq'?esc(x
 /* ── 分頁 ── */
 function tab(){return TABS[CUR]||null}
 function renderTabs(){
-  var h='';
+  var h='<button class="add" id="tabAdd"'+(TABS.length>=5?' disabled title="最多五份"':' title="開一個空白分頁（最多五份）"')+'>＋</button>';
   TABS.forEach(function(t,i){
     var pend=t.marks.filter(function(m){return !m.approved}).length;
     h+='<div class="t'+(i===CUR?' on':'')+'" data-i="'+i+'"><span class="n">'+esc(t.name||'（空白）')+'</span>'+(pend?'<span class="pend">'+pend+'</span>':'')+'<span class="x" data-x="'+i+'">✕</span></div>';
   });
-  h+='<button class="add" id="tabAdd"'+(TABS.length>=5?' disabled title="最多五份"':'')+'>＋ 匯入</button><span class="brand">'+
+  h+='<span class="brand">'+
     (OFFLINE ? '<a href="'+LOCAL+'/" target="_blank">視覺控制台</a>'                       /* 本機：主控台沒有本機版；視覺控制台供在伺服器根目錄 */
              : '<a href="/api/console?k='+encodeURIComponent(KEY)+'">主控台</a> · <a href="/api/viz?k='+encodeURIComponent(KEY)+'">視覺控制台</a>')+'</span>';
   $('#tabs').innerHTML=h;
@@ -439,7 +452,8 @@ function curWords(){ try{ return wordsOf($('#ifE').contentDocument) }catch(e){ r
 function curAllWords(){ try{ return allWords($('#ifE').contentDocument) }catch(e){ return 0 } }
 function fmtN(x){ return String(x).replace(/\B(?=(\d{3})+(?!\d))/g,',') }
 function updPill(){var t=tab(); if(!t)return; updUndo(); var pend=t.marks.filter(function(m){return !m.approved}).length;
-  $('#pMarks').innerHTML='段落 <b>'+(t.blocks||0)+'</b> · 修改 <b>'+t.marks.length+'</b> · 待認可 <b>'+pend+'</b>';
+  $('#pMarks').innerHTML='<b>'+(t.blocks||0)+'</b>段 · <b>'+t.marks.length+'</b>改 · <b>'+pend+'</b>待';
+  $('#pMarks').title='段落 '+(t.blocks||0)+' · 已修改 '+t.marks.length+' 處 · 待認可 '+pend+' 處';
   updWords(); renderTabs();}
 /* 兩欄標題列的字數：右欄＝目前，左欄＝原稿 */
 function updWords(){
@@ -838,7 +852,7 @@ $('#cvAI').onclick=function(){
    .then(function(j){ $('#cvAI').disabled=false; t.gists=Object.assign(t.gists||{},j.gists||{}); renderCanvas(); saveSoon(); toast('脈絡已寫上 '+Object.keys(j.gists||{}).length+' 個節點（'+(j.engine==='cli'?'本機 Claude':j.engine||'Claude')+'）'); })
    .catch(function(){ $('#cvAI').disabled=false; $('#cvStat').textContent='失敗'; });
 };
-document.querySelectorAll('#modes button').forEach(function(b){b.onclick=function(){setMode(b.dataset.mode)}});
+document.querySelectorAll('#modes button[data-mode]').forEach(function(b){b.onclick=function(){setMode(b.dataset.mode)}});
 document.querySelectorAll('#layoutSeg button').forEach(function(b){b.onclick=function(){setLayout(b.dataset.l)}});   /* 版面切換鈕已移除；這行留著不影響 */
 (function(){ var sp=$('#split'), drag=false;
   sp.addEventListener('mousedown',function(e){drag=true; sp.classList.add('on'); document.body.classList.add('dragging'); e.preventDefault()});
@@ -1101,12 +1115,12 @@ if(OFFLINE){
   ['#btnOpen','#cloudSel','#btnDel'].forEach(function(q){var e=$(q); if(e)e.style.display='none'});
   cleanStale();          /* 上次只是匯入沒動過的，開場就清掉——重開不該還躺著別份報告 */
   renderResume();        /* 真的改過的收進「接續上次」，要不要接由 Yoda 決定 */
-  while(TABS.length<3)TABS.push({name:'',slug:'',orig:'',marks:[]});
+  while(TABS.length<2)TABS.push({name:'',slug:'',orig:'',marks:[]});
   loadRules(); loadLocalList(); switchTab(0); try{setMode(localStorage.getItem('yeb-mode')||'editor')}catch(e){} pingServer(); setInterval(pingServer, 20000);
 }
 else{
   var remembered=[]; try{remembered=JSON.parse(localStorage.getItem('yeb-tabs')||'[]')}catch(e){}
-  while(TABS.length<3)TABS.push({name:'',slug:'',orig:'',marks:[]});
+  while(TABS.length<2)TABS.push({name:'',slug:'',orig:'',marks:[]});
   loadRules(); switchTab(0); try{setMode(localStorage.getItem('yeb-mode')||'editor')}catch(e){}
   loadCloudList().then(function(docs){
     var have={}; docs.forEach(function(d){have[d.slug]=1});
