@@ -126,7 +126,8 @@ code{font:11.5px ui-monospace,Consolas,monospace;background:#131a25;padding:1px 
   <span class="sp"></span>
   <button id="btnUndo" title="復原上一個動作（Ctrl+Z）">↶ 復原</button><button id="btnReview">AI 先審一輪</button><button id="btnApproveAll" class="ok">全部認可</button>
   <button id="btnDownload">下載編輯後 HTML</button>
-  <button id="btnSave" class="pri">儲存</button>
+  <button id="btnSave" class="pri" title="把編輯進度（標記、結構調整、視覺模組）存在這台電腦的瀏覽器；不會寫進 reports 夾、也不會上傳">存進度</button>
+  <button id="btnFile" title="把目前這份寫成 reports\ 裡的 HTML 檔（同名舊檔會先備份）；不跑閘門、不上傳">儲存到檔案</button>
   <button id="btnDel" class="danger">刪除此文件</button>
 </div>
 
@@ -948,6 +949,23 @@ function save(silent){ var t=tab(); if(!t||!t.slug)return;
   if(OFFLINE){ try{localStorage.setItem('yeb-doc-'+t.slug,JSON.stringify({name:t.name,marks:t.marks,moves:t.moves||[],gists:t.gists||{},style:t.style||'',orig:t.orig,at:new Date().toISOString()}))}catch(e){toast('本機儲存失敗：這台電腦的瀏覽器只給 5MB，開太多份大報告會滿。請用「下載編輯後 HTML」保存進度',1);return} if(!silent)toast('已存到這台電腦的瀏覽器'); return; }
   api('POST',EP.docs+'&name='+encodeURIComponent(t.slug)+'&part=state',{state:{name:t.name,marks:t.marks,moves:t.moves||[],gists:t.gists||{},style:t.style||''}}).then(function(){if(!silent)toast('已儲存')}); }
 $('#btnSave').onclick=function(){save()};
+/* 儲存到檔案：寫進 reports\，當作工作檔；要上線還是走 ④ 的定稿發佈（有閘門＋上傳） */
+$('#btnFile').onclick=function(){
+  var t=tab(); if(!t||!t.orig){toast('先匯入一份報告',1);return}
+  if(!OFFLINE){toast('這是本機功能：雲端版請用「下載這份」',1);return}
+  var o=outOpts(), pend=(t.marks||[]).filter(function(m){return !m.approved}).length;
+  var note=(o.keepMarks&&pend)?('　·　含 '+pend+' 處未認可的紅框標記'):'';
+  if(!confirm('把這份存成檔案？'+String.fromCharCode(10)+String.fromCharCode(10)+
+              'reports'+String.fromCharCode(92)+t.name+'.html'+String.fromCharCode(10)+
+              '同名舊檔會先備份到 _prev'+String.fromCharCode(92)+note+String.fromCharCode(10)+String.fromCharCode(10)+
+              '（這只是存檔：不跑閘門、不上傳。要上線請用 ④ 定稿發佈）'))return;
+  var btn=this; btn.disabled=true; var old=btn.textContent; btn.textContent='存檔中…';
+  fetch(LOCAL+'/api/save-file',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({name:t.name, html:exportHtml(t,o)})})
+    .then(function(r){return r.json()})
+    .then(function(j){ btn.disabled=false; btn.textContent=old; toast(j.message||'存好了', !j.ok); })
+    .catch(function(){ btn.disabled=false; btn.textContent=old; pingServer(); toast('存不進去：本機伺服器沒開',1); });
+};
 $('#btnApproveAll').onclick=function(){var t=tab(); if(!t)return;
   var pend=(t.marks||[]).filter(function(m){return !m.approved}).length;
   if(!pend){toast('沒有待認可的修改');return}
