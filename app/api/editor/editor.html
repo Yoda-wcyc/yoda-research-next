@@ -430,7 +430,16 @@ function setupPanes(){
     var ok=ev.target.closest&&ev.target.closest('.yeb-ok'); if(ok){approve(ok.getAttribute('data-mark'));ev.preventDefault();ev.stopPropagation();return}
     var no=ev.target.closest&&ev.target.closest('.yeb-no'); if(no){reject(no.getAttribute('data-mark'));ev.preventDefault();ev.stopPropagation();return}
     var ru=ev.target.closest&&ev.target.closest('.yeb-rule'); if(ru){openRuleDlg(ru.getAttribute('data-mark'));ev.preventDefault();ev.stopPropagation();return}
-    var el=ev.target.closest&&ev.target.closest('[data-yeb]'); if(!el)return;
+    var el=ev.target.closest&&ev.target.closest('[data-yeb]');
+    if(!el){   /* 圖、空殼、表格外框這種沒有文字編號的區塊：一樣選得起來、刪得掉，只是不開編輯框 */
+      var t2=ev.target;
+      if(t2&&t2.nodeType===1&&t2!==dE.body&&t2!==dE.documentElement&&!t2.closest('.yeb-selbar')){
+        ev.preventDefault(); ev.stopPropagation();
+        selectBlock(t2); closeEd();
+        toast('已選取這一塊（沒有文字可編輯）· 用右上角 ✕ 刪掉，或按 ⌃ 擴大選取範圍');
+      }
+      return;
+    }
     ev.preventDefault(); ev.stopPropagation(); selectBlock(el); echoLeft(el); openEd(el);
   },true);
   if(dO&&dO.body){   /* 兩欄同步捲動：只有原稿欄存在時才需要 */
@@ -783,7 +792,10 @@ function chapterUnits(d){
     heads.forEach(function(h){
       var sec=h.closest('.section,section,article');
       if(sec&&used.indexOf(sec)<0&&!used.some(function(o){return o.contains(sec)})){
-        used.push(sec); out.push({nodes:[sec],title:chapterTitle(sec)||chapterTitle(h),anchor:h}); return;
+        used.push(sec);
+        var nodes=[sec], y=sec.nextElementSibling;      /* 區塊後面散落的圖／表也歸這一章，否則沒人管、也刪不掉 */
+        while(y && !heads.some(function(hh){return y===hh||y.contains(hh)})){ nodes.push(y); y=y.nextElementSibling; }
+        out.push({nodes:nodes,title:chapterTitle(sec)||chapterTitle(h),anchor:h}); return;
       }
       var nodes=[h], x=h.nextElementSibling;
       while(x&&heads.indexOf(x)<0&&!(x.querySelector&&heads.some(function(hh){return x.contains(hh)}))){nodes.push(x);x=x.nextElementSibling}
