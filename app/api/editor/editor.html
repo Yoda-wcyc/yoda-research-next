@@ -84,6 +84,7 @@ body.dragging iframe{pointer-events:none}
 .grp-mode>.gl{color:#5b86b8}
 .grp-mode button{font-size:12.5px;padding:5px 9px}
 .grp-mode button.on{background:#1b3a5c;color:#fff;box-shadow:inset 0 0 0 1px #2f6fb5}
+.cv-bar button.on{background:#1b3a5c;border-color:#2f6fb5;color:#dbe8f6}
 /* 文件分頁：紅底紅字，跟功能鈕一眼分開（Yoda 2026-09-07 指定） */
 .grp-doc{background:#1e1013;border-color:#5a2630;color:#ffb0b0;flex:1 1 auto;min-width:0;overflow:hidden}
 .grp-doc>.gl{color:#b06a72}
@@ -181,7 +182,7 @@ code{font:11.5px ui-monospace,Consolas,monospace;background:#131a25;padding:1px 
 
 <div class="panes">
   <div class="pane canvas" id="canvasPane" style="display:none"><div class="hd" style="background:#1a2230;color:#9fb3c8">架構畫布（拖拉節點重排，放下就回寫到右側報告）</div>
-    <div class="cv-bar"><button id="cvAI">用 Claude 萃取脈絡</button><button id="cvClean" title="清掉沒有內容的空殼：空標頭、空的圖框、空段落">清掉空殼</button><button id="cvReset">重設結構</button><button id="cvCollapse">全部收合</button><span class="hint" id="cvStat"></span></div>
+    <div class="cv-bar"><button id="cvAI">用 Claude 萃取脈絡</button><button id="cvNum" title="開啟後：搬動或刪除章節，報告裡的 01/02/03 會自動跟著重排（🔑 這種符號編號不動）">自動編號</button><button id="cvClean" title="清掉沒有內容的空殼：空標頭、空的圖框、空段落">清掉空殼</button><button id="cvReset">重設結構</button><button id="cvCollapse">全部收合</button><span class="hint" id="cvStat"></span></div>
     <div class="cvcrumb" id="cvCrumb">點右邊任一段，這裡會顯示它在架構裡的位置</div>
     <div class="cv" id="cv"><div class="empty2">先上傳或開啟一份報告</div></div>
   </div>
@@ -428,9 +429,10 @@ function setupPanes(){
   t.blocks=indexBlocks(dE);
   /* 套回 marks */
   t.marks.forEach(function(m){paintMark(dE,m)});
-  replayMoves(dE, t.moves||[]); replayBlockDels(dE, t.bdel||[]); if(t.clean)removeEmptyShells(dE);
+  replayMoves(dE, t.moves||[]); replayBlockDels(dE, t.bdel||[]); if(t.clean)removeEmptyShells(dE); if(t.autonum)renumberChapters(dE);
   autofix(t, dE);
   if(t.style)applyStyleTo(dE, t.style);
+  var bn=$('#cvNum'); if(bn)bn.classList.toggle('on',!!t.autonum);
   if(MODE==='canvas')renderCanvas(); if(MODE==='style')renderStyleTab(); if(MODE==='output')renderOutTab();
   /* 點擊即編 */
   dE.body.addEventListener('click',function(ev){
@@ -526,10 +528,10 @@ function updWords(){
 }
 
 /* ── 復原：每個會改文件狀態的動作前先快照（marks／moves／style），復原＝退回上一個快照再重掛 ── */
-function snap(){ var t=tab(); if(!t)return; t.undo=t.undo||[]; t.undo.push(JSON.stringify({marks:t.marks||[],moves:t.moves||[],bdel:t.bdel||[],clean:!!t.clean,style:t.style||''})); if(t.undo.length>30)t.undo.shift(); updUndo(); }
+function snap(){ var t=tab(); if(!t)return; t.undo=t.undo||[]; t.undo.push(JSON.stringify({marks:t.marks||[],moves:t.moves||[],bdel:t.bdel||[],clean:!!t.clean,autonum:!!t.autonum,style:t.style||''})); if(t.undo.length>30)t.undo.shift(); updUndo(); }
 function updUndo(){ var t=tab(), b=$('#btnUndo'); if(!b)return; var k=t&&(t.undo||[]).length; b.disabled=!k; b.textContent='↶ 復原'+(k?'（'+k+'）':''); }
 function undo(){ var t=tab(); if(!t||!(t.undo||[]).length){toast('沒有可復原的動作');return}
-  var st=JSON.parse(t.undo.pop()); t.marks=st.marks; t.moves=st.moves; t.bdel=st.bdel||[]; t.clean=!!st.clean; t.style=st.style; t.autofixed=true;   /* 復原後不再自動修一次 */
+  var st=JSON.parse(t.undo.pop()); t.marks=st.marks; t.moves=st.moves; t.bdel=st.bdel||[]; t.clean=!!st.clean; t.autonum=!!st.autonum; t.style=st.style; t.autofixed=true;   /* 復原後不再自動修一次 */
   var sc=0; try{sc=$('#ifE').contentDocument.documentElement.scrollTop}catch(e){}
   closeEd(); mountPanes(); setTimeout(function(){ try{$('#ifE').contentDocument.documentElement.scrollTop=sc}catch(e){} },600);
   updUndo(); saveSoon(); toast('已復原上一步'); }
@@ -589,7 +591,17 @@ function withInline(text, beforeHtml){   /* 改寫後的純文字 → 把還在�
   });
   return out;
 }
-function setEdited(el, text, beforeHtml){ el.innerHTML=withInline(text, beforeHtml||''); }
+function setEdited(el, text, beforeHtml){
+  /* 章標頭特別處理：只換標題那一格，保住編號與版面（2026-09-07 有一次整個標頭被一段話蓋掉） */
+  var t=el.querySelector&&(el.querySelector('.sec-title')||el.querySelector('.section-title'));
+  if(t&&el.querySelector('.sec-num,.section-num')){
+    var num=el.querySelector('.sec-num,.section-num'), nt=(num?(num.textContent||'').trim():'');
+    var body=String(text||'').trim();
+    if(nt&&body.indexOf(nt)===0)body=body.slice(nt.length).trim();   /* 使用者把編號一起打進去就去掉 */
+    t.textContent=body; return;
+  }
+  el.innerHTML=withInline(text, beforeHtml||'');
+}
 function applyEdit(el,after,note){
   var t=tab(), idx=el.getAttribute('data-yeb'), before=el.textContent.replace(/✓ 認可$/,''); snap();
   var beforeHtml=el.innerHTML;
@@ -1102,6 +1114,67 @@ function anchorOf(el){
   var up=0, x=probe; while(x&&x!==el){ up++; x=x.parentElement; }
   return {idx:probe.getAttribute('data-yeb'), up:up, path:pathOf(el)};
 }
+function renumberChapters(d){
+  /* 章號重排：依文件順序給 01、02、03…；🔑 這種非數字的編號不動、也不佔號。
+     報告有兩種寫法：編號在 .sec-num/.section-num，或直接寫在標題開頭。 */
+  var chs=chapterUnits(d), i=0, changed=0;
+  var base=1;                                   /* 報告原本從 00 開始就跟著從 0 起算 */
+  for(var bi=0;bi<chs.length;bi++){
+    var h0=chs[bi].anchor||chs[bi].nodes[0];
+    var n0=h0&&h0.querySelector&&h0.querySelector('.sec-num,.section-num');
+    var v0=n0?(n0.textContent||'').trim():'';
+    if(/^[0-9]{1,2}$/.test(v0)){ base=(parseInt(v0,10)===0)?0:1; break; }
+    var t0=h0&&h0.querySelector&&h0.querySelector('.sec-title,.section-title');
+    var m0=t0?(t0.textContent||'').match(/^\s*([0-9]{2})/):null;
+    if(m0){ base=(parseInt(m0[1],10)===0)?0:1; break; }
+  }
+  chs.forEach(function(ch){
+    var host=ch.anchor||ch.nodes[0]; if(!host||!host.querySelector)return;
+    var num=host.querySelector('.sec-num,.section-num');
+    if(!num&&ch.nodes[0]&&ch.nodes[0].querySelector)num=ch.nodes[0].querySelector('.sec-num,.section-num');
+    var cur=num?(num.textContent||'').trim():'';
+    if(cur&&!/^[0-9]{1,2}$/.test(cur))return;              /* 🔑、★ 這類保持原樣 */
+    var v=('0'+(base+i)).slice(-2); i++;
+    if(num){ if(cur!==v){num.textContent=v; changed++;} }
+    else {
+      var t=host.querySelector('.sec-title,.section-title');
+      if(t){ var m=(t.textContent||'').match(/^\s*([0-9]{2})(\s|　)*/);
+        if(m&&m[1]!==v){ t.textContent=(t.textContent||'').replace(/^\s*[0-9]{2}(\s|　)*/, v+' '); changed++; } }
+    }
+    /* 導覽列的文字也跟著換（市觀／美股／台股的 nav 會寫章號）*/
+    var ids=[]; ch.nodes.forEach(function(x){ if(x.id)ids.push(x.id); });
+    ids.forEach(function(id){
+      [].forEach.call(d.querySelectorAll('a[href="#'+id+'"]'),function(a){
+        var m2=(a.textContent||'').match(/^\s*([0-9]{2})(\s|　)*/);
+        if(m2&&m2[1]!==v){ a.textContent=(a.textContent||'').replace(/^\s*[0-9]{2}(\s|　)*/, v+' '); changed++; }
+      });
+    });
+  });
+  /* 導覽列的排列順序也跟著文件順序（不然編號對了、清單順序還是舊的） */
+  var items=[];
+  chs.forEach(function(ch){
+    var ids=[]; ch.nodes.forEach(function(x){ if(x.id)ids.push(x.id); });
+    for(var k=0;k<ids.length;k++){
+      var a=d.querySelector('nav a[href="#'+ids[k]+'"],[class*="nav"] a[href="#'+ids[k]+'"]');
+      if(a){ var li=(a.parentElement&&/^(LI|TD)$/.test(a.parentElement.tagName))?a.parentElement:a; items.push(li); break; }
+    }
+  });
+  if(items.length>1){
+    var par=items[0].parentElement, same=items.every(function(x){return x.parentElement===par});
+    if(same){ var cur=[].filter.call(par.children,function(c){return items.indexOf(c)>=0});
+      var need=cur.some(function(c,ix){return c!==items[ix]});
+      if(need){ items.forEach(function(x){par.appendChild(x)}); changed++; } }
+  }
+  return changed;
+}
+$('#cvNum').onclick=function(){
+  var t=tab(), d=$('#ifE')&&$('#ifE').contentDocument; if(!t||!d){toast('先匯入一份報告',1);return}
+  if(t.autonum){ t.autonum=false; this.classList.remove('on'); toast('自動編號關閉（現有的章號不動）'); saveSoon(); return; }
+  snap(); t.autonum=true; this.classList.add('on');
+  var k=renumberChapters(d);
+  renderCanvas(); saveSoon();
+  toast(k?('自動編號已開啟，重排了 '+k+' 處章號 · 之後搬動或刪除章節都會自動跟著排'):'自動編號已開啟（目前章號本來就是連號）');
+};
 function emptyShells(d){
   var cand=[].filter.call(d.body.querySelectorAll('.section,.sec-head,.sec-body,.ascii-fig,pre,p,figure,table,li,.dtree,.item,.box,.card'),function(el){
     if(el.closest('nav,.share-bar,.controls-bar,.tablet-hint,#yeb-marks'))return false;
@@ -1191,6 +1264,7 @@ function doMove(key,target,pos){
   if(tg===u||(pos==='after'&&it===iu-1)||(pos==='before'&&it===iu+1)){ toast('位置沒變，不算搬動'); return; }   /* 拖回原位不該記一筆 */
   if(!moveUnit(dE,u,tg,pos))return;
   t.moves=t.moves||[]; t.moves.push({key:key,target:target,pos:pos,at:new Date().toISOString()});
+  if(t.autonum)renumberChapters(dE);
   renderCanvas(); updPill(); saveSoon(); toast('已回寫到報告：「'+u.title.slice(0,18)+'」移到「'+tg.title.slice(0,18)+'」'+(pos==='before'?'之前':'之後'));
   scrollInto($('#ifE').contentWindow, u.anchor||u.nodes[0]);
 }
@@ -1206,6 +1280,7 @@ function doDelete(key){
   t.marks=kept;
   removeUnit(dE,u);
   t.moves=t.moves||[]; t.moves.push({key:key,pos:'del',title:u.title.slice(0,40),level:u.level,at:new Date().toISOString()});
+  if(t.autonum)renumberChapters(dE);
   closeEd(); renderCanvas(); updPill(); saveSoon();
   var refs=refMentions(dE,u.title);
   toast('已刪掉「'+u.title.slice(0,18)+'」'+(u.level===1?'整章':'')+(dropped?'（含 '+dropped+' 處修改）':'')+
@@ -1367,7 +1442,7 @@ if($('#localSel'))$('#localSel').onchange=function(){
 /* ── 儲存／載入 ── */
 function saveSoon(){clearTimeout(tmrSave);tmrSave=setTimeout(function(){save(true)},600)}   /* 自動存檔安靜做，不要蓋掉剛剛那句提示 */
 function save(silent){ var t=tab(); if(!t||!t.slug)return;
-  if(OFFLINE){ try{localStorage.setItem('yeb-doc-'+t.slug,JSON.stringify({name:t.name,marks:t.marks,moves:t.moves||[],bdel:t.bdel||[],clean:!!t.clean,gists:t.gists||{},style:t.style||'',orig:t.orig,at:new Date().toISOString()}))}catch(e){toast('本機儲存失敗：這台電腦的瀏覽器只給 5MB，開太多份大報告會滿。請用「下載編輯後 HTML」保存進度',1);return} if(!silent)toast('已存到這台電腦的瀏覽器'); return; }
+  if(OFFLINE){ try{localStorage.setItem('yeb-doc-'+t.slug,JSON.stringify({name:t.name,marks:t.marks,moves:t.moves||[],bdel:t.bdel||[],clean:!!t.clean,autonum:!!t.autonum,gists:t.gists||{},style:t.style||'',orig:t.orig,at:new Date().toISOString()}))}catch(e){toast('本機儲存失敗：這台電腦的瀏覽器只給 5MB，開太多份大報告會滿。請用「下載編輯後 HTML」保存進度',1);return} if(!silent)toast('已存到這台電腦的瀏覽器'); return; }
   api('POST',EP.docs+'&name='+encodeURIComponent(t.slug)+'&part=state',{state:{name:t.name,marks:t.marks,moves:t.moves||[],bdel:t.bdel||[],gists:t.gists||{},style:t.style||''}}).then(function(){if(!silent)toast('已儲存')}); }
 $('#btnSave').onclick=function(){save()};
 /* 儲存到檔案：寫進 reports\，當作工作檔；要上線還是走 ④ 的定稿發佈（有閘門＋上傳） */
@@ -1408,7 +1483,7 @@ function exportHtml(t, opts){
   var st=d.createElement('style'); st.textContent=MARK_CSS.split('.yeb-ok').join('.yeb-ok-x'); d.head.appendChild(st);
   t.marks.forEach(function(m){var el=d.querySelector('[data-yeb="'+m.idx+'"]'); if(!el)return; el.innerHTML=withInline(m.after, m.beforeHtml||el.innerHTML); if(!m.approved&&opts.keepMarks)el.classList.add('yeb-emark');});
   var origOrder=unitsOf(d).filter(function(u){return u.level<=2}).map(function(u){return u.key});
-  replayMoves(d, t.moves||[]); replayBlockDels(d, t.bdel||[]); if(t.clean)removeEmptyShells(d);
+  replayMoves(d, t.moves||[]); replayBlockDels(d, t.bdel||[]); if(t.clean)removeEmptyShells(d); if(t.autonum)renumberChapters(d);
   d.querySelectorAll('[data-yeb]').forEach(function(e){e.removeAttribute('data-yeb')});
   /* 進度隨檔案走：把 marks 藏在檔尾，上傳回編輯器時原樣還原（複製到另一台電腦也能接著改） */
   if(opts.withStyle&&t.style){ var st=styleByName(t.style); if(st){ var old=d.getElementById('yoda-tokens'); if(old)old.remove();
