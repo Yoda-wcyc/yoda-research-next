@@ -742,9 +742,14 @@ function junkTitle(t){   /* 只有欄名或一坨資料，不算節 */
 function txt(el){return (el?el.textContent:'').replace(/\s+/g,' ').trim()}
 function chapterTitle(el){
   var q=function(sel){return el.querySelector?el.querySelector(sel):null};
-  var num=q('.section-num'), t=q('.section-title')||q('.sec-head')||q('h1')||q('h2')||(el.matches&&el.matches('.section-title,.sec-head,h1,h2')?el:null);
-  var title=((num?txt(num)+' ':'')+txt(t)).trim();
-  if(!title) title=txt(el).slice(0,40);
+  var num=q('.section-num')||q('.sec-num'), t=q('.section-title')||q('.sec-title')||q('.sec-head')||q('h1')||q('h2')||(el.matches&&el.matches('.section-title,.sec-title,.sec-head,h1,h2')?el:null);
+  var nt=txt(num); if(nt.length>10)nt='';        /* 有的報告把整句話塞進編號欄，那就不要當編號用 */
+  var title=((nt?nt+' ':'')+txt(t)).trim();
+  if(!title){                                    /* 標頭是空的：用這一章的內文開頭當名字，別讓它變無名氏 */
+    var body=el.querySelector&&(el.querySelector('.sec-body')||el);
+    title=txt(body).replace(/\s+/g,' ').trim().slice(0,40);
+    if(title)title='（無標題）'+title;
+  }
   return title.slice(0,60);
 }
 function textBlocks(root){   /* 有直接文字、夠長的區塊（跟右欄的段落編號同一種東西） */
@@ -767,6 +772,24 @@ function chapterUnits(d){
       } else nodes=[h];   /* 市觀型：id 在包裝層，整個容器就是章 */
       out.push({nodes:nodes, title:chapterTitle(h), anchor:h});
     });
+    return out;
+  }
+  /* 沒有 nav 的報告（關鍵報告、專題）：以章標頭為準。章＝標頭所在的區塊；
+     那個區塊被別章用掉了（巢狀），就退成「標頭＋後面的兄弟，直到下一個標頭」 */
+  var heads=[].filter.call(d.body.querySelectorAll('.sec-head,.section-header'),function(h){
+     return !h.closest('nav')&&txt(h).trim().length>1; });
+  if(heads.length>=2){
+    var used=[];
+    heads.forEach(function(h){
+      var sec=h.closest('.section,section,article');
+      if(sec&&used.indexOf(sec)<0&&!used.some(function(o){return o.contains(sec)})){
+        used.push(sec); out.push({nodes:[sec],title:chapterTitle(sec)||chapterTitle(h),anchor:h}); return;
+      }
+      var nodes=[h], x=h.nextElementSibling;
+      while(x&&heads.indexOf(x)<0&&!(x.querySelector&&heads.some(function(hh){return x.contains(hh)}))){nodes.push(x);x=x.nextElementSibling}
+      out.push({nodes:nodes,title:chapterTitle(h),anchor:h});
+    });
+    out.sort(function(a,b){return a.anchor.compareDocumentPosition(b.anchor)&Node.DOCUMENT_POSITION_FOLLOWING?-1:1});
     return out;
   }
   var secs=[].filter.call(d.body.querySelectorAll('section,.section,article,[id^="sec-"],[id^="s0"]'),function(el){
@@ -892,14 +915,32 @@ function moveUnit(d,u,target,pos){   /* 把 u 的節點整批搬到 target 的�
   else { var after=ref.nextSibling; u.nodes.forEach(function(x){par.insertBefore(x,after)}); }
   return true;
 }
-function removeUnit(d,u){   /* 整批移除節點；刪整章時把 nav 指向它的連結一起拿掉，不留死連結 */
-  var id=u.anchor&&u.anchor.id;
+function removeUnit(d,u){   /* 整批移除節點；連指向它的連結也一起清，不留死連結 */
+  var ids=[];
+  u.nodes.forEach(function(x){ if(x.id)ids.push(x.id); if(x.querySelectorAll)[].forEach.call(x.querySelectorAll('[id]'),function(y){if(y.id)ids.push(y.id)}); });
+  if(u.anchor&&u.anchor.id&&ids.indexOf(u.anchor.id)<0)ids.push(u.anchor.id);
   u.nodes.forEach(function(x){ if(x.parentNode)x.parentNode.removeChild(x) });
-  if(u.level===1&&id){ [].forEach.call(d.querySelectorAll('a[href="#'+id.replace(/"/g,'\\"')+'"]'),function(a){
-    if(!a.closest('nav,.nav,[class*="nav"]'))return;
-    var li=(a.parentElement&&a.parentElement.tagName==='LI'&&a.parentElement.children.length===1)?a.parentElement:a;
-    if(li.parentNode)li.parentNode.removeChild(li); }); }
+  ids.forEach(function(id){
+    [].forEach.call(d.querySelectorAll('a[href="#'+id.replace(/"/g,'\\"')+'"]'),function(a){
+      var box=a.parentElement;
+      var li=(box&&(box.tagName==='LI'||box.tagName==='TD')&&box.children.length===1&&txt(box)===txt(a))?box:a;
+      if(li.parentNode)li.parentNode.removeChild(li);
+      if(box&&box.parentNode&&!txt(box)&&!box.querySelector('a,button,img,svg'))box.parentNode.removeChild(box);
+    });
+  });
   return true;
+}
+function refMentions(d,title){
+  /* 標題去掉編號後的關鍵字，例如「04 宏觀背景事件」→「宏觀背景事件」 */
+  var key=String(title||'').replace(/^[0-9０-９\s.·]+/,'').split(/[\s·（(]/)[0];
+  if(!key||key.length<3)return [];
+  return [].filter.call(d.querySelectorAll('[data-yeb]'),function(el){
+    return (el.textContent||'').indexOf(key)>=0 && !el.querySelector('[data-yeb]');
+  }).slice(0,20);
+}
+function flashRefs(d,els){
+  els.forEach(function(el){ el.classList.add('yeb-flash'); setTimeout(function(){el.classList.remove('yeb-flash')},2600); });
+  if(els.length){ try{ scrollInto($('#ifE').contentWindow, els[0]); }catch(e){} }
 }
 function replayMoves(d,moves){ (moves||[]).forEach(function(m){ var us=unitsOf(d), by={}; us.forEach(function(u){by[u.key]=u}); var u=by[m.key]; if(!u)return;
   if(m.pos==='del'){ removeUnit(d,u); return; }
@@ -914,7 +955,7 @@ function renderCanvas(){
   var dels=(t.moves||[]).filter(function(m){return m.pos==='del'});
   var LV={1:'章',2:'節',3:'塊'};
   function li(u){ var g=(t.gists||{})[u.key];
-    return '<li class="cnode lv'+u.level+(u.level===2&&u.children.length?' collapsed':'')+(movedKeys[u.key]?' moved':'')+'" data-key="'+esc(u.key)+'" draggable="true"><div class="row"><span class="lv">'+LV[u.level]+'</span><div style="min-width:0;flex:1"><div class="ttl">'+esc(u.title)+'</div>'+(g?'<div class="gist">'+esc(g)+'</div>':'')+'<div class="meta">'+(u.level===1?(u.children.length+' 節 · '):'')+(u.paras?u.paras+' 段':'')+'</div></div>'+(u.children.length?'<span class="tg" title="收合／展開">▾ '+u.children.length+'</span>':'')+'<span class="cx" title="從報告裡刪掉這個區塊（可復原）">✕</span></div>'+(u.children.length?'<ul>'+u.children.map(li).join('')+'</ul>':'')+'</li>'; }
+    return '<li class="cnode lv'+u.level+(movedKeys[u.key]?' moved':'')+'" data-key="'+esc(u.key)+'" draggable="true"><div class="row"><span class="lv">'+LV[u.level]+'</span><div style="min-width:0;flex:1"><div class="ttl">'+esc(u.title)+'</div>'+(g?'<div class="gist">'+esc(g)+'</div>':'')+'<div class="meta">'+(u.level===1?(u.children.length+' 節 · '):'')+(u.paras?u.paras+' 段':'')+'</div></div>'+(u.children.length?'<span class="tg" title="收合／展開">▾ '+u.children.length+'</span>':'')+'<span class="cx" title="從報告裡刪掉這個區塊（可復原）">✕</span></div>'+(u.children.length?'<ul>'+u.children.map(li).join('')+'</ul>':'')+'</li>'; }
   host.innerHTML=root.children.length?'<ul>'+root.children.map(li).join('')+'</ul>':'<div class="empty2">這份報告抓不到章節（沒有 nav、.section、#sec-*、h1/h2）</div>';
   var n1=units.filter(function(u){return u.level===1}).length,
       n2=units.filter(function(u){return u.level===2}).length,
@@ -1075,7 +1116,10 @@ function doDelete(key){
   removeUnit(dE,u);
   t.moves=t.moves||[]; t.moves.push({key:key,pos:'del',title:u.title.slice(0,40),level:u.level,at:new Date().toISOString()});
   closeEd(); renderCanvas(); updPill(); saveSoon();
-  toast('已刪掉「'+u.title.slice(0,18)+'」'+(u.level===1?'整章':'')+(dropped?'（含 '+dropped+' 處修改）':'')+' · 按「復原」可找回');
+  var refs=refMentions(dE,u.title);
+  toast('已刪掉「'+u.title.slice(0,18)+'」'+(u.level===1?'整章':'')+(dropped?'（含 '+dropped+' 處修改）':'')+
+        (refs.length?(' · 另有 '+refs.length+' 處別章提到它（已閃給你看，要刪就點它用 ✕）'):'')+' · 按「復原」可找回', refs.length?1:0);
+  if(refs.length)setTimeout(function(){flashRefs(dE,refs)},300);
   }
 }
 $('#cvReset').onclick=function(){ var t=tab(); if(!t||!(t.moves||[]).length)return;
