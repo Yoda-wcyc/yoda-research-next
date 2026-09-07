@@ -442,12 +442,18 @@ function setupPanes(){
       var t2=ev.target;
       if(t2&&t2.nodeType===1&&t2!==dE.body&&t2!==dE.documentElement&&!t2.closest('.yeb-selbar')){
         ev.preventDefault(); ev.stopPropagation();
-        selectBlock(t2); echoLeft(t2); closeEd();
-        toast('已選取這一塊（沒有文字可編輯）· 用右上角 ✕ 刪掉，或按 ⌃ 擴大選取範圍');
+        var add=!!(ev.ctrlKey||ev.metaKey||ev.shiftKey);
+        selectBlock(t2, add); echoLeft(t2); closeEd();
+        toast(selCount()>1 ? ('已選 '+selCount()+' 塊 · 按右上角「✕ 刪除這 '+selCount()+' 塊」一起刪')
+                           : '已選取這一塊（沒有文字可編輯）· 用右上角 ✕ 刪掉，或 ⌃ 擴大；按住 Ctrl 可以再加選');
       }
       return;
     }
-    ev.preventDefault(); ev.stopPropagation(); selectBlock(el); echoLeft(el); openEd(el);
+    ev.preventDefault(); ev.stopPropagation();
+    var add=!!(ev.ctrlKey||ev.metaKey||ev.shiftKey);
+    selectBlock(el, add); echoLeft(el);
+    if(add||selCount()>1){ closeEd(); toast('已選 '+selCount()+' 塊 · 按右上角「✕ 刪除這 '+selCount()+' 塊」一起刪'); }
+    else openEd(el);
   },true);
   if(dO&&dO.body){   /* 兩欄同步捲動：只有原稿欄存在時才需要 */
     /* 同步滾動：以「視窗最上緣的段落」對齊 */
@@ -705,7 +711,10 @@ $('#edUp').onclick=function(){
   if(p&&p!==d.body&&p!==d.documentElement){ selectBlock(p); toast('選取範圍擴大到外一層（'+(p.textContent||'').trim().length+' 字）'); }
   else toast('已經是最外層了',1);
 };
-$('#edDel').onclick=function(){ var el=SEL_EL||ED_EL; if(!el){toast('先點一段',1);return} delBlock(el); };
+$('#edDel').onclick=function(){ var list=SEL_LIST.length?SEL_LIST.slice():(ED_EL?[ED_EL]:[]); if(!list.length){toast('先點一段',1);return} delBlock(list); };
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'&&selCount()&&!$('#askDlg').classList.contains('on')&&!$('#ed').classList.contains('on')){ hideSel(); toast('已取消選取'); }
+});
 $('#edApply').onclick=function(){ if(!ED_EL)return;
   var v=$('#edText').value;
   /* 同樣的陷阱：指示打在內文框又按了直接套用，整段會被那句話取代 */
@@ -996,7 +1005,7 @@ function renderCanvas(){
   });
 }
 /* 選取一個區塊：右上角浮出「擴大／刪除」，刪的就是框起來的那一塊 */
-var SEL_EL=null, SELX=null;
+var SEL_EL=null, SELX=null, SEL_LIST=[];   /* SEL_LIST＝目前選取的全部區塊；SEL_EL＝最後點的那個（浮動列貼著它） */
 function pathOf(el){   /* 用子節點序號記路徑：沒有 data-yeb 的容器也記得住 */
   var p=[], x=el, d=el.ownerDocument;
   while(x&&x!==d.body){ var i=0, y=x; while((y=y.previousElementSibling))i++; p.unshift(i); x=x.parentElement; }
@@ -1007,7 +1016,17 @@ function byPath(d,path){
   for(var i=0;i<parts.length;i++){ if(!x||!x.children)return null; x=x.children[+parts[i]]; }
   return x||null;
 }
-function hideSel(){ if(SEL_EL)SEL_EL.classList.remove('yeb-sel'); SEL_EL=null; if(SELX)SELX.classList.remove('on'); }
+function hideSel(){
+  SEL_LIST.forEach(function(x){ if(x&&x.classList)x.classList.remove('yeb-sel') });
+  SEL_LIST=[]; SEL_EL=null; if(SELX)SELX.classList.remove('on');
+}
+function selCount(){ return SEL_LIST.length; }
+function updSelBtn(){
+  if(!SELX)return;
+  var d=SELX.querySelector('.del'), u=SELX.querySelector('.up'), k=selCount();
+  if(d)d.textContent = k>1 ? ('✕ 刪除這 '+k+' 塊') : '✕ 刪除';
+  if(u)u.style.display = k>1 ? 'none' : '';    /* 多選時「擴大」沒有意義 */
+}
 function placeSel(){
   if(!SEL_EL||!SELX)return;
   var d=SEL_EL.ownerDocument, w=d.defaultView||{};
@@ -1018,7 +1037,7 @@ function placeSel(){
   SELX.style.top=Math.max(2,top)+'px';
   SELX.style.left=Math.max(4,r.right-150)+'px';
 }
-function selectBlock(el){
+function selectBlock(el, add){
   if(!el)return; var d=el.ownerDocument;
   if(!SELX||SELX.ownerDocument!==d){
     SELX=d.createElement('div'); SELX.className='yeb-selbar'; SELX.setAttribute('data-audit-skip','1');
@@ -1033,29 +1052,46 @@ function selectBlock(el){
         else toast('已經是最外層了',1);
         return;
       }
-      delBlock(SEL_EL);
+      delBlock(SEL_LIST.slice());
     },true);
     d.addEventListener('scroll',placeSel,true);
     if(d.defaultView){d.defaultView.addEventListener('resize',placeSel); d.defaultView.addEventListener('scroll',placeSel,true);}
   }
-  if(SEL_EL)SEL_EL.classList.remove('yeb-sel');
-  SEL_EL=el; el.classList.add('yeb-sel'); placeSel();
+  if(!add){ SEL_LIST.forEach(function(x){ if(x&&x.classList)x.classList.remove('yeb-sel') }); SEL_LIST=[]; }
+  var i=SEL_LIST.indexOf(el);
+  if(i>=0 && add){ el.classList.remove('yeb-sel'); SEL_LIST.splice(i,1); SEL_EL=SEL_LIST[SEL_LIST.length-1]||null;
+    if(!SEL_EL){ SELX.classList.remove('on'); return; } placeSel(); updSelBtn(); return; }
+  /* 加選時，把被包住／包住別人的重複選取清掉，免得刪兩次 */
+  if(add)SEL_LIST=SEL_LIST.filter(function(x){ return !(x.contains&&(x.contains(el)||el.contains(x))); });
+  SEL_LIST.push(el); SEL_EL=el; el.classList.add('yeb-sel'); placeSel(); updSelBtn();
 }
-function delBlock(el){
-  if(!el)return;
-  var t=tab(), path=pathOf(el), words=(el.textContent||'').trim();
-  ask('把框起來的這一塊從報告裡刪掉？\n\n「'+words.slice(0,60)+(words.length>60?'…':'')+'」\n\n共 '+words.length+' 字。按「復原」可以找回。','刪掉')
+function delBlock(els){
+  var list=(els&&els.length!==undefined&&els.nodeType===undefined)?[].slice.call(els):(els?[els]:[]);
+  list=list.filter(function(x){return x&&x.parentNode});
+  if(!list.length)return;
+  var t=tab();
+  var chars=list.reduce(function(a,x){return a+(x.textContent||'').trim().length},0);
+  var first=(list[0].textContent||'').trim();
+  var msg = list.length===1
+    ? ('把框起來的這一塊從報告裡刪掉？\n\n「'+first.slice(0,60)+(first.length>60?'…':'')+'」\n\n共 '+chars+' 字。按「復原」可以找回。')
+    : ('把選起來的 '+list.length+' 塊一起刪掉？\n\n'+list.slice(0,6).map(function(x,i){var w=(x.textContent||'').trim();return (i+1)+'. '+(w.slice(0,26)||'（沒有文字的區塊）')}).join('\n')+(list.length>6?('\n…還有 '+(list.length-6)+' 塊'):'')+'\n\n合計 '+chars+' 字。按「復原」可以一次找回。');
+  ask(msg, list.length===1?'刪掉':('刪掉這 '+list.length+' 塊'))
     .then(function(y){
       if(!y)return;
       snap();
-      t.bdel=t.bdel||[]; t.bdel.push(anchorOf(el));
-      var inside={}; [].forEach.call(el.querySelectorAll('[data-yeb]'),function(x){inside[x.getAttribute('data-yeb')]=1});
-      if(el.getAttribute&&el.getAttribute('data-yeb'))inside[el.getAttribute('data-yeb')]=1;
+      t.bdel=t.bdel||[];
+      var inside={};
+      list.forEach(function(el){
+        t.bdel.push(anchorOf(el));
+        [].forEach.call(el.querySelectorAll('[data-yeb]'),function(x){inside[x.getAttribute('data-yeb')]=1});
+        if(el.getAttribute&&el.getAttribute('data-yeb'))inside[el.getAttribute('data-yeb')]=1;
+      });
       var dropped=(t.marks||[]).filter(function(m){return inside[m.idx]}).length;
       t.marks=(t.marks||[]).filter(function(m){return !inside[m.idx]});
-      hideSel(); if(el.parentNode)el.parentNode.removeChild(el);
+      hideSel();
+      list.forEach(function(el){ if(el.parentNode)el.parentNode.removeChild(el); });
       closeEd(); updPill(); renderCanvas(); saveSoon();
-      toast('已刪掉這一塊'+(dropped?'（含 '+dropped+' 處修改）':'')+' · 按「復原」可找回');
+      toast('已刪掉 '+list.length+' 塊'+(dropped?'（含 '+dropped+' 處修改）':'')+' · 按「復原」可一次找回');
     });
 }
 function anchorOf(el){
