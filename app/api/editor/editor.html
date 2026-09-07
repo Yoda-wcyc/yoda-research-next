@@ -14,7 +14,9 @@ button.danger{border-color:#5a2630;color:#ff8a8a}
 button:disabled{opacity:.4;cursor:default}
 select,input[type=text]{background:#131a25;color:#c9d6e4;border:1px solid #263242;border-radius:5px;padding:5px 7px;font:inherit;font-size:12px}
 /* 頁籤列 */
-.tabs{display:flex;align-items:center;gap:4px;padding:8px 10px 0;background:#0e131c;border-bottom:1px solid #1e2836;flex-wrap:wrap}
+.tabs{display:flex;align-items:flex-end;gap:4px;padding:0;background:transparent;border-bottom:0;flex-wrap:nowrap;
+     flex:1;min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
+.tabs .t{flex:0 0 auto}
 .tabs .t{display:flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid #1e2836;border-bottom:0;border-radius:7px 7px 0 0;background:#0b0f16;color:#7f93a8;cursor:pointer;max-width:260px}
 .tabs .t.on{background:#131a25;color:#e6eef8;border-color:#2f6fb5}
 .tabs .t .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -23,7 +25,21 @@ select,input[type=text]{background:#131a25;color:#c9d6e4;border:1px solid #26324
 .tabs .add{margin-left:2px}
 .tabs .brand{margin-left:auto;font-size:12px;color:#5f7286}
 /* 工具列 */
-.bar{display:flex;gap:8px;align-items:center;padding:8px 12px;background:#0b0f16;border-bottom:1px solid #1e2836;flex-wrap:wrap}
+.modes{border-bottom:1px solid #1e2836}
+.bar{display:flex;gap:6px;align-items:center;padding:5px 8px;background:#0b0f16;border-bottom:1px solid #1e2836;
+     flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
+.bar button{padding:5px 8px}
+.bar select{max-width:150px;padding:5px 6px;font-size:12px}
+/* 功能分組：同色系＝同一件事。開檔藍、編輯琥珀、保存綠、版面灰 */
+.grp{display:flex;align-items:center;gap:4px;padding:3px 6px;border:1px solid #1e2836;border-radius:7px;flex:0 0 auto;position:relative}
+.grp>.gl{font:700 9px/1 ui-monospace,monospace;color:#5f7286;letter-spacing:.5px;padding-right:2px;flex:0 0 auto}
+.grp button{border-color:transparent;background:transparent;color:inherit}
+.grp button:hover{background:#ffffff14}
+.grp-open{background:#0f1a26;border-color:#23384f;color:#bcd6f2}
+.grp-edit{background:#1c1608;border-color:#4a3a16;color:#e8c877}
+.grp-save{background:#0d1e15;border-color:#1f4433;color:#8ae0b0}
+.grp-view{background:#12161d;border-color:#28313d;color:#a9bdd2}
+.grp-open>.gl{color:#5b86b8}.grp-edit>.gl{color:#a3853c}.grp-save>.gl{color:#3f8a63}
 .bar .pill{font:700 11px/1 ui-monospace,monospace;padding:5px 8px;border-radius:5px;background:#131a25;border:1px solid #263242;color:#a9bdd2}
 .bar .pill b{color:#e6eef8}
 .bar .sp{flex:1}
@@ -59,7 +75,10 @@ body.dragging iframe{pointer-events:none}
 .ed .row .sp{flex:1;font-size:11px;color:#5f7286}
 .pane.edit{position:relative}
 /* 頂層模式 */
-.modes{display:flex;gap:0;padding:8px 12px 0;background:#0e131c}
+.modes{display:flex;gap:0;padding:4px 10px 0;background:#0e131c;align-items:flex-end;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}
+.modes .ttl{align-self:center;font-weight:800;color:#e6eef8;margin-right:8px;font-size:13px;white-space:nowrap;flex:0 0 auto}
+.modes>button{flex:0 0 auto}
+.modes .sepv{width:1px;align-self:stretch;background:#1e2836;margin:4px 8px 0}
 .modes button{border-radius:6px 6px 0 0;border-bottom:0;padding:9px 16px;font-size:13px;color:#7f93a8;background:#0b0f16}
 .modes button.on{background:#131a25;color:#e6eef8;border-color:#2f6fb5}
 /* 架構畫布 */
@@ -112,23 +131,32 @@ code{font:11.5px ui-monospace,Consolas,monospace;background:#131a25;padding:1px 
 </head><body>
 
 
-<div class="modes" id="modes"><span style="align-self:center;font-weight:800;color:#e6eef8;margin-right:10px">Yoda 報告工作台</span><button data-mode="canvas">① 架構畫布</button><button data-mode="editor" class="on">② 編輯細節</button><button data-mode="style">③ 視覺模組</button><button data-mode="output">④ 輸出</button></div>
-<div class="tabs" id="tabs"></div>
+<div class="modes" id="modes"><span class="ttl">Yoda 報告工作台</span><button data-mode="canvas">① 架構畫布</button><button data-mode="editor" class="on">② 編輯細節</button><button data-mode="style">③ 視覺模組</button><button data-mode="output">④ 輸出</button><span class="sepv"></span><div class="tabs" id="tabs"></div></div>
 <div class="bar" id="bar">
-  <button id="btnOpen">從雲端開啟…</button>
-  <select id="cloudSel" style="max-width:280px"></select>
-  <label><button type="button" onclick="document.getElementById('fileIn').click()">匯入報告</button></label>
-  <input type="file" id="fileIn" accept=".html,.htm" style="display:none">
-  <select id="localSel" style="display:none;max-width:280px" title="直接從 reports 夾或視覺實驗室挑一份，不用開檔案對話框"></select>
-  <select id="resumeSel" style="display:none;max-width:250px" title="上次改到一半的進度（存在這台電腦的瀏覽器）"></select>
+  <div class="grp grp-open"><span class="gl">開檔</span>
+    <button id="btnOpen" title="從雲端開啟已上傳的文件">雲端</button>
+    <select id="cloudSel"></select>
+    <button type="button" id="btnImport" onclick="document.getElementById('fileIn').click()" title="從硬碟挑一個 HTML 檔匯入（也可以是之前「下載編輯後」的檔，標記會回來）">匯入</button>
+    <input type="file" id="fileIn" accept=".html,.htm" style="display:none">
+    <select id="localSel" style="display:none" title="直接從 reports 夾或視覺實驗室挑一份，不用開檔案對話框"></select>
+    <select id="resumeSel" style="display:none" title="上次改到一半的進度（存在這台電腦的瀏覽器）"></select>
+    <button id="btnDel" class="danger" title="刪除雲端文件">刪</button>
+  </div>
+  <div class="grp grp-edit"><span class="gl">編輯</span>
+    <button id="btnUndo" title="復原上一個動作（Ctrl+Z）">↶ 復原</button>
+    <button id="btnReview" title="整份送 Claude 先審一輪，挑出該改的地方">AI 先審</button>
+    <button id="btnApproveAll" title="把所有待認可的紅框一次認可">全部認可</button>
+  </div>
+  <div class="grp grp-save"><span class="gl">保存</span>
+    <button id="btnSave" title="把編輯進度（標記、結構調整、視覺模組）存在這台電腦的瀏覽器；不會寫進 reports 夾、也不會上傳">存進度</button>
+    <button id="btnFile" title="把目前這份寫成 reports\ 裡的 HTML 檔（同名舊檔會先備份）；不跑閘門、不上傳">存成檔案</button>
+    <button id="btnDownload" title="下載成 .edited.html">下載</button>
+  </div>
+  <div class="grp grp-view"><span class="gl">版面</span>
+    <div class="seg" id="layoutSeg" title="版面"><button data-l="split" class="on">左右</button><button data-l="right">只看右</button><button data-l="fit">全幅</button></div>
+  </div>
   <span class="pill" id="pMarks">—</span>
-  <div class="seg" id="layoutSeg" title="版面"><button data-l="split" class="on">左右</button><button data-l="right">右側全幅</button><button data-l="fit">縮放到全幅</button></div>
   <span class="sp"></span>
-  <button id="btnUndo" title="復原上一個動作（Ctrl+Z）">↶ 復原</button><button id="btnReview">AI 先審一輪</button><button id="btnApproveAll" class="ok">全部認可</button>
-  <button id="btnDownload">下載編輯後 HTML</button>
-  <button id="btnSave" class="pri" title="把編輯進度（標記、結構調整、視覺模組）存在這台電腦的瀏覽器；不會寫進 reports 夾、也不會上傳">存進度</button>
-  <button id="btnFile" title="把目前這份寫成 reports\ 裡的 HTML 檔（同名舊檔會先備份）；不跑閘門、不上傳">儲存到檔案</button>
-  <button id="btnDel" class="danger">刪除此文件</button>
 </div>
 
 <div class="panes">
@@ -230,7 +258,7 @@ function scrollInto(win, el){   /* 只捲 iframe 自己（或它內部的容器�
     while(x&&x!==d.body&&x!==d.documentElement){ var cs=win.getComputedStyle(x); if(/(auto|scroll)/.test(cs.overflowY)&&x.scrollHeight>x.clientHeight+2){sc=x;break} x=x.parentElement }
     var top=el.getBoundingClientRect().top; if(sc) sc.scrollTop+= top - sc.getBoundingClientRect().top - 12; else win.scrollBy(0, top-12); }catch(e){}
 }
-function setMode(m){ MODE=m; document.querySelectorAll('#modes button').forEach(function(b){b.classList.toggle('on',b.dataset.mode===m)});
+function setMode(m){ MODE=m; document.querySelectorAll('#modes>button[data-mode]').forEach(function(b){b.classList.toggle('on',b.dataset.mode===m)});
   $('#canvasPane').style.display = m==='canvas'?'':'none'; $('#stylePane').style.display = m==='style'?'':'none'; $('#outPane').style.display = m==='output'?'':'none';
   document.querySelector('.pane.orig').style.display = m==='editor'?'':'none';
   $('#hdE').textContent = {canvas:'報告（畫布回寫的結果即時顯示）',editor:'編輯（點任一段落即可修改）',style:'報告（套上樣式的樣子）',output:'報告（將要輸出的樣子）'}[m];   /* 只換文字，別動旁邊的字數 */
