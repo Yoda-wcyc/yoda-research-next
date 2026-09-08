@@ -125,6 +125,8 @@ code{font:11.5px ui-monospace,Consolas,monospace;background:#131a25;padding:1px 
 
 <script src="/yoda-tokens.js"></script>
 <script>
+var ZH={'baseline.v0':'基準（現行母板）','linear-dark':'深色介面（Linear 風）','tradingview-terminal':'交易終端（TradingView 風）','initium-editorial':'編輯雜誌（端傳媒風）','stockanalysis-tables':'數據表格（StockAnalysis 風）','radix-scale':'標準階梯（Radix 風）','high-end-visual':'高端視覺','minimalist-ui':'極簡編輯','industrial-brutalist':'工業粗獷'};   /* 畫面顯示中文，value 仍是識別碼 */
+
 var $=function(s){return document.querySelector(s)};
 var INIT=null, STYLE=null, ORIG=null, CURNAME='', TH='dark', SZ=24, OFF=false, tmr=null, BIND=null;
 /* 兩種後端：本機 token_server（可存檔＋可套用） / Vercel（可存檔到 Blob，套用要回本機做） */
@@ -371,7 +373,7 @@ function buildAssign(){
     key:'關鍵報告',topic:'專題／手冊',pro:'個股分析',brief:'簡報',forecast:'預測時間軸',hub:'研究報告中心','free-shell':'免費殼'};
   INIT.types.forEach(function(t){
     h+='<tr><td title="'+t+'">'+(NAMES[t]||t)+'</td><td><select data-t="'+t+'">'+
-       INIT.styles.map(function(s){return '<option value="'+s+'">'+s+'</option>'}).join('')+'</select></td></tr>';
+       INIT.styles.map(function(s){return '<option value="'+s+'" title="'+s+'">'+(ZH[s]||s)+'</option>'}).join('')+'</select></td></tr>';
   });
   $('#asgBody').innerHTML=h;
   document.querySelectorAll('#asgBody select').forEach(function(s){
