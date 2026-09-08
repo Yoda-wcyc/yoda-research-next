@@ -324,10 +324,45 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 /* ── 段落編號規則（兩欄共用）：有直接文字的元素，依文件順序 ── */
 var SKIP={SCRIPT:1,STYLE:1,NOSCRIPT:1,TEXTAREA:1,BUTTON:1,SELECT:1,OPTION:1,SVG:1,CANVAS:1};
 function hasText(el){for(var i=0;i<el.childNodes.length;i++){var n=el.childNodes[i];if(n.nodeType===3&&/\S/.test(n.nodeValue))return true}return false}
-function indexBlocks(doc){
-  var all=doc.body.querySelectorAll('*'), n=0;
-  for(var i=0;i<all.length;i++){var el=all[i]; if(SKIP[el.tagName])continue; if(el.closest&&el.closest('nav,.controls-bar,.share-bar,#yoda-share,.tablet-hint'))continue;
-    if(!hasText(el))continue; el.setAttribute('data-yeb',n++);}
+/* 2026-09-08 重寫定位方式（Yoda：在工作台刪掉的東西存檔後又出現）。
+   舊版用「文件順序流水號」當 data-yeb，但兩端的 DOM 根本不是同一份：
+     畫布  iframe 載入報告、報告自己的 JS 跑完   → 台股報告實測 50,260 個編號元素
+     匯出  exportHtml 用 DOMParser 解析原始檔字串 → 20,813 個（JS 沒跑，動態內容不存在）
+   同一個 .rv-title 兩端編號 49781 vs 20335，位移 29,446。於是畫布上刪掉 49781、
+   匯出時在只有兩萬個編號的文件裡找不到 → 靜默跳過；marks 更危險，可能套到別的段落。
+
+   改法：編號改用「內容指紋＋該指紋第幾次出現」，且畫布端只編號「原始檔裡也存在」的元素
+   （allow 表由靜態 DOM 產生），JS 執行期插入的節點一律跳過。兩端基準因此一致。
+   萬一某元素的文字被 JS 改寫、指紋對不上，它就不編號——結果是「那塊不能編輯」，
+   而不是「編輯套到別人身上」，失敗方向是安全的。 */
+function fpOf(el){
+  var t='';
+  for(var i=0;i<el.childNodes.length;i++){var n=el.childNodes[i]; if(n.nodeType===3)t+=n.nodeValue;}
+  return el.tagName+'|'+t.replace(/\s+/g,' ').trim().slice(0,80);
+}
+function h32(s){var h=5381; for(var i=0;i<s.length;i++)h=((h*33)^s.charCodeAt(i))>>>0; return h.toString(36);}
+function _cand(el){
+  if(SKIP[el.tagName])return false;
+  if(el.closest&&el.closest('nav,.controls-bar,.share-bar,#yoda-share,.tablet-hint'))return false;
+  return hasText(el);
+}
+/* 由「靜態原始檔」算出可編號元素的指紋表 {hash: 出現次數}；畫布端拿它當白名單。 */
+function fpTable(doc){
+  var all=doc.body.querySelectorAll('*'), t={};
+  for(var i=0;i<all.length;i++){var el=all[i]; if(!_cand(el))continue;
+    var k=h32(fpOf(el)); t[k]=(t[k]||0)+1;}
+  return t;
+}
+function indexBlocks(doc, allow){
+  var all=doc.body.querySelectorAll('*'), n=0, used={};
+  for(var i=0;i<all.length;i++){
+    var el=all[i]; if(!_cand(el))continue;
+    var k=h32(fpOf(el)), u=used[k]||0;
+    if(allow && u>=(allow[k]||0))continue;   /* 靜態檔裡沒有（或用完了）＝執行期插入，不編號 */
+    used[k]=u+1;
+    el.setAttribute('data-yeb', k+'-'+u);
+    n++;
+  }
   return n;
 }
 /* ── 注入到 iframe 的樣式：diff 標記（沿用校稿標記的紅慢閃） ── */
@@ -433,9 +468,11 @@ function setupPanes(){
     css(dO,ORIG_CSS+MARK_CSS);
     ['click','mousedown','mouseup','dblclick','keydown','keypress','contextmenu','input','submit','touchstart'].forEach(function(t){
       dO.addEventListener(t,function(e){e.preventDefault();e.stopPropagation()},true)});
-    indexBlocks(dO);
+    indexBlocks(dO, t.fpAllow);
   }
-  t.blocks=indexBlocks(dE);
+  /* 白名單一定要由「原始檔字串」產生——那才是匯出時看到的同一份 DOM */
+  if(!t.fpAllow) t.fpAllow=fpTable(new DOMParser().parseFromString(t.orig,'text/html'));
+  t.blocks=indexBlocks(dE, t.fpAllow);
   /* 套回 marks */
   t.marks.forEach(function(m){paintMark(dE,m)});
   replayMoves(dE, t.moves||[]); replayBlockDels(dE, t.bdel||[]); if(t.clean)removeEmptyShells(dE); if(t.autonum)renumberChapters(dE);
@@ -1383,7 +1420,7 @@ function useHtml(name, html){
     if(empty>=0)CUR=empty; else if(TABS.length<5){ TABS.push({name:'',slug:'',orig:'',marks:[]}); CUR=TABS.length-1; }
     else { toast('五份都開滿了，先關掉一份',1); return; } t=tab(); }
   if(!t){ TABS.push({name:'',slug:'',orig:'',marks:[]}); CUR=TABS.length-1; t=tab(); }
-  t.name=name; t.slug=name; t.orig=html; t.marks=[]; t.moves=[]; t.bdel=[]; t.dels=[]; t.gists={}; t.style=''; t.loaded=true; t.src='file';
+  t.name=name; t.slug=name; t.orig=html; t.marks=[]; t.moves=[]; t.bdel=[]; t.dels=[]; t.gists={}; t.style=''; t.fpAllow=null; t.loaded=true; t.src='file';
   renderTabs(); mountPanes();
   var _d=(typeof DISK!=='undefined')&&DISK[name]; toast('已開啟「'+name+'」· 來源：檔案'+(_d?('（'+_d.mtime+'）'):''));
 }
