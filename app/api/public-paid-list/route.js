@@ -34,8 +34,14 @@ async function handle() {
     }
     reports.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.reportId).localeCompare(String(a.reportId)));
   } catch (e) {}
+  // 快取只為了擋「同時湧入的訪客」，不能讓後台看不到剛上傳的報告。
+  // 2026-09-09：原本 s-maxage=300 + stale-while-revalidate=3600，GAS 用固定網址抓這支，
+  // 結果 CDN 把「美股上傳前那一版」餵給後台，付費報告管理整整少一份、最久可拖一小時
+  // （台股 11:10:16 → 市場觀察 11:10:38 → 美股 11:11:42，快取正好卡在美股之前）。
+  // 改成 30 秒且不供應過期內容：過期就同步回源，最壞情況只落後 30 秒。
+  // 現在讀的是 _index.json（簡單操作），不是當年會把 Blob 打爆的 list()，30 秒足夠保護。
   return Response.json({ ok: true, reports }, { status: 200,
-    headers: { ...CORS, 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600' } });
+    headers: { ...CORS, 'Cache-Control': 'public, s-maxage=30' } });
 }
 export async function GET() { return handle(); }
 export async function POST() { return handle(); }
