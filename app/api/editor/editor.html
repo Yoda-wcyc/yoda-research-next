@@ -1442,6 +1442,7 @@ function loadDisk(){
 }
 function diskNewer(slug, at){ var d=DISK[slug]; if(!d||!at)return 0; var t=Date.parse(at); return (t&&d.ts>t+60000)?Math.round((d.ts-t)/60000):0; }
 function loadLocalList(){
+  return;   /* Yoda 2026-09-09：隱藏「直接讀檔案…」下拉，開檔只留匯入。要復活就刪掉這行 */
   if(!OFFLINE||!$('#localSel'))return;   /* 這個下拉已移除；伺服器的 /api/local-list 仍在（?load= 與測試用得到） */
   fetch(LOCAL+'/api/local-list').then(function(r){return r.json()}).then(function(j){
     var sel=$('#localSel'), fs=j.files||[]; if(!sel||!fs.length)return;
