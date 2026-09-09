@@ -95,8 +95,10 @@ body.dragging iframe{pointer-events:none}
 .grp-doc .tabs .brand{margin-left:auto;font-size:11px;color:#8a5a60;padding-left:6px;flex:0 0 auto}
 /* 架構畫布 */
 .pane.canvas{background:#0b0f16}
-.cv-bar{display:flex;gap:6px;align-items:center;padding:8px 12px;border-bottom:1px solid #1e2836;flex-wrap:wrap}
-.cv-bar .hint{font-size:11px;color:#5f7286}
+.cv-bar{display:flex;gap:6px;align-items:center;padding:8px 12px;border-bottom:1px solid #1e2836;flex-wrap:wrap;flex:0 0 auto;overflow:visible;position:sticky;top:0;z-index:3;background:#0b0f16}   /* 不准被 flex 壓縮、不准被切、釘在畫布頂端：Yoda 回報過按鈕有時會不見 */
+.cv-bar button{flex:0 0 auto}
+.cv-bar .hint{flex:1 1 100%}   /* 狀態文字自己佔一行，不跟按鈕搶位置 */
+.cv-bar .hint{font-size:11px;color:#5f7286;flex:1 1 100%}
 .cv{flex:1;overflow:auto;padding:10px 14px 60px}
 .cv ul{list-style:none;margin:0;padding:0 0 0 18px;border-left:1px dashed #1e2836}
 .cv>ul{padding-left:0;border-left:0}
@@ -1162,16 +1164,20 @@ function renumberChapters(d){
   /* 章號重排：依文件順序給 01、02、03…；🔑 這種非數字的編號不動、也不佔號。
      報告有兩種寫法：編號在 .sec-num/.section-num，或直接寫在標題開頭。 */
   var chs=chapterUnits(d), i=0, changed=0;
-  var base=1;                                   /* 報告原本從 00 開始就跟著從 0 起算 */
+  var _t=(typeof tab==='function')?tab():null;
+  var base=(_t&&typeof _t.numbase==='number')?_t.numbase:1;   /* 起始號在開啟自動編號當下就定案，之後刪章不會讓整份跳號 */
+  var detect=!(_t&&typeof _t.numbase==='number');
   for(var bi=0;bi<chs.length;bi++){
     var h0=chs[bi].anchor||chs[bi].nodes[0];
     var n0=h0&&h0.querySelector&&h0.querySelector('.sec-num,.section-num');
     var v0=n0?(n0.textContent||'').trim():'';
+    if(!detect)break;
     if(/^[0-9]{1,2}$/.test(v0)){ base=(parseInt(v0,10)===0)?0:1; break; }
     var t0=h0&&h0.querySelector&&h0.querySelector('.sec-title,.section-title');
     var m0=t0?(t0.textContent||'').match(/^\s*([0-9]{2})/):null;
     if(m0){ base=(parseInt(m0[1],10)===0)?0:1; break; }
   }
+  if(_t&&detect)_t.numbase=base;                /* 記住這份報告的起始號 */
   chs.forEach(function(ch){
     var host=ch.anchor||ch.nodes[0]; if(!host||!host.querySelector)return;
     var num=host.querySelector('.sec-num,.section-num');
@@ -1213,7 +1219,7 @@ function renumberChapters(d){
 }
 $('#cvNum').onclick=function(){
   var t=tab(), d=$('#ifE')&&$('#ifE').contentDocument; if(!t||!d){toast('先匯入一份報告',1);return}
-  if(t.autonum){ t.autonum=false; this.classList.remove('on'); toast('自動編號關閉（現有的章號不動）'); saveSoon(); return; }
+  if(t.autonum){ t.autonum=false; t.numbase=undefined; this.classList.remove('on'); toast('自動編號關閉（現有的章號不動）'); saveSoon(); return; }
   snap(); t.autonum=true; this.classList.add('on');
   var k=renumberChapters(d);
   renderCanvas(); saveSoon();
