@@ -165,6 +165,7 @@ code{font:11.5px ui-monospace,Consolas,monospace;background:#131a25;padding:1px 
     <select id="cloudSel"></select>
     <button type="button" id="btnImport" onclick="document.getElementById('fileIn').click()" title="從硬碟挑一個 HTML 檔匯入（也可以是之前「下載編輯後」的檔，標記會回來）">匯入</button>
     <input type="file" id="fileIn" accept=".html,.htm" style="display:none">
+    <button id="btnReload" title="重新從硬碟讀取這份報告（檔案在外面被改過時用）；分頁裡的標記與結構調整會清掉">重新整理</button>
     <select id="localSel" style="display:none;max-width:150px" title="直接讀 reports\ 裡的實體檔（不碰瀏覽器草稿）"></select>
     <button id="btnDel" class="danger" title="刪除雲端文件">刪</button>
   </div>
@@ -1473,6 +1474,41 @@ function save(silent){ var t=tab(); if(!t||!t.slug)return;
   if(OFFLINE){ return; }   /* 本機模式不留任何進度：關掉就忘光，下次從檔案讀起（Yoda 2026-09-07）*/
   api('POST',EP.docs+'&name='+encodeURIComponent(t.slug)+'&part=state',{state:{name:t.name,marks:t.marks,moves:t.moves||[],bdel:t.bdel||[],gists:t.gists||{},style:t.style||''}}).then(function(){if(!silent)toast('已儲存')}); }
 $('#btnSave').onclick=function(){save()};
+/* 重新整理：把 reports\ 裡的實體檔重新讀進這個分頁。
+   標記／搬動／刪除都是綁在舊文件的位置上，檔案換了就對不上，所以一併清掉。 */
+$('#btnReload').onclick=function(){
+  var t=tab();
+  if(!t||!t.orig||!t.name){toast('這個分頁還沒有報告',1);return}
+  if(!OFFLINE){toast('這是本機功能：雲端版請重新開啟文件',1);return}
+  var edits=(t.marks||[]).length+(t.moves||[]).length+(t.bdel||[]).length;
+  var btn=this;
+  function go(){
+    btn.disabled=true; var old=btn.textContent; btn.textContent='讀取中…';
+    fetch(LOCAL+'/api/local-list').then(function(r){return r.json()}).then(function(j){
+      var want=t.name+'.html';
+      var hit=(j.files||[]).filter(function(f){return f.name===want});
+      hit.sort(function(a,b){return (a.folder==='reports'?0:1)-(b.folder==='reports'?0:1)});
+      if(!hit.length)throw new Error('reports 夾與視覺實驗室都找不到「'+want+'」');
+      var f=hit[0];
+      return fetch(LOCAL+'/local/'+f.folder+'/'+encodeURIComponent(f.name)).then(function(r){
+        if(!r.ok)throw new Error('讀不到檔案（'+r.status+'）'); return r.text();
+      }).then(function(html){ return {html:html, f:f}; });
+    }).then(function(o){
+      snap();
+      t.orig=o.html; t.marks=[]; t.moves=[]; t.bdel=[]; t.autofixed=false;
+      btn.disabled=false; btn.textContent=old;
+      renderTabs(); mountPanes(); saveSoon();
+      toast('已重新讀取 '+o.f.folder+'\\'+o.f.name+'（'+o.f.kb+'KB · '+o.f.mtime+'）'+(edits?('；分頁裡原本的 '+edits+' 處編輯已清掉，按復原可回到上一步'):''));
+    }).catch(function(e){
+      btn.disabled=false; btn.textContent=old;
+      pingServer(); toast('重新整理失敗：'+(e&&e.message||''),1);
+    });
+  }
+  if(edits){
+    ask('重新從硬碟讀取「'+t.name+'」？\n\n這個分頁目前有 '+edits+' 處編輯（標記／搬動／刪除）。\n檔案內容可能已經變了，這些位置對不上，重新讀取會把它們清掉（可按復原救回）。','重新讀取')
+      .then(function(y){ if(y)go(); });
+  } else go();
+};
 /* 儲存到檔案：寫進 reports\，當作工作檔；要上線還是走 ④ 的定稿發佈（有閘門＋上傳） */
 $('#btnFile').onclick=function(){
   var t=tab(); if(!t||!t.orig){toast('先匯入一份報告',1);return}
