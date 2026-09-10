@@ -212,22 +212,6 @@ code{font:11.5px ui-monospace,Consolas,monospace;background:#131a25;padding:1px 
   <div class="pane orig"><div class="hd">原稿（唯讀・對照基準）<span class="wc" id="wcO"></span></div><div id="origHost" class="empty"></div></div>
   <div class="split" id="split" title="拖拉調整左右比例"></div>
   <div class="pane edit"><div class="hd"><span id="hdE">編輯（點任一段落即可修改）</span><span class="wc" id="wcE"></span></div><div id="editHost" class="empty"></div>
-    <div class="ed" id="ed">
-      <div class="lb" id="edLb">段落</div>
-      <div class="fldlb">① 段落內文（一般編輯直接在右邊報告上打字就好；這裡是給 Claude 看的原文）</div>
-      <textarea id="edText"></textarea>
-      <div id="edWarn" style="display:none;font-size:11.5px;color:#ffc37a;margin-top:6px;line-height:1.5"></div>
-      <div class="fldlb">② 給 Claude 的指示（不要打在上面那格）——例如「縮短到 50 字」「口語一點」「改成因果鍊寫法」</div>
-      <input type="text" id="edInst" placeholder="縮短到 50 字 / 口語一點 / 改成因果鍊寫法（留空＝依規範優化）">
-      <div class="row">
-        <button id="edApply" class="pri">直接套用（用上面①的內文）</button>
-        <button id="edAI">交給 Claude 修改（照②的指示）</button>
-        <select id="edQuick" title="常用指令：選了直接送去改" style="max-width:210px"></select>
-        <button id="edUp" title="把選取範圍往外擴一層（可以一路擴到整張卡片）">⌃ 擴大選取</button>
-        <button id="edDel" class="danger" title="把框起來的這一塊整個從報告裡刪掉">✕ 刪除這一塊</button>
-        <button id="edCancel">取消</button>
-        <span class="sp" id="edStat"></span>
-      </div>
     </div>
   </div>
 </div>
@@ -485,8 +469,17 @@ function setupPanes(){
   if(t.style)applyStyleTo(dE, t.style);
   var bn=$('#cvNum'); if(bn)bn.classList.toggle('on',!!t.autonum);
   if(MODE==='canvas')renderCanvas(); if(MODE==='style')renderStyleTab(); if(MODE==='output')renderOutTab();
+  /* 拖曳選字時記一下起點，等一下判斷這一下是「選字」還是「點擊」 */
+  var MDX=null, MDY=null;
+  dE.addEventListener('mousedown',function(ev){ MDX=ev.clientX; MDY=ev.clientY; },true);
   /* 點擊即編 */
   dE.body.addEventListener('click',function(ev){
+    /* 使用者正在選字（或剛拖過一段距離）：完全不插手，讓他選、讓他複製 */
+    try{
+      var _s=dE.getSelection&&dE.getSelection();
+      if(_s&&String(_s).replace(/\s+/g,'').length)return;
+    }catch(e){}
+    if(MDX!=null&&(Math.abs(ev.clientX-MDX)>6||Math.abs(ev.clientY-MDY)>6))return;
     var ok=ev.target.closest&&ev.target.closest('.yeb-ok'); if(ok){approve(ok.getAttribute('data-mark'));ev.preventDefault();ev.stopPropagation();return}
     var no=ev.target.closest&&ev.target.closest('.yeb-no'); if(no){reject(no.getAttribute('data-mark'));ev.preventDefault();ev.stopPropagation();return}
     var ru=ev.target.closest&&ev.target.closest('.yeb-rule'); if(ru){openRuleDlg(ru.getAttribute('data-mark'));ev.preventDefault();ev.stopPropagation();return}
@@ -503,11 +496,13 @@ function setupPanes(){
       return;
     }
     if(INLINE_EL&&(el===INLINE_EL||INLINE_EL.contains(ev.target)))return;   /* 正在編輯的那段：讓瀏覽器自己處理游標 */
-    ev.preventDefault(); ev.stopPropagation();
+    /* 只有會跳轉／展開的元素才攔；純文字放行，游標與選字交給瀏覽器自己做（攔了就放不了游標） */
+    var hot=ev.target.closest&&ev.target.closest('a,button,summary,input,select,label,[onclick],.tg,.cx,.sortable,th');
     var add=!!(ev.ctrlKey||ev.metaKey||ev.shiftKey);
+    if(hot||add){ ev.preventDefault(); ev.stopPropagation(); }
     selectBlock(el, add); echoLeft(el);
     if(add||selCount()>1){ endInline(true); closeEd(); toast('已選 '+selCount()+' 塊 · 按右上角「✕ 刪除這 '+selCount()+' 塊」一起刪'); }
-    else { closeEd(); startInline(el); }
+    else { closeEd(); startInline(el, ev.clientX, ev.clientY); }
   },true);
   if(dO&&dO.body){   /* 兩欄同步捲動：只有原稿欄存在時才需要 */
     /* 同步滾動：以「視窗最上緣的段落」對齊 */
@@ -788,63 +783,11 @@ $('#pGo').onclick=function(){
   }
 };
 
-/* ── 點擊即編面板 ── */
 var ED_EL=null;
-var ED_ORIG='';
-function openEd(el){
-  ED_EL=el; var t=tab(), idx=el.getAttribute('data-yeb');
-  var m=t.marks.find(function(x){return x.idx===idx});
-  $('#edLb').textContent='段落 #'+idx+' 〈'+el.tagName.toLowerCase()+'〉'+(m?(m.approved?' · 已認可':' · 待認可'):'');
-  $('#edText').value=m?m.after:el.textContent; ED_ORIG=$('#edText').value; $('#edInst').value=''; $('#edStat').textContent='';
-  var rich=[].filter.call(el.querySelectorAll(INLINE_SEL),function(x){return (x.textContent||'').trim().length>=2});
-  $('#edWarn').style.display=rich.length?'':'none';
-  $('#edWarn').textContent=rich.length?('這段裡有 '+rich.length+' 處格式（粗體／連結等）。改寫後我會把「原字沒被改掉」的那幾處自動接回來，被改掉的就會變純文字；按「✕ 退回」可以完整還原。'):'';
-  renderQuick();
-  $('#ed').classList.add('on'); $('#edText').focus();
-}
-function closeEd(){$('#ed').classList.remove('on');ED_EL=null}
-$('#edCancel').onclick=closeEd;
-$('#edUp').onclick=function(){
-  var el=SEL_EL||ED_EL; if(!el){toast('先點一段',1);return}
-  var p=el.parentElement, d=el.ownerDocument;
-  if(p&&p!==d.body&&p!==d.documentElement){ selectBlock(p); toast('選取範圍擴大到外一層（'+(p.textContent||'').trim().length+' 字）'); }
-  else toast('已經是最外層了',1);
-};
-$('#edDel').onclick=function(){ var list=SEL_LIST.length?SEL_LIST.slice():(ED_EL?[ED_EL]:[]); if(!list.length){toast('先點一段',1);return} delBlock(list); };
-document.addEventListener('keydown',function(e){
-  if(e.key==='Escape'&&selCount()&&!$('#askDlg').classList.contains('on')&&!$('#ed').classList.contains('on')){ hideSel(); toast('已取消選取'); }
-});
-$('#edApply').onclick=function(){ if(!ED_EL)return;
-  var v=cleanText($('#edText').value);
-  /* 同樣的陷阱：指示打在內文框又按了直接套用，整段會被那句話取代 */
-  if(v!==ED_ORIG && v.trim().length<=60 && ED_ORIG.length>=v.trim().length*2){
-    var el0=ED_EL;
-    ask('要把整段（'+ED_ORIG.length+' 字）換成這 '+v.trim().length+' 字嗎？\n\n「'+v.trim().slice(0,40)+'」\n\n如果這是給 Claude 的指示，請按取消，改打在下面②那格再按「交給 Claude 修改」。','換掉')
-      .then(function(y){ if(y){ applyEdit(el0,v,'手動'); closeEd(); } });
-    return;
-  }
-  applyEdit(ED_EL,v,'手動'); closeEd(); };
-$('#edAI').onclick=function(){
-  if(!ED_EL)return; var t=tab(), el=ED_EL, idx=el.getAttribute('data-yeb'), d=$('#ifE').contentDocument;
-  var prev=d.querySelector('[data-yeb="'+(idx-1)+'"]'), next=d.querySelector('[data-yeb="'+(+idx+1)+'"]');
-  /* 指示打進內文框：原本會把那句指示送去潤飾，整段內容被吃掉。認出來，當成指示、改原文 */
-  var body=$('#edText').value, inst=$('#edInst').value, note='';
-  if(body!==ED_ORIG && !inst.trim() && body.trim().length<=60 && ED_ORIG.length>=body.trim().length*2){
-    inst=body.trim(); body=ED_ORIG; $('#edInst').value=inst; $('#edText').value=ED_ORIG;
-    note='（把你在內文框打的「'+inst.slice(0,20)+'」當成指示，改的是原本那段）';
-    toast('你把指示打在內文框了，我當成指示處理'+note,1);
-  }
-  $('#edStat').textContent='Claude 處理中…'+note; $('#edAI').disabled=true;
-  api('POST',aiUrl(),{text:body, instruction:inst, tag:el.tagName.toLowerCase(), doc:t.name,
-                    context:{prev:prev?prev.textContent.slice(0,300):'', next:next?next.textContent.slice(0,300):''}})
-   .then(function(j){ $('#edAI').disabled=false; if(!j.text){$('#edStat').textContent='沒有回傳';return}
-     applyEdit(el,cleanText(j.text),'Claude：'+(inst||'優化')); closeEd();
-     toast('已套用到右側預覽（'+({api:'金鑰直打',cli:'本機 Claude',cloud:'雲端'}[j.engine]||'Claude')+'）· 紅框處待你認可'); })
-   .catch(function(e){ $('#edAI').disabled=false;
-     var msg=String(e&&e.message||e);
-     if(/Failed to fetch|NetworkError/i.test(msg)) msg=OFFLINE?'連不到本機伺服器。最快：雙擊 G:\\Yoda x Claude\\Skill\\開工作台.cmd（排程也會在五分鐘內自動拉起）':'連不到雲端';
-     $('#edStat').textContent=msg; $('#edStat').style.color='#ff9a9a'; $('#edStat').style.whiteSpace='pre-wrap'; });
-};
+/* 「交給 Claude 修改」已取消（Yoda 2026-09-10），改成就地編輯；
+   其他地方還會呼叫 closeEd()，留空殼免得到處改。 */
+function closeEd(){ ED_EL=null; }
+function openEd(){}
 
 /* ═══ 架構畫布 v2 ═══
    三層：章（報告 nav 的章節／.section／#sec-*）→ 節（章裡最外層的卡片：.item .box .card .rv-row …）→ 段（章或節裡的文字段落，只計數）
@@ -1123,13 +1066,11 @@ function selCount(){ return SEL_LIST.length; }
 function updSelBtn(){
   if(!SELX)return;
   var k=selCount(), editing=!!INLINE_EL;
-  var del=SELX.querySelector('.del'), ok=SELX.querySelector('.ok'),
-      ca=SELX.querySelector('.cancel'), ai=SELX.querySelector('.ai');
+  var del=SELX.querySelector('.del'), ok=SELX.querySelector('.ok'), ca=SELX.querySelector('.cancel');
   if(del)del.textContent = k>1 ? ('✕ 刪除這 '+k+' 塊') : '✕ 刪除';
   /* 編輯中：套用／取消／Claude 改；沒在編輯：只留刪除 */
   if(ok)ok.style.display = editing ? '' : 'none';
   if(ca)ca.style.display = editing ? '' : 'none';
-  if(ai)ai.style.display = (editing||k===1) ? '' : 'none';
   if(del)del.style.display = editing ? 'none' : '';
 }
 function placeSel(){
@@ -1148,7 +1089,6 @@ function selectBlock(el, add){
     SELX=d.createElement('div'); SELX.className='yeb-selbar'; SELX.setAttribute('data-audit-skip','1');
     SELX.innerHTML='<button class="ok" type="button">✓ 套用</button>'+
                    '<button class="cancel" type="button">✕ 取消</button>'+
-                   '<button class="ai" type="button">Claude 改</button>'+
                    '<button class="del" type="button">✕ 刪除</button>';
     d.body.appendChild(SELX);
     SELX.addEventListener('mousedown',function(ev){ ev.preventDefault(); },true);   /* 別讓編輯中的段落失焦 */
@@ -1157,7 +1097,6 @@ function selectBlock(el, add){
       ev.preventDefault(); ev.stopPropagation();
       if(b.className==='ok'){ endInline(true); return; }
       if(b.className==='cancel'){ endInline(false); hideSel(); return; }
-      if(b.className==='ai'){ var el=INLINE_EL||SEL_EL; endInline(false); if(el)openEd(el); return; }
       endInline(false);
       delBlock(SEL_LIST.slice());
     },true);
@@ -1173,7 +1112,19 @@ function selectBlock(el, add){
   SEL_LIST.push(el); SEL_EL=el; el.classList.add('yeb-sel'); placeSel(); updSelBtn();
 }
 var INLINE_EL=null, INLINE_HTML='', INLINE_TEXT='';
-function startInline(el){
+function placeCaret(el, x, y){
+  /* contenteditable 一 focus 游標會跑到最前面；用點擊座標把它放回使用者點的地方 */
+  if(!el||x==null)return;
+  var d=el.ownerDocument, w=d.defaultView, r=null;
+  try{
+    if(d.caretRangeFromPoint) r=d.caretRangeFromPoint(x,y);
+    else if(d.caretPositionFromPoint){ var p=d.caretPositionFromPoint(x,y);
+      if(p){ r=d.createRange(); r.setStart(p.offsetNode,p.offset); r.collapse(true); } }
+  }catch(e){}
+  if(!r||!el.contains(r.startContainer))return;
+  try{ var sel=w.getSelection(); sel.removeAllRanges(); sel.addRange(r); }catch(e){}
+}
+function startInline(el, x, y){
   if(!el||INLINE_EL===el)return;
   endInline(true);                      /* 換一段就先把上一段收好 */
   var d=el.ownerDocument;
@@ -1182,6 +1133,8 @@ function startInline(el){
   el.setAttribute('spellcheck','false');
   el.classList.add('yeb-editing');
   try{ el.focus({preventScroll:true}); }catch(e){ try{el.focus()}catch(e2){} }
+  placeCaret(el, x, y);
+  setTimeout(function(){ if(INLINE_EL===el)placeCaret(el, x, y); },0);   /* 有些情況要等 contenteditable 生效後再放一次 */
   if(!el.__yebBound){
     el.__yebBound=true;
     el.addEventListener('blur',function(){ if(INLINE_EL===el)endInline(true); });
@@ -1451,40 +1404,6 @@ document.querySelectorAll('#layoutSeg button').forEach(function(b){b.onclick=fun
 setLayout('split');   /* 版面固定左右對照：切換鈕拿掉了，別讓上次存的 right／fit 把人鎖在單欄 */
 try{ localStorage.removeItem('yeb-layout'); }catch(e){}
 
-/* ── 快速指令：常用的那幾句存進規則檔（兩台電腦跟著 rules 同步），選了就直接送去改 ── */
-var QUICK_SEED=['縮短到 50 字','口語一點，別用書面語','改成因果鍊寫法（A→B→C）','把結論放到第一句','刪掉贅字，意思不要變','數字後面補上它代表什麼',
-  /* 2026-09-09 Yoda 加：他常說「把這一段的視覺化和段落分好」——潤飾成可直接送出的完整指示。
-     ⚠ 編輯器只回傳純文字，畫不了圖；所以是「標出該放圖的位置與要畫什麼」，圖另外做。 */
-  '拆段落＋標圖位：把這一段拆成三到四段短的，一段只講一件事，順序照「先問什麼 → 再給讀數 → 所以呢」；每段第一句就把該段重點講完。哪裡用圖比用字清楚，就在原地單獨一行標【圖：要畫什麼·用哪幾個數字】，你不要自己畫圖。數字、代號、日期一個都不能改。',
-  '只拆段落，字不要動：一段只講一件事，長句照原意斷開，不改字、不加字、不刪字。',
-  '這段在描述現象：補上機制（錢為什麼這樣動）與含意（所以現在該怎麼看），最後一句收成一個判斷。'];
-function quickList(){ var q=(RULES.quick||[]).filter(function(x){return x&&String(x).trim()}); return q.length?q:QUICK_SEED; }
-function renderQuick(){
-  var sel=$('#edQuick'); if(!sel)return;
-  var h='<option value="">快速指令…</option>';
-  quickList().forEach(function(q,i){ h+='<option value="i'+i+'">'+esc(q)+'</option>'; });
-  h+='<option value="__add__">＋ 新增一句指令…</option><option value="__del__">— 刪掉某一句 —</option>';
-  sel.innerHTML=h;
-}
-function saveQuick(){ RULES.quick=quickList(); return saveRules().then(function(){renderQuick()}).catch(function(){renderQuick()}); }
-$('#edQuick').onchange=function(){
-  var v=this.value; this.selectedIndex=0; if(!v)return;
-  if(v==='__add__'){
-    var t=prompt('新增一句常用指令（例如：縮短到 50 字 / 把結論放第一句）');
-    if(!t||!t.trim())return;
-    RULES.quick=quickList().concat([t.trim()]); saveQuick(); toast('已加入快速指令：'+t.trim()); return;
-  }
-  if(v==='__del__'){
-    var list=quickList(), msg=list.map(function(q,i){return (i+1)+'. '+q}).join(String.fromCharCode(10));
-    var k=prompt('要刪哪一句？輸入編號：'+String.fromCharCode(10)+String.fromCharCode(10)+msg);
-    var i=parseInt(k,10); if(!i||i<1||i>list.length)return;
-    var gone=list[i-1]; RULES.quick=list.filter(function(_,j){return j!==i-1}); saveQuick(); toast('已刪掉：'+gone); return;
-  }
-  var idx=parseInt(v.slice(1),10), inst=quickList()[idx]; if(!inst)return;
-  if(!ED_EL){toast('先點一段要改的內容',1);return}
-  $('#edInst').value=inst;        /* 選了就直接送出，不用再按一次 */
-  $('#edAI').click();
-};
 
 /* ── 本機伺服器活著沒：連不到就掛常駐橫幅，別讓人對著一句話發呆 ── */
 function pingServer(){
