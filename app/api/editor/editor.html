@@ -214,7 +214,7 @@ code{font:11.5px ui-monospace,Consolas,monospace;background:#131a25;padding:1px 
   <div class="pane edit"><div class="hd"><span id="hdE">編輯（點任一段落即可修改）</span><span class="wc" id="wcE"></span></div><div id="editHost" class="empty"></div>
     <div class="ed" id="ed">
       <div class="lb" id="edLb">段落</div>
-      <div class="fldlb">① 段落內文（自己改就改這裡，改完按「直接套用」）</div>
+      <div class="fldlb">① 段落內文（一般編輯直接在右邊報告上打字就好；這裡是給 Claude 看的原文）</div>
       <textarea id="edText"></textarea>
       <div id="edWarn" style="display:none;font-size:11.5px;color:#ffc37a;margin-top:6px;line-height:1.5"></div>
       <div class="fldlb">② 給 Claude 的指示（不要打在上面那格）——例如「縮短到 50 字」「口語一點」「改成因果鍊寫法」</div>
@@ -393,6 +393,8 @@ var MARK_CSS='.yeb-mark{position:relative;outline:2px solid rgba(255,80,80,.85);
  '.yeb-auto .yeb-ok{background:#1f6a4a}'+
  '[data-yeb]{cursor:text}[data-yeb]:hover{outline:1px dashed rgba(127,159,198,.7);outline-offset:2px}'+
  '.yeb-emark{outline:2px solid #ff3b3b;outline-offset:2px;animation:yebBlink 1.6s ease-in-out infinite}'+
+ '.yeb-editing{outline:2px solid #4c9aff!important;outline-offset:3px;background:rgba(76,154,255,.08);caret-color:#4c9aff;cursor:text}'+
+ '.yeb-editing:focus{outline-color:#7fb0ff!important}'+
  '.yeb-sel{outline:2px dashed #7fb0ff!important;outline-offset:3px;background:rgba(47,111,181,.10)}'+
  '.yeb-selbar{position:fixed!important;z-index:2147483000!important;display:none;gap:6px;font:700 11px/1 -apple-system,sans-serif;white-space:nowrap;pointer-events:auto!important}'+
  '.yeb-selbar.on{display:flex!important}'+
@@ -446,7 +448,7 @@ function switchTab(i){ CUR=i; renderTabs(); mountPanes(); }
 
 /* ── 掛載雙欄 ── */
 function mountPanes(){
-  var t=tab(); closeEd();
+  var t=tab(); if(typeof endInline==='function')endInline(false); closeEd();
   var oh=$('#origHost'), eh=$('#editHost');
   if(!t||!t.orig){
     oh.className='empty'; eh.className='empty';
@@ -494,17 +496,18 @@ function setupPanes(){
       if(t2&&t2.nodeType===1&&t2!==dE.body&&t2!==dE.documentElement&&!t2.closest('.yeb-selbar')){
         ev.preventDefault(); ev.stopPropagation();
         var add=!!(ev.ctrlKey||ev.metaKey||ev.shiftKey);
-        selectBlock(t2, add); echoLeft(t2); closeEd();
+        endInline(true); selectBlock(t2, add); echoLeft(t2); closeEd();
         toast(selCount()>1 ? ('已選 '+selCount()+' 塊 · 按右上角「✕ 刪除這 '+selCount()+' 塊」一起刪')
                            : '已選取這一塊（沒有文字可編輯）· 用右上角 ✕ 刪掉；按住 Ctrl 可以再加選');
       }
       return;
     }
+    if(INLINE_EL&&(el===INLINE_EL||INLINE_EL.contains(ev.target)))return;   /* 正在編輯的那段：讓瀏覽器自己處理游標 */
     ev.preventDefault(); ev.stopPropagation();
     var add=!!(ev.ctrlKey||ev.metaKey||ev.shiftKey);
     selectBlock(el, add); echoLeft(el);
-    if(add||selCount()>1){ closeEd(); toast('已選 '+selCount()+' 塊 · 按右上角「✕ 刪除這 '+selCount()+' 塊」一起刪'); }
-    else openEd(el);
+    if(add||selCount()>1){ endInline(true); closeEd(); toast('已選 '+selCount()+' 塊 · 按右上角「✕ 刪除這 '+selCount()+' 塊」一起刪'); }
+    else { closeEd(); startInline(el); }
   },true);
   if(dO&&dO.body){   /* 兩欄同步捲動：只有原稿欄存在時才需要 */
     /* 同步滾動：以「視窗最上緣的段落」對齊 */
@@ -1119,8 +1122,15 @@ function hideSel(){
 function selCount(){ return SEL_LIST.length; }
 function updSelBtn(){
   if(!SELX)return;
-  var d=SELX.querySelector('.del'), k=selCount();
-  if(d)d.textContent = k>1 ? ('✕ 刪除這 '+k+' 塊') : '✕ 刪除';
+  var k=selCount(), editing=!!INLINE_EL;
+  var del=SELX.querySelector('.del'), ok=SELX.querySelector('.ok'),
+      ca=SELX.querySelector('.cancel'), ai=SELX.querySelector('.ai');
+  if(del)del.textContent = k>1 ? ('✕ 刪除這 '+k+' 塊') : '✕ 刪除';
+  /* 編輯中：套用／取消／Claude 改；沒在編輯：只留刪除 */
+  if(ok)ok.style.display = editing ? '' : 'none';
+  if(ca)ca.style.display = editing ? '' : 'none';
+  if(ai)ai.style.display = (editing||k===1) ? '' : 'none';
+  if(del)del.style.display = editing ? 'none' : '';
 }
 function placeSel(){
   if(!SEL_EL||!SELX)return;
@@ -1136,11 +1146,19 @@ function selectBlock(el, add){
   if(!el)return; var d=el.ownerDocument;
   if(!SELX||SELX.ownerDocument!==d){
     SELX=d.createElement('div'); SELX.className='yeb-selbar'; SELX.setAttribute('data-audit-skip','1');
-    SELX.innerHTML='<button class="del" type="button">✕ 刪除</button>';   /* 只留刪除（Yoda 2026-09-07：拿掉擴大）*/
+    SELX.innerHTML='<button class="ok" type="button">✓ 套用</button>'+
+                   '<button class="cancel" type="button">✕ 取消</button>'+
+                   '<button class="ai" type="button">Claude 改</button>'+
+                   '<button class="del" type="button">✕ 刪除</button>';
     d.body.appendChild(SELX);
+    SELX.addEventListener('mousedown',function(ev){ ev.preventDefault(); },true);   /* 別讓編輯中的段落失焦 */
     SELX.addEventListener('click',function(ev){
       var b=ev.target&&ev.target.closest&&ev.target.closest('button'); if(!b)return;
       ev.preventDefault(); ev.stopPropagation();
+      if(b.className==='ok'){ endInline(true); return; }
+      if(b.className==='cancel'){ endInline(false); hideSel(); return; }
+      if(b.className==='ai'){ var el=INLINE_EL||SEL_EL; endInline(false); if(el)openEd(el); return; }
+      endInline(false);
       delBlock(SEL_LIST.slice());
     },true);
     d.addEventListener('scroll',placeSel,true);
@@ -1153,6 +1171,38 @@ function selectBlock(el, add){
   /* 加選時，把被包住／包住別人的重複選取清掉，免得刪兩次 */
   if(add)SEL_LIST=SEL_LIST.filter(function(x){ return !(x.contains&&(x.contains(el)||el.contains(x))); });
   SEL_LIST.push(el); SEL_EL=el; el.classList.add('yeb-sel'); placeSel(); updSelBtn();
+}
+var INLINE_EL=null, INLINE_HTML='', INLINE_TEXT='';
+function startInline(el){
+  if(!el||INLINE_EL===el)return;
+  endInline(true);                      /* 換一段就先把上一段收好 */
+  var d=el.ownerDocument;
+  INLINE_EL=el; INLINE_HTML=el.innerHTML; INLINE_TEXT=(el.innerText||el.textContent||'');
+  el.setAttribute('contenteditable','true');
+  el.setAttribute('spellcheck','false');
+  el.classList.add('yeb-editing');
+  try{ el.focus({preventScroll:true}); }catch(e){ try{el.focus()}catch(e2){} }
+  if(!el.__yebBound){
+    el.__yebBound=true;
+    el.addEventListener('blur',function(){ if(INLINE_EL===el)endInline(true); });
+    el.addEventListener('keydown',function(ev){
+      if(ev.key==='Escape'){ ev.preventDefault(); ev.stopPropagation(); endInline(false); hideSel(); }
+      else if(ev.key==='Enter'&&(ev.ctrlKey||ev.metaKey)){ ev.preventDefault(); ev.stopPropagation(); endInline(true); }
+    },true);
+  }
+  placeSel(); updSelBtn();
+  toast('就地編輯中：直接打字 · Ctrl+Enter 或點別處＝套用 · Esc＝取消 · 空一行＝分段');
+}
+function endInline(commit){
+  var el=INLINE_EL; if(!el)return;
+  INLINE_EL=null;
+  el.removeAttribute('contenteditable'); el.classList.remove('yeb-editing');
+  var txt=(el.innerText||el.textContent||'');
+  el.innerHTML=INLINE_HTML;             /* 一律先還原：要嘛取消，要嘛交給 applyEdit 重畫 */
+  if(commit && txt.trim() && txt.replace(/\s+/g,' ').trim()!==INLINE_TEXT.replace(/\s+/g,' ').trim()){
+    applyEdit(el, txt, '就地編輯');
+  }
+  updSelBtn();
 }
 function delBlock(els){
   var list=(els&&els.length!==undefined&&els.nodeType===undefined)?[].slice.call(els):(els?[els]:[]);
