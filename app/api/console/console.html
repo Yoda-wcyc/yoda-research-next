@@ -506,6 +506,7 @@ tr:hover td{background:var(--surface2)}
     </div>
     <div class="toolbar" style="align-items:center">
       <button class="btn-done" onclick="loadPaidReports()">↻ 重新整理</button>
+      <span id="paidStamp" style="font:11px/1.6 inherit;color:#7d8fa3"></span>
       <button class="btn-done" style="color:var(--gold,#e0a526);font-weight:800" onclick="notifyBatchSelected()">📨 彙整通知所選（一封）</button>
       <button class="btn-done" style="color:#ff6b6b" onclick="deleteSelectedPaid()">🗑 刪除勾選</button>
       <span id="mailQuota" style="margin-left:auto;font-size:12.5px;color:var(--dim)">今日剩餘寄信額度：<b style="color:var(--text)">—</b></span>
@@ -1912,14 +1913,30 @@ async function deletePaid(i){
   }).catch(function(){toast('連線失敗');});
 }
 /* 付費報告管理分頁：獨立載入 Drive 付費檔清單 */
+/* 清單只在切進分頁時抓一次，頁面開著不動就會停在舊資料——上傳了報告卻「一直沒出現」，
+   其實是畫面停在上傳前那一次（2026-09-10 實際發生，等了一小時）。
+   兩道保險：①標出這份清單是幾點抓的 ②留在這個分頁時每 60 秒自動重抓、切回視窗也重抓。 */
+function stampPaid(n, err){
+  var el=$('paidStamp'); if(!el)return;
+  var t=new Date(), p=function(x){return ('0'+x).slice(-2)};
+  el.textContent = err ? ('讀取失敗 · '+p(t.getHours())+':'+p(t.getMinutes())+':'+p(t.getSeconds()))
+                       : ('清單更新於 '+p(t.getHours())+':'+p(t.getMinutes())+':'+p(t.getSeconds())+' · 共 '+n+' 份');
+  el.style.color = err ? '#ff6b6b' : '#7d8fa3';
+}
 function loadPaidReports(){
   var box=$('paidBody'); if(box) box.innerHTML='<tr><td colspan="5"><div class="empty">載入中…</div></td></tr>';
   loadMailQuota();
   post({action:'adminListPaid',key:KEY}).then(function(pd){
     paidFiles=((pd&&pd.ok&&pd.reports)||[]); paidSet={}; paidFiles.forEach(function(x){ paidSet[x.reportId]=true; });
-    renderPaidFiles(pd);
-  }).catch(function(){ renderPaidFiles({ok:false,error:'連線失敗'}); });
+    renderPaidFiles(pd); stampPaid(paidFiles.length, !(pd&&pd.ok));
+  }).catch(function(){ renderPaidFiles({ok:false,error:'連線失敗'}); stampPaid(0,true); });
 }
+function paidTabOpen(){
+  var v=$('v-paidreports');
+  return !!(v&&v.classList.contains('show'))&&!document.hidden;
+}
+setInterval(function(){ if(paidTabOpen()&&typeof KEY!=='undefined'&&KEY)loadPaidReports(); }, 60000);
+window.addEventListener('focus',function(){ if(paidTabOpen()&&typeof KEY!=='undefined'&&KEY)loadPaidReports(); });
 /* 今日剩餘寄信額度（Gmail 每日約 100 封，過午夜太平洋時間重置）*/
 function loadMailQuota(){
   var el=$('mailQuota'); if(!el)return;
