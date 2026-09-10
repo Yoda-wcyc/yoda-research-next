@@ -412,6 +412,8 @@ var MARK_CSS='.yeb-mark{position:relative;outline:2px solid rgba(255,80,80,.85);
  '.yeb-selbar.on{display:flex!important}'+
  '.yeb-selbar button{font:inherit!important;position:static!important;border:0!important;border-radius:11px!important;padding:5px 10px!important;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.45);opacity:1!important;visibility:visible!important;width:auto!important;height:auto!important;margin:0!important}'+
  '.yeb-selbar .up{background:#1b3a5c;color:#dbe8f6}'+
+ '.yeb-selbar .yes{background:#1f7a4a;color:#fff}'+
+ '.yeb-selbar .no{background:#5a2630;color:#ffbcbc}'+
  '.yeb-selbar .del{background:#7a1f2c;color:#ffdede}'+
  '.yeb-flash{outline:3px solid #2f6fb5;outline-offset:3px;border-radius:4px;animation:yebFlash 1.6s ease-out 1}@keyframes yebFlash{0%{outline-color:#7fb0ff;background:rgba(47,111,181,.18)}100%{outline-color:transparent;background:transparent}}';
 var EDIT_CSS='html,body,*{-webkit-user-select:text!important;user-select:text!important}'+
@@ -1146,10 +1148,23 @@ function hideSel(){
   SEL_LIST=[]; SEL_EL=null; if(SELX)SELX.classList.remove('on');
 }
 function selCount(){ return SEL_LIST.length; }
+function pendMark(){   /* 目前這一塊有沒有「還沒認可」的標記 */
+  var t=tab(), el=INLINE_EL||SEL_EL; if(!t||!el||!el.getAttribute)return null;
+  var idx=el.getAttribute('data-yeb'); if(!idx)return null;
+  return (t.marks||[]).filter(function(m){return m.idx===idx&&!m.approved})[0]||null;
+}
 function updSelBtn(){
   if(!SELX)return;
   var k=selCount(), editing=!!INLINE_EL;
   var del=SELX.querySelector('.del'), ok=SELX.querySelector('.ok'), ca=SELX.querySelector('.cancel');
+  /* 「✓ 認可」原本只長在區塊左上角（top:-12px）。報告的區塊動輒上千 px 高，
+     從中段點下去改字，那一塊的頂端早就捲出畫面 → 認可鈕被畫在畫面外，
+     有時還被這條浮動列的「✕ 刪除」蓋住。改成認可／退回直接放在浮動列上：
+     position:fixed 會夾在畫面內、z-index 最高，永遠按得到。（Yoda 2026-09-10 回報） */
+  var yes=SELX.querySelector('.yes'), no=SELX.querySelector('.no');
+  var pend = (k>1||editing) ? null : pendMark();
+  if(yes)yes.style.display = pend ? '' : 'none';
+  if(no)no.style.display = pend ? '' : 'none';
   if(del)del.textContent = k>1 ? ('✕ 刪除這 '+k+' 塊') : '✕ 刪除';
   /* 編輯中多出「套用／取消」；刪除一律留著。
      以前編輯中會把刪除藏起來，結果點了段落就找不到刪除鈕、得先按取消才回得來（Yoda 2026-09-10 反映）。
@@ -1178,6 +1193,8 @@ function selectBlock(el, add){
     SELX=d.createElement('div'); SELX.className='yeb-selbar'; SELX.setAttribute('data-audit-skip','1');
     SELX.innerHTML='<button class="ok" type="button">✓ 套用</button>'+
                    '<button class="cancel" type="button">✕ 取消</button>'+
+                   '<button class="yes" type="button">✓ 認可</button>'+
+                   '<button class="no" type="button">✕ 退回</button>'+
                    '<button class="del" type="button">✕ 刪除</button>';
     d.body.appendChild(SELX);
     SELX.addEventListener('mousedown',function(ev){ ev.preventDefault(); },true);   /* 別讓編輯中的段落失焦 */
@@ -1186,6 +1203,8 @@ function selectBlock(el, add){
       ev.preventDefault(); ev.stopPropagation();
       if(b.className==='ok'){ endInline(true); return; }
       if(b.className==='cancel'){ endInline(false); hideSel(); return; }
+      if(b.className==='yes'){ var my=pendMark(); if(my)approve(my.id); updSelBtn(); placeSel(); return; }
+      if(b.className==='no'){ var mn=pendMark(); if(mn)reject(mn.id); updSelBtn(); placeSel(); return; }
       endInline(false);
       delBlock(SEL_LIST.slice());
     },true);
@@ -1245,7 +1264,7 @@ function endInline(commit){
     applyEdit(el, txt, '就地編輯');
   }
   if(DK_EL===el)fillDock(el);   /* 在報告裡就地改完 → 下方文字框跟著更新，兩邊不會分岔 */
-  updSelBtn();
+  updSelBtn(); placeSel();      /* 鈕換成「認可／退回」、寬度也變了，位置要重算，否則會停在舊位置 */
 }
 function delBlock(els){
   var list=(els&&els.length!==undefined&&els.nodeType===undefined)?[].slice.call(els):(els?[els]:[]);
