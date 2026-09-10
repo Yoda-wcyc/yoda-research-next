@@ -386,6 +386,9 @@ var MARK_CSS='.yeb-mark{position:relative;outline:2px solid rgba(255,80,80,.85);
  '.yeb-selbar .up{background:#1b3a5c;color:#dbe8f6}'+
  '.yeb-selbar .del{background:#7a1f2c;color:#ffdede}'+
  '.yeb-flash{outline:3px solid #2f6fb5;outline-offset:3px;border-radius:4px;animation:yebFlash 1.6s ease-out 1}@keyframes yebFlash{0%{outline-color:#7fb0ff;background:rgba(47,111,181,.18)}100%{outline-color:transparent;background:transparent}}';
+var EDIT_CSS='html,body,*{-webkit-user-select:text!important;user-select:text!important}'+
+  '[contenteditable="true"]{-webkit-user-modify:read-write-plaintext-only}';   /* 報告母板 body 有 user-select:none（防複製），在工作台裡會讓人放不了游標、選不了字。
+      只解開編輯用的那份，匯出的報告照舊防複製。 */
 var HIDE_HINT='.tablet-hint{display:none!important}';   /* 手機提示遮罩在工作台裡只會擋路：左欄唯讀關不掉、又會被算進段落數 */
 var ORIG_CSS='body{user-select:text}'+HIDE_HINT;   /* 唯讀靠事件攔截（見 setupPanes），不用 pointer-events：那會讓滾輪捲不動內層容器 */
 
@@ -452,7 +455,7 @@ function setupPanes(){
   var t=tab(), fO=$('#ifO'), dO=fO&&fO.contentDocument, dE=$('#ifE').contentDocument;
   if(!dE||!dE.body)return;
   function css(d,txt){var s=d.createElement('style');s.textContent=txt;d.head.appendChild(s)}
-  css(dE,MARK_CSS+HIDE_HINT);
+  css(dE,MARK_CSS+HIDE_HINT+EDIT_CSS);
   if(dO&&dO.body){   /* 原稿對照欄已取消；萬一日後又掛回來，這段仍然管用 */
     css(dO,ORIG_CSS+MARK_CSS);
     ['click','mousedown','mouseup','dblclick','keydown','keypress','contextmenu','input','submit','touchstart'].forEach(function(t){
