@@ -1151,10 +1151,12 @@ function updSelBtn(){
   var k=selCount(), editing=!!INLINE_EL;
   var del=SELX.querySelector('.del'), ok=SELX.querySelector('.ok'), ca=SELX.querySelector('.cancel');
   if(del)del.textContent = k>1 ? ('✕ 刪除這 '+k+' 塊') : '✕ 刪除';
-  /* 編輯中：套用／取消／Claude 改；沒在編輯：只留刪除 */
+  /* 編輯中多出「套用／取消」；刪除一律留著。
+     以前編輯中會把刪除藏起來，結果點了段落就找不到刪除鈕、得先按取消才回得來（Yoda 2026-09-10 反映）。
+     按刪除時上面的 handler 會先 endInline(false) 再刪，所以編輯中按也不會出事。 */
   if(ok)ok.style.display = editing ? '' : 'none';
   if(ca)ca.style.display = editing ? '' : 'none';
-  if(del)del.style.display = editing ? 'none' : '';
+  if(del)del.style.display = '';
 }
 function placeSel(){
   if(!SEL_EL||!SELX)return;
@@ -1164,7 +1166,11 @@ function placeSel(){
   SELX.classList.add('on');
   var top=r.top-13; if(top<2)top=Math.min(r.bottom-26, r.top+6); if(vh&&top>vh-30)top=vh-30;
   SELX.style.top=Math.max(2,top)+'px';
-  SELX.style.left=Math.max(4,r.right-150)+'px';
+  /* 用實際寬度算，別寫死：編輯中是三顆鈕（套用／取消／刪除），寫死 150 會把刪除推出畫面外 */
+  var vw=w.innerWidth||d.documentElement.clientWidth||0, bw=SELX.offsetWidth||150;
+  var left=r.right-bw;
+  if(vw&&left+bw>vw-4)left=vw-4-bw;
+  SELX.style.left=Math.max(4,left)+'px';
 }
 function selectBlock(el, add){
   if(!el)return; var d=el.ownerDocument;
