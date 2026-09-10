@@ -78,6 +78,19 @@ body.dragging iframe{pointer-events:none}
 .ed .row{display:flex;gap:6px;margin-top:8px;align-items:center}
 .ed .row .sp{flex:1;font-size:11px;color:#5f7286}
 .pane.edit{position:relative}
+/* 下方文字框（選取／複製／編輯用）。報告在 iframe 裡防複製，這裡不受影響。 */
+.dock{flex:0 0 auto;display:flex;flex-direction:column;background:#0b0f16;border-top:1px solid #1e2836;max-height:40vh}
+.dock.collapsed #dkBox{display:none}
+.dock .dhd{display:flex;align-items:center;gap:6px;padding:5px 8px;background:#12281d;border-bottom:1px solid #1e2836;font:700 11px/1.7 inherit;color:#8ae0b0}
+.dock .dhd .sp{flex:1}
+.dock .dhd b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:44%}
+.dock .dhd button{font:700 11px/1 inherit;background:#1a2230;color:#cfe0f0;border:1px solid #2a3646;border-radius:5px;padding:5px 10px;cursor:pointer}
+.dock .dhd button:hover{background:#22303f}
+.dock .dhd button.pri{background:#1d5a3a;border-color:#2a7a52;color:#d6ffe8}
+.dock .dhd button.pri:hover{background:#246e47}
+#dkBox{flex:1;min-height:110px;height:150px;resize:vertical;width:100%;box-sizing:border-box;background:#080b10;color:#dbe8f6;
+  border:0;padding:9px 11px;outline:none;font:13px/1.85 -apple-system,'Noto Sans TC',sans-serif;
+  -webkit-user-select:text!important;user-select:text!important}
 /* 頂層模式 */
 .brandmini{font:800 12px/1 inherit;color:#8ea6c0;flex:0 0 auto;padding-right:2px}
 .grp-mode{background:#101826;border-color:#2f4a6a;color:#bcd6f2}
@@ -212,6 +225,21 @@ code{font:11.5px ui-monospace,Consolas,monospace;background:#131a25;padding:1px 
   <div class="pane orig"><div class="hd">原稿（唯讀・對照基準）<span class="wc" id="wcO"></span></div><div id="origHost" class="empty"></div></div>
   <div class="split" id="split" title="拖拉調整左右比例"></div>
   <div class="pane edit"><div class="hd"><span id="hdE">編輯（點任一段落即可修改）</span><span class="wc" id="wcE"></span></div><div id="editHost" class="empty"></div>
+    <!-- 下方文字框：報告母板為了防抄有 user-select:none＋攔 copy，在報告裡選不起來也複製不了。
+         這個框在工作台本體（不在 iframe 裡），所以全選／複製／鍵盤都正常；
+         就地編輯照舊，兩邊改哪邊都會同步。 -->
+    <div id="txtDock" class="dock">
+      <div class="dhd">
+        <b id="dkWho">點報告任一段落，內容會出現在這裡</b>
+        <span class="sp"></span>
+        <button onclick="dkSelectAll()" title="全選（在框裡按 Ctrl+A 也可以）">全選</button>
+        <button onclick="dkCopy()" title="複製整框內容">複製</button>
+        <button onclick="dkApply()" class="pri" title="把這裡的文字套回報告（Ctrl+Enter）">套用</button>
+        <button onclick="dkReset()" title="丟掉這裡的修改，重抓報告目前的內容">還原</button>
+        <button onclick="dkToggle(this)" title="收合／展開">▾</button>
+      </div>
+      <textarea id="dkBox" spellcheck="false" onkeydown="dkKey(event)" placeholder="（還沒選段落）"></textarea>
+    </div>
     </div>
   </div>
 </div>
@@ -492,7 +520,7 @@ function setupPanes(){
       if(t2&&t2.nodeType===1&&t2!==dE.body&&t2!==dE.documentElement&&!t2.closest('.yeb-selbar')){
         ev.preventDefault(); ev.stopPropagation();
         var add=!!(ev.ctrlKey||ev.metaKey||ev.shiftKey);
-        endInline(true); selectBlock(t2, add); echoLeft(t2); closeEd();
+        endInline(true); selectBlock(t2, add); echoLeft(t2); closeEd(); fillDock(t2);
         toast(selCount()>1 ? ('已選 '+selCount()+' 塊 · 按右上角「✕ 刪除這 '+selCount()+' 塊」一起刪')
                            : '已選取這一塊（沒有文字可編輯）· 用右上角 ✕ 刪掉；按住 Ctrl 可以再加選');
       }
@@ -503,7 +531,7 @@ function setupPanes(){
     var hot=ev.target.closest&&ev.target.closest('a,button,summary,input,select,label,[onclick],.tg,.cx,.sortable,th');
     var add=!!(ev.ctrlKey||ev.metaKey||ev.shiftKey);
     if(hot||add){ ev.preventDefault(); ev.stopPropagation(); }
-    selectBlock(el, add); echoLeft(el);
+    selectBlock(el, add); echoLeft(el); fillDock(el);
     if(add||selCount()>1){ endInline(true); closeEd(); toast('已選 '+selCount()+' 塊 · 按右上角「✕ 刪除這 '+selCount()+' 塊」一起刪'); }
     else { closeEd(); startInline(el, ev.clientX, ev.clientY); }
   },true);
@@ -791,6 +819,58 @@ var ED_EL=null;
    其他地方還會呼叫 closeEd()，留空殼免得到處改。 */
 function closeEd(){ ED_EL=null; }
 function openEd(){}
+
+/* ── 下方文字框 ───────────────────────────────────────────────────────────
+   報告母板為了防抄，body 有 user-select:none 又攔了 copy 事件，在預覽裡選不起來、
+   Ctrl+C 也沒用。這個框住在工作台本體（不在 iframe 內），所以選取／複製／全選全部正常。
+   就地編輯完全保留：點一下段落 → 照舊進入就地編輯，同時把文字複製到這裡；
+   兩邊都可以改，走的是同一個 applyEdit，所以校稿標記與進度不會分岔。 */
+var DK_EL=null;
+function dkText(el){
+  /* 已套用過的段落會被 paintMark 加上「✓ 認可」按鈕，textContent 會把它讀進來，要去掉 */
+  return String((el&&(el.innerText||el.textContent))||'').replace(/\s*✓\s*認可\s*$/,'').replace(/ /g,' ').trim();
+}
+function fillDock(el){
+  var box=document.getElementById('dkBox'), who=document.getElementById('dkWho');
+  if(!box||!who)return;
+  DK_EL=el||null;
+  if(!el){ box.value=''; who.textContent='點報告任一段落，內容會出現在這裡'; return; }
+  box.value=dkText(el);
+  var idx=el.getAttribute&&el.getAttribute('data-yeb');
+  who.textContent = idx ? ('第 '+idx+' 段 · <'+el.tagName.toLowerCase()+'>')
+                        : ('<'+el.tagName.toLowerCase()+'> · 這一塊沒有文字編號，只能複製、不能套用');
+}
+function dkSelectAll(){ var b=document.getElementById('dkBox'); if(!b)return; b.focus(); b.select(); }
+function dkCopy(){
+  var b=document.getElementById('dkBox'); if(!b||!b.value){ toast('框裡沒有東西'); return; }
+  b.focus(); b.select();
+  function done(){ toast('已複製（'+b.value.length+' 字）'); }
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(b.value).then(done,function(){ document.execCommand('copy'); done(); }); return; }
+  }catch(e){}
+  try{ document.execCommand('copy'); done(); }catch(e2){ toast('複製失敗，請按 Ctrl+C'); }
+}
+function dkReset(){ if(DK_EL)fillDock(DK_EL); else toast('還沒選段落'); }
+function dkToggle(btn){
+  var d=document.getElementById('txtDock'); if(!d)return;
+  d.classList.toggle('collapsed');
+  if(btn)btn.textContent = d.classList.contains('collapsed') ? '▴' : '▾';
+}
+function dkApply(){
+  if(!DK_EL){ toast('還沒選段落'); return; }
+  if(!DK_EL.getAttribute||!DK_EL.getAttribute('data-yeb')){ toast('這一塊沒有文字編號（圖／表格外框之類），不能從這裡套用'); return; }
+  var v=document.getElementById('dkBox').value;
+  if(!v.trim()){ toast('內容是空的，沒有套用'); return; }
+  if(dkText(DK_EL).replace(/\s+/g,' ')===v.replace(/\s+/g,' ').trim()){ toast('內容沒有變動'); return; }
+  endInline(true);                 /* 如果同一段正在就地編輯，先收好，免得兩邊互相覆蓋 */
+  applyEdit(DK_EL, v, '下方文字框');
+  fillDock(DK_EL);
+  toast('已套用到報告');
+}
+function dkKey(ev){
+  if(ev.key==='Enter'&&(ev.ctrlKey||ev.metaKey)){ ev.preventDefault(); dkApply(); }
+  else if(ev.key==='Escape'){ ev.preventDefault(); dkReset(); }
+}
 
 /* ═══ 架構畫布 v2 ═══
    三層：章（報告 nav 的章節／.section／#sec-*）→ 節（章裡最外層的卡片：.item .box .card .rv-row …）→ 段（章或節裡的文字段落，只計數）
@@ -1158,6 +1238,7 @@ function endInline(commit){
   if(commit && txt.trim() && txt.replace(/\s+/g,' ').trim()!==INLINE_TEXT.replace(/\s+/g,' ').trim()){
     applyEdit(el, txt, '就地編輯');
   }
+  if(DK_EL===el)fillDock(el);   /* 在報告裡就地改完 → 下方文字框跟著更新，兩邊不會分岔 */
   updSelBtn();
 }
 function delBlock(els){
