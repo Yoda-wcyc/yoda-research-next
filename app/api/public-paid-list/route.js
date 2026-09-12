@@ -24,7 +24,7 @@ function catOf(id) {
 // 公開：付費報告清單（只回 檔名/日期/分類·不含內容·免登入）→ 給 archive「付費版」用。
 // 2026-09-06：改讀 reports/_index.json（簡單操作），不再每個訪客 list() 一次（進階操作，Hobby 每月只有 2,000 次，
 // 曾因此整個 Blob 被停用一個月）。回應加 CDN 快取 5 分鐘，同一分鐘一千個訪客也只打一次 Blob。
-async function handle() {
+async function handle(fresh) {
   let reports = [];
   try {
     const idx = await readIndex();
@@ -40,8 +40,10 @@ async function handle() {
   // （台股 11:10:16 → 市場觀察 11:10:38 → 美股 11:11:42，快取正好卡在美股之前）。
   // 改成 30 秒且不供應過期內容：過期就同步回源，最壞情況只落後 30 秒。
   // 現在讀的是 _index.json（簡單操作），不是當年會把 Blob 打爆的 list()，30 秒足夠保護。
+  // 2026-09-12：後台帶 ?fresh=<ts> 來的一律不快取（主控台上傳完立刻要看到；30 秒快取只留給訪客那條路）
   return Response.json({ ok: true, reports }, { status: 200,
-    headers: { ...CORS, 'Cache-Control': 'public, s-maxage=30' } });
+    headers: { ...CORS, 'Cache-Control': fresh ? 'no-store' : 'public, s-maxage=30' } });
 }
-export async function GET() { return handle(); }
-export async function POST() { return handle(); }
+function isFresh(req) { try { return new URL(req.url).searchParams.has('fresh'); } catch (e) { return false; } }
+export async function GET(req) { return handle(isFresh(req)); }
+export async function POST(req) { return handle(isFresh(req)); }

@@ -1923,12 +1923,38 @@ function stampPaid(n, err){
                        : ('清單更新於 '+p(t.getHours())+':'+p(t.getMinutes())+':'+p(t.getSeconds())+' · 共 '+n+' 份');
   el.style.color = err ? '#ff6b6b' : '#7d8fa3';
 }
+/* 2026-09-12 根治「剛上傳看不到」：清單以瀏覽器直抓的 Vercel 索引為準（?fresh=<ts> 唯一網址、伺服器回 no-store，
+   不吃 CDN 30 秒快取），GAS 的 adminListPaid 只負責疊上寄送狀態。Yoda 14:19 上傳美股 0912、14:20 看清單沒有——
+   GAS 那條路吃到的是上傳前那一版快取。現在上傳完切過來就在。*/
+function fetchFreshPaidIds(){
+  return fetch('https://yoda-research-next.vercel.app/api/public-paid-list?fresh='+Date.now(),{cache:'no-store'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){ return ((d&&d.ok&&d.reports)||[]).map(function(x){ return {reportId:x.reportId, updated:x.uploadedAt||''}; }); })
+    .catch(function(){ return null; });
+}
 function loadPaidReports(){
   var box=$('paidBody'); if(box) box.innerHTML='<tr><td colspan="5"><div class="empty">載入中…</div></td></tr>';
   loadMailQuota();
-  post({action:'adminListPaid',key:KEY}).then(function(pd){
-    paidFiles=((pd&&pd.ok&&pd.reports)||[]); paidSet={}; paidFiles.forEach(function(x){ paidSet[x.reportId]=true; });
-    renderPaidFiles(pd); stampPaid(paidFiles.length, !(pd&&pd.ok));
+  Promise.all([
+    post({action:'adminListPaid',key:KEY}).catch(function(){ return null; }),
+    fetchFreshPaidIds()
+  ]).then(function(rr){
+    var pd=rr[0], fresh=rr[1];
+    var gas=((pd&&pd.ok&&pd.reports)||[]), byId={}; gas.forEach(function(x){ byId[x.reportId]=x; });
+    var at=gas.length?gas[0].activeTotal:null, rows;
+    if(fresh&&fresh.length){
+      rows=fresh.map(function(f){
+        var g=byId[f.reportId];
+        if(g) return Object.assign({}, g, {updated:f.updated||g.updated});
+        // Vercel 有、GAS 還沒看到（剛上傳）：寄送欄照實顯示未寄，分母沿用 GAS 的付費會員數
+        return {reportId:f.reportId, updated:f.updated, notified:false, notifiedAt:'', sentCount:0,
+                activeTotal:(at==null?0:at), unsentCount:(at==null?0:at)};
+      });
+    } else rows=gas;   // Vercel 直抓失敗才退回 GAS 那份
+    paidFiles=rows; paidSet={}; paidFiles.forEach(function(x){ paidSet[x.reportId]=true; });
+    var okAny=(pd&&pd.ok)||(fresh&&fresh.length);
+    renderPaidFiles(okAny?{ok:true,reports:rows}:(pd||{ok:false,error:'連線失敗'}));
+    stampPaid(rows.length, !okAny);
   }).catch(function(){ renderPaidFiles({ok:false,error:'連線失敗'}); stampPaid(0,true); });
 }
 function paidTabOpen(){
@@ -2423,7 +2449,11 @@ document.getElementById('btn-upload').onclick=async function(){
     var r=await putReportToVercel(name, buildPaidDoc());
     var res=await readJsonSafe(r);
     b.disabled=false; b.innerHTML=old;
-    if(res&&res.ok){ await uiAlert('✅ 已上傳到 Vercel：'+res.reportId+'\n\n會員 reportId＝'+res.reportId+'\n(report-shell 用這個 id 讀回·約1秒開啟)'); }
+    if(res&&res.ok){
+      // 2026-09-12：上傳成功就立刻重抓付費報告管理的清單（不等 60 秒），切過去就看得到
+      if(typeof loadPaidReports==='function'){ try{ loadPaidReports(); }catch(e){} }
+      await uiAlert('✅ 已上傳到 Vercel：'+res.reportId+'\n\n會員 reportId＝'+res.reportId+'\n(report-shell 用這個 id 讀回·約1秒開啟)\n\n付費報告管理的清單已同步重抓，切過去就會看到這一份。');
+    }
     else await uiAlert('上傳失敗：'+((res&&res.error)||'未知錯誤'));
   }catch(e){ b.disabled=false; b.innerHTML=old; await uiAlert('連線失敗：'+((e&&e.message)||e)); }
 };
