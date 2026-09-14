@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   Yoda 名單挑股器 · ta-pick.js（正本，2026-09-14 新增）
+   Yoda 名單挑股器 · ta-pick.js（正本，v1.1／2026-09-14）
    名單表格最左邊長出一欄核取方塊 → 右下角浮動鈕 → 新視窗開技術分析頁。
    純 vanilla、零依賴、mount 冪等（母板那種重畫 tbody 的表也吃得住）。
 
@@ -20,6 +20,9 @@
                       若按表格日期分桶，同一份報告會被拆成兩份清單。
      <thead><tr><th>代號</th>…        ← 本模組自己在最左插 th[data-nosort]
      <tbody><tr data-sym="NVDA">…     ← 純代號：US 大寫字母、TW 4 碼數字
+   ⚠ **達上限提示在浮動列**（右下角），不在表格裡：勾滿 15 檔時浮動列自己多長
+     一行「已達上限 15 檔：取消或清除後才能再勾」，整條同時轉警示配色
+     （`#ta-pick-bar.ta-pick-bar--cap`）。報告端不用加任何東西。
    狀態 key 與 URL 的 d= 一律用**報告日**，順序：
      <body data-report-date> → <html data-report-date>（去連字號）
      → location.pathname 抓 8 碼 → 'nodate'
@@ -41,7 +44,11 @@
    3. 15 檔上限**每個市場各自算**（桶＝market＋報告日）。勾滿就把該市場
       其餘 checkbox disabled，並且讓讀者看得到原因：被停用的 checkbox 帶
       title＋`.ta-pick-cb--cap` 淡化、每張表的全選格帶同一個 title、
-      浮動列顯示「一次最多 15 檔」。跳到另一張表看到全部不能點，一眼知道為什麼。
+      浮動列**獨立一行**顯示「已達上限 15 檔：取消或清除後才能再勾」（浮動列改直向
+      排：第一列 `.ta-pick-row` 放主鈕＋清除，`.ta-pick-cap` 自己一列，不再跟
+      主鈕文字黏成「分析勾選的 15 檔一次最多 15 檔」），整條浮動列再加
+      `.ta-pick-bar--cap` 轉暖色邊框＋提示微亮。從 §02 捲到 §03 看到整片
+      不能點，右下角那條就是線索，一眼知道為什麼。
    4. 事件用**委派**：3,680 列的 §02 表不可能每格掛 listener。table 上
       掛兩個——capture 階段的 click（吃掉母板 sortTbl）＋ bubble 的 change。
       capture ＋ stopPropagation ＋ stopImmediatePropagation 雙保險，連綁在
@@ -61,6 +68,7 @@
 
 var MAX=15;                                        /* 一次最多丟幾檔 */
 var CAP="一次最多 "+MAX+" 檔，先取消或清除";        /* 達上限時的 hover 說明 */
+var CAPBAR="已達上限 "+MAX+" 檔：取消或清除後才能再勾";  /* 浮動列獨立一行的提示 */
 var HINT="勾選後用右下角按鈕丟到技術分析頁（一次最多 "+MAX+" 檔）";
 var SS="tapick:";                                  /* sessionStorage key 前綴 */
 var STORE=new Map();                               /* 狀態真相：Map<key,Set<sym>>，key=tapick:市場:報告日 */
@@ -135,15 +143,29 @@ function ensureCss(){
   +"table[data-ta-sticky] th.ta-pick-th{z-index:3}"
   +"tr.ta-pick-on>td{background:color-mix(in srgb,var(--accent,#7f9fc6) 9%,transparent)}"
   /* 浮動列：右下角，z-index 壓過報告內容與 tablet-hint 遮罩 */
-  +"#ta-pick-bar{position:fixed;right:18px;bottom:18px;z-index:99999;display:flex;align-items:center;gap:10px;"
+  /* 直向排：第一列是按鈕＋清除，上限提示自己一列。
+     ⚠ 別改回 flex-wrap 讓提示自己換行——浮動列是 fixed、寬度 shrink-to-fit，
+       一開 wrap 連「清除」都會被推下去（實測 09-14）。 */
+  +"#ta-pick-bar{position:fixed;right:18px;bottom:18px;z-index:99999;display:flex;flex-direction:column;align-items:flex-end;gap:7px;"
    +"padding:9px 12px;border-radius:11px;border:1px solid var(--border,#1c2330);background:var(--surface,#0d1118);"
    +"box-shadow:0 6px 22px rgba(0,0,0,.42);font-family:var(--fm,ui-monospace,Consolas,monospace);font-size:13.5px}"
+  +"#ta-pick-bar .ta-pick-row{display:flex;align-items:center;gap:10px}"
   +"#ta-pick-bar .ta-pick-btns{display:flex;align-items:center;gap:8px}"
   +"#ta-pick-bar .ta-pick-go{display:inline-block;padding:7px 14px;border-radius:8px;font-weight:700;text-decoration:none;white-space:nowrap;"
    +"background:var(--accent,#7f9fc6);color:var(--bg,#080b10);border:1px solid var(--accent,#7f9fc6);cursor:pointer}"
   +"#ta-pick-bar .ta-pick-go:hover{filter:brightness(1.12)}"
   +"#ta-pick-bar .ta-pick-go.off{background:transparent;color:var(--dim,#405060);border-color:var(--border,#1c2330);cursor:not-allowed;font-weight:500}"
-  +"#ta-pick-bar .ta-pick-cap{font-size:11.5px;color:var(--yellow,#f0c040);white-space:nowrap}"
+  /* 上限提示：自己一個 block、自己一列，才不會跟主鈕文字黏成
+     「分析勾選的 15 檔一次最多 15 檔」（v1.0 的 bug）。 */
+  +"#ta-pick-bar .ta-pick-cap{display:block;margin:0;"
+   +"font-size:11.5px;line-height:1.4;text-align:right;color:var(--yellow,#f0c040);white-space:nowrap}"
+  /* display:block 的 (1,1,0) 會壓掉瀏覽器內建的 [hidden]{display:none}(0,1,0)，
+     不補這條的話「未達上限要隱藏」就失效——提示會一直掛在那裡。 */
+  +"#ta-pick-bar .ta-pick-cap[hidden]{display:none}"
+  /* 達上限：整條浮動列轉暖色，讓人從別張表捲過來也看得到原因 */
+  +"#ta-pick-bar.ta-pick-bar--cap{border-color:var(--yellow,#f0c040);"
+   +"box-shadow:0 6px 22px rgba(0,0,0,.42),0 0 0 1px color-mix(in srgb,var(--yellow,#f0c040) 34%,transparent)}"
+  +"#ta-pick-bar.ta-pick-bar--cap .ta-pick-cap{font-weight:700;color:color-mix(in srgb,var(--yellow,#f0c040) 80%,#fff)}"
   +"#ta-pick-bar .ta-pick-clear{font-size:11.5px;color:var(--dim,#405060);background:none;border:0;padding:2px 4px;cursor:pointer;text-decoration:underline;font-family:inherit}"
   +"#ta-pick-bar .ta-pick-clear:hover{color:var(--text,#b8c8d8)}"
   +"@media print{#ta-pick-bar{display:none}}";
@@ -319,10 +341,13 @@ function ensureBar(){
   bar=document.createElement("div");
   bar.id="ta-pick-bar";
   var btns=document.createElement("div"); btns.className="ta-pick-btns";
-  var cap=document.createElement("span"); cap.className="ta-pick-cap"; cap.textContent="一次最多 "+MAX+" 檔"; cap.hidden=true;
+  var cap=document.createElement("span"); cap.className="ta-pick-cap"; cap.textContent=CAPBAR; cap.hidden=true;
   var clr=document.createElement("button"); clr.type="button"; clr.className="ta-pick-clear"; clr.textContent="清除";
   clr.addEventListener("click",function(e){ e.preventDefault(); clear(); });
-  bar.appendChild(btns); bar.appendChild(cap); bar.appendChild(clr);
+  /* 第一列＝主鈕＋清除（同一列），第二列＝上限提示（獨立一行） */
+  var row=document.createElement("div"); row.className="ta-pick-row";
+  row.appendChild(btns); row.appendChild(clr);
+  bar.appendChild(row); bar.appendChild(cap);
   document.body.appendChild(bar);
   return bar;
 }
@@ -360,7 +385,11 @@ function renderBar(){
   }else{
     sel.forEach(function(g){ btns.appendChild(goBtn(g,"分析 "+g.market.toUpperCase()+" "+g.syms.length+" 檔",true)); });
   }
-  bar.querySelector(".ta-pick-cap").hidden=!gs.some(function(g){ return g.syms.length>=MAX; });
+  /* 任一市場勾滿 → 提示那一行現身、整條浮動列轉警示配色 */
+  var atCap=gs.some(function(g){ return g.syms.length>=MAX; });
+  var capEl=bar.querySelector(".ta-pick-cap");
+  if(capEl&&capEl.hidden!==!atCap) capEl.hidden=!atCap;
+  if(bar.classList.contains("ta-pick-bar--cap")!==atCap) bar.classList[atCap?"add":"remove"]("ta-pick-bar--cap");
 }
 
 /* ---------- 對外 ---------- */
