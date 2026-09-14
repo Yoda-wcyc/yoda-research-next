@@ -7,6 +7,12 @@ const GAS = "https://script.google.com/macros/s/AKfycbwQQ02EzseXtzvHxH3yegvgvQKn
 const TABS = ["全部", "付費版", "關鍵報告", "市場觀察", "美股", "台股", "AI泡沫", "總經", "簡報", "專題", "使用手冊"];
 // 付費版判定：該筆明確標 paid，或分類為付費旗艦「關鍵報告」
 const isPaidRow = (x) => x.paid === true || x.cat === "關鍵報告";
+// 法遵（2026-09-14 Yoda 核定）：摘要來源是 reports.json，本頁是公開招攬層，
+// 命中部位動作詞的摘要一律不顯示（只隱藏該行摘要，標題與分類照常）。
+// 清單只留「加碼／減碼／停看聽」三個詞——黑馬／布局／承接／續抱等是慣用敘述詞，不過濾。
+const RISKY_SUM = /加碼|減碼|停看聽/;
+const showSummary = (x) =>
+  !!x.summary && x.summary.indexOf("占位") === -1 && !RISKY_SUM.test(x.summary);
 
 export default function Archive() {
   const [all, setAll] = useState(null); // null=載入中, []=空, false=失敗
@@ -86,7 +92,7 @@ export default function Archive() {
           ) : (
             rows.map((x) => {
               const title = x._title || x.file.replace(/\.html$/, "").replace(/_/g, " ");
-              const showSum = x.summary && x.summary.indexOf("占位") === -1;
+              const showSum = showSummary(x);
               const isPaid = isPaidRow(x);
               return (
                 <a
@@ -113,7 +119,10 @@ export default function Archive() {
       </div>
       <footer className="afoot">
         <a className="afoot-home" href="https://yoda-research-next.vercel.app/">← 回 Yoda Research</a>
-        <div>© 2026 Yoda Research｜本站內容不構成投資建議</div>
+        <div className="adisc">
+          本站所有報告、數據與遊戲內容,均屬財經資訊與投資教育,僅供研究學習參考,不構成投資建議、要約或個別有價證券之買賣推介,亦不構成任何買賣、進出場或部位建議。本服務非證券投資顧問事業,撰稿者未具證券投資分析人員資格,不提供代客操作或獲利保證;文中個股僅為篩選與觀察紀錄,不代表推薦。投資均有風險,決策與盈虧由用戶自行判斷並承擔。
+        </div>
+        <div>© 2026 Yoda Research</div>
       </footer>
     </>
   );
