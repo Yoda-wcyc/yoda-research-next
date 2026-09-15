@@ -12,7 +12,23 @@ export async function POST(req) {
   if (!process.env.ADMIN_KEY || body.key !== process.env.ADMIN_KEY) return J({ ok: false, error: '管理密碼錯誤' }, 403);
   try {
     await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS ex_founding text`;
-    return J({ ok: true, migrated: 'members.ex_founding' });
+    // 綠界回拋留痕表：每一筆背景通知都落地一列（成功失敗都寫），GAS 沒寫成時至少查得到發生過。
+    await sql`CREATE TABLE IF NOT EXISTS ecpay_notify_log (
+      id serial PRIMARY KEY,
+      received_at timestamptz DEFAULT now(),
+      rtn_code text,
+      rtn_msg text,
+      merchant_trade_no text,
+      gwsr text,
+      email text,
+      amount text,
+      total_success_times text,
+      gas_ok boolean,
+      gas_error text,
+      attempts int,
+      raw jsonb
+    )`;
+    return J({ ok: true, migrated: 'members.ex_founding, ecpay_notify_log' });
   } catch (e) { return J({ ok: false, error: String((e && e.message) || e) }); }
 }
 export async function GET() { return J({ ok: false, error: 'POST with admin key' }); }
