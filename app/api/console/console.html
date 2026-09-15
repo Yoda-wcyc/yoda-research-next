@@ -858,6 +858,21 @@ function memState(m){
   // 狀態一律以 GAS 算好的為準；沒有 GAS 資料時退回名冊 status
   return (m.sub&&m.sub.stateLabel)||({'有效':'訂閱中','已取消':'已取消','逾期':'逾期未對帳'}[m.status]||m.status);
 }
+/* 會員編號排序鍵：把 M008 的「8」抽出來當【數字】比。
+   ★不能用字串比：字串下 'M10' < 'M2'，M010 會排到 M002 前面，整張表看起來像亂跳。
+     2026-09-15 以前名單根本沒排序（照 Neon 回傳的順序），
+     所以 M009 會夾在 M061 和 M064 中間，人眼會直接判定「這個人不在名單上」。
+   沒有編號或編號沒有數字的人排最後（第一個元素 1 > 0）。 */
+function midKey(m){
+  var mm=String((m&&m.id)||'').match(/(\d+)/);
+  return mm?[0,parseInt(mm[1],10)]:[1,0];
+}
+function byMemberId(a,b){
+  var ka=midKey(a), kb=midKey(b);
+  if(ka[0]!==kb[0])return ka[0]-kb[0];        // 有編號的在前
+  if(ka[1]!==kb[1])return ka[1]-kb[1];        // 數字升序 M001→M064
+  return String(a.id||'').localeCompare(String(b.id||''));  // 同號再比字面，保證穩定
+}
 function membersFiltered(){
   const q=$('memSearch').value.trim().toLowerCase();
   const sf=$('memFilter').value;
@@ -872,7 +887,7 @@ function membersFiltered(){
     else if(sf!=='all'&&memState(m)!==sf)return false;
     if(q&&!(m.name.toLowerCase().includes(q)||m.email.toLowerCase().includes(q)||m.id.toLowerCase().includes(q)||(m.pub||'').toLowerCase().includes(q)))return false;
     return true;
-  });
+  }).sort(byMemberId);   // ★預設一律依會員編號升序（CSV 匯出也走這條，兩邊順序一致）
 }
 /* GAS 版本提示：貼錯版本／貼到一半斷掉，這裡會直接講出來 */
 function renderGasVersion(){
