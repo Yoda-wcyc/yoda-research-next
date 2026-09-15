@@ -1928,9 +1928,9 @@ async function deletePaid(i){
   }).catch(function(){toast('連線失敗');});
 }
 /* 付費報告管理分頁：獨立載入 Drive 付費檔清單 */
-/* 清單只在切進分頁時抓一次，頁面開著不動就會停在舊資料——上傳了報告卻「一直沒出現」，
-   其實是畫面停在上傳前那一次（2026-09-10 實際發生，等了一小時）。
-   兩道保險：①標出這份清單是幾點抓的 ②留在這個分頁時每 60 秒自動重抓、切回視窗也重抓。 */
+/* 清單只在切進分頁或按 ↻ 時抓（Yoda 2026-09-15 定：全部手動，不自動更新）。
+   因為不自動更新，畫面上一定要標出這份清單是幾點抓的（stampPaid），
+   免得看到的是上傳前那一版卻不自知（2026-09-10 實際發生，等了一小時）。 */
 function stampPaid(n, err){
   var el=$('paidStamp'); if(!el)return;
   var t=new Date(), p=function(x){return ('0'+x).slice(-2)};
@@ -1972,12 +1972,6 @@ function loadPaidReports(){
     stampPaid(rows.length, !okAny);
   }).catch(function(){ renderPaidFiles({ok:false,error:'連線失敗'}); stampPaid(0,true); });
 }
-function paidTabOpen(){
-  var v=$('v-paidreports');
-  return !!(v&&v.classList.contains('show'))&&!document.hidden;
-}
-setInterval(function(){ if(paidTabOpen()&&typeof KEY!=='undefined'&&KEY)loadPaidReports(); }, 60000);
-window.addEventListener('focus',function(){ if(paidTabOpen()&&typeof KEY!=='undefined'&&KEY)loadPaidReports(); });
 /* 今日剩餘寄信額度（Gmail 每日約 100 封，過午夜太平洋時間重置）*/
 function loadMailQuota(){
   var el=$('mailQuota'); if(!el)return;
