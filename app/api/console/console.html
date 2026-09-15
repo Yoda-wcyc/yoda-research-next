@@ -2098,12 +2098,38 @@ function viewRecipients(paidId){
   post({action:'adminReportRecipients',key:KEY,reportId:paidId}).then(function(res){
     if(!res||!res.ok){ toast((res&&res.error)||'讀取失敗（GAS 可能尚未部署新版本）'); return; }
     var sent=res.sent||[], unsent=res.unsent||[];
+    // ★「還沒寄（N）」要跟該列的分母同口徑：已關閉通知（notify_off）的人不會收到信，
+    //   留在「還沒寄」裡會讓彈窗數字比分母多一位（曾出現 44 vs 43）。這裡把他們拆到獨立一區。
+    //   資料源＝全域 members[].sub（GAS adminSubscriptionTable，登入後 loadFromGAS 掛上）。
+    //   注意：前端排除【只是顯示口徑一致】，實際寄送仍由 GAS notifyBatchDigest 依 notify_off 再擋一次，
+    //   所以就算這裡判錯（或資料沒載到而不分區），也不會多寄給已關閉通知的人。
+    var offSet=null, subLoaded=false;
+    try{
+      (typeof members!=='undefined'?(members||[]):[]).forEach(function(m){
+        if(!m||!m.sub) return;
+        subLoaded=true;
+        if(m.sub.notifyOff===true || m.sub.willNotify===false){
+          var e=String(m.email||m.sub.email||'').trim().toLowerCase();
+          if(e){ if(!offSet) offSet={}; offSet[e]=1; }
+        }
+      });
+    }catch(err){ subLoaded=false; offSet=null; }
+    var pending=unsent, offList=[];
+    if(subLoaded && offSet){
+      pending=[];
+      unsent.forEach(function(m){
+        var e=String((m&&m.email)||'').trim().toLowerCase();
+        if(e && offSet[e]) offList.push(m); else pending.push(m);
+      });
+    }
     var fmt=function(a){ return a.length? a.map(function(m){ var n=(m.name?(' <span style="color:var(--dim)">('+escH(m.name)+')</span>'):''); return '<div style="padding:3px 0;border-bottom:1px solid var(--border)">'+escH(m.email)+n+'</div>'; }).join('') : '<div style="color:var(--dim);padding:6px 0">（無）</div>'; };
-    var html='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'
-      +'<div><div style="font-weight:700;margin-bottom:6px;color:#e08">🔴 還沒寄（'+unsent.length+'）</div>'+fmt(unsent)+'</div>'
+    var offBlock = offList.length? ('<div style="margin-top:14px"><div style="font-weight:700;margin-bottom:6px;color:var(--dim)">🔕 已關閉通知（'+offList.length+'）· 不寄</div>'+fmt(offList)+'</div>') : '';
+    var note = subLoaded? '' : '<div style="color:var(--dim);font-size:12px;margin-bottom:10px">通知開關資料未載入，未區分已關閉通知的人</div>';
+    var html=note+'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'
+      +'<div><div style="font-weight:700;margin-bottom:6px;color:#e08">🔴 還沒寄（'+pending.length+'）</div>'+fmt(pending)+offBlock+'</div>'
       +'<div><div style="font-weight:700;margin-bottom:6px;color:#4c9">🟢 已經寄（'+sent.length+'）</div>'+fmt(sent)+'</div>'
       +'</div>';
-    var foot = unsent.length? '<button class="btn-primary" onclick="closeModal();doNotify(\''+escJs(paidId)+'\')">只補寄給還沒寄的 '+unsent.length+' 位</button>' : '';
+    var foot = pending.length? '<button class="btn-primary" onclick="closeModal();doNotify(\''+escJs(paidId)+'\')">只補寄給還沒寄的 '+pending.length+' 位</button>' : '';
     openModal('已寄／未寄名單 · '+escH(paidId), html, foot);
   }).catch(function(){toast('連線失敗');});
 }
