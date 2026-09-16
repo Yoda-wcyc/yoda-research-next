@@ -2216,15 +2216,33 @@ async function importHTML(html){
   var handles=collectHandles(doc,PROFILE);
   if(!handles.length){ await uiAlert('找不到可切的段落。支援母板:關鍵報告/簡報(.section)、市場觀察/AI/總經(.content-section)、美股/台股(.section-header)。'); return; }
   var paywall=PROFILE.paywallSel?doc.querySelector(PROFILE.paywallSel):null;
+  /* ── 2026-09-16 修：金軸「按得下去但一格都動不了」的病根 ────────────────
+     .paywall 當初設計成「文章中段的分界標記」：它前面＝§9-5 保護區。
+     但現在的關鍵報告母板把 .paywall 訂閱卡放在文章【最後面】，於是每一段
+     都落在它前面 → 全部 protect → minCut 被推到 N → setCut 把 k 夾在
+     [N,N]，cut 永遠等於 N，金軸怎麼拖都不會動（實測 關鍵報告_20260916：
+     N=10、minCut=10、10 段全 protect）。
+     修法：先驗這個標記「真的有把段落切開」——它後面至少要還剩一段，
+     否則視為純頁尾 CTA，整支忽略，回到「無保護區·全交你拖」。 */
+  var pwSplits = !!paywall && handles.some(function(hnd){
+    var ref=hnd.el||hnd.header;
+    // PRECEDING＝paywall 在這一段之前 → 這一段在 paywall 之後 → 標記真的有切開
+    return !!(ref.compareDocumentPosition(paywall) & Node.DOCUMENT_POSITION_PRECEDING);
+  });
+  var pwIgnored = !!paywall && !pwSplits;
   BLOCKS=handles.map(function(hnd){
     var m=handleMeta(hnd,PROFILE);
     var ref=hnd.el||hnd.header;
-    var before = paywall ? (ref.compareDocumentPosition(paywall) & Node.DOCUMENT_POSITION_FOLLOWING) : false;
+    var before = pwSplits ? (ref.compareDocumentPosition(paywall) & Node.DOCUMENT_POSITION_FOLLOWING) : false;
     var kw = PROFILE.protectKW.some(function(k){return m.title.indexOf(k)>=0;});
     return {title:m.title, text:m.text, protect:!!(before||kw), maskTitle:false, maskContent:false};
   });
   N=BLOCKS.length;
-  minCut=0; BLOCKS.forEach(function(b,i){ if(b.protect) minCut=i+1; });
+  /* minCut 原本取「最後一個保護段 index+1」。只要有一段晚出現的保護段
+     （例如某個後段標題剛好命中 protectKW），最小斷點就被整個推到後面，
+     金軸一樣拖不動。保護段本來就永遠不遮（applyCut 會跳過），不需要靠
+     minCut 護住，所以只算「開頭連續的那一串保護段」。 */
+  minCut=0; for(var mi=0;mi<N;mi++){ if(BLOCKS[mi].protect) minCut=mi+1; else break; }
   applyCut(minCut); // 預設:保護區外全遮內容(無保護區的母板＝全遮,由你拖金軸放行)
   buildEditor();
   document.getElementById('empty').classList.add('hidden');
@@ -2233,7 +2251,12 @@ async function importHTML(html){
   document.getElementById('btn-free').disabled=false;
   document.getElementById('btn-paid').disabled=false;
   document.getElementById('btn-upload').disabled=false;
-  document.getElementById('tb-status').innerHTML='已匯入 <b>'+srcName+'</b> · 判定為 <b>'+PROFILE.label+'</b>　共 <b>'+N+'</b> 段'+(minCut?'（保護 '+minCut+'）':'（無保護區·全交你設斷點）');
+  /* 狀態列把「為什麼金軸只能拖到這裡」講出來：以前保護區把金軸鎖死時畫面
+     什麼都不說，看起來就只是「壞掉拖不動」。 */
+  var note = minCut>=N
+    ? '　<b style="color:var(--danger)">⚠ 全段都被判成保護區，金軸不會動</b>'
+    : (pwIgnored ? '　<span style="color:var(--text3)">（.paywall 在文章最後面＝頁尾訂閱卡，不當分界）</span>' : '');
+  document.getElementById('tb-status').innerHTML='已匯入 <b>'+srcName+'</b> · 判定為 <b>'+PROFILE.label+'</b>　共 <b>'+N+'</b> 段'+(minCut?'（保護 '+minCut+'）':'（無保護區·全交你設斷點）')+note;
 }
 
 // ── 拖曳粗調：線以下整批遮內容，線以上全開 ──
