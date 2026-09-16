@@ -122,6 +122,17 @@ body.dragging iframe{pointer-events:none}
 .cnode.lv2>.row .lv{background:#1f2a1f;color:#9fd8b0;border-color:#2c4a34}
 .cnode.lv3>.row .lv{background:#241f2c;color:#c3b0d8;border-color:#3d3350}
 .cnode.lv3>.row .ttl{font-size:12px;color:#b9c7d6;font-weight:500}
+.cnode.lv4{border-color:#1a222e;background:#0b1017;margin:2px 0}
+.cnode.lv4>.row{padding:4px 9px;cursor:pointer}
+.cnode.lv4>.row .lv{background:#20262f;color:#94a5b8;border-color:#2b323d}
+.cnode.lv4>.row .ttl{font-size:11.5px;color:#a8bacd;font-weight:400}
+.cnode.lv4>.row .meta{display:none}
+.cnode .sg{margin-left:auto;font:10px/1 ui-monospace,monospace;color:#7f93a8;background:#141c28;border:1px solid #243248;border-radius:4px;cursor:pointer;flex:0 0 auto;padding:3px 6px;margin-top:1px}
+.cnode .sg:hover{color:#cfe0ff;border-color:#2f6fb5}
+.cnode .sg+.cx,.cnode .tg+.sg{margin-left:0}
+ul.segs{display:none;border-left:1px dashed #243248;margin-left:6px}
+ul.segs.on{display:block}
+.cvwarn{margin:6px 0;padding:6px 9px;border:1px solid #6a2430;background:#2a141a;color:#ffbcbc;border-radius:6px;font-size:11.5px;line-height:1.5}
 .cnode>.row{display:flex;align-items:flex-start;gap:8px;padding:7px 10px;cursor:grab}
 .cnode>.row:active{cursor:grabbing}
 .cnode .lv{font:700 10px/1 ui-monospace,monospace;color:#5f7286;background:#131a25;border:1px solid #263242;border-radius:4px;padding:3px 5px;margin-top:2px;flex:0 0 auto}
@@ -338,6 +349,8 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 
 /* ── 段落編號規則（兩欄共用）：有直接文字的元素，依文件順序 ── */
 var SKIP={SCRIPT:1,STYLE:1,NOSCRIPT:1,TEXTAREA:1,BUTTON:1,SELECT:1,OPTION:1,SVG:1,CANVAS:1};
+/* 行內標籤：只有在「祖先也是候選」時才讓位，不是無條件排除（見 _cand 註解） */
+var INLINE_TAGS={B:1,STRONG:1,EM:1,I:1,U:1,S:1,SPAN:1,A:1,SMALL:1,MARK:1,CODE:1,SUP:1,SUB:1,ABBR:1,CITE:1,Q:1,TIME:1,LABEL:1};
 function hasText(el){for(var i=0;i<el.childNodes.length;i++){var n=el.childNodes[i];if(n.nodeType===3&&/\S/.test(n.nodeValue))return true}return false}
 /* 2026-09-08 重寫定位方式（Yoda：在工作台刪掉的東西存檔後又出現）。
    舊版用「文件順序流水號」當 data-yeb，但兩端的 DOM 根本不是同一份：
@@ -356,10 +369,31 @@ function fpOf(el){
   return el.tagName+'|'+t.replace(/\s+/g,' ').trim().slice(0,80);
 }
 function h32(s){var h=5381; for(var i=0;i<s.length;i++)h=((h*33)^s.charCodeAt(i))>>>0; return h.toString(36);}
-function _cand(el){
+function _candBase(el){
   if(SKIP[el.tagName])return false;
   if(el.closest&&el.closest('nav,.controls-bar,.share-bar,#yoda-share,.tablet-hint'))return false;
   return hasText(el);
+}
+/* 2026-09-16 編輯單位從「行內孤島」提升到「段落」。
+   舊規則：只要有直接文字節點就發一個 data-yeb，closest() 又取最內層，於是
+   <b>今天沒有新的壞消息</b> 這九個字自己就是一座島——外面那段反而唯讀、
+   島頭 Backspace 是 no-op、選取一跨過邊界 Chrome 直接拒絕。
+   ⚠ 不可以「b/span/em/strong/a 一律不發編號」：實測結論區塊長這樣
+     <div style=display:flex><span>●</span><span>文字…<b>…</b></span></div>
+   文字全掛在 inline span 上，span 不編號＝整塊沒東西可編，比原本更糟。
+   正確規則：inline 標籤只有在「某個祖先也通過候選測試」時才讓位給祖先。
+   非 inline（P／DIV／LI／TD…）維持原規則不變——不准被祖先吸收，否則像
+   .conclusion-box-text 那種「自己有直接文字、底下又一堆子 div」的容器會被
+   整塊吃掉，而 endInline 是用 innerText 回寫的，版面會毀。 */
+function _cand(el){
+  if(!_candBase(el))return false;
+  if(INLINE_TAGS[el.tagName]){
+    var bd=el.ownerDocument&&el.ownerDocument.body;
+    for(var p=el.parentElement; p&&p!==bd&&p.tagName!=='HTML'; p=p.parentElement){
+      if(_candBase(p))return false;   /* 祖先也是候選 → 讓位，整段一起編 */
+    }
+  }
+  return true;
 }
 /* 由「靜態原始檔」算出可編號元素的指紋表 {hash: 出現次數}；畫布端拿它當白名單。 */
 function fpTable(doc){
@@ -378,6 +412,7 @@ function indexBlocks(doc, allow){
     el.setAttribute('data-yeb', k+'-'+u);
     n++;
   }
+  try{ if(typeof invalidateUnits==='function')invalidateUnits(doc); }catch(e){}
   return n;
 }
 /* ── 注入到 iframe 的樣式：diff 標記（沿用校稿標記的紅慢閃） ── */
@@ -394,7 +429,11 @@ var MARK_CSS='.yeb-mark{position:relative;outline:2px solid rgba(255,80,80,.85);
  '@keyframes yebBlink{0%,100%{outline-color:rgba(255,80,80,.85)}50%{outline-color:rgba(255,80,80,.25)}}'+
  '.yeb-del{background:rgba(255,80,80,.22);text-decoration:line-through;color:#ff9a9a;padding:0 2px;border-radius:2px}'+
  '.yeb-ins{background:rgba(80,220,140,.22);color:#9af0c0;padding:0 2px;border-radius:2px}'+
- '.yeb-acts{position:absolute;top:-12px;right:0;z-index:9999;display:flex;gap:6px;white-space:nowrap;max-width:100%}'+
+ /* 認可鈕不准蓋到報告文字（Yoda 2026-09-16）：
+    ① 改貼在被標記元素「內部」右上角，.yeb-mark/.yeb-auto 上留一條 26px 的空白條，連自己的字都不壓。
+    ② 元素比一個畫面還高、從中段點下去時，placeActs() 會把它往下夾進畫面，認可鈕永遠看得到。
+    ③ 它仍然是被編輯元素 innerHTML 的子節點，UI_SEL 的 '.yeb-acts' 照舊剝得掉。 */
+ '.yeb-acts{position:absolute;top:2px;right:2px;z-index:9999;display:flex;gap:6px;white-space:nowrap;max-width:100%}'+
  '.yeb-acts button{position:static!important;top:auto!important;right:auto!important}'+
  '.yeb-ok{position:absolute;top:-10px;right:-10px;z-index:9999;font:700 11px/1 -apple-system,sans-serif;background:#1f7a4a;color:#fff;border:0;border-radius:11px;padding:4px 8px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.4)}'+
  '.yeb-ok:hover{background:#2a9a5f}'+
@@ -402,6 +441,7 @@ var MARK_CSS='.yeb-mark{position:relative;outline:2px solid rgba(255,80,80,.85);
  '.yeb-rule{position:absolute;top:-10px;right:120px;z-index:9999;font:700 11px/1 -apple-system,sans-serif;background:#2a3a55;color:#cfe0ff;border:0;border-radius:11px;padding:4px 8px;cursor:pointer}'+
  '.yeb-note{display:block;font:11px/1.4 -apple-system,sans-serif;color:#ffc37a;margin-top:4px}'+
  '.yeb-auto{outline:2px solid rgba(80,220,140,.7);outline-offset:2px;border-radius:3px}'+
+ '.yeb-mark,.yeb-auto{position:relative;padding-top:26px!important}'+   /* 認可鈕的落腳處：空出來的，所以它壓不到任何字 */
  '.yeb-auto .yeb-ok{background:#1f6a4a}'+
  '[data-yeb]{cursor:text}[data-yeb]:hover{outline:1px dashed rgba(127,159,198,.7);outline-offset:2px}'+
  '.yeb-emark{outline:2px solid #ff3b3b;outline-offset:2px;animation:yebBlink 1.6s ease-in-out infinite}'+
@@ -547,6 +587,7 @@ function setupPanes(){
   if(!dE||!dE.body)return;
   function css(d,txt){var s=d.createElement('style');s.textContent=txt;d.head.appendChild(s)}
   css(dE,MARK_CSS+HIDE_HINT+EDIT_CSS);
+  bindActs(dE);   /* 捲動／改視窗大小時把認可鈕重新夾進畫面 */
   if(dO&&dO.body){   /* 原稿對照欄已取消；萬一日後又掛回來，這段仍然管用 */
     css(dO,ORIG_CSS+MARK_CSS);
     ['click','mousedown','mouseup','dblclick','keydown','keypress','contextmenu','input','submit','touchstart'].forEach(function(t){
@@ -556,9 +597,16 @@ function setupPanes(){
   /* 白名單一定要由「原始檔字串」產生——那才是匯出時看到的同一份 DOM */
   if(!t.fpAllow) t.fpAllow=fpTable(new DOMParser().parseFromString(t.orig,'text/html'));
   t.blocks=indexBlocks(dE, t.fpAllow);
-  /* 套回 marks */
-  t.marks.forEach(function(m){paintMark(dE,m)});
-  replayMoves(dE, t.moves||[]); replayBlockDels(dE, t.bdel||[]); if(t.clean)removeEmptyShells(dE); if(t.autonum)renumberChapters(dE);
+  /* 套回 marks：找不到對應段落一定要出聲，不准靜默跳過
+     （2026-09-16 編號規則改過，舊檔的 marks 可能對不上） */
+  var _miss=0;
+  t.marks.forEach(function(m){
+    if(!dE.querySelector('[data-yeb="'+m.idx+'"]')){ _miss++; try{console.warn('[yeb] 套不回的標記 idx='+m.idx,m)}catch(e){} }
+    paintMark(dE,m); });
+  t.missMarks=_miss;
+  if(_miss)toast('⚠ 有 '+_miss+' 處舊標記找不到對應段落（編輯單位已改成整段），請重新檢查這幾處',true);
+  var _rm=replayMoves(dE, t.moves||[]), _rd=replayBlockDels(dE, t.bdel||[]); warnReplay('掛載', _rm, _rd);
+  if(t.clean)removeEmptyShells(dE); if(t.autonum)renumberChapters(dE);
   autofix(t, dE);
   if(t.style)applyStyleTo(dE, t.style);
   var bn=$('#cvNum'); if(bn)bn.classList.toggle('on',!!t.autonum);
@@ -568,16 +616,28 @@ function setupPanes(){
   dE.addEventListener('mousedown',function(ev){ MDX=ev.clientX; MDY=ev.clientY; },true);
   /* 點擊即編 */
   dE.body.addEventListener('click',function(ev){
-    /* 使用者正在選字（或剛拖過一段距離）：完全不插手，讓他選、讓他複製 */
+    /* 2026-09-16：刷黑之後要能直接覆寫。
+       同一個 [data-yeb] 之內的選取 → 進就地編輯，而且「把選取原封不動留著」
+       （設 contenteditable + focus 會清掉選取，所以先存 Range、startInline 之後再還原）。
+       跨段落選取 → 照舊完全不插手，讓他跨段複製。 */
+    var KEEP_RANGE=null, KEEP_EL=null;
     try{
       var _s=dE.getSelection&&dE.getSelection();
-      if(_s&&String(_s).replace(/\s+/g,'').length)return;
+      if(_s&&_s.rangeCount&&String(_s).replace(/\s+/g,'').length){
+        var _an=_s.anchorNode, _fn=_s.focusNode;
+        var _ae=_an&&(_an.nodeType===1?_an:_an.parentElement), _fe=_fn&&(_fn.nodeType===1?_fn:_fn.parentElement);
+        var _ab=_ae&&_ae.closest&&_ae.closest('[data-yeb]'), _fb=_fe&&_fe.closest&&_fe.closest('[data-yeb]');
+        if(_ab&&_ab===_fb){ KEEP_EL=_ab; KEEP_RANGE=_s.getRangeAt(0).cloneRange(); }
+        else return;   /* 跨段落：不插手 */
+      }
     }catch(e){}
-    if(MDX!=null&&(Math.abs(ev.clientX-MDX)>6||Math.abs(ev.clientY-MDY)>6))return;
+    /* 拖曳位移的 early-return 只擋「跨段選字／不是選字」那條路；單段落內刷黑一定超過 6px，不准再 return */
+    if(!KEEP_RANGE && MDX!=null&&(Math.abs(ev.clientX-MDX)>6||Math.abs(ev.clientY-MDY)>6))return;
     var ok=ev.target.closest&&ev.target.closest('.yeb-ok'); if(ok){approve(ok.getAttribute('data-mark'));ev.preventDefault();ev.stopPropagation();return}
     var no=ev.target.closest&&ev.target.closest('.yeb-no'); if(no){reject(no.getAttribute('data-mark'));ev.preventDefault();ev.stopPropagation();return}
     var ru=ev.target.closest&&ev.target.closest('.yeb-rule'); if(ru){openRuleDlg(ru.getAttribute('data-mark'));ev.preventDefault();ev.stopPropagation();return}
     var el=ev.target.closest&&ev.target.closest('[data-yeb]');
+    if(KEEP_EL)el=KEEP_EL;   /* 刷黑的那一段才是主角，放開滑鼠的位置不算 */
     if(!el){   /* 圖、空殼、表格外框這種沒有文字編號的區塊：一樣選得起來、刪得掉，只是不開編輯框 */
       var t2=ev.target;
       if(t2&&t2.nodeType===1&&t2!==dE.body&&t2!==dE.documentElement&&!t2.closest('.yeb-selbar')){
@@ -596,7 +656,8 @@ function setupPanes(){
     if(hot||add){ ev.preventDefault(); ev.stopPropagation(); }
     selectBlock(el, add); echoLeft(el); fillDock(el);
     if(add||selCount()>1){ endInline(true); closeEd(); toast('已選 '+selCount()+' 塊 · 按右上角「✕ 刪除這 '+selCount()+' 塊」一起刪'); }
-    else { closeEd(); startInline(el, ev.clientX, ev.clientY); }
+    else { closeEd(); startInline(el, ev.clientX, ev.clientY, !!KEEP_RANGE);
+           if(KEEP_RANGE){ try{ var _s3=dE.getSelection(); _s3.removeAllRanges(); _s3.addRange(KEEP_RANGE); }catch(e){} } }
   },true);
   if(dO&&dO.body){   /* 兩欄同步捲動：只有原稿欄存在時才需要 */
     /* 同步滾動：以「視窗最上緣的段落」對齊 */
@@ -654,8 +715,9 @@ function curWords(){ try{ return wordsOf($('#ifE').contentDocument) }catch(e){ r
 function curAllWords(){ try{ return allWords($('#ifE').contentDocument) }catch(e){ return 0 } }
 function fmtN(x){ return String(x).replace(/\B(?=(\d{3})+(?!\d))/g,',') }
 function updPill(){var t=tab(); if(!t)return; updUndo(); var pend=t.marks.filter(function(m){return !m.approved}).length;
-  $('#pMarks').innerHTML='<b>'+(t.blocks||0)+'</b>段 · <b>'+t.marks.length+'</b>改 · <b>'+pend+'</b>待';
-  $('#pMarks').title='段落 '+(t.blocks||0)+' · 已修改 '+t.marks.length+' 處 · 待認可 '+pend+' 處';
+  var _mm=t.missMarks||0;
+  $('#pMarks').innerHTML='<b>'+(t.blocks||0)+'</b>段 · <b>'+t.marks.length+'</b>改 · <b>'+pend+'</b>待'+(_mm?(' · <b style="color:#ff8a8a">'+_mm+'</b>找不到'):'');
+  $('#pMarks').title='段落 '+(t.blocks||0)+' · 已修改 '+t.marks.length+' 處 · 待認可 '+pend+' 處'+(_mm?(' · 有 '+_mm+' 處舊標記找不到對應段落，請重新檢查'):'');
   updWords(); renderTabs();}
 /* 兩欄標題列的字數：右欄＝目前，左欄＝原稿 */
 function updWords(){
@@ -677,7 +739,7 @@ function undo(){ var t=tab(); if(!t||!(t.undo||[]).length){toast('沒有可復�
   closeEd(); mountPanes(); setTimeout(function(){ try{$('#ifE').contentDocument.documentElement.scrollTop=sc}catch(e){} },600);
   updUndo(); saveSoon(); toast('已復原上一步'); }
 $('#btnUndo').onclick=undo;
-document.addEventListener('keydown',function(e){ if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&(e.key==='z'||e.key==='Z')){ var tg=e.target; if(tg&&/^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName))return; e.preventDefault(); undo(); } });
+document.addEventListener('keydown',function(e){ if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&(e.key==='z'||e.key==='Z')){ var tg=e.target; if(tg&&(/^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName)||tg.isContentEditable))return;   /* 就地編輯中：交給瀏覽器自己的 undo，別重灌整份 */ e.preventDefault(); undo(); } });
 
 /* ── 標記：畫、認可 ── */
 function normFinding(f){   /* Claude 有時回中文鍵名，兩種都接 */
@@ -685,23 +747,61 @@ function normFinding(f){   /* Claude 有時回中文鍵名，兩種都接 */
   var pick=function(){ for(var i=0;i<arguments.length;i++){ var v=f[arguments[i]]; if(v!==undefined&&v!==null&&v!=='')return v; } return ''; };
   return {idx:pick('idx','段號','段落','id','index'), issue:String(pick('issue','問題','說明','理由')), proposal:String(pick('proposal','建議','改成','修改建議','建議改法'))};
 }
+/* ── 認可鈕（.yeb-acts）定位 ──
+   預設就停在被標記元素內部右上角那條保留空白裡（壓不到字）。
+   元素比畫面高、頂端已經捲出去時，把它往下夾進畫面；夾的方向只有「往下」——
+   往上越過元素上緣就會蓋到前一段，那正是這次要修的毛病。 */
+function placeActs(bar){
+  if(!bar||!bar.parentElement)return; var el=bar.parentElement;
+  var d=bar.ownerDocument, w=d.defaultView;
+  var vh=(w&&w.innerHeight)||d.documentElement.clientHeight||0; if(!vh)return;
+  var r=el.getBoundingClientRect(); if(!r.height)return;
+  var bh=bar.offsetHeight||20;
+  var want=r.top+2, y=Math.min(Math.max(want,2), vh-bh-2);
+  if(y<want)y=want;
+  bar.style.top=Math.round(y-r.top-(el.clientTop||0))+'px';
+  /* 閃開浮動選取列：它 z-index 2147483000 比認可鈕高，兩邊一起被夾到畫面頂端就會把認可鈕蓋掉
+     （2026-09-10 那次「認可鈕被 ✕ 刪除蓋住」就是這個）。重疊就整條往下挪到選取列下面。 */
+  try{
+    var sb=(typeof SELX!=='undefined')&&SELX;
+    if(sb&&sb.ownerDocument===d&&sb.classList.contains('on')){
+      var br=bar.getBoundingClientRect(), sr=sb.getBoundingClientRect();
+      if(br.right>sr.left&&br.left<sr.right&&br.bottom>sr.top&&br.top<sr.bottom){
+        var y2=Math.max(sr.bottom+4, want);
+        bar.style.top=Math.round(y2-r.top-(el.clientTop||0))+'px';
+      }
+    }
+  }catch(e){}
+}
+function placeAllActs(d){ try{ [].forEach.call(d.querySelectorAll('.yeb-acts'), placeActs) }catch(e){} }
+function bindActs(d){
+  if(!d||d.__yebActsBound)return; d.__yebActsBound=true;
+  var tick=false;
+  function go(){ if(tick)return; tick=true;
+    var w=d.defaultView, raf=(w&&w.requestAnimationFrame)?w.requestAnimationFrame.bind(w):function(f){setTimeout(f,16)};
+    raf(function(){ tick=false; placeAllActs(d) }); }
+  d.addEventListener('scroll',go,true);
+  if(d.defaultView){ d.defaultView.addEventListener('scroll',go,true); d.defaultView.addEventListener('resize',go) }
+}
 function paintMark(d,m){
   var el=d.querySelector('[data-yeb="'+m.idx+'"]'); if(!el)return;
   el.classList.remove('yeb-mark','yeb-auto');
   if(m.approved&&m.auto&&!m.seen){   /* 匯入時自動修：綠框，預設已認可；✕ 退回 */
     el.classList.add('yeb-auto');
-    el.innerHTML=diffHtml(m.before,m.after)+'<span class="yeb-acts"><button class="yeb-no" data-mark="'+m.id+'" title="退回這個自動修改">✕ 退回</button><button class="yeb-ok" data-mark="'+m.id+'" title="知道了，隱藏綠框">✓</button></span>'+(m.note?'<span class="yeb-note">'+esc(m.note)+'</span>':'');
+    el.innerHTML=diffHtml(m.before,afterText(m))+'<span class="yeb-acts"><button class="yeb-no" data-mark="'+m.id+'" title="退回這個自動修改">✕ 退回</button><button class="yeb-ok" data-mark="'+m.id+'" title="知道了，隱藏綠框">✓</button></span>'+(m.note?'<span class="yeb-note">'+esc(m.note)+'</span>':'');
+    placeActs(el.querySelector('.yeb-acts'));
     return;
   }
-  if(m.approved){ setEdited(el, m.after, m.beforeHtml, m.id); return; }
+  if(m.approved){ setEdited(el, m.after, m.beforeHtml, m.id, m.isHtml); return; }
   el.classList.add('yeb-mark');
-  el.innerHTML=diffHtml(m.before,m.after)+
+  el.innerHTML=diffHtml(m.before,afterText(m))+
     '<span class="yeb-acts">'+
     '<button class="yeb-rule" data-mark="'+m.id+'" title="把這個改法存成規則，以後自動">規則</button>'+
     '<button class="yeb-no" data-mark="'+m.id+'" title="退回：恢復原文、拿掉標記">✕ 退回</button>'+
     '<button class="yeb-ok" data-mark="'+m.id+'" title="認可這一處修改（標記消失、版本確定）">✓ 認可</button>'+
     '</span>'+
     (m.note?'<span class="yeb-note">'+esc(m.note)+'</span>':'');
+  placeActs(el.querySelector('.yeb-acts'));
 }
 function reject(id){
   var t=tab(), m=t.marks.find(function(x){return x.id===id}); if(!m)return; snap();
@@ -732,6 +832,72 @@ function withInline(text, beforeHtml){   /* 改寫後的純文字 → 把還在�
   });
   return out;
 }
+/* ── 就地編輯要保住段內的行內標籤（2026-09-16）──
+   起因：編輯單位從「行內孤島」提升到「段落」之後，endInline 用 innerText 取值、
+   setEdited 用純文字回寫，於是改一整段就把段內的 <b>／<span> 攤平成純文字。
+   Yoda 的報告大量用粗體強調，等於改一段毀一段。
+   作法：就地編輯這條路改走 innerHTML —— stripUI() 先把工作台自己塞進去的 UI
+   （認可鈕、註記、差異標記）剝掉，cleanInline() 再過一次行內白名單，mark 打 isHtml 旗標。
+   ⚠ AI 先審那條路原樣不動：Claude 回的東西一律 cleanText 轉純文字（提示詞硬規則是只回純文字），
+     沒有 isHtml 旗標的舊 mark 也一律當純文字，舊檔不會壞。 */
+var UI_SEL='.yeb-acts,.yeb-note,.yeb-selbar,.yeb-ok,.yeb-no,.yeb-rule,.yeb-del,script,style,noscript';
+var UI_UNWRAP='.yeb-ins';        /* 差異裡的「新字」是內容：留字、丟標籤 */
+var PSEP='\uE000';               /* 分段哨兵（私用區，讀者不會打得出來）：切完就丟 */
+var KEEP_TAG={B:1,STRONG:1,EM:1,I:1,U:1,S:1,SPAN:1,A:1,SMALL:1,MARK:1,CODE:1,SUP:1,SUB:1,BR:1};
+var BLOCK_TAG={P:1,DIV:1,LI:1,UL:1,OL:1,DL:1,DT:1,DD:1,H1:1,H2:1,H3:1,H4:1,H5:1,H6:1,BLOCKQUOTE:1,PRE:1,TR:1,TD:1,TH:1,TABLE:1,SECTION:1,ARTICLE:1,HEADER:1,FOOTER:1,FIGURE:1,FIGCAPTION:1};
+var ATTR_OK={'class':1,'style':1,'href':1,'target':1,'title':1};
+function _unwrapEl(x){ var p=x.parentNode; if(!p)return; while(x.firstChild)p.insertBefore(x.firstChild,x); p.removeChild(x); }
+function _scrubUI(root){
+  /* 工作台塞進被編輯元素 innerHTML 的東西，一件都不准寫進報告 */
+  [].forEach.call(root.querySelectorAll(UI_SEL),function(x){ if(x.parentNode)x.parentNode.removeChild(x) });
+  [].forEach.call(root.querySelectorAll(UI_UNWRAP),function(x){ _unwrapEl(x) });
+  [].forEach.call(root.querySelectorAll('[contenteditable],[spellcheck],[data-yeb],[data-yeb-split]'),function(x){
+    x.removeAttribute('contenteditable'); x.removeAttribute('spellcheck');
+    x.removeAttribute('data-yeb'); x.removeAttribute('data-yeb-split'); });
+  [].forEach.call(root.querySelectorAll('.yeb-mark,.yeb-auto,.yeb-emark,.yeb-sel,.yeb-editing,.yeb-flash'),function(x){
+    x.classList.remove('yeb-mark','yeb-auto','yeb-emark','yeb-sel','yeb-editing','yeb-flash');
+    if(!(x.getAttribute('class')||'').trim())x.removeAttribute('class'); });
+}
+function stripUI(html){
+  var box=document.createElement('div'); box.innerHTML=String(html==null?'':html);
+  _scrubUI(box); return box.innerHTML;
+}
+function cleanInline(html){
+  /* 只留行內白名單，其餘標籤 unwrap（留字、丟標籤）；on* 屬性一律砍；script／style 連內容一起丟。
+     非行內的容器（div／p／li…）unwrap 前補一個分段哨兵，「空一行＝分段」才不會在 HTML 路徑失效。 */
+  var box=document.createElement('div'); box.innerHTML=String(html==null?'':html);
+  _scrubUI(box);
+  (function walk(node){
+    [].slice.call(node.childNodes).forEach(function(c){
+      if(c.nodeType===8){ if(c.parentNode)c.parentNode.removeChild(c); return; }
+      if(c.nodeType!==1)return;
+      var tag=c.tagName;
+      if(tag==='SCRIPT'||tag==='STYLE'||tag==='NOSCRIPT'){ if(c.parentNode)c.parentNode.removeChild(c); return; }
+      walk(c);
+      if(KEEP_TAG[tag]){
+        [].slice.call(c.attributes).forEach(function(a){
+          var n=(a.name||'').toLowerCase();
+          if(n.indexOf('on')===0){ c.removeAttribute(a.name); return; }
+          if(ATTR_OK[n]||n.indexOf('data-')===0)return;
+          c.removeAttribute(a.name);
+        });
+        return;
+      }
+      if(BLOCK_TAG[tag]&&c.parentNode)c.parentNode.insertBefore(c.ownerDocument.createTextNode(PSEP), c);
+      _unwrapEl(c);
+    });
+  })(box);
+  return box.innerHTML.replace(/(?:\s*<br\s*\/?>\s*){2,}/gi, PSEP);   /* 連兩個換行＝分段，跟純文字路徑一致 */
+}
+function htmlText(h){   /* HTML → 純文字：給 diff、給章標頭、給「有沒有改動」比對用 */
+  return cleanText(String(h==null?'':h).split(PSEP).join('\n\n'));
+}
+function splitParts(html){   /* 依哨兵切段；只有標籤沒有字的碎片丟掉 */
+  return String(html==null?'':html).split(PSEP)
+    .map(function(x){return x.replace(/^(?:\s|<br\s*\/?>)+|(?:\s|<br\s*\/?>)+$/gi,'')})
+    .filter(function(x){return x.replace(/<[^>]*>/g,'').replace(/&nbsp;/gi,' ').trim().length>0});
+}
+function afterText(m){ return m&&m.isHtml ? htmlText(m.after) : String((m&&m.after)||''); }
 function cleanText(t){
   /* Claude 有時會回 HTML（<p>…</p>、<br>、markdown 星號）。原封不動塞進去就變成讀者看得到的程式碼。
      這裡一律拆成純文字：段落界線換成空行、單純換行保留，其餘標籤直接丟掉。 */
@@ -744,18 +910,36 @@ function cleanText(t){
      .replace(/&quot;/gi,'"').replace(/&#39;/g,"'").replace(/&amp;/gi,'&');
   return t.replace(/\n{3,}/g,'\n\n').replace(/[ \t]+\n/g,'\n').trim();
 }
-function setEdited(el, text, beforeHtml, markId){
+function setEdited(el, text, beforeHtml, markId, isHtml){
   /* 章標頭特別處理：只換標題那一格，保住編號與版面（2026-09-07 有一次整個標頭被一段話蓋掉） */
   var t=el.querySelector&&(el.querySelector('.sec-title')||el.querySelector('.section-title'));
   if(t&&el.querySelector('.sec-num,.section-num')){
     var num=el.querySelector('.sec-num,.section-num'), nt=(num?(num.textContent||'').trim():'');
-    var body=cleanText(text).replace(/\n+/g,' ').trim();
+    var body=(isHtml?htmlText(text):cleanText(text)).replace(/\n+/g,' ').trim();
     if(nt&&body.indexOf(nt)===0)body=body.slice(nt.length).trim();   /* 使用者把編號一起打進去就去掉 */
     t.textContent=body; return;
   }
-  var d=el.ownerDocument, clean=cleanText(text);
+  var d=el.ownerDocument;
   /* 上一次分段產生的兄弟先收掉，重畫才不會越長越多 */
   if(markId)[].forEach.call(d.querySelectorAll('[data-yeb-split="'+markId+'"]'),function(x){ if(x.parentNode)x.parentNode.removeChild(x) });
+  if(isHtml){
+    /* 就地編輯：用 innerHTML 回寫，段內的粗體／連結原樣活著。
+       值一定要再過一次 stripUI+cleanInline——進度 JSON 是可以被人手改的，不准從那裡注入 HTML。 */
+    var hp=splitParts(cleanInline(stripUI(text)));
+    el.innerHTML=(hp.shift()||'');
+    var hr=el;
+    hp.forEach(function(p){
+      var c=el.cloneNode(false);
+      c.removeAttribute('data-yeb');
+      c.classList.remove('yeb-mark','yeb-auto','yeb-emark','yeb-sel','yeb-editing');
+      if(markId)c.setAttribute('data-yeb-split',markId);
+      c.innerHTML=p;
+      if(hr.parentNode)hr.parentNode.insertBefore(c, hr.nextSibling);
+      hr=c;
+    });
+    return;
+  }
+  var clean=cleanText(text);
   var parts=clean.split(/\n{2,}/).map(function(x){return x.trim()}).filter(Boolean);
   var first=parts.shift()||'';
   el.innerHTML=withInline(first, beforeHtml||'').replace(/\n/g,'<br>');
@@ -772,15 +956,22 @@ function setEdited(el, text, beforeHtml, markId){
     ref=c;
   });
 }
-function applyEdit(el,after,note){
-  after=cleanText(after);   /* 不管誰呼叫，存進 mark 的一律是純文字（曾經把 <p> 當文字寫進報告） */
+function applyEdit(el,after,note,isHtml){
+  /* isHtml＝就地編輯那條路：存進 mark 的是「清理過的 HTML」，段內粗體才活得下來。
+     其他呼叫者（AI 先審、下方文字框）一律 cleanText 轉純文字（曾經把 <p> 當文字寫進報告）。 */
+  after = isHtml ? cleanInline(stripUI(after)) : cleanText(after);
+  /* 抓回來的 HTML 一個行內標籤都沒有（最常見：那一段正顯示紅綠差異，本來就被 diffHtml 攤平成純文字）
+     → 退回純文字路徑，讓 setEdited 的 withInline 依 beforeHtml 把粗體／連結接回去，行為跟改版前一致。 */
+  if(isHtml && !/<(?!br\b)[a-z][^>]*>/i.test(after)){ after=htmlText(after); isHtml=false; }
   var t=tab(), idx=el.getAttribute('data-yeb'), before=el.textContent.replace(/✓ 認可$/,''); snap();
   var beforeHtml=el.innerHTML;
   var old=t.marks.find(function(x){return x.idx===idx});
   if(old){ before=old.before; beforeHtml=old.beforeHtml||beforeHtml; t.marks.splice(t.marks.indexOf(old),1); }   /* 同一段再改：before 維持最初原稿 */
-  if(after===before){ if(old){el.innerHTML=old.beforeHtml||esc(before);el.classList.remove('yeb-mark')} updPill(); saveSoon(); return; }
+  var afterTxt = isHtml ? htmlText(after) : after;
+  if(afterTxt===before){ if(old){el.innerHTML=old.beforeHtml||esc(before);el.classList.remove('yeb-mark')} updPill(); saveSoon(); return; }
   var m={id:'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), idx:idx, tag:el.tagName.toLowerCase(), before:before, beforeHtml:beforeHtml, after:after, approved:false, at:new Date().toISOString(), note:note||''};
-  t.marks.push(m); paintMark($('#ifE').contentDocument,m); updPill(); saveSoon();
+  if(isHtml)m.isHtml=true;
+  t.marks.push(m); paintMark($('#ifE').contentDocument,m); invalidateUnits(); updPill(); saveSoon();
 }
 
 /* ── B：匯入自動修 —— 不需要判斷的修正不經人（綠框、預設已認可、可退回）；禁用詞只標旗 ── */
@@ -807,7 +998,7 @@ function autofix(t, d){
 var RULE_MARK=null;
 function openRuleDlg(id){
   var t=tab(), m=t.marks.find(function(x){return x.id===id}); if(!m)return; RULE_MARK=m;
-  var dl=diff(m.before,m.after), from=dl.filter(function(x){return x[0]==='del'}).map(function(x){return x[1]}).join('').trim(), to=dl.filter(function(x){return x[0]==='ins'}).map(function(x){return x[1]}).join('').trim();
+  var dl=diff(m.before,afterText(m)), from=dl.filter(function(x){return x[0]==='del'}).map(function(x){return x[1]}).join('').trim(), to=dl.filter(function(x){return x[0]==='ins'}).map(function(x){return x[1]}).join('').trim();
   $('#rlType').value='replace'; $('#rlFrom').value=from; $('#rlTo').value=to; $('#rlWriting').value=(m.note||'').replace(/^(Claude：|AI審：)/,''); $('#rlNote').value='';
   $('#rlType').onchange(); $('#ruleDlg').classList.add('on');
 }
@@ -1042,27 +1233,42 @@ function cardUnits(chapter){
       cards.push({el:box,title:txt(h).slice(0,40),paras:textBlocks(box).length});
     });
     if(cards.length>=2){
+      /* 2026-09-16：這裡原本直接 return，於是 CARD_SEL 裡的 .rv-end（小結）這種
+         「沒有小標、卻是獨立區塊」的東西整條從沒被問過，永遠上不了樹。
+         改成：小標抓到的節留著，再補掃一次卡片，只收「不跟小標範圍重疊」的。
+         舊的節 key 一個字都不動（只會多出新的節），所以舊 moves[] 照樣對得上。 */
+      cards=cards.concat(scanCards(chapter, used));
       cards.sort(function(a,b){return a.el.compareDocumentPosition(b.el)&Node.DOCUMENT_POSITION_FOLLOWING?-1:1});
       return cards;
     }
     cards=[];   /* 只抓到一個＝這章沒有真正的小標，走原本的卡片判斷 */
   }
+  return scanCards(chapter, []);
+}
+/* 卡片掃描（原本寫在 cardUnits 裡）：CARD_SEL 候選 → 只取最外層 → 去掉 exclude 蓋住的範圍。
+   exclude＝小標已經圈走的節；補掃時傳進來，才不會跟小標那批重疊。 */
+function scanCards(chapter, exclude){
+  var cards=[], seen=[];
+  exclude=exclude||[];
+  function blocked(el){ return exclude.some(function(o){ return o===el||(o.contains&&o.contains(el))||(el.contains&&el.contains(o)) }); }
   chapter.nodes.forEach(function(root){
+    if(!root.querySelectorAll)return;
     var cands=[].slice.call(root.querySelectorAll(CARD_SEL));
     if(root.matches&&root.matches(CARD_SEL)&&root!==chapter.anchor)cands.unshift(root);
     cands.forEach(function(el){
       if(el.closest('nav'))return;
+      if(blocked(el))return;
       if(seen.some(function(o){return o!==el&&o.contains(el)}))return;   /* 只取最外層 */
       if(/(^|\s)(cards|grid)(\s|$)/.test(el.className||'')){ /* 純排版容器：拆成它的子卡片 */
-        [].forEach.call(el.children,function(c){ if(txt(c).length>=16&&!seen.some(function(o){return o.contains(c)})){seen.push(c)} }); return; }
+        [].forEach.call(el.children,function(c){ if(txt(c).length>=16&&!blocked(c)&&!seen.some(function(o){return o.contains(c)})){seen.push(c)} }); return; }
       if(txt(el).length<16)return; seen.push(el);
     });
   });
   /* 清單列不是節：同一個父元素下超過 12 個同類候選，整個父元素收成一個節（台股籌碼表一列一個 .item） */
   (function(){ var groups={}; seen.forEach(function(el){ var k=(el.parentElement?el.parentElement.tagName+'#'+(el.parentElement.id||'')+'.'+(el.parentElement.className||''):'')+'|'+(el.className||el.tagName); (groups[k]=groups[k]||[]).push(el); });
-    var replaced=[]; Object.keys(groups).forEach(function(k){ var g=groups[k]; if(g.length>12){ var par=g[0].parentElement; g.forEach(function(el){seen.splice(seen.indexOf(el),1)}); if(par&&replaced.indexOf(par)<0&&!seen.some(function(o){return o===par||o.contains(par)})){replaced.push(par);seen.push(par);} } });
+    var replaced=[]; Object.keys(groups).forEach(function(k){ var g=groups[k]; if(g.length>12){ var par=g[0].parentElement; g.forEach(function(el){seen.splice(seen.indexOf(el),1)}); if(par&&!blocked(par)&&replaced.indexOf(par)<0&&!seen.some(function(o){return o===par||o.contains(par)})){replaced.push(par);seen.push(par);} } });
   })();
-  if(!seen.length){   /* 沒有卡片的章（簡報這種扁平版面）：用章裡「最外層的文字區塊」當節 */
+  if(!seen.length&&!exclude.length){   /* 沒有卡片的章（簡報這種扁平版面）：用章裡「最外層的文字區塊」當節 */
     chapter.nodes.forEach(function(root){ [].forEach.call(root.children,function(c){ if(c===chapter.anchor||c.closest('nav'))return; if(txt(c).length>=16&&!(c.matches&&c.matches(CH_TITLE_SEL)))seen.push(c); }); });
   }
   seen.forEach(function(el){
@@ -1086,6 +1292,7 @@ function partLabel(el){
   if(tag==='ul'||tag==='ol'){ return '清單｜'+t.slice(0,22)+'（'+el.children.length+' 項）'; }
   return kind+'｜'+t.slice(0,26);
 }
+var PART_MAX=200, PART_TRUNC=[];   /* 上限與「被截掉幾個」的紀錄（畫布會把它寫出來） */
 function partUnits(sec){
   var out=[], seen=[];
   if(!sec||!sec.querySelectorAll)return out;
@@ -1096,30 +1303,108 @@ function partUnits(sec){
     seen.push(el);
   });
   if(!seen.length){   /* 這個節本身就是一張表／一段長內容：改用它的直接子區塊當第三層 */
-    [].forEach.call(sec.children,function(c){ if(txt(c).length>=16&&seen.length<12)seen.push(c); });
+    [].forEach.call(sec.children,function(c){ if(txt(c).length>=16&&seen.length<PART_MAX)seen.push(c); });
   }
-  seen.slice(0,12).forEach(function(el){ out.push({el:el,title:partLabel(el),paras:textBlocks(el).length}); });
+  /* 2026-09-16：原本寫死 slice(0,12)，第 13 個以後靜默吞掉——那些塊在左邊看不到、也刪不掉。
+     上限拉到 200；真的截斷時一定要出聲（console.warn ＋ 畫布上寫「還有 N 個未列出」）。 */
+  if(seen.length>PART_MAX){
+    var _cut=seen.length-PART_MAX;
+    try{console.warn('[yeb] partUnits 截斷：這個節有 '+seen.length+' 個區塊，只列前 '+PART_MAX+' 個，還有 '+_cut+' 個未列出', sec)}catch(e){}
+    PART_TRUNC.push(_cut);
+  }
+  seen.slice(0,PART_MAX).forEach(function(el){ out.push({el:el,title:partLabel(el),paras:textBlocks(el).length}); });
   return out;
 }
+/* 2026-09-16 unitsOf 加快取：加了第四層「段」之後節點數是原本的 20 倍，
+   echoLeft 每點一次就重算整棵樹（改動前實測 ~72ms）撐不住。
+   快取掛在 document 自己身上（匯出端是另一份 DOMParser 文件，不會互相污染），
+   三道失效機制：① 動到 DOM 的函式直接呼叫 invalidateUnits ② 元素總數變了
+   ③ MutationObserver（報告自己的 JS 動了 DOM 也算）。 */
+function invalidateUnits(d){
+  try{ if(d){ d.__yebU=null; return; } }catch(e){}
+  try{ var f=(typeof $==='function')&&$('#ifE'); if(f&&f.contentDocument)f.contentDocument.__yebU=null; }catch(e){}
+}
 function unitsOf(d){
-  var units=[], dup={};
+  var n=-1; try{ n=d.body.getElementsByTagName('*').length; }catch(e){}
+  try{ var c=d.__yebU; if(c&&c.n===n)return c.units; }catch(e){}
+  var units=buildUnits(d);
+  try{ d.__yebU={n:n, units:units};
+       if(!d.__yebMO&&d.defaultView&&d.defaultView.MutationObserver){
+         d.__yebMO=new d.defaultView.MutationObserver(function(){ try{d.__yebU=null}catch(e){} });
+         d.__yebMO.observe(d.body,{childList:true,subtree:true,characterData:true});
+       } }catch(e){}
+  return units;
+}
+function segLabel(el){ var s=txt(el); return s.length>20 ? s.slice(0,20)+'…' : s; }
+/* 元素 → 單位 的索引（跟 units 一起快取）。有了它，「這一段屬於哪個章／節／塊／段」
+   是往上走幾層就查到，不用把上千個單位全掃一遍問 contains()。 */
+function unitIndex(d){
+  var units=unitsOf(d), c=null;
+  try{ c=d.__yebU; }catch(e){}
+  if(c&&c.idx&&c.idx.units===units)return c.idx;
+  var map=new Map(), by={};
+  units.forEach(function(u){ by[u.key]=u;
+    (u.nodes||[]).forEach(function(n){ if(!n||n.nodeType!==1)return; var p=map.get(n); if(!p||u.level>=p.level)map.set(n,u); }); });
+  var idx={map:map, by:by, units:units};
+  try{ if(c)c.idx=idx; }catch(e){}
+  return idx;
+}
+var OWN_RUN=0;
+function buildUnits(d){
+  var units=[], dup={}, owner=[], ownerKey=[];
+  PART_TRUNC=[];
+  function own(el,key){ if(el&&el.nodeType===1){ owner.push(el); ownerKey.push(key); } }
   chapterUnits(d).forEach(function(ch){
     var base='章:'+ch.title.slice(0,30), k=base+':'+(dup[base]=(dup[base]||0)+1);
     var snippet=ch.nodes.map(txt).join(' ').slice(ch.title.length, ch.title.length+600);
     var u={key:k,level:1,title:ch.title,nodes:ch.nodes,cont:ch.nodes.length===1?ch.nodes[0]:null,anchor:ch.anchor,snippet:snippet,parent:null,paras:0};
-    units.push(u);
+    units.push(u); ch.nodes.forEach(function(nd){own(nd,k)});
     var d2={};
     cardUnits(ch).forEach(function(c){
       var b2=k+'>節:'+c.title.slice(0,30), k2=b2+':'+(d2[b2]=(d2[b2]||0)+1);
       units.push({key:k2,level:2,title:c.title,nodes:[c.el],cont:c.el,anchor:c.el,snippet:txt(c.el).slice(c.title.length,c.title.length+500),parent:k,paras:c.paras});
+      own(c.el,k2);
       var d3={};
       partUnits(c.el).forEach(function(pt){
         var b3=k2+'>塊:'+pt.title.slice(0,26), k3=b3+':'+(d3[b3]=(d3[b3]||0)+1);
         units.push({key:k3,level:3,title:pt.title,nodes:[pt.el],cont:pt.el,anchor:pt.el,snippet:txt(pt.el).slice(0,300),parent:k2,paras:pt.paras});
+        own(pt.el,k3);
       });
     });
     u.paras=ch.nodes.reduce(function(a,nd){return a+(nd.querySelectorAll?textBlocks(nd).length:0)},0);
   });
+  /* ── 第四層「段」（2026-09-16，Yoda：「左邊的架構沒有精準顯示每一個段落，害我不能整段刪除」）
+     報告裡每一個 [data-yeb] 都要有自己的節點，才點得到、刪得掉。
+     掛法：往上找最近的「已經是某個單位容器」的祖先（塊 → 節 → 章），掛在它底下；
+     元素自己就是某個單位的容器（例如整張表就是一個塊）＝它已經有節點，不重複發。
+     這一層是「附加」的：章／節／塊三層的 key 產生規則一個字都沒動，舊 moves[] 照樣對得上。 */
+  var mk='__yebOwn'+(++OWN_RUN), i;
+  for(i=0;i<owner.length;i++){ try{ owner[i][mk]=ownerKey[i]; }catch(e){} }
+  var segs={}, d4={}, orphan=[];
+  [].forEach.call(d.querySelectorAll('[data-yeb]'),function(el){
+    if(el[mk]!=null)return;                        /* 自己就是章／節／塊，已經有節點了 */
+    var p=el.parentElement, host=null;
+    while(p){ if(p[mk]!=null){ host=p[mk]; break; } p=p.parentElement; }
+    var lbl=segLabel(el); if(!lbl)return;          /* 空白段不列 */
+    if(host==null){ orphan.push(el); return; }     /* 掛在所有章外面的（頁尾、警語）：最後統一收容 */
+    var b4=host+'>段:'+lbl.slice(0,20), k4=b4+':'+(d4[b4]=(d4[b4]||0)+1);
+    (segs[host]=segs[host]||[]).push({key:k4,level:4,title:lbl,nodes:[el],cont:el,anchor:el,snippet:txt(el).slice(0,200),parent:host,paras:0});
+  });
+  /* 收容所：頁尾版權列、身分揭露警語這些「不屬於任何章」的東西，以前在左邊完全看不到、
+     也刪不掉。給它們一個章當家，覆蓋率才是真的 100%。只在真的有孤兒時才出現，
+     而且是全新的 key，一個舊 key 都沒動到。 */
+  if(orphan.length){
+    var outer=orphan.filter(function(el){ return !orphan.some(function(o){return o!==el&&o.contains(el)}) });
+    var ko='章:（不屬於任何章節）:'+(dup['章:（不屬於任何章節）']=(dup['章:（不屬於任何章節）']||0)+1);
+    units.push({key:ko,level:1,title:'（不屬於任何章節）頁首／頁尾／警語',nodes:outer,cont:outer.length===1?outer[0]:null,
+                anchor:outer[0],snippet:txt(outer[0]).slice(0,300),parent:null,paras:orphan.length});
+    orphan.forEach(function(el){
+      var lb=segLabel(el), b=ko+'>段:'+lb.slice(0,20), k=b+':'+(d4[b]=(d4[b]||0)+1);
+      (segs[ko]=segs[ko]||[]).push({key:k,level:4,title:lb,nodes:[el],cont:el,anchor:el,snippet:txt(el).slice(0,200),parent:ko,paras:0});
+    });
+  }
+  for(i=0;i<owner.length;i++){ try{ delete owner[i][mk]; }catch(e){} }
+  Object.keys(segs).forEach(function(h){ segs[h].forEach(function(s){units.push(s)}) });
   return units;
 }
 function treeOf(units){ var root={children:[],level:0}, by={}; units.forEach(function(u){u.children=[];by[u.key]=u});
@@ -1129,6 +1414,7 @@ function moveUnit(d,u,target,pos){   /* 把 u 的節點整批搬到 target 的�
   var par=ref.parentNode; if(!par)return false;
   if(pos==='before'){ u.nodes.forEach(function(x){par.insertBefore(x,ref)}); }
   else { var after=ref.nextSibling; u.nodes.forEach(function(x){par.insertBefore(x,after)}); }
+  invalidateUnits(d);
   return true;
 }
 function removeUnit(d,u){   /* 整批移除節點；連指向它的連結也一起清，不留死連結 */
@@ -1144,6 +1430,7 @@ function removeUnit(d,u){   /* 整批移除節點；連指向它的連結也一�
       if(box&&box.parentNode&&!txt(box)&&!box.querySelector('a,button,img,svg'))box.parentNode.removeChild(box);
     });
   });
+  invalidateUnits(d);
   return true;
 }
 function refMentions(d,title){
@@ -1158,39 +1445,89 @@ function flashRefs(d,els){
   els.forEach(function(el){ el.classList.add('yeb-flash'); setTimeout(function(){el.classList.remove('yeb-flash')},2600); });
   if(els.length){ try{ scrollInto($('#ifE').contentWindow, els[0]); }catch(e){} }
 }
-function replayMoves(d,moves){ (moves||[]).forEach(function(m){ var us=unitsOf(d), by={}; us.forEach(function(u){by[u.key]=u}); var u=by[m.key]; if(!u)return;
-  if(m.pos==='del'){ removeUnit(d,u); return; }
-  var t=by[m.target]; if(t&&u!==t)moveUnit(d,u,t,m.pos); }); }
+/* 2026-09-16：找不到對應的 key 原本是靜默跳過——結構規則一改，搬動／刪除就無聲失效，
+   畫面看起來對、匯出卻是錯的。現在一律記下來，由 warnReplay 出紅字。 */
+function replayMoves(d,moves){ var miss=[];
+  (moves||[]).forEach(function(m){ var us=unitsOf(d), by={}; us.forEach(function(u){by[u.key]=u}); var u=by[m.key];
+    if(!u){ miss.push(m.key); try{console.warn('[yeb] 結構對不上：找不到要'+(m.pos==='del'?'刪除':'搬動')+'的節點 key='+m.key, m)}catch(e){} return; }
+    if(m.pos==='del'){ removeUnit(d,u); return; }
+    var t=by[m.target];
+    if(!t){ miss.push(m.target); try{console.warn('[yeb] 結構對不上：找不到搬動的目標 key='+m.target, m)}catch(e){} return; }
+    if(u!==t)moveUnit(d,u,t,m.pos); });
+  return miss; }
+function warnReplay(where, missMoves, missDels){
+  var n=(missMoves?missMoves.length:0)+(missDels||0);
+  if(!n)return 0;
+  try{console.warn('[yeb] '+where+'：'+n+' 筆搬動／刪除對不上',{moves:missMoves,dels:missDels})}catch(e){}
+  try{toast('⚠ '+where+'：結構已更新，有 '+n+' 筆搬動／刪除對不上，請按「重設結構」重做',true)}catch(e){}
+  return n; }
 function reorderTo(d,keys){ var us=unitsOf(d), by={}; us.forEach(function(u){by[u.key]=u}); var prev=null;
   keys.forEach(function(k){ var u=by[k]; if(!u)return; if(prev){ moveUnit(d,u,prev,'after'); us=unitsOf(d); by={}; us.forEach(function(x){by[x.key]=x}); u=by[k]; } prev=u; }); }
-var DRAG=null;
+var DRAG=null, CV_BY={}, CV_T=null, CV_MOVED={};
+var LVNAME={1:'章',2:'節',3:'塊',4:'段'};
+/* 一個節點的 HTML。第四層「段」不跟著一起吐出來：一份報告上千段，
+   全塞進 innerHTML 會整個卡住。段一律收在 <ul class="segs"> 裡，按「＋N 段」才 render。 */
+function cvLi(u){
+  var t=CV_T||{}, g=(t.gists||{})[u.key];
+  var kids=u.children.filter(function(c){return c.level!==4}), segs=u.children.filter(function(c){return c.level===4});
+  return '<li class="cnode lv'+u.level+(CV_MOVED[u.key]?' moved':'')+'" data-key="'+esc(u.key)+'"'+(u.level===4?'':' draggable="true"')+'>'
+    +'<div class="row"><span class="lv">'+LVNAME[u.level]+'</span>'
+    +'<div style="min-width:0;flex:1"><div class="ttl">'+esc(u.title)+'</div>'
+    +(g?'<div class="gist">'+esc(g)+'</div>':'')
+    +'<div class="meta">'+(u.level===1?(kids.length+' 節 · '):'')+(u.paras?u.paras+' 段':'')+'</div></div>'
+    +(kids.length?'<span class="tg" title="收合／展開">▾ '+kids.length+'</span>':'')
+    +(segs.length?'<span class="sg" data-n="'+segs.length+'" title="把這裡的每一段列出來，可以單獨點、單獨刪">＋'+segs.length+' 段</span>':'')
+    +'<span class="cx" title="從報告裡刪掉這個區塊（可復原）">✕</span></div>'
+    +(kids.length?'<ul>'+kids.map(function(c){return cvLi(c)}).join('')+'</ul>':'')
+    +(segs.length?'<ul class="segs"></ul>':'')
+    +'</li>';
+}
+/* 把某個節點的「段」展開（需要時才 render，並把事件綁上去）*/
+function openSegs(key){
+  var host=$('#cv'), node=host&&host.querySelector('.cnode[data-key="'+String(key).replace(/"/g,'\\"')+'"]');
+  if(!node)return null;
+  var ul=node.querySelector(':scope > ul.segs'); if(!ul)return node;
+  if(!ul.childElementCount){
+    var u=CV_BY[key]; if(!u)return node;
+    ul.innerHTML=u.children.filter(function(c){return c.level===4}).map(function(c){return cvLi(c)}).join('');
+    ul.querySelectorAll('.cnode').forEach(bindNode);
+  }
+  ul.classList.add('on');
+  var sg=node.querySelector(':scope > .row > .sg'); if(sg)sg.textContent='－收起 '+ul.childElementCount+' 段';
+  return node;
+}
+function bindNode(el){
+  var host=$('#cv');
+  el.addEventListener('dragstart',function(ev){ if(ev.target.closest('.cnode')!==el)return; DRAG=el.dataset.key; el.classList.add('drag'); ev.dataTransfer.effectAllowed='move'; try{ev.dataTransfer.setData('text/plain',DRAG)}catch(e){} ev.stopPropagation(); });
+  el.addEventListener('dragend',function(){ el.classList.remove('drag'); host.querySelectorAll('.over-before,.over-after').forEach(function(x){x.classList.remove('over-before','over-after')}); DRAG=null; });
+  el.addEventListener('dragover',function(ev){ if(!DRAG||DRAG===el.dataset.key||el.closest('[data-key="'+DRAG+'"]'))return; ev.preventDefault(); ev.stopPropagation();
+    var r=el.querySelector('.row').getBoundingClientRect(), before=ev.clientY < r.top + r.height/2;
+    host.querySelectorAll('.over-before,.over-after').forEach(function(x){x.classList.remove('over-before','over-after')}); el.classList.add(before?'over-before':'over-after'); });
+  el.addEventListener('drop',function(ev){ if(!DRAG)return; ev.preventDefault(); ev.stopPropagation();
+    var r=el.querySelector('.row').getBoundingClientRect(), pos=ev.clientY < r.top + r.height/2 ? 'before':'after';
+    doMove(DRAG, el.dataset.key, pos); });
+  var tg=el.querySelector(':scope > .row > .tg'); if(tg)tg.onclick=function(ev){ev.stopPropagation(); el.classList.toggle('collapsed'); updCollapseBtn()};
+  var sg=el.querySelector(':scope > .row > .sg'); if(sg)sg.onclick=function(ev){ ev.stopPropagation();
+    var ul=el.querySelector(':scope > ul.segs');
+    if(ul&&ul.classList.contains('on')){ ul.classList.remove('on'); sg.textContent='＋'+(sg.dataset.n||ul.childElementCount)+' 段'; return; }
+    openSegs(el.dataset.key); };
+  el.querySelector(':scope > .row').addEventListener('click',function(ev){ if(ev.target.closest('.tg,.cx,.sg'))return; ev.stopPropagation(); jumpTo(el.dataset.key); });
+  var cx=el.querySelector(':scope > .row > .cx'); if(cx)cx.onclick=function(ev){ev.stopPropagation(); ev.preventDefault(); doDelete(el.dataset.key)};
+}
 function renderCanvas(){
   var t=tab(), host=$('#cv'); if(!t||!t.orig){host.innerHTML='<div class="empty2">先匯入一份報告</div>';$('#cvStat').textContent='';return}
   var dE=$('#ifE')&&$('#ifE').contentDocument; if(!dE||!dE.body){host.innerHTML='<div class="empty2">報告載入中…</div>';return}
   var units=unitsOf(dE), root=treeOf(units), movedKeys={}; (t.moves||[]).forEach(function(m){if(m.pos!=='del')movedKeys[m.key]=1});
   var dels=(t.moves||[]).filter(function(m){return m.pos==='del'});
-  var LV={1:'章',2:'節',3:'塊'};
-  function li(u){ var g=(t.gists||{})[u.key];
-    return '<li class="cnode lv'+u.level+(movedKeys[u.key]?' moved':'')+'" data-key="'+esc(u.key)+'" draggable="true"><div class="row"><span class="lv">'+LV[u.level]+'</span><div style="min-width:0;flex:1"><div class="ttl">'+esc(u.title)+'</div>'+(g?'<div class="gist">'+esc(g)+'</div>':'')+'<div class="meta">'+(u.level===1?(u.children.length+' 節 · '):'')+(u.paras?u.paras+' 段':'')+'</div></div>'+(u.children.length?'<span class="tg" title="收合／展開">▾ '+u.children.length+'</span>':'')+'<span class="cx" title="從報告裡刪掉這個區塊（可復原）">✕</span></div>'+(u.children.length?'<ul>'+u.children.map(li).join('')+'</ul>':'')+'</li>'; }
-  host.innerHTML=root.children.length?'<ul>'+root.children.map(li).join('')+'</ul>':'<div class="empty2">這份報告抓不到章節（沒有 nav、.section、#sec-*、h1/h2）</div>';
-  var n1=units.filter(function(u){return u.level===1}).length,
-      n2=units.filter(function(u){return u.level===2}).length,
-      n3=units.filter(function(u){return u.level===3}).length;
-  $('#cvStat').textContent='章 '+n1+' · 節 '+n2+' · 塊 '+n3+' · 已搬動 '+Object.keys(movedKeys).length+(dels.length?' · 已刪除 '+dels.length:'')+(Object.keys(t.gists||{}).length?' · 脈絡 '+Object.keys(t.gists).length:'');
+  CV_T=t; CV_MOVED=movedKeys; CV_BY={}; units.forEach(function(u){CV_BY[u.key]=u});
+  var trunc=PART_TRUNC.reduce(function(a,b){return a+b},0);
+  host.innerHTML=(trunc?'<div class="cvwarn">⚠ 有 '+PART_TRUNC.length+' 個節的區塊數超過上限（'+PART_MAX+'），還有 '+trunc+' 個未列出（詳見 console）</div>':'')
+    +(root.children.length?'<ul>'+root.children.map(function(c){return cvLi(c)}).join('')+'</ul>':'<div class="empty2">這份報告抓不到章節（沒有 nav、.section、#sec-*、h1/h2）</div>');
+  var n1=0,n2=0,n3=0,n4=0;
+  units.forEach(function(u){ if(u.level===1)n1++; else if(u.level===2)n2++; else if(u.level===3)n3++; else n4++; });
+  $('#cvStat').textContent='章 '+n1+' · 節 '+n2+' · 塊 '+n3+' · 段 '+n4+' · 已搬動 '+Object.keys(movedKeys).length+(dels.length?' · 已刪除 '+dels.length:'')+(Object.keys(t.gists||{}).length?' · 脈絡 '+Object.keys(t.gists).length:'');
   $('#cvStat').title=dels.length?'已刪除（按「復原」或「重設結構」可找回）：'+dels.map(function(m){return m.title||m.key}).join('、'):'';
-  host.querySelectorAll('.cnode').forEach(function(el){
-    el.addEventListener('dragstart',function(ev){ if(ev.target.closest('.cnode')!==el)return; DRAG=el.dataset.key; el.classList.add('drag'); ev.dataTransfer.effectAllowed='move'; try{ev.dataTransfer.setData('text/plain',DRAG)}catch(e){} ev.stopPropagation(); });
-    el.addEventListener('dragend',function(){ el.classList.remove('drag'); host.querySelectorAll('.over-before,.over-after').forEach(function(x){x.classList.remove('over-before','over-after')}); DRAG=null; });
-    el.addEventListener('dragover',function(ev){ if(!DRAG||DRAG===el.dataset.key||el.closest('[data-key="'+DRAG+'"]'))return; ev.preventDefault(); ev.stopPropagation();
-      var r=el.querySelector('.row').getBoundingClientRect(), before=ev.clientY < r.top + r.height/2;
-      host.querySelectorAll('.over-before,.over-after').forEach(function(x){x.classList.remove('over-before','over-after')}); el.classList.add(before?'over-before':'over-after'); });
-    el.addEventListener('drop',function(ev){ if(!DRAG)return; ev.preventDefault(); ev.stopPropagation();
-      var r=el.querySelector('.row').getBoundingClientRect(), pos=ev.clientY < r.top + r.height/2 ? 'before':'after';
-      doMove(DRAG, el.dataset.key, pos); });
-    var tg=el.querySelector(':scope > .row > .tg'); if(tg)tg.onclick=function(ev){ev.stopPropagation(); el.classList.toggle('collapsed'); updCollapseBtn()};
-    el.querySelector(':scope > .row').addEventListener('click',function(ev){ if(ev.target.closest('.tg,.cx'))return; ev.stopPropagation(); jumpTo(el.dataset.key); });
-    var cx=el.querySelector(':scope > .row > .cx'); if(cx)cx.onclick=function(ev){ev.stopPropagation(); ev.preventDefault(); doDelete(el.dataset.key)};
-  });
+  host.querySelectorAll('.cnode').forEach(bindNode);
 }
 /* 選取一個區塊：右上角浮出「擴大／刪除」，刪的就是框起來的那一塊 */
 var SEL_EL=null, SELX=null, SEL_LIST=[];   /* SEL_LIST＝目前選取的全部區塊；SEL_EL＝最後點的那個（浮動列貼著它） */
@@ -1206,7 +1543,7 @@ function byPath(d,path){
 }
 function hideSel(){
   SEL_LIST.forEach(function(x){ if(x&&x.classList)x.classList.remove('yeb-sel') });
-  SEL_LIST=[]; SEL_EL=null; if(SELX)SELX.classList.remove('on');
+  SEL_LIST=[]; SEL_EL=null; if(SELX){ SELX.classList.remove('on'); try{ placeAllActs(SELX.ownerDocument) }catch(e){} }
 }
 function selCount(){ return SEL_LIST.length; }
 function pendMark(){   /* 目前這一塊有沒有「還沒認可」的標記 */
@@ -1236,9 +1573,15 @@ function updSelBtn(){
 }
 function placeSel(){
   if(!SEL_EL||!SELX)return;
-  var d=SEL_EL.ownerDocument, w=d.defaultView||{};
-  var r=SEL_EL.getBoundingClientRect(), vh=w.innerHeight||d.documentElement.clientHeight||0;
-  /* 視窗座標＋固定定位：報告內部有自己的捲動容器時也對得準。不做隱藏判斷，只把位置夾在畫面內 */
+  var tgt=INLINE_EL||SEL_EL;   /* 正在編輯就以被編輯的那一段為準 */
+  var d=tgt.ownerDocument, w=d.defaultView||{};
+  var r=tgt.getBoundingClientRect(), vh=w.innerHeight||d.documentElement.clientHeight||0;
+  var vwAll=w.innerWidth||d.documentElement.clientWidth||0;
+  /* 視窗座標＋固定定位：報告內部有自己的捲動容器時也對得準。
+     捲出畫面就收起來（2026-09-16）：以前只把位置夾在畫面內、從不隱藏，
+     於是只要有選取，這條列就永遠釘在畫面上蓋住底下的字。
+     這裡只動顯示、不動選取狀態（跟 hideSel 用同一個 class），捲回來自己會再出現。 */
+  if(vh&&vwAll&&(r.bottom<=0||r.top>=vh||r.right<=0||r.left>=vwAll)){ SELX.classList.remove('on'); return; }
   SELX.classList.add('on');
   var top=r.top-13; if(top<2)top=Math.min(r.bottom-26, r.top+6); if(vh&&top>vh-30)top=vh-30;
   SELX.style.top=Math.max(2,top)+'px';
@@ -1247,6 +1590,7 @@ function placeSel(){
   var left=r.right-bw;
   if(vw&&left+bw>vw-4)left=vw-4-bw;
   SELX.style.left=Math.max(4,left)+'px';
+  try{ placeAllActs(d) }catch(e){}   /* 選取列動了，認可鈕的閃避要重算 */
 }
 function selectBlock(el, add){
   if(!el)return; var d=el.ownerDocument;
@@ -1293,7 +1637,7 @@ function placeCaret(el, x, y){
   if(!r||!el.contains(r.startContainer))return;
   try{ var sel=w.getSelection(); sel.removeAllRanges(); sel.addRange(r); }catch(e){}
 }
-function startInline(el, x, y){
+function startInline(el, x, y, keepRange){   /* keepRange=true：呼叫端要自己還原 Range，這裡不准動游標 */
   if(!el||INLINE_EL===el)return;
   endInline(true);                      /* 換一段就先把上一段收好 */
   var d=el.ownerDocument;
@@ -1302,8 +1646,10 @@ function startInline(el, x, y){
   el.setAttribute('spellcheck','false');
   el.classList.add('yeb-editing');
   try{ el.focus({preventScroll:true}); }catch(e){ try{el.focus()}catch(e2){} }
-  placeCaret(el, x, y);
-  setTimeout(function(){ if(INLINE_EL===el)placeCaret(el, x, y); },0);   /* 有些情況要等 contenteditable 生效後再放一次 */
+  if(!keepRange){
+    placeCaret(el, x, y);
+    setTimeout(function(){ if(INLINE_EL===el)placeCaret(el, x, y); },0);   /* 有些情況要等 contenteditable 生效後再放一次 */
+  }
   if(!el.__yebBound){
     el.__yebBound=true;
     el.addEventListener('blur',function(){ if(INLINE_EL===el)endInline(true); });
@@ -1320,9 +1666,12 @@ function endInline(commit){
   INLINE_EL=null;
   el.removeAttribute('contenteditable'); el.classList.remove('yeb-editing');
   var txt=(el.innerText||el.textContent||'');
+  /* 取值改走 HTML：段內的 <b>／<span> 要活下來（2026-09-16）。
+     先 stripUI 剝掉工作台自己塞進 innerHTML 的認可鈕／註記／差異標記，再過行內白名單。 */
+  var html=cleanInline(stripUI(el.innerHTML));
   el.innerHTML=INLINE_HTML;             /* 一律先還原：要嘛取消，要嘛交給 applyEdit 重畫 */
   if(commit && txt.trim() && txt.replace(/\s+/g,' ').trim()!==INLINE_TEXT.replace(/\s+/g,' ').trim()){
-    applyEdit(el, txt, '就地編輯');
+    applyEdit(el, html, '就地編輯', true);
   }
   if(DK_EL===el)fillDock(el);   /* 在報告裡就地改完 → 下方文字框跟著更新，兩邊不會分岔 */
   updSelBtn(); placeSel();      /* 鈕換成「認可／退回」、寬度也變了，位置要重算，否則會停在舊位置 */
@@ -1351,7 +1700,9 @@ function delBlock(els){
       var dropped=(t.marks||[]).filter(function(m){return inside[m.idx]}).length;
       t.marks=(t.marks||[]).filter(function(m){return !inside[m.idx]});
       hideSel();
+      var _doc=list[0]&&list[0].ownerDocument;
       list.forEach(function(el){ if(el.parentNode)el.parentNode.removeChild(el); });
+      invalidateUnits(_doc);
       closeEd(); updPill(); renderCanvas(); saveSoon();
       toast('已刪掉 '+list.length+' 塊'+(dropped?'（含 '+dropped+' 處修改）':'')+' · 按「復原」可一次找回');
     });
@@ -1419,6 +1770,7 @@ function renumberChapters(d){
       var need=cur.some(function(c,ix){return c!==items[ix]});
       if(need){ items.forEach(function(x){par.appendChild(x)}); changed++; } }
   }
+  if(changed)invalidateUnits(d);
   return changed;
 }
 $('#cvNum').onclick=function(){
@@ -1441,6 +1793,7 @@ function emptyShells(d){
 function removeEmptyShells(d){
   var els=emptyShells(d), k=0;
   els.forEach(function(el){ if(el.parentNode){ el.parentNode.removeChild(el); k++; } });
+  if(k)invalidateUnits(d);
   return k;
 }
 $('#cvClean').onclick=function(){
@@ -1459,6 +1812,7 @@ $('#cvClean').onclick=function(){
     });
 };
 function replayBlockDels(d,list){
+  var miss=0, hit=0;
   (list||[]).forEach(function(a){
     var el=null;
     if(typeof a==='string'){ el=byPath(d,a); }
@@ -1467,8 +1821,11 @@ function replayBlockDels(d,list){
       for(var i=0;i<(a.up||0)&&el;i++)el=el.parentElement;
       if(!el&&a.path)el=byPath(d,a.path);
     } else if(a&&a.path){ el=byPath(d,a.path); }
-    if(el&&el.parentNode&&el!==d.body)el.parentNode.removeChild(el);
+    if(el&&el.parentNode&&el!==d.body){ el.parentNode.removeChild(el); hit++; }
+    else { miss++; try{console.warn('[yeb] 結構對不上：找不到要刪除的區塊',a)}catch(e){} }
   });
+  if(hit)invalidateUnits(d);
+  return miss;
 }
 
 /* 點右邊的段落 → 左邊跟著反應：架構模式選起它所屬的章／節；編輯模式左欄原稿同一段閃一下 */
@@ -1483,16 +1840,18 @@ function echoLeft(el){
       setTimeout(function(){o.classList.remove('yeb-flash')},1700); }
   }catch(e){}
   if(MODE!=='canvas')return;
-  var us=unitsOf($('#ifE').contentDocument), path=[];
-  us.forEach(function(u){ if(u.nodes.some(function(nd){return nd===el||(nd.contains&&nd.contains(el))}))path.push(u); });
-  path.sort(function(a,b){return a.level-b.level});
-  var hit=path[path.length-1];
+  var ix=unitIndex($('#ifE').contentDocument), path=[];
+  var hit=null, _x=el;
+  while(_x&&!hit){ hit=ix.map.get(_x)||null; _x=_x.parentElement; }
+  for(var _c=hit; _c; _c=(_c.parent?ix.by[_c.parent]:null))path.unshift(_c);
   var crumb=$('#cvCrumb');
   if(crumb){ crumb.innerHTML = path.length
       ? path.map(function(u){return '<b>'+esc(u.title.slice(0,26))+'</b>'}).join('<span class="sep">›</span>')
       : '這一塊不屬於任何章節（可能是頁首／頁尾或掛在章外面的內容）'; }
   if(!hit)return;
-  var cv=$('#cv'), node=cv.querySelector('.cnode[data-key="'+hit.key.replace(/"/g,'\\"')+'"]');
+  var cv=$('#cv');
+  if(hit.level===4&&hit.parent)openSegs(hit.parent);   /* 段是按需展開的，先叫出來才選得到 */
+  var node=cv.querySelector('.cnode[data-key="'+hit.key.replace(/"/g,'\\"')+'"]');
   cv.querySelectorAll('.cnode.sel,.cnode.pulse').forEach(function(x){x.classList.remove('sel','pulse')});
   if(!node)return;
   var p=node.parentElement;                       /* 收合起來的話先展開，不然選了也看不到 */
@@ -1505,7 +1864,7 @@ function echoLeft(el){
 
 /* 點左邊的章／節 → 右欄捲到那裡並閃一下 */
 function jumpTo(key){
-  var dE=$('#ifE').contentDocument, wE=$('#ifE').contentWindow, us=unitsOf(dE), u=us.filter(function(x){return x.key===key})[0]; if(!u)return;
+  var dE=$('#ifE').contentDocument, wE=$('#ifE').contentWindow, u=unitIndex(dE).by[key]; if(!u)return;
   document.querySelectorAll('#cv .cnode.sel').forEach(function(x){x.classList.remove('sel')}); var node=document.querySelector('#cv .cnode[data-key="'+key.replace(/"/g,'\\"')+'"]'); if(node)node.classList.add('sel');
   var target=u.anchor||u.nodes[0]; scrollInto(wE,target);
   dE.querySelectorAll('.yeb-flash').forEach(function(x){x.classList.remove('yeb-flash')}); void target.offsetWidth; target.classList.add('yeb-flash'); setTimeout(function(){target.classList.remove('yeb-flash')},1700);
@@ -1523,7 +1882,9 @@ function doMove(key,target,pos){
   scrollInto($('#ifE').contentWindow, u.anchor||u.nodes[0]);
 }
 function doDelete(key){
-  var t=tab(), dE=$('#ifE').contentDocument, us=unitsOf(dE), u=us.filter(function(x){return x.key===key})[0]; if(!u)return;
+  var t=tab(), dE=$('#ifE').contentDocument, us=unitsOf(dE), u=unitIndex(dE).by[key]; if(!u)return;
+  /* 段＝一個 [data-yeb]，走既有的 bdel 錨點機制（moves[] 的 pos:'del' 是整章／整節用的）*/
+  if(u.level===4){ delBlock([u.cont]); return; }
   var kids=us.filter(function(x){return x.parent===key}).length;
   ask('把這個'+(u.level===1?'章':'節')+'從報告裡刪掉？\n\n「'+u.title.slice(0,40)+'」'+(kids?'（連同底下 '+kids+' 節）':'')+'\n\n按「復原」可以找回。','刪掉')
     .then(function(y){ if(y)go(); });
@@ -1542,20 +1903,21 @@ function doDelete(key){
   if(refs.length)setTimeout(function(){flashRefs(dE,refs)},300);
   }
 }
-$('#cvReset').onclick=function(){ var t=tab(); if(!t||!(t.moves||[]).length)return;
+$('#cvReset').onclick=function(){ var t=tab(); if(!t||(!(t.moves||[]).length&&!(t.bdel||[]).length))return;
   ask('把章節順序與刪掉的區塊都還原成原稿？（文字修改不受影響）','還原').then(function(y){
-    if(!y)return; snap(); t.moves=[]; mountPanes(); saveSoon(); }); };
+    /* 對話框本來就說「刪掉的區塊都還原」，但以前只清 moves，bdel 刪掉的段永遠回不來（2026-09-16 補） */
+    if(!y)return; snap(); t.moves=[]; t.bdel=[]; mountPanes(); saveSoon(); }); };
 function updCollapseBtn(){ var b=$('#cvCollapse'), all=$('#cv').querySelectorAll('.cnode');
-  var anyClosed=[].some.call(all,function(e){return e.classList.contains('collapsed')&&e.querySelector(':scope>ul')});
+  var anyClosed=[].some.call(all,function(e){return e.classList.contains('collapsed')&&e.querySelector(':scope>ul:not(.segs)')});
   b.textContent=anyClosed?'全部展開':'全部收合'; }
 $('#cvCollapse').onclick=function(){   /* 只要還有收起來的，就一律展開；全開才收合。名稱與行為對得上 */
   var all=$('#cv').querySelectorAll('.cnode');
-  var anyClosed=[].some.call(all,function(e){return e.classList.contains('collapsed')&&e.querySelector(':scope>ul')});
-  all.forEach(function(e){ if(e.querySelector(':scope>ul'))e.classList.toggle('collapsed',!anyClosed) });
+  var anyClosed=[].some.call(all,function(e){return e.classList.contains('collapsed')&&e.querySelector(':scope>ul:not(.segs)')});
+  all.forEach(function(e){ if(e.querySelector(':scope>ul:not(.segs)'))e.classList.toggle('collapsed',!anyClosed) });
   updCollapseBtn(); };
 $('#cvAI').onclick=function(){
   var t=tab(); if(!t||!t.orig)return;
-  var us=unitsOf($('#ifE').contentDocument).slice(0,120); if(!us.length){toast('抓不到章節',1);return}
+  var us=unitsOf($('#ifE').contentDocument).filter(function(u){return u.level<=3}).slice(0,120); if(!us.length){toast('抓不到章節',1);return}
   $('#cvStat').textContent='Claude 讀 '+us.length+' 個節點中…'; $('#cvAI').disabled=true;
   api('POST',aiUrl(),{mode:'outline',doc:t.name,nodes:us.map(function(u){return {id:u.key,level:u.level,title:u.title,snippet:u.snippet}})})
    .then(function(j){ $('#cvAI').disabled=false; t.gists=Object.assign(t.gists||{},j.gists||{}); renderCanvas(); saveSoon(); toast('脈絡已寫上 '+Object.keys(j.gists||{}).length+' 個節點（'+(j.engine==='cli'?'本機 Claude':j.engine||'Claude')+'）'); })
@@ -1719,9 +2081,14 @@ function exportHtml(t, opts){
   d.querySelectorAll('script#yeb-marks').forEach(function(s){s.remove()});
   var _oldMark=d.getElementById('yeb-mark-css'); if(_oldMark)_oldMark.remove();   /* 每存一次就多一份 → 先清掉舊的（2026-09-07）*/
   var st=d.createElement('style'); st.id='yeb-mark-css'; st.textContent=MARK_CSS.split('.yeb-ok').join('.yeb-ok-x'); d.head.appendChild(st);
-  t.marks.forEach(function(m){var el=d.querySelector('[data-yeb="'+m.idx+'"]'); if(!el)return; setEdited(el, m.after, m.beforeHtml||el.innerHTML, m.id); if(!m.approved&&opts.keepMarks)el.classList.add('yeb-emark');});
+  var _xmiss=0;
+  t.marks.forEach(function(m){var el=d.querySelector('[data-yeb="'+m.idx+'"]');
+    if(!el){ _xmiss++; try{console.warn('[yeb] 匯出時找不到標記對應段落 idx='+m.idx,m)}catch(e){} return; }
+    setEdited(el, m.after, m.beforeHtml||el.innerHTML, m.id, m.isHtml); if(!m.approved&&opts.keepMarks)el.classList.add('yeb-emark');});
+  if(_xmiss){ try{toast('⚠ 匯出：有 '+_xmiss+' 處標記找不到對應段落，沒有寫進檔案',true)}catch(e){} }
   var origOrder=unitsOf(d).filter(function(u){return u.level<=2}).map(function(u){return u.key});
-  replayMoves(d, t.moves||[]); replayBlockDels(d, t.bdel||[]); if(t.clean)removeEmptyShells(d); if(t.autonum)renumberChapters(d);
+  var _rm=replayMoves(d, t.moves||[]), _rd=replayBlockDels(d, t.bdel||[]); warnReplay('匯出', _rm, _rd);
+  if(t.clean)removeEmptyShells(d); if(t.autonum)renumberChapters(d);
   d.querySelectorAll('[data-yeb]').forEach(function(e){e.removeAttribute('data-yeb')});
   /* 進度隨檔案走：把 marks 藏在檔尾，上傳回編輯器時原樣還原（複製到另一台電腦也能接著改） */
   if(opts.withStyle&&t.style){ var st=styleByName(t.style); if(st){ var old=d.getElementById('yoda-tokens'); if(old)old.remove();
