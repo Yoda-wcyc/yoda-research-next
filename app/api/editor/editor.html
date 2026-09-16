@@ -421,6 +421,67 @@ var EDIT_CSS='html,body,*{-webkit-user-select:text!important;user-select:text!im
       只解開編輯用的那份，匯出的報告照舊防複製。 */
 var HIDE_HINT='.tablet-hint{display:none!important}';   /* 手機提示遮罩在工作台裡只會擋路：左欄唯讀關不掉、又會被算進段落數 */
 var ORIG_CSS='body{user-select:text}'+HIDE_HINT;   /* 唯讀靠事件攔截（見 setupPanes），不用 pointer-events：那會讓滾輪捲不動內層容器 */
+/* ── 載進 iframe 前先解開報告母板的防拷貝鎖（只解這份副本，t.orig 原樣不動，所以存檔／匯出的檔照舊帶著鎖）── */
+var UNLOCK_JS='<scr'+'ipt>(function(){'+
+  'var LOCK={contextmenu:1,copy:1,cut:1,paste:1,selectstart:1,dragstart:1,beforecopy:1,beforecut:1};'+
+  'var AEL=EventTarget.prototype.addEventListener;'+
+  'EventTarget.prototype.addEventListener=function(t,f,o){'+
+    'if(LOCK[t])return;'+
+    'if(t===\'keydown\'||t===\'keypress\'||t===\'keyup\'){'+
+      'var g=function(e){'+
+        'try{ var n=e.target; if(n&&n.nodeType===3)n=n.parentElement;'+
+        ' if(n&&n.closest&&n.closest(\'[contenteditable="true"]\'))return; }catch(x){}'+
+        'return (typeof f===\'function\'?f:(f&&f.handleEvent)).apply(this,arguments); };'+
+      'return AEL.call(this,t,g,o);'+
+    '}'+
+    'return AEL.call(this,t,f,o);'+
+  '};'+
+  '[\'oncontextmenu\',\'oncopy\',\'oncut\',\'onpaste\',\'onselectstart\',\'ondragstart\'].forEach(function(k){'+
+    '[document,document.documentElement].forEach(function(o){'+
+      'try{Object.defineProperty(o,k,{set:function(){},get:function(){return null},configurable:true})}catch(e){}'+
+    '});'+
+  '});'+
+'})();<\/scr'+'ipt>';
+var UNLOCK_ATTR=/\s(?:oncontextmenu|onselectstart|oncopy|oncut|ondragstart)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
+function unlockHtml(html){
+  if(typeof html!=='string'||!html)return html;
+  var s=html.replace(UNLOCK_ATTR,'');
+  var m=s.match(/<head[^>]*>/i);
+  if(m){var i=s.indexOf(m[0])+m[0].length; return s.slice(0,i)+UNLOCK_JS+s.slice(i)}
+  var j=s.search(/<script\b/i);
+  if(j>=0) return s.slice(0,j)+UNLOCK_JS+s.slice(j);
+  return UNLOCK_JS+s;
+}
+
+/* ── 匯出前補上防拷貝鎖：母板原文照抄（template-key report.html 行 53 / 621-623）。
+   已經有鎖的（含母板舊寫法）一律原樣回傳，不會變兩份。 ── */
+var LOCK_CSS='body{-webkit-user-select:none;user-select:none}';
+var LOCK_JS="\n<scr"+"ipt id=\"yoda-copyguard\">\n"+
+  "document.addEventListener('contextmenu',function(e){e.preventDefault();return false;});\n"+
+  "document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&['c','a','u','s','p'].includes(e.key.toLowerCase())){e.preventDefault();}if(e.key==='F12'){e.preventDefault();}});\n"+
+  "document.addEventListener('copy',function(e){e.preventDefault();return false;});\n"+
+  "<\/scr"+"ipt>\n";
+function hasLock(html){   /* 專屬標記認得自己補的，特徵字串認得母板本來就有的那份 */
+  return /id=["']yoda-copyguard["']/.test(html)
+      || /addEventListener\(\s*['\"]contextmenu['\"]/.test(html)
+      || /contextmenu['\"]\s*,/.test(html)
+      || /\soncontextmenu\s*=/i.test(html);
+}
+function lockHtml(html){
+  if(typeof html!=='string'||!html)return html;
+  if(hasLock(html))return html;                      /* 冪等：不准加第二份 */
+  var s=html;
+  if(!/(^|[^-\w])user-select\s*:\s*none/i.test(s)){   /* 原檔沒鎖 CSS 才補，寫法照母板 */
+    var cssTag='<style id="yoda-copyguard-css">'+LOCK_CSS+'</style>\n';
+    var hc=s.match(/<\/head>/i);
+    if(hc){ var hi=s.indexOf(hc[0]); s=s.slice(0,hi)+cssTag+s.slice(hi); }
+    else { var ho=s.match(/<head[^>]*>/i);
+      if(ho){ var bi=s.indexOf(ho[0])+ho[0].length; s=s.slice(0,bi)+'\n'+cssTag+s.slice(bi); } else { s=cssTag+s; } }
+  }
+  var bc=s.match(/<\/body>/i);
+  if(bc){ var i=s.lastIndexOf(bc[0]); return s.slice(0,i)+LOCK_JS+s.slice(i); }
+  return s+LOCK_JS;
+}
 
 /* ── 字元級 diff（LCS），中文逐字、英數逐詞 ── */
 function tokens(s){return s.match(/[A-Za-z0-9_.%+\-]+|\s+|[\s\S]/g)||[]}
@@ -478,7 +539,7 @@ function mountPanes(){
   oh.innerHTML='';                    /* 原稿對照欄已取消：不再掛第二份 iframe，大報告少載一次 */
   eh.innerHTML='<iframe id="ifE" sandbox="allow-same-origin allow-scripts"></iframe>';
   var fE=$('#ifE');
-  fE.srcdoc=t.orig;
+  fE.srcdoc=unlockHtml(t.orig);   /* 載進來先解鎖；t.orig 不動，匯出依舊帶防拷貝 */
   fE.onload=function(){ setupPanes(); };
 }
 function setupPanes(){
@@ -1667,7 +1728,8 @@ function exportHtml(t, opts){
     var sty=d.createElement('style'); sty.id='yoda-tokens'; sty.setAttribute('data-style',t.style); sty.textContent=cssFor(d,st); d.head.appendChild(sty); } }
   if(opts.carry){ var keep=d.createElement('script'); keep.type='application/json'; keep.id='yeb-marks';
   keep.textContent=JSON.stringify({name:t.name,marks:t.marks,moves:t.moves||[],bdel:t.bdel||[],gists:t.gists||{},style:t.style||'',origOrder:origOrder}).split('</').join('<\\/'); d.body.appendChild(keep); }
-  return '<!doctype html>\n'+d.documentElement.outerHTML;
+  /* 從工作台出去的一律帶拷貝鎖（Yoda 2026-09-16）：原檔有就維持一份，沒有就補上 */
+  return lockHtml('<!doctype html>\n'+d.documentElement.outerHTML);
 }
 function downloadTab(t, opts, quiet){ if(!t||!t.orig)return; var html=exportHtml(t,opts);
   var fn=(t.name||'report')+'.edited.html';
