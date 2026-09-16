@@ -435,6 +435,11 @@ var MARK_CSS='.yeb-mark{position:relative;outline:2px solid rgba(255,80,80,.85);
     ③ 它仍然是被編輯元素 innerHTML 的子節點，UI_SEL 的 '.yeb-acts' 照舊剝得掉。 */
  '.yeb-acts{position:absolute;top:2px;right:2px;z-index:9999;display:flex;gap:6px;white-space:nowrap;max-width:100%}'+
  '.yeb-acts button{position:static!important;top:auto!important;right:auto!important}'+
+ /* 這一段被選取／正在就地編輯時，浮動選取列上已經有同樣的「認可／退回」——
+    自己這條 .yeb-acts 就先讓位，取消選取自然回來。
+    只藏 .yeb-acts 本身，.yeb-mark/.yeb-auto 的 padding-top:26px 保留空白條不動，版面才不會上下跳。
+    藏法用 CSS，DOM 結構原樣，stripUI()／UI_SEL 照舊剝得掉。 */
+ '.yeb-sel>.yeb-acts,.yeb-editing>.yeb-acts{display:none!important}'+
  '.yeb-ok{position:absolute;top:-10px;right:-10px;z-index:9999;font:700 11px/1 -apple-system,sans-serif;background:#1f7a4a;color:#fff;border:0;border-radius:11px;padding:4px 8px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.4)}'+
  '.yeb-ok:hover{background:#2a9a5f}'+
  '.yeb-no{position:absolute;top:-10px;right:64px;z-index:9999;font:700 11px/1 -apple-system,sans-serif;background:#5a2630;color:#ffbcbc;border:0;border-radius:11px;padding:4px 8px;cursor:pointer}'+
@@ -1623,6 +1628,7 @@ function selectBlock(el, add){
   /* 加選時，把被包住／包住別人的重複選取清掉，免得刪兩次 */
   if(add)SEL_LIST=SEL_LIST.filter(function(x){ return !(x.contains&&(x.contains(el)||el.contains(x))); });
   SEL_LIST.push(el); SEL_EL=el; el.classList.add('yeb-sel'); placeSel(); updSelBtn();
+  try{ placeAllActs(el.ownerDocument) }catch(e){}   /* 剛被取消選取的那幾段，認可鈕重新現身時要站對位置 */
 }
 var INLINE_EL=null, INLINE_HTML='', INLINE_TEXT='';
 function placeCaret(el, x, y){
