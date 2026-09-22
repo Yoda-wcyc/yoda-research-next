@@ -158,7 +158,13 @@
   var LADDER_ORDER = ['micro', 'xs', 'sm', 'note', 'body', 'lead', 'h3', 'h2', 'h1'];
   /* 歸類用的基準階梯固定不動（與 Python REF_LADDER 相同）：元素屬於哪一級由它決定，樣式只改那一級多大 */
   var REF_LADDER = { micro: 0.4, xs: 0.46, sm: 0.52, note: 0.6, body: 0.7, lead: 0.8, h3: 0.92, h2: 1.05, h1: 1.3 };
-  var SKIP_LH = /ascii|af-|dtree|pre|fig|svg|code|mono/i;
+  /* 2026-09-22 對齊 Python 正本（yoda_tokens.py 的 SKIP_LH）。
+     這裡本來就該是 \bpre\b，卻被寫成兩個退格字元（0x08）——
+     補丁腳本在非 raw 字串裡寫 \b，被當成跳脫字元吃掉的殘骸。
+     後果是 pre 等於從跳過清單裡消失（沒有任何選擇器含退格字元），
+     <pre> 那一批的行高本來不該被接管，雲端版卻一直在接管。
+     ⚠ 要改這一行請用 chr(92) 組反斜線，不要在字面量裡寫，會再壞一次。 */
+  var SKIP_LH = /ascii|af-|dtree|\bpre\b|fig|svg|code|mono/i;
   var SKIP_SEL = /^\s*(@|from|to|\d+%)|::?(before|after)\s*$/i;
   function mult(v, base) {
     v = String(v || '').trim(); var m;
