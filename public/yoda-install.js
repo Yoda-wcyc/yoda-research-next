@@ -20,12 +20,14 @@
   // 淺色＝body.light 或 html[data-theme=light](簡報是 html 停 dark、body 加 .light,也對得上),其餘算深色
   // 淺色 #596069(四種寫法都改);深色 #8a9bb0(.legal-disc 深色原本 #8a8f98 已及格,不動)
   // 舞台頁(全螢幕遊戲,免責在 .stage 後面、底下是會換的天色):加深色底框,圓角/內距同頁面卡片
+  // 頁尾 .ftr 裡的品牌字「Yoda Research」也掛 class="disc",但它是 inline color:var(--accent) 的品牌色、不是免責字:
+  // 用 :not([style*="accent"]) 排除,維持品牌藍(2026-09-26 審查:原本被 !important 蓋成灰色,49 頁)
   if(!document.getElementById('yoda-disc-override')){
     var ds=document.createElement('style');ds.id='yoda-disc-override';
-    var DL='body.light ',HL='html[data-theme="light"] ',DK='html:not([data-theme="light"]) body:not(.light) ';
+    var DL='body.light ',HL='html[data-theme="light"] ',DK='html:not([data-theme="light"]) body:not(.light) ',FD='.ftr .disc:not([style*="accent"])';
     ds.textContent=
-      [DL+'.legal-disc',HL+'.legal-disc',DL+'.ftr .disc',HL+'.ftr .disc',DL+'.disclaimer',HL+'.disclaimer',DL+'.disc-box',HL+'.disc-box'].join(',')+'{color:#596069!important}'+
-      [DK+'.ftr .disc',DK+'.disclaimer',DK+'.disc-box'].join(',')+'{color:#8a9bb0!important}'+
+      [DL+'.legal-disc',HL+'.legal-disc',DL+FD,HL+FD,DL+'.disclaimer',HL+'.disclaimer',DL+'.disc-box',HL+'.disc-box'].join(',')+'{color:#596069!important}'+
+      [DK+FD,DK+'.disclaimer',DK+'.disc-box'].join(',')+'{color:#8a9bb0!important}'+
       '.stage~.legal-disc{background:rgba(9,12,22,.78);color:#c3cad6!important;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);padding:30px 26px!important;border-radius:18px!important}';
     document.head.appendChild(ds);
   }
