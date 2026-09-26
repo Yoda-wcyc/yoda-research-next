@@ -16,6 +16,19 @@
     cs.textContent='.controls-bar .ctrl-btn.active{background:#fff!important;color:#1a1a1a!important;box-shadow:0 1px 3px rgba(0,0,0,.28)!important}';
     document.head.appendChild(cs);
   }
+  // 免責小字字色:統一管理(改這裡即全報告同步) — 2026-09-26 調深,淺/深色對比都 ≥4.5
+  // 淺色＝body.light 或 html[data-theme=light](簡報是 html 停 dark、body 加 .light,也對得上),其餘算深色
+  // 淺色 #596069(四種寫法都改);深色 #8a9bb0(.legal-disc 深色原本 #8a8f98 已及格,不動)
+  // 舞台頁(全螢幕遊戲,免責在 .stage 後面、底下是會換的天色):加深色底框,圓角/內距同頁面卡片
+  if(!document.getElementById('yoda-disc-override')){
+    var ds=document.createElement('style');ds.id='yoda-disc-override';
+    var DL='body.light ',HL='html[data-theme="light"] ',DK='html:not([data-theme="light"]) body:not(.light) ';
+    ds.textContent=
+      [DL+'.legal-disc',HL+'.legal-disc',DL+'.ftr .disc',HL+'.ftr .disc',DL+'.disclaimer',HL+'.disclaimer',DL+'.disc-box',HL+'.disc-box'].join(',')+'{color:#596069!important}'+
+      [DK+'.ftr .disc',DK+'.disclaimer',DK+'.disc-box'].join(',')+'{color:#8a9bb0!important}'+
+      '.stage~.legal-disc{background:rgba(9,12,22,.78);color:#c3cad6!important;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);padding:30px 26px!important;border-radius:18px!important}';
+    document.head.appendChild(ds);
+  }
   var CSS='https://yoda-research-next.vercel.app/yoda-btn.css';
   if(!document.querySelector('link[data-yoda-btn]')){
     var l=document.createElement('link');l.rel='stylesheet';l.href=CSS;l.setAttribute('data-yoda-btn','1');
