@@ -44,7 +44,7 @@ select,input[type=text]{background:#131a25;color:#c9d6e4;border:1px solid #26324
 .bar .pill b{color:#e6eef8}
 .bar .sp{flex:1}
 /* 雙欄 */
-.panes{flex:1;display:grid;grid-template-columns:var(--leftw,1fr) 6px 1fr;gap:0;min-height:0}
+.panes{flex:1;display:grid;grid-template-columns:var(--leftw,35%) 6px 1fr;gap:0;min-height:0}   /* 2026-09-26：樹不需要一半寬，預設 35／65，右邊預覽縮放倍率才不會太小 */
 .pane{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
 .split{cursor:col-resize;background:#1e2836}.split:hover,.split.on{background:#2f6fb5}
 body.layout-right .panes{grid-template-columns:1fr}
@@ -127,16 +127,16 @@ body.dragging iframe{pointer-events:none}
 .cnode.lv4>.row .lv{background:#20262f;color:#94a5b8;border-color:#2b323d}
 .cnode.lv4>.row .ttl{font-size:11.5px;color:#a8bacd;font-weight:400}
 .cnode.lv4>.row .meta{display:none}
-.cnode .sg{margin-left:auto;font:10px/1 ui-monospace,monospace;color:#7f93a8;background:#141c28;border:1px solid #243248;border-radius:4px;cursor:pointer;flex:0 0 auto;padding:3px 6px;margin-top:1px}
+.cnode .sg{margin-left:auto;font:10px/1 ui-monospace,monospace;color:#7f93a8;background:#141c28;border:1px solid #243248;border-radius:4px;cursor:pointer;flex:0 0 auto;padding:3px 6px}
 .cnode .sg:hover{color:#cfe0ff;border-color:#2f6fb5}
 .cnode .sg+.cx,.cnode .tg+.sg{margin-left:0}
 ul.segs{display:none;border-left:1px dashed #243248;margin-left:6px}
 ul.segs.on{display:block}
 .cvwarn{margin:6px 0;padding:6px 9px;border:1px solid #6a2430;background:#2a141a;color:#ffbcbc;border-radius:6px;font-size:11.5px;line-height:1.5}
-.cnode>.row{display:flex;align-items:flex-start;gap:8px;padding:7px 10px;cursor:grab}
+.cnode>.row{display:flex;align-items:center;gap:8px;padding:7px 10px;cursor:grab}
 .cnode>.row:active{cursor:grabbing}
-.cnode .lv{font:700 10px/1 ui-monospace,monospace;color:#5f7286;background:#131a25;border:1px solid #263242;border-radius:4px;padding:3px 5px;margin-top:2px;flex:0 0 auto}
-.cnode .ttl{font-weight:600;color:#e6eef8;line-height:1.4}
+.cnode .lv{font:700 10px/1 ui-monospace,monospace;color:#5f7286;background:#131a25;border:1px solid #263242;border-radius:4px;padding:3px 5px;flex:0 0 auto}
+.cnode .ttl{font-weight:600;color:#e6eef8;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}   /* 2026-09-26：標題吃滿整欄、單行，放不下才出「…」；完整文字在 title（滑鼠停留） */
 .cnode .gist{font-size:11.5px;color:#9fb3c8;line-height:1.5;margin-top:3px}
 .cnode .meta{font:10px/1 ui-monospace,monospace;color:#5f7286;margin-top:4px}
 .cnode .tg{margin-left:auto;font-size:11px;color:#5f7286;cursor:pointer;flex:0 0 auto;padding:2px 4px}
@@ -292,19 +292,37 @@ function saveRules(){ return fetch(rulesUrl(),{method:'POST',headers:{'Content-T
 var TABS=[], CUR=-1, tmrSave=null, SYNC_LOCK=false;
 var OFFLINE=(location.protocol==='file:')||/^(localhost|127\.0\.0\.1):8777$/.test(location.host);   /* 本機模式：雙擊開的檔，或本機伺服器供的頁（http://localhost:8777/workbench）——兩種開法行為要一樣 */
 var MODE='canvas';   /* 'canvas' | 'style' | 'output'（editor 步驟已取消，右欄照樣點了就能改） */
-var LAYOUT='split';  /* split 左右 | right 右側全幅 | fit 左右＋把報告整份縮進欄寬（報告多半固定 1200px 寬） */
+var LAYOUT='split';  /* split 左右 | right 右側全幅（縮放已不看 LAYOUT：fitFrames 一律用報告設計寬度排版再縮進欄寬） */
 function setLayout(l){ LAYOUT=l; document.body.classList.toggle('layout-right',l==='right');
   var seg=document.querySelectorAll('#layoutSeg button'); if(seg.length)seg.forEach(function(b){b.classList.toggle('on',b.dataset.l===l)});
   try{localStorage.setItem('yeb-layout',l)}catch(e){} setTimeout(fitFrames,50); }
+/* 2026-09-26（Yoda：「架構、排版都亂成一團」）：報告母板設計寬度是 1200（<meta name=viewport content=width=1200>），
+   但 iframe 不吃 viewport meta，右欄只有 700 多 px 時正文欄被擠到 300 多 px、整份跑版。
+   改成：iframe 一律用報告設計寬度排版，窗格比它窄就 transform:scale() 等比縮小塞進去（只縮不放大）。
+   以前這套只在 LAYOUT==='fit' 時才開；09-07 拿掉「版面」切換鈕、開場寫死 setLayout('split') 之後就永遠關著了
+   （當時停用的原因是切換鈕移除後怕人被鎖在單欄，不是縮放本身有問題）。
+   iframe 內部的座標系不受外層 transform 影響：點擊、游標、浮動列都在 iframe 裡算，照舊。 */
+var DESIGN_W=1200;
+function designWidth(f){
+  var dw=DESIGN_W;
+  try{ var d=f.contentDocument, m=d&&d.querySelector('meta[name=viewport]');
+       var mw=m?parseInt(((m.getAttribute('content')||'').match(/width\s*=\s*(\d+)/)||[])[1]||'0',10):0;
+       if(mw>=600&&mw<=2400)dw=mw; }catch(e){}
+  return dw;
+}
 function fitFrames(){
-  ['ifO','ifE'].forEach(function(id){ var f=$('#'+id); if(!f)return; var host=f.parentElement; f.style.cssText='';
-    if(LAYOUT!=='fit')return;
-    try{ var d=f.contentDocument; if(!d||!d.documentElement)return;
-      var docW=Math.max(d.documentElement.scrollWidth, d.body?d.body.scrollWidth:0, parseInt((((d.querySelector('meta[name=viewport]')||{}).content||'').match(/width=(\d+)/)||[])[1]||'0')||0);
-      var W=host.clientWidth, Hh=host.clientHeight; if(docW>W+2){ var k=W/docW;
-        f.style.cssText='flex:none;position:absolute;top:0;left:0;width:'+docW+'px;height:'+Math.round(Hh/k)+'px;transform:scale('+k+');transform-origin:0 0;border:0'; } }catch(e){} });
+  ['ifO','ifE'].forEach(function(id){ var f=$('#'+id); if(!f)return; var host=f.parentElement; if(!host)return;
+    var W=host.clientWidth, Hh=host.clientHeight; if(!W||!Hh)return;       /* 窗格被收起來（display:none）時不動它 */
+    var dw=designWidth(f), css='', k=1;
+    if(W<dw){ k=W/dw;
+      css='flex:none;position:absolute;top:0;left:0;width:'+dw+'px;height:'+(Hh/k).toFixed(2)+'px;transform:scale('+k.toFixed(5)+');transform-origin:0 0;border:0'; }
+    if(f.style.cssText!==css)f.style.cssText=css;
+    f.setAttribute('data-scale',k.toFixed(4)); });
 }
 window.addEventListener('resize',function(){setTimeout(fitFrames,50)});
+/* 窗格大小一變就重算：拖分隔線、下方文字框拉高拉低、切模式都會改到右欄尺寸，不只視窗 resize */
+try{ if(window.ResizeObserver){ var _fitRO=new ResizeObserver(function(){ fitFrames(); });
+  ['editHost','origHost'].forEach(function(id){ var h=document.getElementById(id); if(h)_fitRO.observe(h); }); } }catch(e){}
 /* 外層永遠釘在最上面：iframe 裡任何 scrollIntoView／focus 都可能把整頁往下捲，按鈕列就不見了 */
 window.addEventListener('scroll',function(){ if(window.scrollY||window.scrollX)window.scrollTo(0,0); },{passive:true});
 document.addEventListener('scroll',function(){ var e=document.scrollingElement||document.documentElement; if(e.scrollTop)e.scrollTop=0; },true);
@@ -348,7 +366,125 @@ function api(m,u,b,gz){
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 
 /* ── 段落編號規則（兩欄共用）：有直接文字的元素，依文件順序 ── */
-var SKIP={SCRIPT:1,STYLE:1,NOSCRIPT:1,TEXTAREA:1,BUTTON:1,SELECT:1,OPTION:1,SVG:1,CANVAS:1};
+/* 2026-09-22：原本這張表裡有一個 SVG:1，但它從來沒生效過——SVG 元素的 tagName
+   保留原始大小寫（'svg'、'text'），大寫鍵永遠對不上；而且 SKIP 只跳過元素自己、
+   不跳過子樹，就算攔到 <svg>，底下的 <text> 照樣會被編號。
+   查證後決定「不要修成會生效」：市場一分鐘的流程圖字就是 SVG <text>，
+   要能編就必須留著編號（見 startInline 的 SVG 分支）。改成明確列出真正要跳過的
+   SVG 節點——<svg> 自己（沒有直接文字，本來就進不來）與 <title>／<desc>
+   （無障礙 metadata，不是版面上的字）。CANVAS 是 HTML 元素，大寫鍵有效，原樣保留。 */
+var SKIP={SCRIPT:1,STYLE:1,NOSCRIPT:1,TEXTAREA:1,BUTTON:1,SELECT:1,OPTION:1,CANVAS:1};
+var SVGNS='http://www.w3.org/2000/svg';
+function isSvgNode(el){ return !!(el&&el.namespaceURI===SVGNS); }
+var SVG_SKIP={svg:1,title:1,desc:1,metadata:1};
+/* SVG 元素自己不能當 editing host（Chrome 不支援），但它的 HTML 祖先可以：
+   contenteditable 掛在 <div class="fm-stage"> 上、游標放進 <text> 的文字節點，就編得動了。
+   實測（2026-09-22，HeadlessChrome 153）：打字與 Backspace 都進得去，
+   <text> 底下仍然只有一個純文字節點，按 Enter 不會插入 <div>／<br>。 */
+function svgHostOf(el){
+  for(var p=el&&el.parentNode; p&&p.nodeType===1; p=p.parentNode){ if(!isSvgNode(p))return p; }
+  return null;
+}
+/* 2026-09-22：綁在報告 iframe 裡的 keydown 要繞過 UNLOCK_JS 的包裝。
+   UNLOCK_JS 為了讓報告母板的防拷貝鎖失效，覆寫了 iframe 那個 realm 的
+   EventTarget.prototype.addEventListener：凡是 keydown／keypress／keyup，
+   只要事件落在 [contenteditable="true"] 裡面就直接 return、不呼叫 handler。
+   本意是擋報告自己那支「Ctrl+C/A/U/S/P 一律 preventDefault」的鎖，
+   但工作台自己的 Esc／Ctrl+Enter 也是綁在 iframe 元素上的 keydown——
+   於是就地編輯中那兩個快捷鍵從來沒有生效過（實測：一般段落與圖裡的字都一樣，
+   探針收到 0 個 keydown，toast 停在「就地編輯中」、改動要點別處才套得進去）。
+   解法：改用**工作台自己這個 realm** 的 addEventListener 去綁——同一份底層實作，
+   只是沒有被覆寫。UNLOCK_JS 對報告自己的腳本照舊有效，語意一點都沒動到。 */
+function addEvt(el, type, fn, opt){
+  try{ return EventTarget.prototype.addEventListener.call(el, type, fn, opt); }
+  catch(e){ return el.addEventListener(type, fn, opt); }
+}
+function caretInside(el){
+  try{ var s=el.ownerDocument.getSelection(); if(!s||!s.rangeCount)return false;
+       var n=s.anchorNode; return !!(n&&el.contains(n.nodeType===1?n:n.parentNode)); }catch(e){ return false }
+}
+function caretEnd(el){   /* caretRangeFromPoint 在 SVG 上不一定給得出位置，退而求其次：游標放到這行字的尾巴 */
+  try{ var d=el.ownerDocument, w=d.defaultView, r=d.createRange(), tn=el.firstChild;
+       if(tn&&tn.nodeType===3)r.setStart(tn, tn.nodeValue.length); else r.selectNodeContents(el);
+       r.collapse(false); var s=w.getSelection(); s.removeAllRanges(); s.addRange(r); }catch(e){}
+}
+
+/* ══ 市場一分鐘（flow_mini.py）專用：字寬估算 ＋ 兩個一致性警告 ＋ fm-data 同步 ══ */
+/* flow_mini._tw() 的同一條公式（CJK 算一個字寬、ASCII 0.58、空白與「·」0.36）。
+   方塊寬度是產圖時用它算死的，這裡用同一條估，才不會「工具說沒事、圖卻凸出去」。 */
+function fmTw(text, px){
+  var s=String(text==null?'':text), w=0;
+  for(var i=0;i<s.length;i++){ var c=s.charCodeAt(i);
+    w += (c===32||c===0xb7) ? px*0.36 : (c<128 ? px*0.58 : px); }
+  return w;
+}
+/* 這一行字實際能用多寬：取同一層裡「包住這行字中心點」的**最小**方塊。
+   要取最小的：岔路標籤的中心落在一個 42 寬的透明 rect 裡，旁邊 150 寬的結果框
+   並沒有包住它，拿來當額度會放行一段根本塞不下的字。 */
+function fmFit(el){
+  try{
+    var b=el.getBBox(), cx=b.x+b.width/2, cy=b.y+b.height/2;
+    var scope=(el.parentNode&&el.parentNode.nodeType===1)?el.parentNode:null; if(!scope)return null;
+    var best=0;
+    [].forEach.call(scope.querySelectorAll('rect,polygon'),function(r){
+      var q; try{ q=r.getBBox() }catch(e){ return }
+      if(!q.width||cx<q.x-1||cx>q.x+q.width+1||cy<q.y-1||cy>q.y+q.height+1)return;
+      if(!best||q.width<best)best=q.width;
+    });
+    if(!best)return null;
+    var fs=parseFloat(el.getAttribute('font-size'))||14;
+    return {box:Math.round(best), fs:fs, used:Math.round(fmTw(el.textContent,fs))};
+  }catch(e){ return null }
+}
+var FM_PAD=14;   /* flow_mini 自己留的邊界介於 8（150 寬的框）與 18（280 寬的框）之間，取中間值 */
+function fmLenWarn(el, after){
+  var f=fmFit(el); if(!f)return '';
+  var want=Math.round(fmTw(after,f.fs));
+  if(want<=f.box-FM_PAD)return '';
+  if(want<=f.used)return '';   /* 本來就頂到邊、這次沒變更長 → 不囉嗦 */
+  return '字變長了（估 '+want+'／框寬 '+f.box+'）：方塊寬度是產圖時算死的，不會自己縮字，這樣會凸出框外';
+}
+function fmNorm(s){ return String(s==null?'':s).replace(/[\s·・（）()]/g,''); }
+/* 改到「今天的定調」那一句時，規則表標亮那一列的最後一格也要一起改——
+   產圖時 flow_mini.check() 會 assert 兩者相等，在工作台改是繞過那道閘門的。 */
+function fmStanceWarn(el, before){
+  try{
+    var root=el.closest&&el.closest('#fm-root'); if(!root)return '';
+    var td=root.querySelector('tr.fm-today td:last-child'); if(!td)return '';
+    var a=fmNorm(before), b=fmNorm(td.textContent);
+    if(a.length<4||b.length<4)return '';
+    if(a===b||a.indexOf(b)>=0||b.indexOf(a)>=0)
+      return '這是「今天的定調」：規則表標亮那一列還寫著「'+String(td.textContent||'').trim()+'」，兩邊要一起改';
+    return '';
+  }catch(e){ return '' }
+}
+/* 流程圖上的字有一半在 <script class="fm-data"> 的 JSON 裡有第二份（點方塊浮出來的卡片讀那一份）。
+   只改 SVG 不改 JSON，圖上跟卡片會打架，而且是「兩邊互相印證」的那種錯——同一個來源餵給兩處，
+   錯了會一起錯。所以一定要一起改，改完再驗一次 JSON 還解得開，解不開就整個放棄同步。 */
+function fmSyncData(el, from, to){
+  try{
+    var root=el.closest&&el.closest('#fm-root'); if(!root)return 0;
+    var sc=root.querySelector('script.fm-data'); if(!sc)return 0;
+    var raw=sc.textContent||'';
+    var a=JSON.stringify(String(from==null?'':from)).slice(1,-1);
+    var b=JSON.stringify(String(to==null?'':to)).slice(1,-1);
+    if(!a||a===b||raw.indexOf(a)<0)return 0;
+    var out=raw.split(a).join(b);
+    try{ JSON.parse(out); }catch(e){ try{console.warn('[yeb] fm-data 同步後 JSON 解不開，放棄同步',e)}catch(x){} return -1; }
+    sc.textContent=out;
+    return raw.split(a).length-1;
+  }catch(e){ return 0 }
+}
+/* 匯出走的是「重新解析 t.orig ＋ 重播 marks」那條路，畫布上對 fm-data 的改動不會跟著出去，
+   所以匯出時要照 marks 再同步一次（來源是原稿的 before，剛好對得上原稿裡的 JSON）。 */
+function fmSyncFromMarks(d, marks){
+  var n=0;
+  (marks||[]).forEach(function(m){
+    var el=d.querySelector('[data-yeb="'+m.idx+'"]'); if(!el||!isSvgNode(el))return;
+    var r=fmSyncData(el, m.before, afterText(m)); if(r>0)n+=r;
+  });
+  return n;
+}
 /* 行內標籤：只有在「祖先也是候選」時才讓位，不是無條件排除（見 _cand 註解） */
 var INLINE_TAGS={B:1,STRONG:1,EM:1,I:1,U:1,S:1,SPAN:1,A:1,SMALL:1,MARK:1,CODE:1,SUP:1,SUB:1,ABBR:1,CITE:1,Q:1,TIME:1,LABEL:1};
 function hasText(el){for(var i=0;i<el.childNodes.length;i++){var n=el.childNodes[i];if(n.nodeType===3&&/\S/.test(n.nodeValue))return true}return false}
@@ -371,6 +507,7 @@ function fpOf(el){
 function h32(s){var h=5381; for(var i=0;i<s.length;i++)h=((h*33)^s.charCodeAt(i))>>>0; return h.toString(36);}
 function _candBase(el){
   if(SKIP[el.tagName])return false;
+  if(isSvgNode(el)&&SVG_SKIP[el.tagName])return false;
   if(el.closest&&el.closest('nav,.controls-bar,.share-bar,#yoda-share,.tablet-hint'))return false;
   return hasText(el);
 }
@@ -657,6 +794,10 @@ function setupPanes(){
     if(INLINE_EL&&(el===INLINE_EL||INLINE_EL.contains(ev.target)))return;   /* 正在編輯的那段：讓瀏覽器自己處理游標 */
     /* 只有會跳轉／展開的元素才攔；純文字放行，游標與選字交給瀏覽器自己做（攔了就放不了游標） */
     var hot=ev.target.closest&&ev.target.closest('a,button,summary,input,select,label,[onclick],.tg,.cx,.sortable,th');
+    /* 2026-09-22：圖裡的字一律攔。市場一分鐘的流程圖在 <g data-k> 上自己綁了 click，
+       不攔的話「點字要編輯」會順手把浮出卡片打開，卡片蓋住半頁、也蓋住正在編的那行。
+       這些 SVG 節點沒有 a/button/summary 這些標籤，所以上面那條抓不到，要另外補。 */
+    if(!hot && isSvgNode(ev.target)) hot=ev.target;
     var add=!!(ev.ctrlKey||ev.metaKey||ev.shiftKey);
     if(hot||add){ ev.preventDefault(); ev.stopPropagation(); }
     selectBlock(el, add); echoLeft(el); fillDock(el);
@@ -791,6 +932,17 @@ function bindActs(d){
 function paintMark(d,m){
   var el=d.querySelector('[data-yeb="'+m.idx+'"]'); if(!el)return;
   el.classList.remove('yeb-mark','yeb-auto');
+  /* 2026-09-22：圖裡的字（SVG）只換文字＋外框，不准塞任何 HTML。
+     <text> 的 innerHTML 會在 SVG 命名空間建節點，<span>／<button>／<del>／<ins>
+     在那裡畫不出來——結果不是「看不到認可鈕」，是整行字消失。
+     所以差異標記與認可鈕都不進 SVG；認可／退回走浮動選取列（updSelBtn 的 pendMark 那條路），
+     那條列是 position:fixed、掛在 body 上，跟 SVG 無關。 */
+  if(isSvgNode(el)){
+    el.textContent=afterText(m);
+    if(m.approved&&m.auto&&!m.seen)el.classList.add('yeb-auto');
+    else if(!m.approved)el.classList.add('yeb-mark');
+    return;
+  }
   if(m.approved&&m.auto&&!m.seen){   /* 匯入時自動修：綠框，預設已認可；✕ 退回 */
     el.classList.add('yeb-auto');
     el.innerHTML=diffHtml(m.before,afterText(m))+'<span class="yeb-acts"><button class="yeb-no" data-mark="'+m.id+'" title="退回這個自動修改">✕ 退回</button><button class="yeb-ok" data-mark="'+m.id+'" title="知道了，隱藏綠框">✓</button></span>'+(m.note?'<span class="yeb-note">'+esc(m.note)+'</span>':'');
@@ -810,7 +962,10 @@ function paintMark(d,m){
 }
 function reject(id){
   var t=tab(), m=t.marks.find(function(x){return x.id===id}); if(!m)return; snap();
-  var el=$('#ifE').contentDocument.querySelector('[data-yeb="'+m.idx+'"]'); if(el){el.innerHTML=m.beforeHtml||esc(m.before);el.classList.remove('yeb-mark','yeb-auto')}   /* 退回＝連原本的粗體／連結一起還原 */
+  var el=$('#ifE').contentDocument.querySelector('[data-yeb="'+m.idx+'"]');
+  if(el&&isSvgNode(el)){ fmSyncData(el, afterText(m), m.before);   /* 圖裡的字：連 fm-data 的那一份一起退回去 */
+    el.textContent=m.before; el.classList.remove('yeb-mark','yeb-auto'); }
+  else if(el){el.innerHTML=m.beforeHtml||esc(m.before);el.classList.remove('yeb-mark','yeb-auto')}   /* 退回＝連原本的粗體／連結一起還原 */
   t.marks.splice(t.marks.indexOf(m),1); updPill(); saveSoon();
 }
 function approve(id){
@@ -916,6 +1071,9 @@ function cleanText(t){
   return t.replace(/\n{3,}/g,'\n\n').replace(/[ \t]+\n/g,'\n').trim();
 }
 function setEdited(el, text, beforeHtml, markId, isHtml){
+  /* 圖裡的字（SVG）：只換文字。不能走下面那條路——splitParts／cloneNode／innerHTML
+     都會在 SVG 命名空間裡建 HTML 節點，畫不出來，等於把那行字弄不見。 */
+  if(isSvgNode(el)){ el.textContent=(isHtml?htmlText(text):cleanText(text)).replace(/\s+/g,' ').trim(); return; }
   /* 章標頭特別處理：只換標題那一格，保住編號與版面（2026-09-07 有一次整個標頭被一段話蓋掉） */
   var t=el.querySelector&&(el.querySelector('.sec-title')||el.querySelector('.section-title'));
   if(t&&el.querySelector('.sec-num,.section-num')){
@@ -971,12 +1129,20 @@ function applyEdit(el,after,note,isHtml){
   var t=tab(), idx=el.getAttribute('data-yeb'), before=el.textContent.replace(/✓ 認可$/,''); snap();
   var beforeHtml=el.innerHTML;
   var old=t.marks.find(function(x){return x.idx===idx});
+  /* fm-data 裡目前擺的是哪一版：同一行改第二次時，JSON 裡already是上一次的 after，
+     拿原稿的 before 去找會找不到，所以搜尋鍵要用「上一次的 after」。 */
+  var fmFrom = old ? afterText(old) : before;
   if(old){ before=old.before; beforeHtml=old.beforeHtml||beforeHtml; t.marks.splice(t.marks.indexOf(old),1); }   /* 同一段再改：before 維持最初原稿 */
   var afterTxt = isHtml ? htmlText(after) : after;
-  if(afterTxt===before){ if(old){el.innerHTML=old.beforeHtml||esc(before);el.classList.remove('yeb-mark')} updPill(); saveSoon(); return; }
+  if(afterTxt===before){
+    if(isSvgNode(el)){ fmSyncData(el, fmFrom, before); el.textContent=before; el.classList.remove('yeb-mark','yeb-auto'); }
+    else if(old){el.innerHTML=old.beforeHtml||esc(before);el.classList.remove('yeb-mark')}
+    updPill(); saveSoon(); return; }
   var m={id:'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), idx:idx, tag:el.tagName.toLowerCase(), before:before, beforeHtml:beforeHtml, after:after, approved:false, at:new Date().toISOString(), note:note||''};
   if(isHtml)m.isHtml=true;
-  t.marks.push(m); paintMark($('#ifE').contentDocument,m); invalidateUnits(); updPill(); saveSoon();
+  t.marks.push(m); paintMark($('#ifE').contentDocument,m);
+  if(isSvgNode(el))fmSyncData(el, fmFrom, afterTxt);   /* 圖上改了，浮出卡片讀的那一份 JSON 要一起改 */
+  invalidateUnits(); updPill(); saveSoon();
 }
 
 /* ── B：匯入自動修 —— 不需要判斷的修正不經人（綠框、預設已認可、可退回）；禁用詞只標旗 ── */
@@ -1235,7 +1401,7 @@ function cardUnits(chapter){
       if(!box)box=h;
       if(used.some(function(o){return o===box||o.contains(box)}))return;
       used.push(box);
-      cards.push({el:box,title:txt(h).slice(0,40),paras:textBlocks(box).length});
+      cards.push({el:box,title:txt(h).slice(0,40),full:txt(h),paras:textBlocks(box).length});
     });
     if(cards.length>=2){
       /* 2026-09-16：這裡原本直接 return，於是 CARD_SEL 裡的 .rv-end（小結）這種
@@ -1278,21 +1444,27 @@ function scanCards(chapter, exclude){
   }
   seen.forEach(function(el){
     var t=el.querySelector(CARD_TITLE_SEL), title=txt(t).slice(0,40)||txt(el).slice(0,28);
+    var full=txt(t)||txt(el);                         /* 顯示用全文；title 是組 key 用的短版，不准動 */
     var paras=textBlocks(el).length;
     if(junkTitle(title)&&paras<2)return;              /* 表格欄名／資料殘塊不當節 */
-    if(junkTitle(title))title=txt(el).slice(0,30);
-    cards.push({el:el,title:title,paras:paras});
+    if(junkTitle(title)){ title=txt(el).slice(0,30); full=txt(el); }
+    cards.push({el:el,title:title,full:full,paras:paras});
   });
   cards.sort(function(a,b){return a.el.compareDocumentPosition(b.el)&Node.DOCUMENT_POSITION_FOLLOWING?-1:1});
   return cards;
 }
 var PART_SEL='table,figure,.ascii-fig,.dtree,.chip-tbl,.viz,.kv,.ladder-grid,.cards,.grid,ul,ol,pre,blockquote,.hl-box,.alertbox,.rv-row,.op-tbl,.env-regime';
-function partLabel(el){
+function partLabel(el,full){   /* full＝顯示用（不截字，交給 CSS 省略號）；不帶 full 的短標籤是組 key 用的，一個字都不准動 */
   var cap=el.querySelector&&el.querySelector('caption,figcaption,th,.cap,.fig-cap,.hd');
   var t=(cap?txt(cap):'')||txt(el);
   t=t.replace(/\s+/g,' ').trim();
   var tag=el.tagName.toLowerCase();
   var kind=tag==='table'?'表':(tag==='ul'||tag==='ol')?'清單':(tag==='pre'?'圖':(/ascii-fig|dtree|viz|figure/.test(el.className+' '+tag)?'圖':'塊'));
+  if(full){
+    if(tag==='table')return '表｜'+t+'（'+el.querySelectorAll('tr').length+' 列）';
+    if(tag==='ul'||tag==='ol')return '清單｜'+t+'（'+el.children.length+' 項）';
+    return kind+'｜'+t;
+  }
   if(tag==='table'){ var rows=el.querySelectorAll('tr').length; return '表｜'+t.slice(0,22)+'（'+rows+' 列）'; }
   if(tag==='ul'||tag==='ol'){ return '清單｜'+t.slice(0,22)+'（'+el.children.length+' 項）'; }
   return kind+'｜'+t.slice(0,26);
@@ -1317,7 +1489,7 @@ function partUnits(sec){
     try{console.warn('[yeb] partUnits 截斷：這個節有 '+seen.length+' 個區塊，只列前 '+PART_MAX+' 個，還有 '+_cut+' 個未列出', sec)}catch(e){}
     PART_TRUNC.push(_cut);
   }
-  seen.slice(0,PART_MAX).forEach(function(el){ out.push({el:el,title:partLabel(el),paras:textBlocks(el).length}); });
+  seen.slice(0,PART_MAX).forEach(function(el){ out.push({el:el,title:partLabel(el),full:partLabel(el,true),paras:textBlocks(el).length}); });
   return out;
 }
 /* 2026-09-16 unitsOf 加快取：加了第四層「段」之後節點數是原本的 20 倍，
@@ -1367,12 +1539,12 @@ function buildUnits(d){
     var d2={};
     cardUnits(ch).forEach(function(c){
       var b2=k+'>節:'+c.title.slice(0,30), k2=b2+':'+(d2[b2]=(d2[b2]||0)+1);
-      units.push({key:k2,level:2,title:c.title,nodes:[c.el],cont:c.el,anchor:c.el,snippet:txt(c.el).slice(c.title.length,c.title.length+500),parent:k,paras:c.paras});
+      units.push({key:k2,level:2,title:c.title,disp:c.full,nodes:[c.el],cont:c.el,anchor:c.el,snippet:txt(c.el).slice(c.title.length,c.title.length+500),parent:k,paras:c.paras});
       own(c.el,k2);
       var d3={};
       partUnits(c.el).forEach(function(pt){
         var b3=k2+'>塊:'+pt.title.slice(0,26), k3=b3+':'+(d3[b3]=(d3[b3]||0)+1);
-        units.push({key:k3,level:3,title:pt.title,nodes:[pt.el],cont:pt.el,anchor:pt.el,snippet:txt(pt.el).slice(0,300),parent:k2,paras:pt.paras});
+        units.push({key:k3,level:3,title:pt.title,disp:pt.full,nodes:[pt.el],cont:pt.el,anchor:pt.el,snippet:txt(pt.el).slice(0,300),parent:k2,paras:pt.paras});
         own(pt.el,k3);
       });
     });
@@ -1392,8 +1564,11 @@ function buildUnits(d){
     while(p){ if(p[mk]!=null){ host=p[mk]; break; } p=p.parentElement; }
     var lbl=segLabel(el); if(!lbl)return;          /* 空白段不列 */
     if(host==null){ orphan.push(el); return; }     /* 掛在所有章外面的（頁尾、警語）：最後統一收容 */
+    /* 2026-09-26：表格裡的每一格不再各自成段（美股一份 29,007 段裡 26,845 個是表格內部）。
+       表格本身已經是「塊」，整張點選、整張刪；儲存格照樣能在右邊點下去就地編輯（data-yeb 編號沒動）。 */
+    if(el.closest('table'))return;
     var b4=host+'>段:'+lbl.slice(0,20), k4=b4+':'+(d4[b4]=(d4[b4]||0)+1);
-    (segs[host]=segs[host]||[]).push({key:k4,level:4,title:lbl,nodes:[el],cont:el,anchor:el,snippet:txt(el).slice(0,200),parent:host,paras:0});
+    (segs[host]=segs[host]||[]).push({key:k4,level:4,title:lbl,disp:txt(el),nodes:[el],cont:el,anchor:el,snippet:txt(el).slice(0,200),parent:host,paras:0});
   });
   /* 收容所：頁尾版權列、身分揭露警語這些「不屬於任何章」的東西，以前在左邊完全看不到、
      也刪不掉。給它們一個章當家，覆蓋率才是真的 100%。只在真的有孤兒時才出現，
@@ -1404,8 +1579,9 @@ function buildUnits(d){
     units.push({key:ko,level:1,title:'（不屬於任何章節）頁首／頁尾／警語',nodes:outer,cont:outer.length===1?outer[0]:null,
                 anchor:outer[0],snippet:txt(outer[0]).slice(0,300),parent:null,paras:orphan.length});
     orphan.forEach(function(el){
+      if(el.closest('table'))return;               /* 收容章照樣成立（章 key 不變），只是表格內部不列成段 */
       var lb=segLabel(el), b=ko+'>段:'+lb.slice(0,20), k=b+':'+(d4[b]=(d4[b]||0)+1);
-      (segs[ko]=segs[ko]||[]).push({key:k,level:4,title:lb,nodes:[el],cont:el,anchor:el,snippet:txt(el).slice(0,200),parent:ko,paras:0});
+      (segs[ko]=segs[ko]||[]).push({key:k,level:4,title:lb,disp:txt(el),nodes:[el],cont:el,anchor:el,snippet:txt(el).slice(0,200),parent:ko,paras:0});
     });
   }
   for(i=0;i<owner.length;i++){ try{ delete owner[i][mk]; }catch(e){} }
@@ -1475,12 +1651,18 @@ var LVNAME={1:'章',2:'節',3:'塊',4:'段'};
 function cvLi(u){
   var t=CV_T||{}, g=(t.gists||{})[u.key];
   var kids=u.children.filter(function(c){return c.level!==4}), segs=u.children.filter(function(c){return c.level===4});
+  /* 2026-09-26：標題不再用 JS 截字（顯示交給 CSS 單行＋省略號）；完整文字進 title。
+     300 字只是防一段超長內文把 DOM 撐爆，遠超過欄寬，畫面上看不到這一刀。
+     原本標題下還有一行 .meta（u.paras＝這個單位底下 textBlocks 的總數，含表格儲存格、含子節點裡的），
+     右邊又有 .sg「＋N 段」（＝直接掛在這個節點下、展開後真的會列出來的段數），同一節點兩個數字對不上。
+     只留 .sg：它的數字就是按下去會看到的列數。.tg 也只留箭頭，子節點數放進 title。 */
+  var full=String(u.disp||u.title||''); if(full.length>300)full=full.slice(0,300)+'…';
   return '<li class="cnode lv'+u.level+(CV_MOVED[u.key]?' moved':'')+'" data-key="'+esc(u.key)+'"'+(u.level===4?'':' draggable="true"')+'>'
     +'<div class="row"><span class="lv">'+LVNAME[u.level]+'</span>'
-    +'<div style="min-width:0;flex:1"><div class="ttl">'+esc(u.title)+'</div>'
+    +'<div style="min-width:0;flex:1"><div class="ttl" title="'+esc(full).replace(/"/g,'&quot;')+'">'+esc(full)+'</div>'
     +(g?'<div class="gist">'+esc(g)+'</div>':'')
-    +'<div class="meta">'+(u.level===1?(kids.length+' 節 · '):'')+(u.paras?u.paras+' 段':'')+'</div></div>'
-    +(kids.length?'<span class="tg" title="收合／展開">▾ '+kids.length+'</span>':'')
+    +'</div>'
+    +(kids.length?'<span class="tg" title="收合／展開（底下 '+kids.length+' 個'+(u.level===1?'節':'塊')+'）">▾</span>':'')
     +(segs.length?'<span class="sg" data-n="'+segs.length+'" title="把這裡的每一段列出來，可以單獨點、單獨刪">＋'+segs.length+' 段</span>':'')
     +'<span class="cx" title="從報告裡刪掉這個區塊（可復原）">✕</span></div>'
     +(kids.length?'<ul>'+kids.map(function(c){return cvLi(c)}).join('')+'</ul>':'')
@@ -1630,7 +1812,7 @@ function selectBlock(el, add){
   SEL_LIST.push(el); SEL_EL=el; el.classList.add('yeb-sel'); placeSel(); updSelBtn();
   try{ placeAllActs(el.ownerDocument) }catch(e){}   /* 剛被取消選取的那幾段，認可鈕重新現身時要站對位置 */
 }
-var INLINE_EL=null, INLINE_HTML='', INLINE_TEXT='';
+var INLINE_EL=null, INLINE_HOST=null, INLINE_HTML='', INLINE_TEXT='';
 function placeCaret(el, x, y){
   /* contenteditable 一 focus 游標會跑到最前面；用點擊座標把它放回使用者點的地方 */
   if(!el||x==null)return;
@@ -1646,38 +1828,82 @@ function placeCaret(el, x, y){
 function startInline(el, x, y, keepRange){   /* keepRange=true：呼叫端要自己還原 Range，這裡不准動游標 */
   if(!el||INLINE_EL===el)return;
   endInline(true);                      /* 換一段就先把上一段收好 */
-  var d=el.ownerDocument;
-  INLINE_EL=el; INLINE_HTML=el.innerHTML; INLINE_TEXT=(el.innerText||el.textContent||'');
-  el.setAttribute('contenteditable','true');
-  el.setAttribute('spellcheck','false');
+  /* 2026-09-22：SVG 節點不能自己當 editing host。
+     Chrome 不支援對 SVG 元素做 contenteditable——setAttribute 不丟錯、el.focus() 也不丟錯，
+     但焦點根本沒進去（activeElement 還在 body）、execCommand('insertText') 回 false、
+     打字全被吞掉。舊版照樣加藍框又跳「就地編輯中」，於是變成「看起來進去了卻一個字都打不進」，
+     沒有任何錯誤訊號。（已排除焦點問題：加 tabindex 讓它 focus 得到之後仍然打不進去。）
+     解法是把 contenteditable 掛到最近的 HTML 祖先（市場一分鐘＝div.fm-stage），
+     游標再放進 <text> 的文字節點——這樣打字就進得去，而且 DOM 不會被弄髒。
+     真的找不到 HTML 祖先時才退回「誠實拒絕」。 */
+  var host=null;
+  if(isSvgNode(el)){
+    host=svgHostOf(el);
+    if(!host){
+      selectBlock(el, false); echoLeft(el); fillDock(el);
+      toast('這一塊是圖裡的文字（SVG），而且找不到可以承載編輯的外層容器，工作台改不了', 1);
+      return;
+    }
+  }
+  var d=el.ownerDocument, eh=host||el;
+  INLINE_EL=el; INLINE_HOST=host; INLINE_HTML=el.innerHTML; INLINE_TEXT=(el.innerText||el.textContent||'');
+  eh.setAttribute('contenteditable','true');
+  eh.setAttribute('spellcheck','false');
   el.classList.add('yeb-editing');
-  try{ el.focus({preventScroll:true}); }catch(e){ try{el.focus()}catch(e2){} }
+  try{ eh.focus({preventScroll:true}); }catch(e){ try{eh.focus()}catch(e2){} }
   if(!keepRange){
     placeCaret(el, x, y);
-    setTimeout(function(){ if(INLINE_EL===el)placeCaret(el, x, y); },0);   /* 有些情況要等 contenteditable 生效後再放一次 */
+    if(host&&!caretInside(el))caretEnd(el);
+    setTimeout(function(){ if(INLINE_EL!==el)return;
+      placeCaret(el, x, y);
+      if(host&&!caretInside(el))caretEnd(el); },0);   /* 有些情況要等 contenteditable 生效後再放一次 */
   }
-  if(!el.__yebBound){
+  if(host){
+    /* 監聽掛在 host 上（<text> 永遠不會拿到焦點，blur／keydown 都不會在它身上發生）。
+       host 是共用容器，所以只綁一次，handler 一律現查 INLINE_EL／INLINE_HOST，
+       不准閉包抓住第一次編的那個元素——不然第二次編別行就會套到第一行身上。 */
+    if(!host.__yebHostBound){
+      host.__yebHostBound=true;
+      addEvt(host,'blur',function(){ if(INLINE_EL&&INLINE_HOST===host)endInline(true); },true);
+      addEvt(host,'keydown',function(ev){
+        if(!INLINE_EL||INLINE_HOST!==host)return;
+        if(ev.key==='Escape'){ ev.preventDefault(); ev.stopPropagation(); endInline(false); hideSel(); }
+        else if(ev.key==='Enter'){ ev.preventDefault(); ev.stopPropagation();   /* 圖裡的字沒有「分段」這回事，Enter 一律不插行 */
+          if(ev.ctrlKey||ev.metaKey)endInline(true); }
+      },true);
+    }
+  } else if(!el.__yebBound){
     el.__yebBound=true;
-    el.addEventListener('blur',function(){ if(INLINE_EL===el)endInline(true); });
-    el.addEventListener('keydown',function(ev){
+    addEvt(el,'blur',function(){ if(INLINE_EL===el)endInline(true); });
+    addEvt(el,'keydown',function(ev){
       if(ev.key==='Escape'){ ev.preventDefault(); ev.stopPropagation(); endInline(false); hideSel(); }
       else if(ev.key==='Enter'&&(ev.ctrlKey||ev.metaKey)){ ev.preventDefault(); ev.stopPropagation(); endInline(true); }
     },true);
   }
-  placeSel(); updSelBtn();
-  toast('就地編輯中：直接打字 · Ctrl+Enter 或點別處＝套用 · Esc＝取消 · 空一行＝分段');
+  updSelBtn(); placeSel();   /* 2026-09-26：先換鈕再量寬（編輯中三顆鈕 173px），原本順序反了，列會用選取時 54px 的舊寬度定位、右半截伸出畫面 */
+  toast(host ? '就地編輯中（圖裡的字）：直接打字 · Ctrl+Enter 或點別處＝套用 · Esc＝取消 · 不能分段'
+             : '就地編輯中：直接打字 · Ctrl+Enter 或點別處＝套用 · Esc＝取消 · 空一行＝分段');
 }
 function endInline(commit){
   var el=INLINE_EL; if(!el)return;
-  INLINE_EL=null;
-  el.removeAttribute('contenteditable'); el.classList.remove('yeb-editing');
+  var host=INLINE_HOST, eh=host||el;
+  INLINE_EL=null; INLINE_HOST=null;
+  eh.removeAttribute('contenteditable'); eh.removeAttribute('spellcheck'); el.classList.remove('yeb-editing');
   var txt=(el.innerText||el.textContent||'');
   /* 取值改走 HTML：段內的 <b>／<span> 要活下來（2026-09-16）。
      先 stripUI 剝掉工作台自己塞進 innerHTML 的認可鈕／註記／差異標記，再過行內白名單。 */
   var html=cleanInline(stripUI(el.innerHTML));
   el.innerHTML=INLINE_HTML;             /* 一律先還原：要嘛取消，要嘛交給 applyEdit 重畫 */
   if(commit && txt.trim() && txt.replace(/\s+/g,' ').trim()!==INLINE_TEXT.replace(/\s+/g,' ').trim()){
-    applyEdit(el, html, '就地編輯', true);
+    var note='就地編輯';
+    if(host){
+      /* 圖裡的字有兩件事工具要幫忙盯（此時 el 已還原成原文，估寬的基準才對）：
+         ① 方塊寬度是產圖時算死的，字變長會凸出框外；
+         ② 改到「今天的定調」就要同步規則表標亮那一列。 */
+      var w=[fmLenWarn(el, txt), fmStanceWarn(el, INLINE_TEXT)].filter(Boolean);
+      if(w.length){ note+='｜⚠ '+w.join('｜'); toast('⚠ '+w.join(' ｜ '), 1); }
+    }
+    applyEdit(el, html, note, true);
   }
   if(DK_EL===el)fillDock(el);   /* 在報告裡就地改完 → 下方文字框跟著更新，兩邊不會分岔 */
   updSelBtn(); placeSel();      /* 鈕換成「認可／退回」、寬度也變了，位置要重算，否則會停在舊位置 */
@@ -2086,12 +2312,21 @@ function exportHtml(t, opts){
   d.querySelectorAll('style').forEach(function(s){ if(/\.yeb-mark\{|\[data-yeb\]\{/.test(s.textContent||''))s.remove(); });
   d.querySelectorAll('script#yeb-marks').forEach(function(s){s.remove()});
   var _oldMark=d.getElementById('yeb-mark-css'); if(_oldMark)_oldMark.remove();   /* 每存一次就多一份 → 先清掉舊的（2026-09-07）*/
-  var st=d.createElement('style'); st.id='yeb-mark-css'; st.textContent=MARK_CSS.split('.yeb-ok').join('.yeb-ok-x'); d.head.appendChild(st);
   var _xmiss=0;
   t.marks.forEach(function(m){var el=d.querySelector('[data-yeb="'+m.idx+'"]');
     if(!el){ _xmiss++; try{console.warn('[yeb] 匯出時找不到標記對應段落 idx='+m.idx,m)}catch(e){} return; }
     setEdited(el, m.after, m.beforeHtml||el.innerHTML, m.id, m.isHtml); if(!m.approved&&opts.keepMarks)el.classList.add('yeb-emark');});
   if(_xmiss){ try{toast('⚠ 匯出：有 '+_xmiss+' 處標記找不到對應段落，沒有寫進檔案',true)}catch(e){} }
+  fmSyncFromMarks(d, t.marks);   /* 圖裡的字改了，市場一分鐘的 fm-data JSON 要跟著出去（必須在拔掉 data-yeb 之前）*/
+  /* 校稿標記的 CSS 只有在「這份檔裡真的還有標記」時才需要帶出去。
+     以前是無條件塞一塊 3KB 的 .yeb-* 進 <head>——交付版（全部認可、或關掉保留標記）
+     其實一個標記都沒有，那塊 CSS 就純粹是跟著付費報告一起出貨的死重量。
+     ⚠ 不要改成「清掉所有含 .yeb- 的 <style>」：清除條件抓的是整個 <style>，
+     哪天這段 CSS 被併進別人的 style 區塊，那條會把報告的版面一起刪掉。 */
+  if(d.querySelector('.yeb-emark,.yeb-mark,.yeb-auto')){
+    var st=d.createElement('style'); st.id='yeb-mark-css';
+    st.textContent=MARK_CSS.split('.yeb-ok').join('.yeb-ok-x'); d.head.appendChild(st);
+  }
   var origOrder=unitsOf(d).filter(function(u){return u.level<=2}).map(function(u){return u.key});
   var _rm=replayMoves(d, t.moves||[]), _rd=replayBlockDels(d, t.bdel||[]); warnReplay('匯出', _rm, _rd);
   if(t.clean)removeEmptyShells(d); if(t.autonum)renumberChapters(d);
