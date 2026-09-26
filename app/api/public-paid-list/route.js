@@ -27,7 +27,7 @@ function catOf(id) {
 async function handle(fresh) {
   let reports = [];
   try {
-    const idx = await readIndex();
+    const idx = await readIndex({ fresh });   // ?fresh 連 _index.json 也回源讀，不吃 Blob CDN 那層 60 秒快取
     for (const e of idx.entries) {
       const id = e.reportId;
       reports.push({ file: id + '.html', reportId: id, date: dateOf(id), cat: catOf(id), paid: true, drive: true, summary: '', uploadedAt: e.uploadedAt });
@@ -41,6 +41,7 @@ async function handle(fresh) {
   // 改成 30 秒且不供應過期內容：過期就同步回源，最壞情況只落後 30 秒。
   // 現在讀的是 _index.json（簡單操作），不是當年會把 Blob 打爆的 list()，30 秒足夠保護。
   // 2026-09-12：後台帶 ?fresh=<ts> 來的一律不快取（主控台上傳完立刻要看到；30 秒快取只留給訪客那條路）
+  // 2026-09-26：?fresh 另外讓 readIndex 回源讀 _index.json（原本只繞過這支路由的回應快取，讀索引還是走 Blob CDN）
   return Response.json({ ok: true, reports }, { status: 200,
     headers: { ...CORS, 'Cache-Control': fresh ? 'no-store' : 'public, s-maxage=30' } });
 }
