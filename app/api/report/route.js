@@ -2,6 +2,7 @@ import { verifyJwt } from '../../../lib/jwt';
 import { blobPath } from '../../../lib/blob';
 import { CORS, J, preflight } from '../../../lib/cors';
 import { get } from '@vercel/blob';
+import { taMarket, taAllowed, taReady, signTaTicket, injectTaPick, stripTaPick } from '../../../lib/ta';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,12 @@ export async function POST(req) {
     if (!payload) return J({ ok: true, allow: false, reason: 'need-login', error: '請重新登入' });
   }
 
+  // 技術分析（少數指定會員）：名單與資料齊不齊，跟讀報告並行查，不拖慢開報告。任何錯誤都當「不注入」。
+  const taMkt = (!isFree && payload) ? taMarket(reportId) : null;
+  const taCheck = taMkt
+    ? Promise.all([taAllowed(payload.sub), taReady(reportId)]).catch(() => [false, false])
+    : null;
+
   let html;
   try {
     const result = await get(blobPath(reportId), { access: 'private' });
@@ -39,5 +46,18 @@ export async function POST(req) {
   const dateTag = d8 ? ' · ' + d8.slice(0, 4) + '-' + d8.slice(4, 6) + '-' + d8.slice(6, 8) : '';
   const wm = isFree ? '免費版 · Yoda Research' + dateTag : ((payload && payload.wm) || '會員專屬');
   html = html.split('{{WATERMARK}}').join(wm); // 逐人浮水印（免費檔＝通用戳記）
+  // 名單內＋這份報告的 TA 資料已上傳 → 注入勾選模組；名單外什麼都不注入（看不到任何技術分析 UI）
+  if (taCheck) {
+    let injected = false;
+    try {
+      const [allowed, ready] = await taCheck;
+      if (allowed && ready) {
+        const ticket = signTaTicket({ sub: payload.sub, wm: payload.wm, loginExp: payload.exp });
+        html = injectTaPick(html, { ticket, rid: reportId, market: taMkt });
+        injected = true;
+      }
+    } catch (e) { /* 注入失敗不影響報告 */ }
+    if (!injected && html.indexOf('ta-pick.js') >= 0) html = stripTaPick(html);
+  }
   return J({ ok: true, allow: true, html, watermark: wm, memberId: (payload && payload.sub) || '' });
 }

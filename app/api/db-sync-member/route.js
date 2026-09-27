@@ -15,6 +15,8 @@ export async function POST(req) {
   try {
     if (body.del && body.member_id) {
       await sql`DELETE FROM members WHERE member_id = ${String(body.member_id)}`;
+      // 會員刪除時連帶撤銷技術分析權限（ta_access 表不存在就略過）
+      try { await sql`DELETE FROM ta_access WHERE member_id = ${String(body.member_id)}`; } catch (e) {}
       return J({ ok: true, deleted: String(body.member_id) });
     }
     const m = body.member;
