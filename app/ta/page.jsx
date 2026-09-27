@@ -5,9 +5,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 //
 // 進來的路：報告 iframe 裡的 ta-pick.js 勾選 → 開新分頁 /ta?r=<reportId>&t=A,B,…&d=YYYYMMDD#k=<TA通行票>
 //   ① 從 #k 讀票 → 存 sessionStorage（重新整理還在）→ replaceState 抹掉 hash（網址列、分享、瀏覽紀錄都不留票）
-//   ② POST /api/ta-data mode:'summary' → 數字總表（每欄可排序、十列視窗）
-//   ③ 明細卡 25 檔一批，捲到才去拿（mode:'detail'）；點總表一列＝跳到那張卡
+//   ② POST /api/ta-data mode:'summary'（一次載入）→ 左 1/4 固定清單（搜尋／排序／↑↓ 切換，自己捲動）
+//   ③ 右 3/4 只顯示選中那一檔的明細：選到才去拿（mode:'detail'，連同清單上前後幾檔、一次最多 25 檔），取過的留在頁面記憶體
+//      右欄頂部分頁「單檔明細｜全部總表」：總表每欄可排序、點一列＝切到那檔明細；網址 #s=<代號> 記住目前選的（重新整理回同一檔）
 // 沒票、票過期、不在名單 → 只顯示一句話，不透露功能細節。
+// 版面改版：Yoda 2026-09-27「股票名單放在左邊 1/4 欄位並且固定……右邊 3/4 欄位顯示被選取的股票技術分析內容」。
 
 const SS_KEY = "yoda_ta_k";
 const PAGE = 25;
@@ -309,7 +311,8 @@ function Detail({ d }) {
   );
 }
 
-function Card({ row, idx, item, state, onLoad, flash }) {
+// ───────── 右欄：單檔明細 ─────────
+function One({ row, item, onRetry }) {
   const sym = row.sym;
   const d = item && !item.error ? item : null;
   const m = (d && d.meta) || {};
@@ -318,7 +321,7 @@ function Card({ row, idx, item, state, onLoad, flash }) {
   const close = row.close != null ? row.close : g(d, "price", "close");
   const conflict = g(d, "confidence", "conflict");
   return (
-    <section className={"ta-card" + (flash ? " flash" : "")} id={"c-" + sym} data-sym={sym} data-idx={idx}>
+    <div className="ta-one" id={"c-" + sym} data-sym={sym}>
       <div className="ta-ch">
         <h2><span className="mono">{sym}</span>{row.name || m.name || ""}</h2>
         <span className="ta-px mono">{fnum(close)} <span className={ud(chg)}>{fpct(chg)}</span></span>
@@ -331,18 +334,38 @@ function Card({ row, idx, item, state, onLoad, flash }) {
       {d && m.notes && m.notes.length ? (
         <div className="ta-notes">資料註記：{m.notes.join("；")}｜來源 {m.source || "—"}｜基準 {m.bench || "—"}</div>
       ) : null}
-      {d ? <Detail d={d} /> : item && item.error ? (
-        <div className="ta-err">這檔明細讀不到：{item.error}</div>
-      ) : (
-        <div className="ta-ph">
-          {state === "loading" ? <span>明細載入中…</span> : <>
-            <span>明細還沒載入（25 檔一批，捲到這裡會自動載入）</span>
-            <button type="button" className="ta-btn" onClick={onLoad}>載入這一批</button>
-          </>}
+      {d ? <Detail key={sym} d={d} /> : item && item.error ? (
+        <div className="ta-err">
+          <span>這檔明細讀不到：{item.error}</span>
+          <button type="button" className="ta-btn" onClick={onRetry}>重試</button>
         </div>
+      ) : (
+        <div className="ta-ph"><span>明細載入中…</span></div>
       )}
-    </section>
+    </div>
   );
+}
+
+// ───────── 左欄清單的排序 ─────────
+// 預設「送來的順序」＝報告表格勾選／送出的順序（與改版前總表的預設一致）。
+const SORTS = [
+  { key: "orig", label: "送來的順序", dir: 1, val: (r, i) => i },
+  { key: "conf", label: "信心分", dir: -1, val: (r) => (r.conf == null ? null : Number(r.conf)) },
+  { key: "rel20", label: "REL20", dir: -1, val: (r) => (r.rel20 == null ? null : Number(r.rel20)) },
+  { key: "atr", label: "ATR%", dir: -1, val: (r) => (r.atr_pct == null ? null : Number(r.atr_pct)) },
+  { key: "sym", label: "代號", dir: 1, val: (r) => r.sym },
+];
+const SORT_BY = Object.fromEntries(SORTS.map((s) => [s.key, s]));
+function dirLabel(key, dir) {
+  if (key === "orig") return dir > 0 ? "正序" : "倒序";
+  if (key === "sym") return dir > 0 ? "A→Z" : "Z→A";
+  return dir < 0 ? "高→低" : "低→高";
+}
+function hashSym() {
+  try {
+    const m = (location.hash || "").match(/[#&]s=([^&]+)/);
+    return m ? decodeURIComponent(m[1]).trim().toUpperCase() : "";
+  } catch (e) { return ""; }
 }
 
 // ───────── 主頁 ─────────
@@ -352,16 +375,29 @@ export default function TaPage() {
   const [err, setErr] = useState("");
   const [ctx, setCtx] = useState(null);         // {k, rid, syms, d}
   const [sum, setSum] = useState(null);
-  const [items, setItems] = useState({});       // sym → dict 或 {error}
-  const [pageState, setPageState] = useState({}); // page → 'loading' | 'done'
-  const [flashSym, setFlashSym] = useState("");
-  const inflight = useRef(new Set());
+  const [items, setItems] = useState({});       // sym → dict 或 {error}（頁面記憶體快取）
+  const [sel, setSel] = useState("");           // 目前選中的代號（網址 #s= 記住）
+  const [tab, setTab] = useState("one");        // one＝單檔明細｜all＝全部總表
+  const [q, setQ] = useState("");
+  const [sortKey, setSortKey] = useState("orig");
+  const [sortDir, setSortDir] = useState(1);
+  const inflight = useRef(new Set());           // 正在向 /api/ta-data 取明細的代號
+  const itemsRef = useRef({});
+  const selRef = useRef("");
+  const visRef = useRef([]);
+  const hashSel = useRef("");
+  const listRef = useRef(null);
+  const paneRef = useRef(null);
+  const firstScroll = useRef(true);
 
   const toGate = useCallback((reason, msg) => {
     setPhase("gate");
     if (reason === "ticket") setGateMsg("通行票已過期或無效。請回到會員報告，重新勾選後再開啟。");
     else setGateMsg(msg || "此功能僅限指定會員。請從會員報告進入。");
   }, []);
+
+  // 網址 #s=<代號>：重新整理後回到同一檔（要在下面讀票、抹 hash 之前先記下來）
+  useEffect(() => { hashSel.current = hashSym(); }, []);
 
   useEffect(() => {
     let k = "";
@@ -391,84 +427,138 @@ export default function TaPage() {
     }).catch((e) => { setErr(String(e && e.message || e)); setPhase("error"); });
   }, [toGate]);
 
-  const rows = (sum && sum.rows) || [];
+  const rows = useMemo(() => (sum && sum.rows) || [], [sum]);
 
-  const loadPage = useCallback(async (p) => {
-    if (!ctx || !sum) return;
-    if (inflight.current.has(p)) return;
-    const list = rows.slice(p * PAGE, p * PAGE + PAGE).map((r) => r.sym);
-    if (!list.length) return;
-    inflight.current.add(p);
-    setPageState((s) => ({ ...s, [p]: "loading" }));
+  // 左欄：搜尋（代號／名稱）＋排序；空值一律排最後，同值照送來的順序
+  const vis = useMemo(() => {
+    const qq = q.trim().toLowerCase();
+    let out = rows.map((r, i) => [r, i]);
+    if (qq) out = out.filter(([r]) => r.sym.toLowerCase().includes(qq) || String(r.name || "").toLowerCase().includes(qq));
+    const sd = SORT_BY[sortKey] || SORTS[0];
+    out.sort((a, b) => {
+      const x = sd.val(a[0], a[1]), y = sd.val(b[0], b[1]);
+      const xn = x === null || x === undefined || x === "" || (typeof x === "number" && !Number.isFinite(x));
+      const yn = y === null || y === undefined || y === "" || (typeof y === "number" && !Number.isFinite(y));
+      if (xn && yn) return a[1] - b[1];
+      if (xn) return 1;
+      if (yn) return -1;
+      const c = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y), "zh-Hant", { numeric: true });
+      return c ? c * sortDir : a[1] - b[1];
+    });
+    return out.map((x) => x[0]);
+  }, [rows, q, sortKey, sortDir]);
+  visRef.current = vis;
+  selRef.current = sel;
+
+  // 明細按需取：選中那檔＋清單上它後面 20 檔、前面 4 檔（還沒取過的），一次最多 25 檔；取過的留在 items（頁面記憶體）
+  const loadFor = useCallback(async (sym) => {
+    if (!ctx || !sum || !sym) return;
+    if (itemsRef.current[sym] || inflight.current.has(sym)) return;
+    const ord = visRef.current.some((r) => r.sym === sym) ? visRef.current.map((r) => r.sym) : rows.map((r) => r.sym);
+    const i = ord.indexOf(sym);
+    const list = [sym];
+    const push = (s) => {
+      if (list.length >= PAGE || !s || itemsRef.current[s] || inflight.current.has(s) || list.includes(s)) return;
+      list.push(s);
+    };
+    if (i >= 0) {
+      for (let k = 1; k <= 20; k++) push(ord[i + k]);
+      for (let k = 1; k <= 4; k++) push(ord[i - k]);
+      for (let k = 21; list.length < PAGE && i + k < ord.length; k++) push(ord[i + k]);
+    }
+    list.forEach((s) => inflight.current.add(s));
+    const done = () => list.forEach((s) => inflight.current.delete(s));
     try {
       const j = await api({ k: ctx.k, rid: ctx.rid, syms: list, mode: "detail" });
       if (!j || !j.ok) {
-        if (j && (j.reason === "ticket" || j.reason === "revoked")) { toGate(j.reason); return; }
+        if (j && (j.reason === "ticket" || j.reason === "revoked")) { done(); toGate(j.reason); return; }
         throw new Error((j && j.error) || "讀取失敗");
       }
-      setItems((it) => {
-        const nx = { ...it, ...j.items };
-        for (const s of j.missing || []) if (!nx[s]) nx[s] = { error: "資料缺漏" };
-        return nx;
-      });
-      setPageState((s) => ({ ...s, [p]: "done" }));
+      const nx = { ...itemsRef.current, ...(j.items || {}) };
+      for (const s of j.missing || []) if (!nx[s]) nx[s] = { error: "資料缺漏" };
+      for (const s of list) if (!nx[s]) nx[s] = { error: "資料缺漏" };
+      done();
+      itemsRef.current = nx; setItems(nx);
     } catch (e) {
-      inflight.current.delete(p);   // 失敗可重試
-      setPageState((s) => ({ ...s, [p]: undefined }));
-      setItems((it) => {
-        const nx = { ...it };
-        for (const s of list) if (!nx[s]) nx[s] = { error: String((e && e.message) || e) + "（重新整理可再試）" };
-        return nx;
-      });
+      done();   // 只把選中那檔標錯（可按重試）；順帶預取的幾檔等選到時再取
+      const nx = { ...itemsRef.current, [sym]: { error: String((e && e.message) || e) } };
+      itemsRef.current = nx; setItems(nx);
     }
   }, [ctx, sum, rows, toGate]);
 
-  // 第一批自動載入
-  useEffect(() => { if (phase === "ok" && rows.length) loadPage(0); }, [phase, rows.length, loadPage]);
+  const retry = useCallback((sym) => {
+    const nx = { ...itemsRef.current };
+    delete nx[sym];
+    itemsRef.current = nx; setItems(nx);
+    loadFor(sym);
+  }, [loadFor]);
 
-  // 捲到還沒載入的卡 → 載入那一批
+  // 預設選第一檔；網址有 #s= 且在清單裡就選它
   useEffect(() => {
-    if (phase !== "ok" || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver((ents) => {
-      for (const e of ents) {
-        if (!e.isIntersecting) continue;
-        const i = Number(e.target.getAttribute("data-idx"));
-        if (Number.isFinite(i)) loadPage(Math.floor(i / PAGE));
-      }
-    }, { rootMargin: "400px 0px" });
-    document.querySelectorAll(".ta-card[data-idx]").forEach((el) => {
-      const s = el.getAttribute("data-sym");
-      if (!items[s]) io.observe(el);
-    });
-    return () => io.disconnect();
-  }, [phase, items, loadPage]);
+    if (phase !== "ok" || selRef.current || !rows.length) return;
+    const h = hashSel.current;
+    setSel(h && rows.some((r) => r.sym === h) ? h : (visRef.current[0] || rows[0]).sym);
+  }, [phase, rows]);
 
-  // 點總表一列 → 直接跳到那張卡（用 instant 蓋過全站 html{scroll-behavior:smooth}；不用 smooth：平滑捲動會一路經過中間的卡、把沿途每一批都載入，
-  // 版面邊捲邊長，最後停不到目標）；明細載入後卡片變高，再對準一次。
-  const pendingJump = useRef("");
-  const jump = useCallback((sym) => {
-    const i = rows.findIndex((r) => r.sym === sym);
-    if (i < 0) return;
-    const el = document.getElementById("c-" + sym);
-    if (el) el.scrollIntoView({ behavior: "instant", block: "start" });
-    pendingJump.current = items[sym] ? "" : sym;
-    loadPage(Math.floor(i / PAGE));
-    setFlashSym(sym);
-    setTimeout(() => setFlashSym((x) => (x === sym ? "" : x)), 1600);
-  }, [rows, items, loadPage]);
+  // 換股：取明細、網址記住、右欄捲回頂端、左欄把選中列捲進視窗
   useEffect(() => {
-    const sym = pendingJump.current;
-    if (!sym || !items[sym]) return;
-    pendingJump.current = "";
-    requestAnimationFrame(() => {
-      const el = document.getElementById("c-" + sym);
-      if (el) el.scrollIntoView({ behavior: "instant", block: "start" });
-    });
-  }, [items]);
+    if (phase !== "ok" || !sel) return;
+    loadFor(sel);
+    try {
+      const want = "#s=" + encodeURIComponent(sel);
+      if (location.hash !== want) history.replaceState(null, "", location.pathname + location.search + want);
+    } catch (e) {}
+    if (paneRef.current) paneRef.current.scrollTop = 0;
+    const list = listRef.current;
+    if (!list) return;
+    let el = null;
+    try { el = list.querySelector('[data-sym="' + CSS.escape(sel) + '"]'); } catch (e) {}
+    if (!el) return;
+    if (firstScroll.current) {
+      firstScroll.current = false;
+      list.scrollTop = Math.max(0, el.offsetTop - list.clientHeight / 2 + el.offsetHeight / 2);
+    } else if (el.offsetTop < list.scrollTop) {
+      list.scrollTop = el.offsetTop;
+    } else if (el.offsetTop + el.offsetHeight > list.scrollTop + list.clientHeight) {
+      list.scrollTop = el.offsetTop + el.offsetHeight - list.clientHeight;
+    }
+  }, [phase, sel, loadFor]);
+
+  // 鍵盤 ↑／↓：在左欄（目前的搜尋＋排序結果）上下切換；下拉選單有焦點時讓給選單
+  useEffect(() => {
+    if (phase !== "ok") return;
+    const onKey = (e) => {
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const t = e.target, tag = t && t.tagName;
+      if (tag === "SELECT" || tag === "TEXTAREA" || (t && t.isContentEditable)) return;
+      const list = visRef.current;
+      if (!list.length) return;
+      e.preventDefault();
+      const cur = list.findIndex((r) => r.sym === selRef.current);
+      const ni = cur < 0 ? 0 : Math.max(0, Math.min(list.length - 1, cur + (e.key === "ArrowDown" ? 1 : -1)));
+      if (list[ni].sym !== selRef.current) setSel(list[ni].sym);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [phase]);
+
+  // 手動改網址 #s= 也跟著切
+  useEffect(() => {
+    if (phase !== "ok") return;
+    const onHash = () => {
+      const s = hashSym();
+      if (s && s !== selRef.current && rows.some((r) => r.sym === s)) { setSel(s); setTab("one"); }
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, [phase, rows]);
+
+  const pick = useCallback((sym) => { setSel(sym); setTab("one"); }, []);
 
   const sumCols = useMemo(() => [
     { label: "代號", cls: "code mono", render: (r) => r.sym, sort: (r) => r.sym },
-    { label: "名稱", render: (r) => r.name || "", sort: (r) => r.name || "" },
+    { label: "名稱", render: (r) => <span className="ta-nm" title={r.name || ""}>{r.name || ""}</span>, sort: (r) => r.name || "" },
     { label: "資料日", render: (r) => <>{r.asof || "—"}{r.stale ? <span className="warn" title="資料可能過期"> ⚠過期</span> : null}</>, sort: (r) => r.asof || "" },
     { label: "收盤", num: true, render: (r) => fnum(r.close), sort: (r) => (r.close == null ? null : Number(r.close)) },
     { label: "1日%", num: true, render: (r) => <span className={ud(r.chg1d)}>{fpct(r.chg1d)}</span>, sort: (r) => (r.chg1d == null ? null : Number(r.chg1d)) },
@@ -515,45 +605,94 @@ export default function TaPage() {
   const missing = sum.missing || [];
   const errs = sum.errors || {};
   const wm = sum.wm || "會員專屬";
+  const selRow = rows.find((r) => r.sym === sel) || null;
 
   return (
-    <main className="ta-root">
+    <main className="ta-root ta-app">
       <div className="ta-wm" aria-hidden="true">{Array.from({ length: 36 }, (_, i) => <span key={i}>{wm}</span>)}</div>
-      <div className="ta-badge">會員專屬</div>
-      <h1 className="ta-h1">會員專屬·技術分析資料<span className="sep">｜</span>資料截至 {asof || "—"}</h1>
-      <div className="ta-meta">
-        來源報告：<b>{sum.market === "tw" ? "台股分析" : "美股分析"} {d8(sum.report_date)}</b>
-        <span className="sep">　</span>本次 <b>{rows.length}</b> 檔{missing.length ? <>（另有 {missing.length} 檔沒有資料）</> : null}
-        {sum.generated_at ? <><span className="sep">　</span>計算時間 {String(sum.generated_at).replace("T", " ").slice(0, 16)}</> : null}
-      </div>
-      {staleN ? <div className="ta-notice">有 {staleN} 檔的資料日早於報告日（標「⚠過期」），價位以該檔資料日的收盤為準。</div> : null}
-      {missing.length ? (
-        <div className="ta-notice">沒有資料：{missing.map((s) => s + (errs[s] ? "（" + String(errs[s]).slice(0, 40) + "）" : "")).join("、")}。可能是代號不在這份報告的名單裡，或計算時抓不到行情。</div>
-      ) : null}
-
-      <div className="ta-sumwrap">
-        <div className="ta-cap">數字總表（點欄名排序、點一列跳到明細）</div>
-        {rows.length ? (
-          <div className="ta-scroll">
-            <SortTable className="ta-sum" cols={sumCols} rows={rows} rowKey={(r) => r.sym} onRowClick={(r) => jump(r.sym)} />
-          </div>
-        ) : <div className="ta-ph">這次勾選的代號都沒有資料。</div>}
-        <div className="ta-hint">
-          趨勢「多／中／空」＝長線（EMA50 對 EMA200）、中線（EMA20／50／200）、短線（收盤對 EMA20＋斜率）；REL20＝近 20 日相對大盤的百分點，不是漲幅；
-          預設停損括號內是距離收盤的百分比；信心分是條件符合幾項，不是勝率。
+      <header className="ta-head">
+        <div className="ta-hrow">
+          <span className="ta-badge">會員專屬</span>
+          <h1 className="ta-h1">會員專屬·技術分析資料<span className="sep">｜</span>資料截至 {asof || "—"}</h1>
         </div>
-      </div>
+        <div className="ta-meta">
+          來源報告：<b>{sum.market === "tw" ? "台股分析" : "美股分析"} {d8(sum.report_date)}</b>
+          <span className="sep">　</span>本次 <b>{rows.length}</b> 檔{missing.length ? <>（另有 {missing.length} 檔沒有資料）</> : null}
+          {sum.generated_at ? <><span className="sep">　</span>計算時間 {String(sum.generated_at).replace("T", " ").slice(0, 16)}</> : null}
+        </div>
+        {staleN ? <div className="ta-notice">有 {staleN} 檔的資料日早於報告日（標「⚠過期」），價位以該檔資料日的收盤為準。</div> : null}
+      </header>
 
-      {rows.map((r, i) => {
-        const p = Math.floor(i / PAGE);
-        return (
-          <Card key={r.sym} row={r} idx={i} item={items[r.sym]} state={pageState[p]} onLoad={() => loadPage(p)} flash={flashSym === r.sym} />
-        );
-      })}
+      <div className="ta-split">
+        {/* ── 左 1/4：清單（獨立捲動） ── */}
+        <aside className="ta-left" aria-label="股票清單">
+          <div className="ta-ltools">
+            <input type="search" className="ta-q" placeholder="搜尋代號／名稱" aria-label="搜尋代號或名稱" value={q}
+              onChange={(e) => setQ(e.target.value)} autoComplete="off" spellCheck={false} />
+            <div className="ta-sortrow">
+              <span>排序</span>
+              <select className="ta-sel" aria-label="排序方式" value={sortKey}
+                onChange={(e) => { const k = e.target.value; setSortKey(k); setSortDir((SORT_BY[k] || SORTS[0]).dir); e.target.blur(); }}>
+                {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+              </select>
+              <button type="button" className="ta-dir" title="反轉排序方向" onClick={() => setSortDir((x) => -x)}>{dirLabel(sortKey, sortDir)}</button>
+            </div>
+          </div>
+          <div className="ta-list" ref={listRef} role="listbox" aria-label="代號清單">
+            {vis.map((r) => {
+              const on = r.sym === sel;
+              const side = r.side === "short" ? "short" : "long";
+              return (
+                <div key={r.sym} className={"ta-li" + (on ? " on" : "")} data-sym={r.sym} role="option" aria-selected={on} onClick={() => pick(r.sym)}>
+                  <div className="l1">
+                    <b className="mono">{r.sym}</b>
+                    <span className="nm" title={r.name || ""}>{r.name || ""}</span>
+                    <span className={"ta-cf " + side} title={(side === "short" ? "空方" : "多方") + "信心分（條件符合幾項，不是勝率）"}>{side === "short" ? "空" : "多"} {fnum(r.conf)}</span>
+                  </div>
+                  <div className="l2">
+                    <span className="mono">{fnum(r.close)}</span>
+                    <span className={"mono " + ud(r.chg1d)}>{fpct(r.chg1d)}</span>
+                    <span className={r.state === "多頭" ? "up" : r.state === "空頭" ? "dn" : "mut"}>{r.state || "—"}</span>
+                    {r.stale ? <span className="warn" title="資料可能過期">⚠過期</span> : null}
+                  </div>
+                </div>
+              );
+            })}
+            {!vis.length ? <div className="ta-lempty">{rows.length ? "沒有符合搜尋的代號" : "這次勾選的代號都沒有資料"}</div> : null}
+          </div>
+          <div className="ta-lfoot">
+            共 <b>{rows.length}</b> 檔{q.trim() ? <>（符合搜尋 {vis.length} 檔）</> : null}｜缺資料 <b>{missing.length}</b> 檔
+            {missing.length ? <>（{missing.map((s, i) => <span key={s} title={errs[s] ? String(errs[s]) : "不在這份報告的名單裡，或計算時抓不到行情"}>{i ? "、" : ""}{s}</span>)}）</> : null}
+          </div>
+        </aside>
 
-      <div className="ta-foot">
-        以上數字全由寫死的技術規則計算（均線、結構高低點、ADX、ATR、相對強弱），沒有經過回測校準；信心分是條件符合幾項，不是勝率；
-        停損的主要用途是把尾部風險壓住，不是保證獲利。本頁為會員專屬資料，請勿轉傳。
+        {/* ── 右 3/4：單檔明細｜全部總表（各自捲動） ── */}
+        <div className="ta-right">
+          <div className="ta-tabs" role="tablist">
+            <button type="button" role="tab" aria-selected={tab === "one"} className={"ta-tab" + (tab === "one" ? " on" : "")} onClick={() => setTab("one")}>單檔明細</button>
+            <span className="sep">｜</span>
+            <button type="button" role="tab" aria-selected={tab === "all"} className={"ta-tab" + (tab === "all" ? " on" : "")} onClick={() => setTab("all")}>全部總表</button>
+            <span className="ta-kbd">鍵盤 ↑／↓ 切換股票</span>
+          </div>
+          <div className="ta-pane" ref={paneRef} hidden={tab !== "one"}>
+            {selRow ? <One row={selRow} item={items[selRow.sym]} onRetry={() => retry(selRow.sym)} />
+              : <div className="ta-ph">{rows.length ? "從左邊清單選一檔。" : "這次勾選的代號都沒有資料。"}</div>}
+            <div className="ta-foot">
+              以上數字全由寫死的技術規則計算（均線、結構高低點、ADX、ATR、相對強弱），沒有經過回測校準；信心分是條件符合幾項，不是勝率；
+              停損的主要用途是把尾部風險壓住，不是保證獲利。本頁為會員專屬資料，請勿轉傳。
+            </div>
+          </div>
+          <div className="ta-pane ta-pane-all" hidden={tab !== "all"}>
+            <div className="ta-allcap">數字總表（點欄名排序、點一列看那一檔的明細）</div>
+            {rows.length ? (
+              <SortTable className="ta-sum" cols={sumCols} rows={rows} rowKey={(r) => r.sym} onRowClick={(r) => pick(r.sym)} rowClass={(r) => (r.sym === sel ? "sel" : "")} />
+            ) : <div className="ta-ph">這次勾選的代號都沒有資料。</div>}
+            <div className="ta-hint">
+              趨勢「多／中／空」＝長線（EMA50 對 EMA200）、中線（EMA20／50／200）、短線（收盤對 EMA20＋斜率）；REL20＝近 20 日相對大盤的百分點，不是漲幅；
+              預設停損括號內是距離收盤的百分比；信心分是條件符合幾項，不是勝率。
+            </div>
+          </div>
+        </div>
       </div>
     </main>
   );

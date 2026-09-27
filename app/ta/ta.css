@@ -10,15 +10,69 @@ html[data-theme="light"] .ta-root{ --ta-cyan:#00708a; --ta-muted:#5f6670; }
 .ta-root .up{color:var(--red)} .ta-root .dn{color:var(--green)} .ta-root .mut{color:var(--dim)}
 .ta-root .warn{color:var(--yellow)}
 
+/* 版面（Yoda 2026-09-27）：整頁不捲；頁首固定，下面左 1/4 清單、右 3/4 明細各自捲動 */
+.ta-root.ta-app{max-width:1600px;height:100vh;display:flex;flex-direction:column;overflow:hidden;padding:14px 20px 16px}
+.ta-head{flex:none;padding-right:290px}  /* 右上角讓給站內控制列（字級／深淺） */
+.ta-split{flex:1;min-height:0;display:grid;grid-template-columns:minmax(260px,25%) minmax(0,1fr);gap:16px;margin-top:12px}
+
 /* 頁首 */
 .ta-badge{display:inline-block;font-size:calc(12.5px*var(--scale));font-weight:700;letter-spacing:.08em;color:#1a1200;
   background:var(--gold-lg);border-radius:999px;padding:2px 12px;margin-bottom:10px}
+.ta-hrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.ta-hrow .ta-badge{margin:0;flex:none}
 .ta-h1{font-size:calc(28px*var(--scale));font-weight:700;line-height:1.3;margin:0 0 6px}
+.ta-hrow .ta-h1{margin:0}
 .ta-h1 .sep{color:var(--dim);font-weight:400;margin:0 8px}
 .ta-meta{color:var(--dim);font-size:calc(13.5px*var(--scale))}
+.ta-head .ta-meta{margin-top:4px}
 .ta-meta b{color:var(--text);font-weight:600}
 .ta-notice{margin:12px 0;padding:8px 12px;border-left:3px solid var(--yellow);background:var(--surface);border-radius:4px;
   font-size:calc(13.5px*var(--scale))}
+.ta-head .ta-notice{margin:8px 0 0;padding:5px 12px}
+
+/* 左欄：清單 */
+.ta-left,.ta-right{display:flex;flex-direction:column;min-height:0;background:var(--surface);
+  border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.ta-ltools{flex:none;display:flex;flex-direction:column;gap:8px;padding:10px 10px 9px;border-bottom:1px solid var(--border)}
+.ta-q,.ta-sel{font:inherit;font-size:calc(14px*var(--scale));color:var(--text);background:var(--bg);border:1px solid var(--border);
+  border-radius:8px;padding:5px 10px;outline:none}
+.ta-q{width:100%}
+.ta-q:focus,.ta-sel:focus{border-color:var(--accent)}
+.ta-sortrow{display:flex;align-items:center;gap:6px;font-size:calc(13px*var(--scale));color:var(--dim)}
+.ta-sel{flex:1;min-width:0;padding:4px 8px;cursor:pointer}
+.ta-dir{flex:none;font:inherit;font-size:calc(12.5px*var(--scale));color:var(--text);background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;padding:4px 9px;cursor:pointer;white-space:nowrap}
+.ta-dir:hover{border-color:var(--accent)}
+.ta-list{flex:1;min-height:0;overflow-y:auto;position:relative;overscroll-behavior:contain}
+.ta-li{padding:6px 12px 7px 9px;border-bottom:1px solid var(--divider);border-left:3px solid transparent;cursor:pointer;user-select:none}
+.ta-li:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.ta-li.on{background:color-mix(in srgb,var(--accent) 20%,transparent);border-left-color:var(--accent)}
+.ta-li .l1{display:flex;align-items:center;gap:8px;min-width:0;line-height:1.45}
+.ta-li .l1 b{flex:none;font-weight:700;font-size:calc(14.5px*var(--scale))}
+.ta-li .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dim);font-size:calc(13px*var(--scale))}
+.ta-li .l2{display:flex;align-items:baseline;gap:10px;font-size:calc(13px*var(--scale));line-height:1.45;margin-top:1px}
+.ta-cf{flex:none;font-size:calc(12px*var(--scale));line-height:1.45;padding:0 7px;border-radius:999px;border:1px solid var(--border);
+  background:var(--surface2);white-space:nowrap}
+.ta-cf.long{color:var(--red);border-color:color-mix(in srgb,var(--red) 45%,transparent)}
+.ta-cf.short{color:var(--green);border-color:color-mix(in srgb,var(--green) 45%,transparent)}
+.ta-lempty{padding:18px 12px;color:var(--dim);font-size:calc(13.5px*var(--scale))}
+.ta-lfoot{flex:none;padding:8px 12px;border-top:1px solid var(--border);color:var(--dim);font-size:calc(12.5px*var(--scale));
+  max-height:8em;overflow:auto;line-height:1.55}
+.ta-lfoot b{color:var(--text);font-weight:600}
+
+/* 右欄：分頁＋內容 */
+.ta-tabs{flex:none;display:flex;align-items:center;gap:2px;padding:7px 12px;border-bottom:1px solid var(--border)}
+.ta-tabs .sep{color:var(--dim);margin:0 2px}
+.ta-tab{font:inherit;font-size:calc(14px*var(--scale));color:var(--dim);background:none;border:1px solid transparent;border-radius:8px;
+  padding:3px 14px;cursor:pointer}
+.ta-tab:hover{color:var(--text)}
+.ta-tab.on{color:var(--text);background:var(--surface2);border-color:var(--border);font-weight:700}
+.ta-kbd{margin-left:auto;color:var(--dim);font-size:calc(12px*var(--scale))}
+.ta-pane{flex:1;min-height:0;overflow:auto;padding:14px 20px 18px;container-type:inline-size;overscroll-behavior:contain}
+.ta-pane[hidden]{display:none}
+.ta-pane-all{padding:0}
+.ta-allcap{font-weight:700;font-size:calc(14.5px*var(--scale));padding:10px 14px 8px}
+.ta-pane-all .ta-hint{padding:0 14px 14px}
 
 /* 閘門訊息 */
 .ta-gate{max-width:560px;margin:120px auto;text-align:center;background:var(--surface);border:1px solid var(--border);
@@ -38,23 +92,23 @@ html[data-theme="light"] .ta-root{ --ta-cyan:#00708a; --ta-muted:#5f6670; }
 .ta-tbl tbody tr.on td{font-weight:600;color:var(--text)}
 .ta-cap{font-weight:700;font-size:calc(14.5px*var(--scale));margin:0 0 6px}
 
-/* 總表：十列視窗（表頭黏住） */
-.ta-sumwrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin:18px 0 10px}
-.ta-scroll{max-height:calc(33px*11*var(--scale));overflow:auto;border:1px solid var(--divider);border-radius:8px}
+/* 全部總表（右欄分頁；表頭黏在分頁頂端） */
 .ta-sum tbody tr{cursor:pointer}
 .ta-sum tbody tr:hover td{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.ta-sum tbody tr.sel td{background:color-mix(in srgb,var(--accent) 20%,transparent)}
 .ta-sum td.code{font-weight:700}
+.ta-sum th,.ta-sum td{padding-left:5px;padding-right:5px}
+.ta-sum th:first-child,.ta-sum td:first-child{padding-left:14px}
+.ta-sum th:last-child,.ta-sum td:last-child{padding-right:14px}
+.ta-nm{display:inline-block;max-width:8em;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}  /* 全名看左欄／明細；1280 寬時總表不用橫捲 */
 .ta-tr{display:inline-flex;gap:3px}
 .ta-tr span{display:inline-block;min-width:1.6em;text-align:center;border-radius:4px;padding:0 3px;font-size:.92em;
   background:var(--surface2)}
 .ta-hint{color:var(--dim);font-size:calc(12.5px*var(--scale));margin-top:8px}
 
-/* 明細卡 */
-.ta-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px 18px;margin:0 0 22px;
-  scroll-margin-top:70px}
-.ta-card.flash{box-shadow:0 0 0 2px var(--accent)}
+/* 單檔明細 */
 .ta-ch{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;border-bottom:1px solid var(--divider);padding-bottom:10px;margin-bottom:12px}
-.ta-ch h2{font-size:calc(22px*var(--scale));font-weight:700}
+.ta-ch h2{font-size:calc(22px*var(--scale));font-weight:700;margin:0}  /* 蓋掉全站 h2 的 margin-bottom，右欄高度有限 */
 .ta-ch h2 .mono{margin-right:8px}
 .ta-px{font-size:calc(18px*var(--scale))}
 .ta-chip{font-size:calc(12.5px*var(--scale));padding:1px 9px;border-radius:999px;background:var(--surface2);
@@ -67,8 +121,9 @@ html[data-theme="light"] .ta-root{ --ta-cyan:#00708a; --ta-muted:#5f6670; }
 .ta-btn{font:inherit;font-size:calc(13px*var(--scale));color:var(--text);background:var(--surface2);border:1px solid var(--border);
   border-radius:8px;padding:5px 14px;cursor:pointer}
 .ta-btn:hover{border-color:var(--accent)}
-.ta-err{padding:14px;border:1px dashed var(--border);border-radius:8px;color:var(--yellow)}
+.ta-err{padding:14px;border:1px dashed var(--border);border-radius:8px;color:var(--yellow);display:flex;align-items:center;gap:14px}
 .ta-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px 26px;margin-top:4px}
+@container (max-width:980px){ .ta-cols{grid-template-columns:minmax(0,1fr)} }  /* 右欄不夠寬時四個區塊改單欄，表格不擠 */
 .ta-block{margin-bottom:6px}
 .ta-kv th{color:var(--dim);font-weight:500;width:1%;cursor:default;position:static;background:none;border-bottom:1px solid var(--divider)}
 .ta-inv{background:var(--surface2);border-radius:8px;padding:9px 12px;font-size:calc(13.5px*var(--scale))}
@@ -100,3 +155,4 @@ svg.ta-k .lastc{fill:var(--text)}
   align-content:space-around;justify-content:space-around;gap:90px 60px;padding:40px;opacity:.07}
 .ta-wm span{transform:rotate(-22deg);font-size:15px;white-space:nowrap;color:var(--text);user-select:none}
 .ta-foot{color:var(--dim);font-size:calc(12.5px*var(--scale));margin-top:30px;border-top:1px solid var(--divider);padding-top:12px}
+.ta-pane .ta-foot{margin-top:22px}
