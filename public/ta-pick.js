@@ -1,5 +1,21 @@
 /* ═══════════════════════════════════════════════════════════════
-   Yoda 名單挑股器 · ta-pick.js（正本，v1.1／2026-09-14）
+   Yoda 名單挑股器 · ta-pick.js（正本，v1.2／2026-09-27；v1.1／2026-09-14）
+
+   ── v1.2 新增（script 標籤上的選填屬性；**一個都沒給＝行為跟 v1.1 一樣**，本機 /r 靠這點）──
+   <script src="…/ta-pick.js?v=1.2" data-ta-url="…/ta"
+           data-ta-max="200"          一次最多幾檔（預設 15，範圍 1～200）
+           data-ta-k="<TA 通行票>"    放進連結的 hash：…#k=<票>（**只放 hash、不放 query**：不進伺服器紀錄）
+           data-ta-rid="<reportId>"   放進連結 query：&r=<reportId>
+           data-ta-autotag            （或 data-ta-auto="tw"）台股表自動打標：thead 第一格純文字＝「代號」、
+                                      tbody 列第一格符合 ^\d{4,6}[A-Z]?$ → 補 table[data-ta="tw"]＋tr[data-sym]
+                                      （規則同 token_server.py tw_tag_tables；已有 data-ta 的表不動；
+                                      自動打標的表之後 tbody 重畫，新列也會再補標）
+   ></script>
+   · 連結：${TA_URL}?t=A,B&d=YYYYMMDD[&r=<rid>][#k=<票>]；TA_URL 本身已含 ? 時用 & 接。
+   · 每張名單表上方多一顆「整張表送出」（table caption 裡的 <a target=_blank>）：送該表**所有**列的代號
+     （含捲到視窗外、被收合的列），照目前排序取前 MAX 檔；超過上限時按鈕文字直接寫「前 N 檔（本表 M 檔）」。
+     不動勾選狀態。表只有 0～1 列、或沒設 TA 頁網址時不顯示。
+   · MAX > 15 時，全選格的說明改成「勾選本表目前排序的前 N 檔」（捲動容器裡視窗外的列也算可見）。
    名單表格最左邊長出一欄核取方塊 → 右下角浮動鈕 → 新視窗開技術分析頁。
    純 vanilla、零依賴、mount 冪等（母板那種重畫 tbody 的表也吃得住）。
 
@@ -66,19 +82,35 @@
 (function(){
 "use strict";
 
-var MAX=15;                                        /* 一次最多丟幾檔 */
+/* script 標籤上的設定只能在同步執行期讀（currentScript 之後會變 null），先一次抓住 */
+var CFG=(function(){
+  var o={url:"",k:"",rid:"",max:"",auto:false};
+  try{
+    var s=document.currentScript, ds=s&&s.dataset;
+    if(ds){
+      if(ds.taUrl) o.url=String(ds.taUrl).trim();
+      if(ds.taK) o.k=String(ds.taK).trim();
+      if(ds.taRid) o.rid=String(ds.taRid).trim();
+      if(ds.taMax) o.max=String(ds.taMax).trim();
+      var av=s.hasAttribute("data-ta-autotag")?String(ds.taAutotag||"tw"):(ds.taAuto!=null?String(ds.taAuto):"");
+      av=av.trim().toLowerCase();
+      o.auto=(av==="tw"||av==="1"||av==="true");
+    }
+  }catch(e){}
+  return o;
+})();
+var DS_URL=CFG.url;
+
+/* 上限：data-ta-max（1～200），沒給＝15（v1.1）。下面三句提示一定要在 MAX 定好之後才組 */
+var MAX=(function(){ var n=parseInt(CFG.max,10); return (n>0)?Math.min(200,n):15; })();
 var CAP="一次最多 "+MAX+" 檔，先取消或清除";        /* 達上限時的 hover 說明 */
 var CAPBAR="已達上限 "+MAX+" 檔：取消或清除後才能再勾";  /* 浮動列獨立一行的提示 */
 var HINT="勾選後用右下角按鈕丟到技術分析頁（一次最多 "+MAX+" 檔）";
+/* MAX>15 時全選的真實行為＝照目前排序（DOM 順序）勾前 MAX 列；捲動容器裡視窗外的列也算可見 */
+var ALLHINT=MAX>15?"勾選本表目前排序的前 "+MAX+" 檔":"";
 var SS="tapick:";                                  /* sessionStorage key 前綴 */
 var STORE=new Map();                               /* 狀態真相：Map<key,Set<sym>>，key=tapick:市場:報告日 */
 var warned=false;                                  /* TA 頁網址沒設定只警告一次 */
-
-/* data-ta-url 只能在 script 同步執行期讀（currentScript 之後會變 null），先抓住 */
-var DS_URL=(function(){
-  try{ var s=document.currentScript; if(s&&s.dataset&&s.dataset.taUrl) return String(s.dataset.taUrl).trim(); }catch(e){}
-  return "";
-})();
 /* window.TA_PICK_URL 可能比本檔晚設定，所以每次要用的時候才解析 */
 function taUrl(){
   if(DS_URL) return DS_URL;
@@ -168,7 +200,16 @@ function ensureCss(){
   +"#ta-pick-bar.ta-pick-bar--cap .ta-pick-cap{font-weight:700;color:color-mix(in srgb,var(--yellow,#f0c040) 80%,#fff)}"
   +"#ta-pick-bar .ta-pick-clear{font-size:11.5px;color:var(--dim,#405060);background:none;border:0;padding:2px 4px;cursor:pointer;text-decoration:underline;font-family:inherit}"
   +"#ta-pick-bar .ta-pick-clear:hover{color:var(--text,#b8c8d8)}"
-  +"@media print{#ta-pick-bar{display:none}}";
+  /* v1.2 整張表送出：放在 table 的 caption（不動 thead／tbody，母板 sortTbl 的欄號不受影響）；
+     包一層 sticky 的 span，表格橫向捲動時按鈕留在左邊 */
+  +"table[data-ta]>caption.ta-pick-caption{caption-side:top;text-align:left;padding:2px 0 5px;margin:0;border:0;background:none}"
+  +"table[data-ta]>caption .ta-pick-sendwrap{display:inline-block;position:sticky;left:0}"
+  +"table[data-ta]>caption .ta-pick-sendwrap[hidden]{display:none}"
+  +"table[data-ta]>caption a.ta-pick-sendall{display:inline-block;font-family:var(--fm,ui-monospace,Consolas,monospace);font-size:11.5px;font-weight:600;line-height:1.5;"
+   +"color:var(--accent,#7f9fc6);text-decoration:none;white-space:nowrap;padding:1px 9px;border-radius:6px;"
+   +"border:1px solid color-mix(in srgb,var(--accent,#7f9fc6) 45%,transparent);background:transparent;cursor:pointer}"
+  +"table[data-ta]>caption a.ta-pick-sendall:hover{background:color-mix(in srgb,var(--accent,#7f9fc6) 13%,transparent)}"
+  +"@media print{#ta-pick-bar{display:none}table[data-ta]>caption .ta-pick-sendwrap{display:none}}";
   (document.head||document.documentElement).appendChild(st);
 }
 
@@ -220,9 +261,28 @@ function mount(table){
     th.title=hintOf(table);
     var all=document.createElement("input");
     all.type="checkbox"; all.className="ta-pick-all";
-    all.setAttribute("aria-label","全選本表可見列");
+    all.setAttribute("aria-label",ALLHINT||"全選本表可見列");
     th.appendChild(all);
     hr.insertBefore(th,hr.firstChild);
+  }
+
+  /* ①b v1.2「整張表送出」鈕（caption 內；已有 caption 就附在後面）。顯示與否、文字在 paint() 更新 */
+  if(!table.__taSend||!table.contains(table.__taSend)){
+    var capEl=table.caption;
+    if(!capEl){ capEl=table.createCaption(); capEl.className="ta-pick-caption"; }
+    var wrap=document.createElement("span"); wrap.className="ta-pick-sendwrap"; wrap.hidden=true;
+    var sa=document.createElement("a");
+    sa.className="ta-pick-sendall"; sa.target="_blank"; sa.rel="noopener";
+    sa.setAttribute("data-ta-market",market);
+    var arm=function(){ var h=hrefAll(table); if(h) sa.href=h; else sa.removeAttribute("href"); return h; };
+    /* href 在按下前一刻才組（mousedown／focus 先寫好，ctrl+click、中鍵也拿得到）：
+       不在每次重畫時掃整張表，3,000 列才不會變慢 */
+    sa.addEventListener("mousedown",arm);
+    sa.addEventListener("focus",arm);
+    sa.addEventListener("click",function(e){ if(!arm()) e.preventDefault(); });
+    wrap.appendChild(sa);
+    capEl.appendChild(wrap);
+    table.__taSend=sa;
   }
 
   /* ② 每列最左插 td（已有就跳過）。迴圈內只寫 DOM、不讀 layout。 */
@@ -274,12 +334,38 @@ function paint(table){
     var mid=on>0&&on<n;
     if(allCb.indeterminate!==mid) allCb.indeterminate=mid;
     if(allCb.disabled!==(n===0)) allCb.disabled=(n===0);
-    var t=full?CAP:hintOf(table);
+    var t=full?CAP:(ALLHINT?ALLHINT+"｜"+hintOf(table):hintOf(table));
     if(allCb.title!==t) allCb.title=t;
     var pth=allCb.parentNode;
     if(pth&&pth.title!==t) pth.title=t;                 /* 全選格本身也帶同一個說明 */
   }
+  /* v1.2 整張表送出：只更新文字與顯示（比對後才寫），不掃表、不組 href */
+  var sa=table.__taSend;
+  if(sa){
+    var hide=(n<2)||!taUrl();
+    var w=sa.parentNode;
+    if(w&&w.hidden!==hide) w.hidden=hide;
+    if(!hide){
+      var lab=n>MAX?"整張表送出前 "+MAX+" 檔（本表 "+n+" 檔）↗":"整張表送出 "+n+" 檔 ↗";
+      var tt=n>MAX?"本表 "+n+" 檔，一次最多 "+MAX+" 檔：照目前排序送前 "+MAX+" 檔（想換一批先排序）。不影響勾選。"
+                  :"把本表全部 "+n+" 檔（含捲到外面的列）一次丟到技術分析頁。不影響勾選。";
+      if(sa.textContent!==lab) sa.textContent=lab;
+      if(sa.title!==tt) sa.title=tt;
+    }
+  }
 }
+
+/* ---------- v1.2 整張表送出：該表所有列（不看可見性），目前 DOM 順序、去重、截到 MAX ---------- */
+function symsAll(table){
+  var rows=table.querySelectorAll("tbody tr[data-sym]"), out=[], seen={};
+  for(var i=0;i<rows.length&&out.length<MAX;i++){
+    var s=(rows[i].getAttribute("data-sym")||"").trim();
+    if(!s||seen[s]) continue;
+    seen[s]=1; out.push(s);
+  }
+  return out;
+}
+function hrefAll(table){ return buildHref(symsAll(table)); }
 
 /* ---------- 勾／取消單檔 ---------- */
 function pick(table,sym,on){
@@ -297,6 +383,9 @@ function pick(table,sym,on){
 function toggleAll(table,on){
   var market=marketOf(table); if(!market) return;
   var key=keyOf(market), set=bucket(key), i;
+  /* v1.2：列數比上限多的表，全選後格子是「半勾」，再按一下瀏覽器會把它當「全選」——但已經滿了、什麼都加不進去，
+     看起來像按鈕壞掉。滿了而且本表有勾 → 當成「取消本表」。 */
+  if(on&&set.size>=MAX&&table.querySelector("input.ta-pick-cb:checked")) on=false;
   if(on){
     /* 勾：掃列，勾到上限就 break——最多讀 15 列的 offsetParent */
     var rows=table.querySelectorAll("tbody tr[data-sym]");
@@ -351,10 +440,17 @@ function ensureBar(){
   document.body.appendChild(bar);
   return bar;
 }
-function hrefFor(g){
-  var u=taUrl(); if(!u||!g||!g.syms.length) return "";
-  return u+(u.indexOf("?")<0?"?":"&")+"t="+g.syms.map(encodeURIComponent).join(",")+"&d="+encodeURIComponent(repDate());
+/* 連結：${TA_URL}?t=…&d=…[&r=rid][#k=票]。TA_URL 已含 ? 就用 & 接；TA_URL 自帶的 #… 先拿掉（不然參數會落進 hash）。
+   通行票只放 hash：hash 不會送到伺服器、不進存取紀錄，/ta 頁讀完就用 replaceState 抹掉。 */
+function buildHref(syms){
+  var u=taUrl(); if(!u||!syms||!syms.length) return "";
+  var hi=u.indexOf("#"); if(hi>=0) u=u.slice(0,hi);
+  var h=u+(u.indexOf("?")<0?"?":"&")+"t="+syms.map(encodeURIComponent).join(",")+"&d="+encodeURIComponent(repDate());
+  if(CFG.rid) h+="&r="+encodeURIComponent(CFG.rid);
+  if(CFG.k) h+="#k="+encodeURIComponent(CFG.k);
+  return h;
 }
+function hrefFor(g){ return g?buildHref(g.syms):""; }
 function goBtn(g,label,live){
   var a=document.createElement("a");
   a.className="ta-pick-go"+(live?"":" off");
@@ -392,8 +488,45 @@ function renderBar(){
   if(bar.classList.contains("ta-pick-bar--cap")!==atCap) bar.classList[atCap?"add":"remove"]("ta-pick-bar--cap");
 }
 
+/* ---------- v1.2 台股表自動打標（script 有 data-ta-autotag 或 data-ta-auto="tw" 才跑）----------
+   規則同 token_server.py tw_tag_tables：
+     · 表：沒有 data-ta，且 thead 第一列第一格是 th、純文字剛好是「代號」
+     · 列：tbody 的直屬列、沒有 data-sym、第一格是 td 且純文字符合 ^\d{4,6}[A-Z]?$ → 補 data-sym
+     · 至少一列符合才把表標成 data-ta="tw"
+   自動打標過的表（本模組標的，或伺服器端補標並帶 data-ta-autotagged 的）之後 tbody 重畫，新列會再補標；
+   報告作者自己寫 data-ta 的表一律不碰。只寫屬性、不讀 layout。 */
+var TW_CODE=/^\d{4,6}[A-Z]?$/;
+function tagRows(t){
+  var n=0, bs=t.tBodies;
+  for(var b=0;b<bs.length;b++){
+    var rs=bs[b].rows;
+    for(var i=0;i<rs.length;i++){
+      var tr=rs[i];
+      if(tr.hasAttribute("data-sym")) continue;
+      var f=tr.firstElementChild;
+      if(!f||f.nodeName!=="TD") continue;
+      var code=(f.textContent||"").trim();
+      if(TW_CODE.test(code)){ tr.setAttribute("data-sym",code); n++; }
+    }
+  }
+  return n;
+}
+function autoTag(){
+  if(!CFG.auto) return;
+  var ts=document.querySelectorAll("table");
+  for(var i=0;i<ts.length;i++){
+    var t=ts[i];
+    if(t.__taAuto||t.hasAttribute("data-ta-autotagged")){ t.__taAuto=true; tagRows(t); continue; }
+    if(t.hasAttribute("data-ta")) continue;
+    var hr=t.tHead&&t.tHead.rows[0], c=hr&&hr.firstElementChild;
+    if(!c||c.nodeName!=="TH"||(c.textContent||"").trim()!=="代號") continue;
+    if(tagRows(t)>0){ t.setAttribute("data-ta","tw"); t.__taAuto=true; }
+  }
+}
+
 /* ---------- 對外 ---------- */
 function mountAll(){
+  autoTag();
   var ts=document.querySelectorAll("table[data-ta]");
   for(var i=0;i<ts.length;i++) mount(ts[i]);
   renderBar();
@@ -438,13 +571,15 @@ function watch(){
         if((n.matches&&n.matches("table[data-ta]"))
           ||(n.querySelector&&n.querySelector("table[data-ta]"))
           ||(n.closest&&n.closest("table[data-ta]"))){ schedule(); return; }
+        /* v1.2 自動打標開著時，後來才渲染出來、還沒標的表（含 thead 的 table）也要吃到 */
+        if(CFG.auto&&((n.matches&&n.matches("table"))||(n.querySelector&&n.querySelector("table thead")))){ schedule(); return; }
       }
     }
   }).observe(document.documentElement,{subtree:true,childList:true});
 }
 
 window.TAPick={mount:mount,mountAll:mountAll,refresh:refresh,state:state,clear:clear,MAX:MAX,
-               _date:repDate,_url:taUrl};
+               _date:repDate,_url:taUrl,_href:buildHref,_hrefAll:hrefAll,version:"1.2"};
 
 if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",function(){ mountAll(); watch(); });
 else { mountAll(); watch(); }
