@@ -27,11 +27,13 @@ export async function POST(req) {
     const pays = await sql`SELECT DISTINCT lower(email) AS e FROM payments WHERE email <> ''`;
     const paidSet = new Set(pays.map((r) => r.e));
     // 技術分析名單（ta_access 表）一起帶出來；表還沒建（migration 沒跑）就退回原查詢，名單不能因此掛掉
-    let rows;
+    // ★退回時不帶 ta_access 欄位：主控台靠「有沒有這個欄位」判斷要不要把開關整欄降級成「無法讀取權限名單」
+    let rows, hasTa = true;
     try {
       rows = await sql`SELECT m.*, COALESCE(t.enabled, false) AS ta_access FROM members m LEFT JOIN ta_access t ON t.member_id = m.member_id`;
     } catch (e) {
       rows = await sql`SELECT * FROM members`;
+      hasTa = false;
     }
     members = rows.map((m) => {
       const inPay = paidSet.has(String(m.email || '').toLowerCase());
@@ -47,7 +49,7 @@ export async function POST(req) {
         earned_months: computeEarnedMonths(pp, rpc, m.plan || ''), granted: Number(m.earned_free_months) || 0,
         next_charge_date: fmtDate(m.next_charge_date),
         ex_founding: m.ex_founding || '',
-        ta_access: m.ta_access === true,
+        ...(hasTa ? { ta_access: m.ta_access === true } : {}),
         certs: { mw: fmtDate(m.cert_mw), tw: fmtDate(m.cert_tw), us: fmtDate(m.cert_us), key: fmtDate(m.cert_key), macro: fmtDate(m.cert_macro) },
       };
     });
