@@ -1,5 +1,22 @@
 /* ═══════════════════════════════════════════════════════════════
-   Yoda 名單挑股器 · ta-pick.js（正本，v1.3／2026-09-27；v1.2／2026-09-27；v1.1／2026-09-14）
+   Yoda 名單挑股器 · ta-pick.js（正本，v1.3.1／2026-09-27；v1.3／2026-09-27；v1.2／2026-09-27；v1.1／2026-09-14）
+
+   ── v1.3.1：overlay 勾選格在橫捲容器裡固定在左側（台股 §05 名單區改 overflow-x:auto 之後）──
+   · overlay 格子改兩層：span.ta-pick-cell--ov＝鋪滿整列的絕對定位軌道（pointer-events:none、不佔 grid 格子）
+     ＞ span.ta-pick-stk＝position:sticky 的勾選框格（寬＝--ta-ovpad、z-index:1）＞ input。列往左捲時勾選框貼在
+     「最近捲動容器」可視區最左、捲動中照樣能勾；grid 六軌、padding、勾選框位置在 scrollLeft=0 時與 v1.3 逐像素相同。
+   · overlay 的 data-ta-pad 表頭列也插一個同構的空白留位格（aria-hidden、第一個子元素），表頭跟著捲時留位區固定。
+     表頭留位格預設 left＝-留位寬：§05 的表頭自己就是捲動容器（overflow:hidden＋JS 同步 scrollLeft），sticky 從
+     捲動容器扣掉 padding 的內容框量起，要退回本模組加的那段 padding。表頭是被外層容器帶著捲時，JS 自動改回 0。
+   · 底色：容器裡有元素捲離最左（scrollLeft≠0）時，data-ta 容器加 .ta-pick-hs → 勾選格與表頭留位格上卡片底色
+     var(--ta-cellbg, var(--surface, …))（已勾的列再疊勾選色）；全部回到最左就拿掉——不捲的容器永遠是 v1.3 的透明格。
+     卡片底色不是 --surface（例：漸層卡）→ 在卡片上設 --ta-cellbg。
+   · 列自己是捲動容器（例：列設 overflow:hidden 做省略號）：掛上時讀第一列 overflow-x（跟 padding 同一次讀），
+     容器寫 --ta-stkl，勾選框不會被推到留位區右邊。
+   · 限制：捲動容器要在 data-ta 容器裡面（或就是它）——包在容器外面的捲動（整頁橫捲）勾選框仍會貼住，但不會上底色。
+     全選／整張表送出的頂端列不在捲動容器裡（§05 是），在的話會跟著捲走。
+   · 結構變更（只影響 overlay）：列的勾選框從 cell>input 變成 cell>stk>input；overlay 表頭多一個第一個子元素
+     （.ta-pick-cell--pad）。table 模式、prepend 模式完全不變。
 
    ── v1.3 新增：不是 table 的清單（div 格線／flex 列；台股 §05 法人籌碼四型態）──
    **table 的行為完全不變**（仍是 table[data-ta] ＋ tbody tr[data-sym]）；新增的是：
@@ -16,7 +33,7 @@
      · 容器最前面插一條 <div class="ta-pick-head">：「全選」＋「整張表送出」（語意同 table 版：全選只勾可見列、
        受上限；整張表送出＝該容器全部列、照 DOM 順序截到上限）。容器裡 0 列有 data-sym 時整條隱藏。
      · 容器上選填 data-ta-cell="overlay|prepend"（**預設 overlay**）：
-         overlay＝勾選格絕對定位在列左側（不佔 grid／flex 的格子），列加 class ta-pick-ov、
+         overlay＝勾選格絕對定位在列左側（不佔 grid／flex 的格子；v1.3.1 起裡面是 sticky 格，見上），列加 class ta-pick-ov、
                   padding-left＝原本的值＋26px（原本的值：每個容器讀第一列一次 getComputedStyle，之後快取）；
                   data-ta-pad 的表頭列同樣加 26px（讀它自己的原值），所以**每一欄**都跟表頭對齊。
                   為什麼預設 overlay：§05 的 .c3-srow 是 display:grid、六條固定軌道
@@ -35,6 +52,9 @@
      §05 單卡最多約 380 列、收合的卡不排版，無感；單一容器上千列的清單改用 prepend 或拆成多個容器。
    ⚠ overlay 讓列的內容往右移 26px：列若本來就比容器寬（§05 窄卡 532.5px 時六欄已超出、右側被 overflow 裁掉），
      會多裁 26px——那是版面本身的問題，要在列樣板的欄寬處理，不是這支檔能補的。
+     （§05 已由 TW 改成名單區 overflow-x:auto＋列 min-width＋表頭同步捲；v1.3.1 讓勾選格在捲動中固定左側。）
+   ⚠ v1.3.1 sticky 的 z-index 放在 .ta-pick-stk、不放在軌道：軌道若自成堆疊層，Chrome 會每列多開兩個合成層
+     （3,000 列實測 6,006 層）；現在同一捲動容器的勾選格併成一層（3,000 列 8 層、§05 開 A 卡 47 層，v1.3 為 6／44）。
    ⚠ 容器不可巢狀、列不可巢狀（一個 data-sym 列只屬於一個容器）；div 容器裡的 <tr> 不算列。
    ⚠ 列的第一個子元素會變成勾選格：列內樣式若用 >:first-child／:nth-child(n) 定位欄位會整排位移（同 table 版坑③）。
    ⚠ 列上的 click（例：chip-render 點列展開明細）不會被勾選格觸發：容器在 capture 階段把勾選格／全選的 click 吃掉。
@@ -253,7 +273,25 @@ function ensureCss(){
   +".ta-pick-cell{display:inline-flex;align-items:center;justify-content:center;flex:none;box-sizing:border-box;"
    +"width:28px;min-width:28px;margin:0;padding:0}"
   /* overlay：格子絕對定位在列左側、不佔 grid／flex 的格子；寬度＝列的新 padding-left（原值＋26px），勾選框置中 */
-  +".ta-pick-cell.ta-pick-cell--ov{position:absolute;left:0;top:0;bottom:0;width:var(--ta-ovpad,34px);min-width:0;z-index:1}"
+  /* v1.3.1：overlay 格子改成兩層——外層 .ta-pick-cell--ov＝鋪滿整列的絕對定位「軌道」（不吃點擊、不佔格子），
+     內層 .ta-pick-stk＝sticky left:0 的勾選框（寬＝--ta-ovpad、吃點擊）。absolute 本身不能 sticky，
+     所以 sticky 放在軌道裡：列在橫捲容器裡往左捲時，勾選框貼在捲動容器可視區最左；不捲時位置與 v1.3 逐像素相同。 */
+  +".ta-pick-cell.ta-pick-cell--ov{position:absolute;left:0;top:0;bottom:0;right:0;display:block;width:auto;min-width:0;pointer-events:none}"
+  /* sticky 的 left 是從「最近捲動容器的內容框」（扣掉它的 padding）量起：列的捲動容器（§05 .c3-rows）沒有 padding → 0；
+     --ta-stkl 只在「列／表頭自己就是捲動容器」時改成負的留位寬，退回自己加的那段 padding */
+  +".ta-pick-cell--ov>.ta-pick-stk{position:sticky;left:var(--ta-stkl,0px);display:flex;align-items:center;justify-content:center;box-sizing:border-box;"
+   +"width:var(--ta-ovpad,34px);height:100%;margin:0;padding:0;z-index:1;pointer-events:auto}"
+  /* 表頭留位格：預設當作「表頭自己是捲動容器」（§05：表頭 overflow:hidden、JS 同步 scrollLeft）→ left＝-留位寬；
+     表頭不是捲動容器時這個負值不會造成任何位移。表頭是跟著外層容器一起捲的（外層捲動時 JS 加 .ta-pick-hl0）→ 改回 0。
+     不捲時不吃點擊（跟 v1.3 一樣點到的是表頭列本身），捲動中才擋住底下被蓋住的欄名 */
+  +"[data-ta-pad].ta-pick-ov{--ta-stkl:calc(-1 * var(--ta-ovpad,34px))}"
+  +"[data-ta-pad].ta-pick-ov.ta-pick-hl0{--ta-stkl:0px}"
+  +".ta-pick-cell--pad>.ta-pick-stk{pointer-events:none}"
+  +".ta-pick-hs .ta-pick-cell--pad>.ta-pick-stk{pointer-events:auto}"
+  /* 底色只在「容器裡有東西捲離最左」時才上（data-ta 容器加 .ta-pick-hs，由 scroll 監聽切換）：不捲的容器維持 v1.3 的透明格。
+     底色順序：--ta-cellbg（報告可在卡片上自訂）→ --surface（mw/us/tw 母板卡片底色）→ --bg2 → --bg；已勾的列疊同一層勾選色 */
+  +".ta-pick-hs .ta-pick-cell--ov>.ta-pick-stk{background-color:var(--ta-cellbg,var(--surface,var(--bg2,var(--bg,#0d1118))))}"
+  +".ta-pick-hs .ta-pick-on>.ta-pick-cell--ov>.ta-pick-stk{background-image:linear-gradient(color-mix(in srgb,var(--accent,#7f9fc6) 9%,transparent),color-mix(in srgb,var(--accent,#7f9fc6) 9%,transparent))}"
   +".ta-pick-ov{position:relative}"      /* 刻意低特異度：列本身已是 sticky／absolute 就沿用（同樣能當定位基準） */
   /* --ta-ovpad 由本模組寫在容器（列用）與 data-ta-pad 表頭列自己身上；!important 才壓得過母板 #id .class{padding:…} */
   +"[data-ta] .ta-pick-ov{padding-left:var(--ta-ovpad,34px)!important}"
@@ -280,6 +318,9 @@ function wire(table){
   /* table：勾選欄；v1.3 div 容器：列的勾選格＋頂端列的全選（整張表送出的 <a> 不在這裡擋，它要跑自己的 click） */
   var HIT=isTable(table)?".ta-pick-td,.ta-pick-th":".ta-pick-cell,.ta-pick-hall";
   var ROW=isTable(table)?"tr[data-sym]":"[data-sym]";
+  /* v1.3.1 div 容器：容器裡（含容器本身）任何元素橫向捲動 → 捲離最左就加 .ta-pick-hs（overlay 勾選框上底色）。
+     scroll 不冒泡，所以掛 capture；passive，不擋捲動。table 不掛（table 行為不變）。 */
+  if(!isTable(table)) table.addEventListener("scroll",onHs,{capture:true,passive:true});
   /* capture 階段先吃掉勾選欄的 click：母板 sortTbl 可能綁在 th 上或祖先上；div 列上的 onclick（點列展開）同理 */
   table.addEventListener("click",function(e){
     var t=e.target;
@@ -298,6 +339,25 @@ function wire(table){
       toggleAll(table,t.checked);
     }
   });
+}
+
+/* v1.3.1：容器裡（含容器本身）有任何元素捲離最左（scrollLeft≠0）→ 容器加 .ta-pick-hs（勾選格、表頭留位格上底色），
+   全部回到最左才拿掉。記在容器上的是「目前捲離最左的元素」集合：§05 名單區與表頭同步捲，兩個都回 0 才算回來。
+   掛在容器上（不是捲動元素上）：名單區一捲，表頭留位格同一格畫面就有底色，不用等表頭自己的 scroll 事件（晚一格）。
+   只讀捲動位置、值沒變不寫。 */
+function onHs(e){
+  var t=e.target, box=e.currentTarget; if(!t||t.nodeType!==1||!box||!box.classList) return;
+  var set=box.__taHsSet||(box.__taHsSet=[]), k=set.indexOf(t), on=t.scrollLeft!==0;
+  if(on&&k<0){
+    set.push(t);
+    /* 捲的是「包著表頭列」的外層（不是表頭自己；querySelectorAll 只找子孫）：表頭留位格要從外層的左緣量，left 改回 0
+       （只加不拿，回到最左時 0 與負值沒有差別）。每個捲動元素只在「從最左捲出去」那一下查一次 */
+    var hs=t.querySelectorAll("[data-ta-pad].ta-pick-ov");
+    for(var i=0;i<hs.length;i++) if(!hs[i].classList.contains("ta-pick-hl0")) hs[i].classList.add("ta-pick-hl0");
+  }else if(!on&&k>=0) set.splice(k,1);
+  for(var j=set.length-1;j>=0;j--) if(!box.contains(set[j])) set.splice(j,1);   /* 被重畫掉的捲動元素 */
+  var any=set.length>0;
+  if(box.classList.contains("ta-pick-hs")!==any) box.classList[any?"add":"remove"]("ta-pick-hs");
 }
 
 /* td 原型：3,000 列用 cloneNode 複製，比每列 createElement 快一截 */
@@ -390,35 +450,57 @@ function mount(table,prep){
    插格迴圈裡不讀任何樣式／layout。 */
 var OVGAP=26;                                        /* overlay 在列左側多留的寬度（px） */
 function cellMode(el){ return ((el.getAttribute("data-ta-cell")||"").trim().toLowerCase()==="prepend")?"prepend":"overlay"; }
-function padOf(el){
-  try{ var v=getComputedStyle(el).paddingLeft, n=parseFloat(v); return (/px$/.test(v)&&n>=0)?n:0; }catch(e){ return 0; }
+function padOf(el,box){
+  try{
+    var cs=getComputedStyle(el), v=cs.paddingLeft, n=parseFloat(v);
+    /* v1.3.1：同一次讀順便看列自己是不是捲動容器（例：列設 overflow:hidden 做省略號）——是的話 sticky 勾選框要退回
+       自己加的 padding（--ta-stkl），不然不捲的時候也會被推到留位區右邊 */
+    if(box){ var ox=cs.overflowX; box.__taSx=!!ox&&ox!=="visible"&&ox!=="clip"; }
+    return (/px$/.test(v)&&n>=0)?n:0;
+  }catch(e){ return 0; }
 }
 var CELL={};                                          /* 勾選格原型（cloneNode 複製，同 table 版 td） */
-function cellProto(ov){
-  var k=ov?"ov":"pre";
+/* k："pre"＝span.ta-pick-cell>input；"ov"＝span.ta-pick-cell--ov（軌道）>span.ta-pick-stk（sticky）>input；
+   "ovpad"＝表頭留位用的 ov 格（軌道＋空的 sticky 格，不放 input；aria-hidden） */
+function cellProto(k){
   if(CELL[k]) return CELL[k];
-  var c=document.createElement("span"); c.className=ov?"ta-pick-cell ta-pick-cell--ov":"ta-pick-cell";
-  var cb=document.createElement("input"); cb.type="checkbox"; cb.className="ta-pick-cb";
-  c.appendChild(cb);
+  var c=document.createElement("span"), cb;
+  if(k==="pre"){
+    c.className="ta-pick-cell";
+    cb=document.createElement("input"); cb.type="checkbox"; cb.className="ta-pick-cb";
+    c.appendChild(cb);
+  }else{
+    c.className=k==="ovpad"?"ta-pick-cell ta-pick-cell--ov ta-pick-cell--pad":"ta-pick-cell ta-pick-cell--ov";
+    var sk=document.createElement("span"); sk.className="ta-pick-stk";
+    if(k==="ovpad") c.setAttribute("aria-hidden","true");
+    else{ cb=document.createElement("input"); cb.type="checkbox"; cb.className="ta-pick-cb"; sk.appendChild(cb); }
+    c.appendChild(sk);
+  }
   CELL[k]=c;
   return c;
 }
-/* ① 讀：還沒插格的列、還沒處理的表頭列（data-ta-pad）、overlay 的原 padding-left */
+function hasCell(el){ var f=el.firstElementChild; return !!(f&&f.classList&&f.classList.contains("ta-pick-cell")); }
+/* ① 讀：還沒插格的列、還沒處理的表頭列（data-ta-pad）、overlay 的原 padding-left
+   v1.3.1：overlay 表頭列也插一個留位格（sticky 空白格）；已處理過、但內容被 innerHTML 重畫掉留位格的表頭列只補格
+   （不再讀 padding——那時讀到的是本模組自己加過 26px 的值） */
 function prepList(box){
   if(!box||!marketOf(box)) return null;
-  var ov=cellMode(box)==="overlay", i, r, f;
+  var ov=cellMode(box)==="overlay", i, r;
   var rows=rowsOf(box), need=[];
   for(i=0;i<rows.length;i++){
-    r=rows[i]; f=r.firstElementChild;
-    if(f&&f.classList&&f.classList.contains("ta-pick-cell")) continue;
+    r=rows[i];
+    if(hasCell(r)) continue;
     if(!(r.getAttribute("data-sym")||"").trim()) continue;
     need.push(r);
   }
   var pads=[], ps=box.querySelectorAll("[data-ta-pad]");
-  for(i=0;i<ps.length;i++) if(!ps[i].classList.contains("ta-pick-padded")) pads.push(ps[i]);
-  if(ov&&need.length&&box.__taPad==null) box.__taPad=padOf(need[0]);
+  for(i=0;i<ps.length;i++){
+    if(!ps[i].classList.contains("ta-pick-padded")) pads.push(ps[i]);
+    else if(ov&&!hasCell(ps[i])) pads.push(ps[i]);
+  }
+  if(ov&&need.length&&box.__taPad==null) box.__taPad=padOf(need[0],box);
   var padv=[];
-  if(ov) for(i=0;i<pads.length;i++) padv.push(padOf(pads[i]));
+  if(ov) for(i=0;i<pads.length;i++) padv.push(pads[i].classList.contains("ta-pick-padded")?null:padOf(pads[i]));
   return {ov:ov,need:need,pads:pads,padv:padv};
 }
 function mountList(box,prep){
@@ -433,6 +515,8 @@ function mountList(box,prep){
   if(ov&&box.__taPad!=null){
     var w=(box.__taPad+OVGAP)+"px";
     if(box.style.getPropertyValue("--ta-ovpad")!==w) box.style.setProperty("--ta-ovpad",w);
+    var sx=box.__taSx?"-"+w:"";                         /* 列自己是捲動容器：sticky 退回留位寬（見 padOf） */
+    if(box.style.getPropertyValue("--ta-stkl")!==sx){ if(sx) box.style.setProperty("--ta-stkl",sx); else box.style.removeProperty("--ta-stkl"); }
   }
 
   /* ③ 頂端列：全選＋整張表送出（容器被 innerHTML 重畫掉就重建）。顯示與否、文字在 paint() 更新 */
@@ -459,14 +543,19 @@ function mountList(box,prep){
     box.__taHead=head; box.__taSend=sa;
   }
 
-  /* ④ 表頭列留位（data-ta-pad）：overlay＝同樣多 26px（用它自己的原值）；prepend＝插一個同寬空白格 */
+  /* ④ 表頭列留位（data-ta-pad）：overlay＝同樣多 26px（用它自己的原值）＋插一個 sticky 空白留位格（v1.3.1：
+     表頭跟著橫捲時，留位區固定在左側、底色蓋住捲過去的欄名）；prepend＝插一個同寬空白格 */
   for(i=0;i<pads.length;i++){
     var p=pads[i];
-    if(p.classList.contains("ta-pick-padded")) continue;        /* prep 之後被別條路處理過（純 DOM 讀，不碰樣式） */
     if(ov){
-      p.style.setProperty("--ta-ovpad",(padv[i]+OVGAP)+"px");
-      p.classList.add("ta-pick-ov");
+      if(p.classList.contains("ta-pick-padded")&&hasCell(p)) continue;   /* prep 之後被別條路處理過（純 DOM 讀，不碰樣式） */
+      if(!p.classList.contains("ta-pick-padded")&&padv[i]!=null){
+        p.style.setProperty("--ta-ovpad",(padv[i]+OVGAP)+"px");
+        p.classList.add("ta-pick-ov");
+      }
+      if(!hasCell(p)) p.insertBefore(cellProto("ovpad").cloneNode(true),p.firstChild);
     }else{
+      if(p.classList.contains("ta-pick-padded")) continue;      /* prep 之後被別條路處理過（純 DOM 讀，不碰樣式） */
       var sp=document.createElement("span"); sp.className="ta-pick-cell ta-pick-cell--pad"; sp.setAttribute("aria-hidden","true");
       p.insertBefore(sp,p.firstChild);
     }
@@ -474,13 +563,13 @@ function mountList(box,prep){
   }
 
   /* ⑤ 每列最前面插勾選格。迴圈內只寫 DOM、不讀 layout。 */
-  var proto=cellProto(ov), rc=ov?"ta-pick-ov":"ta-pick-pre";
+  var proto=cellProto(ov?"ov":"pre"), rc=ov?"ta-pick-ov":"ta-pick-pre";
   for(i=0;i<need.length;i++){
     r=need[i];
-    var f0=r.firstElementChild; if(f0&&f0.classList&&f0.classList.contains("ta-pick-cell")) continue;   /* 同上 */
+    if(hasCell(r)) continue;   /* 同上 */
     sym=(r.getAttribute("data-sym")||"").trim();
     var c=proto.cloneNode(true);
-    c.firstChild.value=sym;
+    (ov?c.firstChild.firstChild:c.firstChild).value=sym;
     r.insertBefore(c,r.firstChild);
     r.classList.add(rc);
   }
@@ -499,6 +588,7 @@ function paint(table){
   var n=0,on=0;
   for(var i=0;i<rows.length;i++){
     var tr=rows[i], f=tr.firstElementChild, cb=f&&f.firstElementChild;
+    if(cb&&cb.nodeName==="SPAN") cb=cb.firstElementChild;   /* v1.3.1 overlay：格子>sticky 格>input（table／prepend 仍是格子>input） */
     if(!cb||!cb.className||cb.className.indexOf("ta-pick-cb")<0) continue;
     n++;
     var sel=set.has((tr.getAttribute("data-sym")||"").trim());
@@ -807,7 +897,7 @@ function watch(){
 
 window.TAPick={mount:function(el){ mount(el); },mountAll:mountAll,refresh:refresh,state:state,clear:clear,MAX:MAX,
                _date:repDate,_url:taUrl,_href:buildHref,_hrefAll:hrefAll,
-               _mountMany:function(l){ mountMany(Array.prototype.slice.call(l||[])); },version:"1.3"};
+               _mountMany:function(l){ mountMany(Array.prototype.slice.call(l||[])); },version:"1.3.1"};
 
 if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",function(){ mountAll(); watch(); });
 else { mountAll(); watch(); }
