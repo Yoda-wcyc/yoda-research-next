@@ -351,6 +351,7 @@ tr:hover td{background:var(--surface2)}
         <option value="notify">下一封通知信會收到</option>
         <option value="nopay">查無綠界付款紀錄</option>
         <option value="internal">內部帳號（站方測試用·不計入統計）</option>
+        <option value="ta">技術分析名單（已開權限）</option>
       </select>
       <span id="memCount" style="font-size:13px;color:var(--dim);font-weight:600;white-space:nowrap"></span>
       <button class="btn-primary" onclick="openAdd()">＋ 新增會員</button>
@@ -368,7 +369,8 @@ tr:hover td{background:var(--surface2)}
           <th>綠界付款<br><span style="font-weight:400;color:var(--dim)">首次／最近</span></th>
           <th title="帳面記的期數 vs 綠界實際扣款筆數，對不上就要對帳">期數<br><span style="font-weight:400;color:var(--dim)">帳面／綠界</span></th>
           <th>權益到期日</th><th>剩餘</th><th>通知信</th>
-          <th title="推薦人 / 帶進付費 / 應送月">推薦</th><th></th>
+          <th title="推薦人 / 帶進付費 / 應送月">推薦</th>
+          <th id="taTh" title="技術分析權限（少數指定會員）·點一下把已開權限的排到最前面，再點一下恢復" style="cursor:pointer;white-space:nowrap" onclick="toggleTaSort()">技術分析<span id="taSortMark" style="font-weight:400;color:var(--dim)"> ↕</span></th><th></th>
         </tr></thead>
         <tbody id="memBody"></tbody>
       </table>
@@ -685,6 +687,7 @@ function login(){
     $('loginBtn').disabled=false;
     if(res&&res.ok){
       try{localStorage.setItem('yoda_admin_key',KEY);}catch(e){}
+      taDetect(res.members);
       members=computeRefCounts((res.members||[]).map(mapMember));
       $('login').style.display='none';$('app').style.display='block';
       renderAll();                    // 先用 Neon 鏡像把畫面撐起來（快）
@@ -710,6 +713,7 @@ function mapMember(g){
     comp:Number(g.granted)||0, paidRefs:Number(g.referred_paid_count)||0,
     exFounding:/^(y|yes|true|1)$/i.test(String(g.ex_founding||'').trim()), // 曾取消·排除創始·回頭客
     inPayments:g.in_payments===true,
+    ta:g.ta_access===true,   // 技術分析權限（獨立 ta_access 表·LEFT JOIN 帶回；鏡像 TRUNCATE members 不會洗掉）
     paid:(typeof g.paid==='boolean')?g.paid:(g.status==='active'&&String(g.next_charge_date||'').trim()!=='')}; // 付費真偽：優先用後端算好的(Payments為主·扣款日為輔)，沒帶時退回扣款日proxy
 }
 /* 即時計算每位會員「帶進的推薦成效」：數 referred_by 指向此人 ref_code 的會員為 total，
@@ -727,6 +731,65 @@ function computeRefCounts(list){
     ref.refName = ref.ref ? (byCode[String(ref.ref).toUpperCase()]||ref.ref) : '';
   });
   return list;
+}
+/* ===== 技術分析權限（少數指定付費會員）=====
+   讀：/api/admin-data 每列多帶 ta_access（ta_access 表 LEFT JOIN）。
+   寫：POST /api/admin-ta-access {key, member_id, enabled}。
+   後端還沒部署／migration 還沒跑 → admin-data 不會帶 ta_access 欄 → 整欄降級成灰色、不能切，
+   表頭顯示「無法讀取權限名單」，其他欄位照常。 */
+var taAvail=null;        // null=還沒讀過；true=後端有帶 ta_access；false=沒帶（降級）
+var taSortFirst=false;   // 表頭點一下：已開權限的排前面
+var taBusy={};           // 切換中的 member_id，避免連點
+function taDetect(list){
+  taAvail=Array.isArray(list)&&list.length>0&&list.some(function(g){return g&&Object.prototype.hasOwnProperty.call(g,'ta_access');});
+  var th=$('taTh'); if(!th)return;
+  var n=Array.isArray(list)?list.filter(function(g){return g&&g.ta_access===true;}).length:0;
+  th.innerHTML='技術分析'+(taAvail
+    ?'<div style="font-weight:400;color:var(--dim)">已開 '+n+' 位</div>'
+    :'<div style="font-weight:400;color:var(--amber,#ff9f0a)">無法讀取權限名單</div>')
+    +'<span id="taSortMark" style="font-weight:400;color:var(--dim)">'+(taSortFirst?' ▲':' ↕')+'</span>';
+  th.title=taAvail?'技術分析權限（少數指定會員）·點一下把已開權限的排到最前面，再點一下恢復'
+    :'後端還沒提供 ta_access（Next 還沒部署，或 /api/db-migrate 還沒跑）。其他欄位不受影響。';
+}
+function toggleTaSort(){
+  taSortFirst=!taSortFirst;
+  var mk=$('taSortMark'); if(mk)mk.textContent=taSortFirst?' ▲':' ↕';
+  renderMembers();
+}
+function taCell(m){
+  if(!taAvail) return '<span class="email" title="無法讀取權限名單">—</span>';
+  if(m.mirrorMissing) return '<span class="email" title="這位還沒同步到 Neon，等鏡像同步後才能開權限">未同步</span>';
+  var id=escH(m.id);
+  return '<input type="checkbox" class="ta-sw" style="width:16px;height:16px;cursor:pointer;accent-color:var(--gold,#e0a526)"'
+    +(m.ta?' checked':'')+(taBusy[m.id]?' disabled':'')
+    +' title="'+(m.ta?'已開技術分析權限·取消勾選＝撤銷':'勾選＝給技術分析權限')+'"'
+    +' onchange="setTaAccess(\''+id+'\',this)">';
+}
+async function setTaAccess(id, cb){
+  var m=members.find(function(x){return x.id===id;});
+  var want=!!cb.checked;
+  var who=m?((m.name||id)+'（'+id+'）'):id;
+  var ok=await uiConfirm(want
+    ?('給 '+who+' 技術分析權限？\n對方下次開美股／台股分析報告就會看到勾選欄與「技術分析」按鈕。')
+    :('撤銷 '+who+' 的技術分析權限？\n撤銷後對方開著的 /ta 頁下一次查詢就會失效，報告裡也不再出現勾選欄。'));
+  if(!ok){ cb.checked=!want; return; }
+  taBusy[id]=true; cb.disabled=true;
+  try{
+    var r=await fetch('https://yoda-research-next.vercel.app/api/admin-ta-access',
+      {method:'POST',body:JSON.stringify({key:KEY,member_id:id,enabled:want})});
+    var res=null; try{ res=await r.json(); }catch(e){}
+    if(!res||!res.ok) throw new Error((res&&res.error)||('HTTP '+r.status));
+    if(m) m.ta=(res.enabled===undefined)?want:(res.enabled===true);
+    toast((m&&m.ta)?'已開啟技術分析權限：'+id:'已撤銷技術分析權限：'+id);
+  }catch(e){
+    cb.checked=!want;
+    toast('技術分析權限更新失敗：'+String((e&&e.message)||e));
+  }finally{
+    delete taBusy[id];
+    var n=members.filter(function(x){return x.ta;}).length;
+    var th=$('taTh'); var sub=th&&th.querySelector('div'); if(taAvail&&sub) sub.textContent='已開 '+n+' 位';
+    renderMembers();
+  }
 }
 /* 名冊走 Neon 鏡像（秒出），付款日/權益到期日走 GAS 讀 Sheet 正本（慢一點但是權威）。
    兩邊並行抓，GAS 那半邊失敗或還沒部署新版時只是少了幾欄，名單照常顯示。 */
@@ -759,6 +822,7 @@ function loadFromGAS(){
       toast('讀取會員資料失敗（Neon/Vercel 那一邊）');
       return false;
     }
+    taDetect(ad.members);
     members=computeRefCounts((ad.members||[]).map(mapMember));
     if(subsInfo){
       var by={}; subsInfo.members.forEach(function(x){by[x.memberId]=x;});
@@ -883,13 +947,18 @@ function membersFiltered(){
     //   要看的話用篩選選「內部帳號」。它在所有統計裡本來就已經被排除。
     const isInt=(m.internal===true)||(m.sub&&m.sub.stateLabel==='內部帳號');
     if(sf==='internal'){ if(!isInt)return false; }
-    else if(isInt)return false;
+    else if(isInt&&sf!=='ta')return false;   // 技術分析名單連內部測試帳號一起列（先用內部帳號試）
     if(sf==='notify'){ if(!(m.sub&&m.sub.willNotify))return false; }
     else if(sf==='nopay'){ if(!m.sub||m.sub.hasEcpayRecord)return false; }
+    else if(sf==='ta'){ if(!m.ta)return false; }
     else if(sf!=='all'&&memState(m)!==sf)return false;
     if(q&&!(m.name.toLowerCase().includes(q)||m.email.toLowerCase().includes(q)||m.id.toLowerCase().includes(q)||(m.pub||'').toLowerCase().includes(q)))return false;
     return true;
-  }).sort(byMemberId);   // ★預設一律依會員編號升序（CSV 匯出也走這條，兩邊順序一致）
+  }).sort(function(a,b){
+    // 點「技術分析」表頭：已開權限的排前面（同組內仍依會員編號）；沒點時跟原本一樣
+    if(taSortFirst&&(!!a.ta)!==(!!b.ta)) return a.ta?-1:1;
+    return byMemberId(a,b);
+  });   // ★預設一律依會員編號升序（CSV 匯出也走這條，兩邊順序一致）
 }
 /* GAS 版本提示：貼錯版本／貼到一半斷掉，這裡會直接講出來 */
 function renderGasVersion(){
@@ -981,8 +1050,9 @@ function renderMembers(){
       <td>${left}</td>
       <td>${notify}</td>
       <td>${refCell}</td>
+      <td style="text-align:center">${taCell(m)}</td>
       <td>${st==='已結束'||m.status==='已取消'?'':`<button class="mini-act" onclick="giftMonth('${m.id}')">贈送月</button> <button class="mini-act" style="color:var(--gold,#e0a526)" onclick="cancelSub('${m.id}')">取消訂閱</button> `}<button class="mini-act" style="color:#ff6b6b" onclick="deleteMember('${m.id}')">刪除</button></td>
-    </tr>`;}).join('') || `<tr><td colspan="12"><div class="empty">沒有符合的會員</div></td></tr>`;
+    </tr>`;}).join('') || `<tr><td colspan="13"><div class="empty">沒有符合的會員</div></td></tr>`;
 }
 /* 摘要列：一眼看完人數分佈、下一封通知信誰會收到、以及對不上帳的地方 */
 function renderMemSummary(){
