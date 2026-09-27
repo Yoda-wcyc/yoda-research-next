@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 //     rid  ＝ 付費_美股分析_YYYYMMDD / 付費_台股分析_YYYYMMDD
 //     syms ＝ 代號陣列，最多 200 個（detail 一次最多 25 個）
 //
-//   summary → {ok, rid, market, report_date, generated_at, asof_req, wm, rows:[{sym,...}依請求順序], missing:[...], errors:{...}}
+//   summary → {ok, rid, market, report_date, generated_at, asof_req, wm, rows:[{sym,...}依請求順序], missing:[...], errors:{...}, v, schema}
 //   detail  → {ok, items:{sym: 完整 analyze() 結果}, missing:[...]}
 //   失敗    → {ok:false, reason:'ticket'|'revoked'|'bad-request'|'not-ready'|'error', error}
 //
@@ -62,6 +62,7 @@ export async function POST(req) {
     return R({
       ok: true, rid, market, report_date: sum.report_date || '', generated_at: sum.generated_at || '',
       asof_req: sum.asof_req || '', wm: p.wm || '', rows, missing, errors: errs,
+      v: sum.v || 1, schema: sum.schema || '',   // 資料格式版本（v2＝三訊號 sig3-1；v1＝舊版，/ta 頁只列代號）
     });
   }
 

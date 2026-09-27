@@ -9,10 +9,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 //   ③ 右 3/4 只顯示選中那一檔的明細：選到才去拿（mode:'detail'，連同清單上前後幾檔、一次最多 25 檔），取過的留在頁面記憶體
 //      右欄頂部分頁「單檔明細｜全部總表」：總表每欄可排序、點一列＝切到那檔明細；網址 #s=<代號> 記住目前選的（重新整理回同一檔）
 // 沒票、票過期、不在名單 → 只顯示一句話，不透露功能細節。
-// 版面改版：Yoda 2026-09-27「股票名單放在左邊 1/4 欄位並且固定……右邊 3/4 欄位顯示被選取的股票技術分析內容」。
+//
+// 內容（Yoda 2026-09-27 定案「三訊號」，資料 v:2／schema 'sig3-1'，算法全在 Skill\analyze_symbol.py 檔頭）：
+//   ① 前五大量 ② 跳空缺口 ③ 多空排列 ＋ 日線支撐／壓力各一條（今收 ±10% 內最強，無則範圍外最強＝pick_scope 'beyond'）。
+//   不給停損／目標價／信心分／ADX／布林。
+//   讀到舊版（v1）資料：頁首與右欄顯示「此報告的技術分析資料是舊版，更新中」，清單照常列代號，不去拿明細。
+//   預留欄位（引擎之後才加；資料有就顯示、沒有就整欄不出現）：gaps.items[].trend／position／seq／type／type_short／notes
+//   → 缺口表「趨勢・位置・第幾個・類型」四欄＋圖上缺口旁一個字（突／逃／竭／彈／島）；gaps.islands[] → 缺口表下一行；
+//   top_volume.items[].trend／position → 大量表「趨勢／位置」欄、read → 表下逐根列；summary badge.gap_type → 左欄「缺」徽章改顯示它。
 
 const SS_KEY = "yoda_ta_k";
 const PAGE = 25;
+const OLD_MSG = "此報告的技術分析資料是舊版，更新中";
 
 // ───────── 小工具 ─────────
 function fnum(x, nd = 2) {
@@ -29,31 +37,52 @@ function fpct(x, sign = true) {
   if (!Number.isFinite(v)) return "—";
   return (sign && v > 0 ? "+" : "") + fnum(v) + "%";
 }
-function ud(x) { const v = Number(x); return !Number.isFinite(v) || v === 0 ? "" : v > 0 ? "up" : "dn"; }
+function f1(x) { const v = Number(x); return x === null || x === undefined || !Number.isFinite(v) ? "—" : v.toFixed(1); }
+function fvol(v, market) {
+  const x = Number(v);
+  if (v === null || v === undefined || !Number.isFinite(x)) return "—";
+  if (market === "tw") return Math.round(x / 1000).toLocaleString("en-US");   // 股 → 張
+  return (x / 1e6).toFixed(1) + "M";
+}
+function ud(x) { const v = Number(x); return x === null || x === undefined || !Number.isFinite(v) || v === 0 ? "" : v > 0 ? "up" : "dn"; }
 function d8(s) { const m = String(s || "").match(/(\d{4})-?(\d{2})-?(\d{2})/); return m ? m[1] + "-" + m[2] + "-" + m[3] : ""; }
 function g(o, ...path) { let x = o; for (const p of path) { if (!x || typeof x !== "object") return undefined; x = x[p]; } return x; }
-function srcZh(s) {
-  return String(s || "")
-    .replace(/swing high (\d{4}-\d\d-\d\d)/g, "前高 $1")
-    .replace(/swing low (\d{4}-\d\d-\d\d)/g, "前低 $1")
-    .replace(/52w 高/g, "52 週高").replace(/52w 低/g, "52 週低");
+function nz(x) { return x === null || x === undefined || x === "" ? null : Number(x); }
+const chgOf = (r) => (r ? (r.chg_1d_pct !== undefined ? r.chg_1d_pct : r.chg1d) : null);   // v2 chg_1d_pct／v1 chg1d
+const isSig = (r) => !!(r && (r.badge || r.key));                                            // v2 的 summary 列
+
+// ───────── 徽章（清單／總表／明細頂部共用）─────────
+// 量：今收相對最大量那根 K（上方紅、下方綠、區間灰）；缺：上／下最近未補缺口（顏色看較近那個：向上缺口紅、向下缺口綠）；
+// 排：短線・中長線排列（多紅、空綠、糾／資料不足灰）；撐壓：選中那條壓力／支撐的距離（距離不分多空，灰）。
+const REL_TXT = { 1: "上方", 0: "區間", "-1": "下方" };
+function toneN(v) { return v === 1 ? "up" : v === -1 ? "dn" : ""; }
+function volWord(r) {
+  const k = g(r, "key", "vol_rel");
+  if (k === 1 || k === 0 || k === -1) return REL_TXT[k];
+  const t = String(g(r, "badge", "vol") || "");
+  return t.indexOf("上方") >= 0 ? "上方" : t.indexOf("下方") >= 0 ? "下方" : t.indexOf("區間") >= 0 ? "區間" : "無";
 }
-const TREND_ZH = { BUY: "多", SELL: "空", NEUTRAL: "中" };
-const TREND_CLS = { BUY: "up", SELL: "dn", NEUTRAL: "mut" };
-const METHOD_ZH = { swing: "前波高低點 ± 半個 ATR14", chandelier: "Chandelier（22 根極值 ∓ 3×ATR22）", atr2: "收盤 ∓ 2×ATR14" };
-const BREAKDOWN_ZH = {
-  trend_long: "長線趨勢", trend_inter: "中線趨勢", trend_short: "短線趨勢", structure: "結構",
-  adx: "ADX 趨勢強度", volume: "五日量價", rel20: "REL20 相對強弱", ma_align: "均線排列",
-};
-const sideZh = (s) => (s === "short" ? "空方" : "多方");
-function r2Price(r) { const x = r && r.r2; return x && typeof x === "object" ? x.price : x; }
-function trendArr(r) {
-  const t = r && r.trend;
-  if (Array.isArray(t)) return t;
-  if (t && typeof t === "object") return [t.long, t.inter, t.short];
-  return [null, null, null];
+const squeeze = (t) => String(t || "—").replace(/(上|下|壓|撐) /g, "$1").replace(/｜/g, " ");
+function gapTone(r) { const v = nz(g(r, "key", "gap_near_pct")); return v === null || v === 0 ? "" : v < 0 ? "up" : "dn"; }
+function maHalves(r) {
+  const t = String(g(r, "badge", "ma") || "短—・中—");
+  const [a, b] = t.split("・");
+  return [[a || "短—", toneN(g(r, "key", "ma_short"))], [b || "中—", toneN(g(r, "key", "ma_mid"))]];
 }
-function trendScore(t) { return t.reduce((a, x) => a + (x === "BUY" ? 1 : x === "SELL" ? -1 : 0), 0); }
+function Badges({ r, full }) {
+  const b = r.badge || {};
+  const [ms, mm] = maHalves(r);
+  return (
+    <div className={"ta-bds" + (full ? " full" : "")}>
+      <span className={"ta-bd v " + toneN(g(r, "key", "vol_rel"))} title={"量：" + (b.vol || "—")}><i>量</i>{full ? b.vol || "—" : volWord(r)}</span>
+      <span className={"ta-bd gp " + gapTone(r)} title={"缺：" + (b.gap || "—") + (b.gap_type ? "｜" + b.gap_type : "") + "（上＝上方最近未補缺口、下＝下方最近未補缺口，距現價）"}>
+        <i>缺</i>{full ? (b.gap || "—") + (b.gap_type ? "｜" + b.gap_type : "") : b.gap_type ? String(b.gap_type) : squeeze(b.gap)}
+      </span>
+      <span className="ta-bd ma" title={"排：" + (b.ma || "—") + "（短＝SMA5／10／20、中＝SMA20／60／120）"}><i>排</i><span className={ms[1]}>{ms[0]}</span>・<span className={mm[1]}>{mm[0]}</span></span>
+      <span className="ta-bd sr" title={"撐壓：" + (b.sr || "—") + "（選中那條壓力／支撐距現價）"}><i>撐壓</i>{full ? b.sr || "—" : squeeze(b.sr)}</span>
+    </div>
+  );
+}
 
 async function api(body) {
   const res = await fetch("/api/ta-data", {
@@ -65,7 +94,7 @@ async function api(body) {
 }
 
 // ───────── 可排序表格（B-13：每一欄都能排序）─────────
-function SortTable({ cols, rows, rowKey, className, onRowClick, rowClass, caption }) {
+function SortTable({ cols, rows, rowKey, className, onRowClick, rowClass }) {
   const [sk, setSk] = useState(null);
   const [dir, setDir] = useState(1);
   const sorted = useMemo(() => {
@@ -81,17 +110,16 @@ function SortTable({ cols, rows, rowKey, className, onRowClick, rowClass, captio
       if (xn) return 1;           // 空值一律排最後
       if (yn) return -1;
       if (typeof x === "number" && typeof y === "number") return (x - y) * dir;
-      return String(x).localeCompare(String(y), "zh-Hant") * dir;
+      return String(x).localeCompare(String(y), "zh-Hant", { numeric: true }) * dir;
     });
     return out;
   }, [rows, cols, sk, dir]);
-  const click = (i) => {
+  const click = (i) => {   // 第一次點：欄位有 first 用 first（1 升冪／−1 降冪），否則數字欄降冪、文字欄升冪
     if (sk === i) setDir(-dir);
-    else { setSk(i); setDir(cols[i].num ? -1 : 1); }
+    else { setSk(i); setDir(cols[i].first || (cols[i].num ? -1 : 1)); }
   };
   return (
     <table className={"ta-tbl " + (className || "")}>
-      {caption ? <caption className="ta-cap" style={{ textAlign: "left" }}>{caption}</caption> : null}
       <thead>
         <tr>
           {cols.map((c, i) => (
@@ -115,42 +143,91 @@ function SortTable({ cols, rows, rowKey, className, onRowClick, rowClass, captio
   );
 }
 
-// ───────── K 線圖（120 根，SVG 自畫）─────────
+// ───────── K 線圖（120 根＋量；底色固定深色，白色撐壓線才看得見）─────────
+const MA_COLORS = [["sma5", "MA5", "#f0c040"], ["sma10", "MA10", "#ff8a4c"], ["sma20", "MA20", "#56c1d6"], ["sma60", "MA60", "#8fa8ff"], ["sma120", "MA120", "#c78be8"]];
+const K_UP = "#e0525e", K_DN = "#3fae7a", GOLD = "#ffc94a";
+const MARKS = "①②③④⑤";
+const SR_BEYOND = "10% 內無，取範圍外最強";
+function mark(rank) { return rank >= 1 && rank <= MARKS.length ? MARKS[rank - 1] : String(rank || "?"); }
+function srcAbbr(sources) {
+  const out = [];
+  for (const s0 of sources || []) {
+    const s = String(s0);
+    let a;
+    if (s.startsWith("大量K")) a = "量";
+    else if (s.startsWith("缺口")) a = "缺";
+    else { const m = s.match(/觸及\s*(\d+)/); a = m ? "觸" + m[1] : s.slice(0, 2); }
+    if (!out.includes(a)) out.push(a);
+  }
+  return out.join("·");
+}
+
 function KChart({ d }) {
   const raw = g(d, "chart", "bars") || [];
   const bars = raw.map((b) => (Array.isArray(b) ? { date: b[0], o: b[1], h: b[2], l: b[3], c: b[4], v: b[5] } : b));
-  if (bars.length < 2) return <div className="ta-nochart">沒有 K 線資料</div>;
-  const s20 = g(d, "chart", "sma20") || [];
-  const s60 = g(d, "chart", "sma60") || [];
-  const W = 1000, H = 360, L = 58, R = 150, T = 14, B = 28;
-  const pw = W - L - R, ph = H - T - B;
-  const hl = [];
-  const dflt = g(d, "risk", "default") || {};
-  if (dflt.price != null) hl.push([dflt.price, "停損 " + fnum(dflt.price), "h-stop"]);
-  const r2 = g(d, "targets", "r2") || {};
-  if (r2.price != null) hl.push([r2.price, "2R " + fnum(r2.price), "h-tgt"]);
-  for (const x of (g(d, "levels", "above") || []).slice(0, 3)) if (x.price != null) hl.push([x.price, "壓 " + fnum(x.price), "h-lvl"]);
-  for (const x of (g(d, "levels", "below") || []).slice(0, 3)) if (x.price != null) hl.push([x.price, "撐 " + fnum(x.price), "h-lvl"]);
+  const n = bars.length;
+  if (n < 2) return <div className="ta-nochart">沒有 K 線資料</div>;
+  const market = g(d, "meta", "market");
+  const sig = d.signals || {};
+  const sr = sig.sr_levels || {};
+  const lines = [...(sr.support || []).slice(0, 1).map((x) => [x, "sup"]), ...(sr.resistance || []).slice(0, 1).map((x) => [x, "res"])];
+  const gaps = (g(sig, "gaps", "items") || []).filter((x) => x.fill !== "full");
+  const tv = g(sig, "top_volume", "items") || [];
+  const W = 1000, L = 62, R = 178, T = 16, PH = 310, GP = 14, VH = 72, B = 24;
+  const H = T + PH + GP + VH + B, pw = W - L - R;
   const vals = [];
   for (const b of bars) { if (b.h != null) vals.push(b.h); if (b.l != null) vals.push(b.l); }
-  for (const x of hl) vals.push(x[0]);
+  for (const [x] of lines) if (x.price != null) vals.push(x.price);
+  for (const x of gaps) for (const p of [x.open_top, x.open_bottom]) if (p != null) vals.push(p);
+  if (!vals.length) return <div className="ta-nochart">沒有 K 線資料</div>;
   let lo = Math.min(...vals), hi = Math.max(...vals);
-  const pad = (hi - lo) * 0.04 || hi * 0.01 || 1;
+  const pad = (hi - lo) * 0.05 || hi * 0.01 || 1;
   lo -= pad; hi += pad;
-  const n = bars.length, step = pw / n, bw = Math.max(1.2, step * 0.62);
-  const Y = (p) => T + ((hi - p) / (hi - lo)) * ph;
+  const step = pw / n, bw = Math.max(1.2, step * 0.62);
+  const Y = (p) => T + ((hi - p) / (hi - lo)) * PH;
   const X = (i) => L + step * (i + 0.5);
+  const dateI = {};
+  bars.forEach((b, i) => { dateI[String(b.date)] = i; });
+  const vmax = Math.max(1, ...bars.map((b) => Number(b.v) || 0));
+  const VB = T + PH + GP + VH;
+  const VY = (v) => VB - (v / vmax) * VH;
+  const cid = "tac-" + String(g(d, "meta", "symbol") || "x").replace(/[^0-9A-Za-z]/g, "_");
   const els = [];
-  for (let k = 0; k < 5; k++) {
-    const p = lo + ((hi - lo) * (k + 0.5)) / 5, y = Y(p);
+  // 格線＋價格軸
+  for (let k = 0; k < 6; k++) {
+    const p = lo + ((hi - lo) * (k + 0.5)) / 6, y = Y(p);
     els.push(<line key={"g" + k} className="grid" x1={L} x2={L + pw} y1={y} y2={y} />);
     els.push(<text key={"gt" + k} className="ax" x={L - 6} y={y + 4} textAnchor="end">{fnum(p, hi - lo < 50 ? 1 : 0)}</text>);
   }
+  els.push(<line key="vbase" className="grid" x1={L} x2={L + pw} y1={VB} y2={VB} />);
   for (let i = 0; i < n; i += 20) {
     const dd = String(bars[i].date || "");
-    els.push(<text key={"d" + i} className="ax" x={X(i)} y={H - 8} textAnchor="middle">{i === 0 ? dd.slice(2) : dd.slice(5)}</text>);
+    els.push(<text key={"d" + i} className="ax" x={X(i)} y={H - 7} textAnchor="middle">{i === 0 ? dd.slice(2) : dd.slice(5)}</text>);
   }
-  els.push(<text key="dl" className="ax" x={L + pw} y={H - 8} textAnchor="end">{String(bars[n - 1].date || "").slice(5)}</text>);
+  els.push(<text key="dl" className="ax" x={L + pw} y={H - 7} textAnchor="end">{String(bars[n - 1].date || "").slice(5)}</text>);
+  els.push(<text key="vl" className="ax" x={L - 6} y={T + PH + GP + 10} textAnchor="end">{market === "tw" ? "量（張）" : "量"}</text>);
+  // 未補缺口色塊（紅＝向上缺口、綠＝向下缺口）：未補＝從缺口日畫到右緣；部分回補＝原缺口畫到第一次回補那天，剩下沒補的區間續畫到右緣
+  gaps.forEach((x, k) => {
+    const i = dateI[String(x.date)];
+    if (i === undefined || x.open_top == null || x.open_bottom == null) return;
+    const fill = x.dir === "up" ? K_UP : K_DN;
+    const x0 = X(i) - step / 2;
+    let xs = x0;
+    if (x.fill === "partial" && x.fill_date && dateI[String(x.fill_date)] !== undefined && x.top != null && x.bottom != null) {
+      const xj = X(dateI[String(x.fill_date)]);
+      const y1 = Y(x.top), y2 = Y(x.bottom);
+      els.push(<rect key={"ga" + k} className="gapbox0" x={x0} y={y1} width={Math.max(1, xj - x0)} height={Math.max(1, y2 - y1)}
+        fill={fill} fillOpacity=".12" clipPath={"url(#" + cid + ")"} data-date={x.date} data-top={x.top} data-bottom={x.bottom} />);
+      xs = xj;
+    }
+    const y1 = Y(x.open_top), y2 = Y(x.open_bottom);
+    els.push(<rect key={"gb" + k} className="gapbox" x={xs} y={y1} width={Math.max(1, L + pw - xs)} height={Math.max(1, y2 - y1)}
+      fill={fill} fillOpacity=".22" clipPath={"url(#" + cid + ")"}
+      data-date={x.date} data-dir={x.dir} data-fill={x.fill} data-top={x.open_top} data-bottom={x.open_bottom} />);
+  });
+  // K 棒（收 ≥ 開＝紅）＋量柱；前五大量：金框 K 棒＋金色量柱＋①～⑤
+  const topI = {};
+  for (const t of tv) { const i = dateI[String(t.date)]; if (i !== undefined) topI[i] = t.rank; }
   let prev = null;
   bars.forEach((b, i) => {
     const c = b.c;
@@ -158,214 +235,337 @@ function KChart({ d }) {
     const op = b.o != null ? b.o : prev != null ? prev : c;
     const h = b.h != null ? b.h : Math.max(op, c);
     const l = b.l != null ? b.l : Math.min(op, c);
-    const cls = c >= op ? "up" : "dn";
+    const col = c >= op ? K_UP : K_DN;
     const x = X(i);
-    els.push(<line key={"w" + i} className={"wk " + cls} x1={x} x2={x} y1={Y(h)} y2={Y(l)} />);
+    const rk = topI[i];
+    els.push(<line key={"w" + i} className="wk" x1={x} x2={x} y1={Y(h)} y2={Y(l)} stroke={col} strokeWidth="1" />);
     const y1 = Y(Math.max(op, c)), y2 = Y(Math.min(op, c));
-    els.push(<rect key={"b" + i} className={"bd " + cls} x={x - bw / 2} y={y1} width={bw} height={Math.max(1, y2 - y1)} />);
+    els.push(<rect key={"b" + i} className={"bd" + (rk ? " top" : "")} x={x - bw / 2} y={y1} width={bw} height={Math.max(1, y2 - y1)} fill={col}
+      stroke={rk ? GOLD : undefined} strokeWidth={rk ? 1.6 : undefined} data-date={b.date} data-rank={rk || undefined} />);
+    const v = Number(b.v);
+    if (v > 0) {
+      els.push(<rect key={"v" + i} className={"vb" + (rk ? " top" : "")} x={x - bw / 2} y={VY(v)} width={bw} height={Math.max(0.5, VB - VY(v))}
+        fill={rk ? GOLD : col} fillOpacity={rk ? 1 : 0.55} data-date={rk ? b.date : undefined} />);
+    }
+    if (rk) {
+      els.push(<text key={"m" + i} className="mk" x={x} y={Y(h) - 5} textAnchor="middle" data-date={b.date} data-rank={rk}>{mark(rk)}</text>);
+      if (v > 0) els.push(<text key={"mv" + i} className="mk mkv" x={x} y={VY(v) - 3} textAnchor="middle">{mark(rk)}</text>);
+    }
     prev = c;
   });
-  for (const [arr, cls] of [[s20, "ma20"], [s60, "ma60"]]) {
+  // 均線（裁在價格區內）
+  for (const [key, nm, col] of MA_COLORS) {
+    const arr = g(d, "chart", key) || [];
     const segs = []; let cur = [];
     arr.slice(0, n).forEach((v, i) => {
       if (v == null) { if (cur.length > 1) segs.push(cur); cur = []; }
       else cur.push(X(i).toFixed(1) + "," + Y(v).toFixed(1));
     });
     if (cur.length > 1) segs.push(cur);
-    segs.forEach((sg, k) => els.push(<polyline key={cls + k} className={cls} points={sg.join(" ")} />));
+    segs.forEach((sg, k) => els.push(<polyline key={key + k} className={"ma " + key} data-ma={nm} points={sg.join(" ")} fill="none" stroke={col}
+      strokeWidth="1.2" strokeOpacity=".9" clipPath={"url(#" + cid + ")"} />));
   }
-  // 水平線＋右側標籤（由上往下排、至少隔 13px，避免疊字）
-  const lab = hl.map(([p, t, c]) => [Y(p), t, c]).sort((a, b) => a[0] - b[0]);
-  const ys = []; let last = -1e9;
-  for (const [y] of lab) { const ny = Math.max(y, last + 13); ys.push(ny); last = ny; }
-  const over = ys.length ? ys[ys.length - 1] - (H - B) : 0;
+  // 缺口類型（欄位 type_short 有才畫）：缺口日位置、色塊左側標一個字（突／逃／竭／彈／島）；已補的缺口淡一點
+  let typed = 0;
+  (g(sig, "gaps", "items") || []).forEach((x, k) => {
+    const i = dateI[String(x.date)];
+    const ts = x.type_short;
+    if (i === undefined || !ts) return;
+    const top = x.top != null ? x.top : x.open_top, bot = x.bottom != null ? x.bottom : x.open_bottom;
+    if (top == null || bot == null) return;
+    typed++;
+    els.push(<text key={"gl" + k} className={"gl " + (x.dir === "up" ? "up" : "dn") + (x.fill === "full" ? " filled" : "")} x={X(i) - step / 2 - 3}
+      y={(Y(top) + Y(bot)) / 2 + 4} textAnchor="end" data-date={x.date} data-type={ts}>
+      {String(ts)}{x.type ? <title>{x.type + (x.notes ? "：" + x.notes : "")}</title> : null}
+    </text>);
+  });
+  // 支撐（白實線）／壓力（白虛線）：各只一條；線尾標價位＋來源縮寫（量／缺／觸N；測＝正在測試），pick_scope＝beyond 多一行註記
+  const lab = [];
+  lines.forEach(([x, side]) => {
+    if (x.price == null) return;
+    const y = Y(x.price);
+    els.push(<line key={"sr" + side} className={"sr-line " + side} x1={L} x2={L + pw} y1={y} y2={y} stroke="#ffffff" strokeWidth="1.8"
+      strokeDasharray={side === "res" ? "7 5" : undefined} data-kind={side} data-price={x.price} data-scope={x.pick_scope || ""} />);
+    const t = (side === "sup" ? "撐 " : "壓 ") + fnum(x.price) + (srcAbbr(x.sources) ? " " + srcAbbr(x.sources) : "") + (x.testing ? " 測" : "");
+    lab.push([y, t, side, x.pick_scope === "beyond" ? SR_BEYOND : ""]);
+  });
+  lab.sort((a, b) => a[0] - b[0]);
+  const hs = lab.map((z) => 14 + (z[3] ? 13 : 0));
+  const ys = []; let last = -1e9, lh = 0;
+  lab.forEach(([y], k) => { const ny = Math.max(y, last + lh); ys.push(ny); last = ny; lh = hs[k]; });
+  const over = ys.length ? ys[ys.length - 1] + hs[hs.length - 1] - 14 - (T + PH) : 0;
   if (over > 0) {
     for (let k = 0; k < ys.length; k++) ys[k] -= over;
-    for (let k = ys.length - 2; k >= 0; k--) ys[k] = Math.min(ys[k], ys[k + 1] - 13);
+    for (let k = ys.length - 2; k >= 0; k--) ys[k] = Math.min(ys[k], ys[k + 1] - hs[k]);
   }
-  lab.forEach(([y, t, c], k) => {
+  lab.forEach(([y, t, side, nt], k) => {
     const ty = ys[k];
-    els.push(<line key={"h" + k} className={c} x1={L} x2={L + pw} y1={y} y2={y} />);
-    els.push(<line key={"hk" + k} className={c + " lk"} x1={L + pw} x2={L + pw + 6} y1={y} y2={ty} />);
-    els.push(<text key={"ht" + k} className={"hl " + c} x={L + pw + 9} y={ty + 4}>{t}</text>);
+    els.push(<line key={"lk" + side} x1={L + pw} x2={L + pw + 7} y1={y} y2={ty} stroke="#ffffff" strokeWidth="1" strokeOpacity=".6" />);
+    els.push(<text key={"lt" + side} className={"srl " + side} x={L + pw + 10} y={ty + 4}>{t}</text>);
+    if (nt) els.push(<text key={"ln" + side} className={"srn " + side} x={L + pw + 10} y={ty + 17}>{nt}</text>);
   });
   const lc = bars[n - 1].c;
-  if (lc != null) els.push(<circle key="lc" className="lastc" cx={X(n - 1)} cy={Y(lc)} r="3" />);
+  if (lc != null) els.push(<circle key="lc" className="lastc" cx={X(n - 1)} cy={Y(lc)} r="3" fill="#ffffff" />);
   return (
     <>
-      <svg className="ta-k" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label="日 K 線圖">{els}</svg>
+      <svg className="ta-k" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label="日 K 線圖" data-n={n}>
+        <rect x="0" y="0" width={W} height={H} className="kbg" fill="#0b0f15" />
+        <defs><clipPath id={cid}><rect x={L} y={T} width={pw} height={PH} /></clipPath></defs>
+        {els}
+      </svg>
       <div className="ta-cnote">
-        怎麼看：最近 {n} 根日 K（紅 K 漲、綠 K 跌），黃線 SMA20、藍線 SMA60；
-        <i style={{ color: "var(--orange)" }}></i>橘虛線＝預設停損
-        <i style={{ color: "var(--ta-cyan)" }}></i>青虛線＝2R 目標
-        <i style={{ color: "var(--ta-muted)", borderTopStyle: "dotted" }}></i>灰點線＝上方壓力／下方支撐（右側標價）。
+        怎麼看：最近 {n} 根日 K（紅漲綠跌），下方是成交量；均線
+        {MA_COLORS.map(([k, nm, col]) => <span key={k}><i className="sw" style={{ color: col }}></i>{nm}</span>)}；
+        <span className="lg"><i className="sw" style={{ color: "#fff" }}></i></span>白實線＝支撐、
+        <span className="lg"><i className="sw dash" style={{ color: "#fff" }}></i></span>白虛線＝壓力
+        （各只畫一條：今收 ±10% 內強度最高的，該側 10% 內沒線才取範圍外最強並加註），右側標價位與來源：量＝前五大量 K 的高低、缺＝未補缺口邊緣、觸N＝觸及 N 天、測＝正在測試；
+        <i className="bx" style={{ background: K_UP }}></i>向上缺口<i className="bx" style={{ background: K_DN }}></i>向下缺口
+        （色塊＝還沒補的區間，畫到右緣；部分回補的原缺口畫到第一次回補那天）；
+        {typed ? <>缺口旁的一個字＝缺口類型（突／逃／竭／彈／島，完整名稱與說明見跳空缺口表「類型」欄；淡色＝已補）；</> : null}
+        <span className="gd">金框 K 棒／金色量柱</span>＋①～⑤＝前五大量 K（① 量最大）。
       </div>
     </>
   );
 }
 
-// ───────── 明細卡內容 ─────────
-function KV({ rows }) {
+// ───────── 圖下四張表 ─────────
+const FILL_ZH = { none: "未補", partial: "部分回補", full: "已補" };
+const REL_CLS = { "在上方": "up", "在下方": "dn" };
+const has = (v) => v !== null && v !== undefined && v !== "";
+const txt = (v) => (has(v) ? (typeof v === "object" ? JSON.stringify(v) : String(v)) : "—");
+// 預留欄位（引擎之後才加）：資料裡任一列有這個欄位才出現該欄，沒有就整欄不顯示
+function optCols(rows, specs) {
+  return specs.filter((c) => rows.some((x) => has(x[c.f]))).map((c) => ({
+    label: c.label, title: c.title, num: c.num, cls: c.cls,
+    render: c.render || ((x) => txt(x[c.f])),
+    sort: (x) => (has(x[c.f]) ? (typeof x[c.f] === "number" ? x[c.f] : String(x[c.f])) : null),
+  }));
+}
+// 島狀（signals.gaps.islands[]）：格式未定，先通用顯示——有說明文字就用說明，否則拼日期／方向／天數，再不行列出簡單欄位
+const ISLAND_KEYS = { start: "起", end: "迄", from: "起", to: "迄", dir: "方向", days: "天數", bars: "根數", date: "日期", type: "類型" };
+function islandText(x) {
+  if (!x || typeof x !== "object") return txt(x);
+  for (const k of ["text", "note", "notes", "desc", "read"]) if (typeof x[k] === "string" && x[k]) return x[k];
+  const a = x.start || x.from || x.start_date, b = x.end || x.to || x.end_date;
+  const dir = x.dir === "up" ? "向上" : x.dir === "down" ? "向下" : x.dir;
+  if (a || b) return [(a || "?") + "～" + (b || "?"), dir, has(x.days) ? x.days + " 天" : has(x.bars) ? x.bars + " 根" : ""].filter(Boolean).join("，");
+  return Object.entries(x).filter(([, v]) => has(v) && typeof v !== "object").map(([k, v]) => (ISLAND_KEYS[k] || k) + " " + v).join("，") || "—";
+}
+
+function TopVolume({ d }) {
+  const tv = g(d, "signals", "top_volume") || {};
+  const market = g(d, "meta", "market");
+  const rows = tv.items || [];
+  const cols = [
+    { label: "#", render: (x) => mark(x.rank), sort: (x) => x.rank },
+    { label: "日期", render: (x) => x.date, sort: (x) => x.date },
+    { label: "幾天前", num: true, render: (x) => x.days_ago, sort: (x) => nz(x.days_ago) },
+    { label: market === "tw" ? "量（張）" : "量（股）", num: true, render: (x) => fvol(x.volume, market), sort: (x) => nz(x.volume) },
+    { label: "量倍數", num: true, title: "當天量 ÷ 當天之前 20 天均量", render: (x) => (x.vol_ratio == null ? "—" : f1(x.vol_ratio) + "x"), sort: (x) => nz(x.vol_ratio) },
+    { label: "漲跌", num: true, render: (x) => <span className={ud(x.chg_pct)}>{fpct(x.chg_pct)}</span>, sort: (x) => nz(x.chg_pct) },
+    { label: "K 棒", render: (x) => x.candle || "—", sort: (x) => x.candle || "" },
+    { label: "收在", title: "收盤落在當天區間的哪一段", render: (x) => x.close_pos || "—", sort: (x) => nz(x.close_pos_ratio) },
+    { label: "最高＝關卡", num: true, render: (x) => <>{fnum(x.high)} <span className="mut">({fpct(x.dist_high_pct)})</span></>, sort: (x) => nz(x.high) },
+    { label: "最低＝關卡", num: true, render: (x) => <>{fnum(x.low)} <span className="mut">({fpct(x.dist_low_pct)})</span></>, sort: (x) => nz(x.low) },
+    { label: "現價在", render: (x) => <b className={REL_CLS[x.relation] || ""}>{x.relation || "—"}</b>, sort: (x) => ({ "在上方": 1, "區間內": 0, "在下方": -1 })[x.relation] },
+    ...(rows.some((x) => has(x.trend) || has(x.position)) ? [{   // 預留：趨勢／位置（有才出現）
+      label: "趨勢／位置", render: (x) => txt(x.trend) + "／" + txt(x.position), sort: (x) => (has(x.trend) || has(x.position) ? txt(x.trend) + txt(x.position) : null),
+    }] : []),
+  ];
+  const reads = rows.filter((x) => has(x.read));   // 預留：解讀（有才出現；文字長，放表下逐根列）
   return (
-    <table className="ta-tbl ta-kv">
-      <tbody>
-        {rows.map(([k, v], i) => (
-          <tr key={i}><th>{k}</th><td className="wrap">{v}</td></tr>
-        ))}
-      </tbody>
-    </table>
+    <div className="ta-block" data-blk="vol">
+      <div className="ta-cap">① 前五大量 <span className="mut">近 {g(d, "signals", "window_bars") || "—"} 根日 K 量最大的 5 根；那根的最高／最低就是關卡，括號＝關卡距現價</span></div>
+      {rows.length ? <div className="ta-hs"><SortTable className="ta-dt" cols={cols} rows={rows} rowKey={(x) => "v" + x.rank} /></div>
+        : <div className="ta-empty">視窗內沒有成交量資料</div>}
+      {reads.length ? (
+        <dl className="ta-reads">{reads.map((x) => <div key={x.rank} className="ta-rule"><dt>{mark(x.rank)} {x.date}</dt><dd>{txt(x.read)}</dd></div>)}</dl>
+      ) : null}
+    </div>
   );
 }
 
+function Gaps({ d }) {
+  const gp = g(d, "signals", "gaps") || {};
+  const rows = gp.items || [];
+  const cols = [
+    { label: "日期", render: (x) => x.date, sort: (x) => x.date },
+    { label: "方向", render: (x) => <span className={x.dir === "up" ? "up" : "dn"}>{x.dir === "up" ? "向上" : "向下"}</span>, sort: (x) => x.dir },
+    ...optCols(rows, [
+      { f: "trend", label: "趨勢" },
+      { f: "position", label: "位置" },
+      { f: "seq", label: "第幾個", num: true },
+      { f: "type", label: "類型", render: (x) => (has(x.type) ? (
+        <span className={x.notes ? "ta-tip" : ""} title={has(x.notes) ? txt(x.notes) : undefined}>{has(x.type_short) ? <b className="ta-gt">{txt(x.type_short)}</b> : null}{txt(x.type)}</span>
+      ) : "—") },
+    ]),
+    { label: "缺口（下緣～上緣）", num: true, title: "缺口原本的區間；排序依下緣", render: (x) => fnum(x.bottom) + "～" + fnum(x.top), sort: (x) => nz(x.bottom) },
+    { label: "幅度", num: true, render: (x) => fpct(x.size_pct, false), sort: (x) => nz(x.size_pct) },
+    { label: "量倍數", num: true, title: "缺口當天量 ÷ 之前 20 天均量", render: (x) => (x.vol_ratio == null ? "—" : f1(x.vol_ratio) + "x"), sort: (x) => nz(x.vol_ratio) },
+    { label: "回補（日期）", title: "部分回補＝第一次碰進缺口那天；已補＝完全補上那天", render: (x) => (
+      <>{FILL_ZH[x.fill] || x.fill || "—"}{x.fill_date ? <span className="mut"> {x.fill_date}</span> : null}</>
+    ), sort: (x) => ({ none: 0, partial: 1, full: 2 })[x.fill] * 1e9 + (x.fill_date ? Number(String(x.fill_date).replace(/\D/g, "")) : 0) },
+    { label: "未補區間", num: true, render: (x) => (x.fill !== "full" && x.open_bottom != null ? fnum(x.open_bottom) + "～" + fnum(x.open_top) : "—"), sort: (x) => (x.fill !== "full" ? nz(x.open_bottom) : null) },
+    { label: "距現價", num: true, render: (x) => <span className={ud(x.dist_pct)}>{fpct(x.dist_pct)}</span>, sort: (x) => (x.dist_pct == null ? null : Math.abs(Number(x.dist_pct))) },
+  ];
+  return (
+    <div className="ta-block" data-blk="gap">
+      <div className="ta-cap">② 跳空缺口 <span className="mut">近 {g(d, "signals", "window_bars") || "—"} 根全部 {gp.n || 0} 個（未補／部分回補 {gp.n_open || 0}、已補 {gp.n_filled || 0}）；未補依離現價近到遠、已補依日期新到舊</span></div>
+      {rows.length ? (
+        <div className="ta-win10"><SortTable className="ta-dt" cols={cols} rows={rows} rowKey={(x) => x.date + x.dir} rowClass={(x) => (x.fill === "full" ? "filled" : "")} /></div>
+      ) : <div className="ta-empty">近 {g(d, "signals", "window_bars") || "—"} 根沒有跳空缺口</div>}
+      {Array.isArray(gp.islands) && gp.islands.length ? (
+        <div className="ta-islands">島狀 {gp.islands.length} 個：{gp.islands.map((x, i) => <span key={i}>{i ? "；" : ""}{islandText(x)}</span>)}</div>
+      ) : null}
+    </div>
+  );
+}
+
+function MaAlign({ d }) {
+  const ma = g(d, "signals", "ma_align") || {};
+  const rows = [["short", "短線（SMA5／10／20）"], ["mid", "中長線（SMA20／60／120）"]].map(([k, nm]) => ({ k, nm, ...(ma[k] || {}) }));
+  const stZh = (s) => (s === "insufficient" ? "資料不足" : s || "—");
+  const stCls = (s) => (s === "多頭排列" ? "up" : s === "空頭排列" ? "dn" : "mut");
+  const note = (x) => {
+    if ((x.state === "多頭排列" || x.state === "空頭排列") && x.nearest_break) {
+      const nb = x.nearest_break;
+      return <>最接近被破壞：{nb.a} {fnum(nb.a_value)} 與 {nb.b} {fnum(nb.b_value)}（差 {fpct(nb.gap_pct, false)}）</>;
+    }
+    return x.why || "—";
+  };
+  const cols = [
+    { label: "組", render: (x) => x.nm, sort: (x) => x.k },
+    { label: "狀態", render: (x) => <b className={stCls(x.state)}>{stZh(x.state)}</b>, sort: (x) => ({ "多頭排列": 1, "糾結": 0, "空頭排列": -1 })[x.state] },
+    { label: "已成立", title: "目前狀態連續第幾天（含今天）", render: (x) => (x.days == null ? "—" : <>第 {x.days_capped ? "≥" : ""}{x.days} 天 <span className="mut">（{x.since} 起）</span></>), sort: (x) => nz(x.days) },
+    { label: "不成立原因／最接近被破壞", cls: "wrap", render: note, sort: (x) => x.why || "" },
+    { label: "均線值（今−昨）", cls: "wrap", render: (x) => (
+      <span className="ta-mas">收盤 <b>{fnum(x.close)}</b>{(x.lines || []).map((l) => (
+        <span key={l.name}>{l.name} <b>{fnum(l.value)}</b> <span className={ud(l.slope)}>({Number(l.slope) > 0 ? "+" : ""}{fnum(l.slope, 4)})</span></span>
+      ))}</span>
+    ), sort: (x) => nz(x.close) },
+  ];
+  return (
+    <div className="ta-block" data-blk="ma">
+      <div className="ta-cap">③ 多空排列 <span className="mut">多頭＝收盤 &gt; 第一條 &gt; 第二條 &gt; 第三條，且三條都比昨天高；空頭相反；其他＝糾結</span></div>
+      <div className="ta-hs"><SortTable className="ta-dt" cols={cols} rows={rows} rowKey={(x) => x.k} /></div>
+    </div>
+  );
+}
+
+function SrLevels({ d }) {
+  const sr = g(d, "signals", "sr_levels") || {};
+  const rows = [...(sr.resistance || []).slice(0, 1), ...(sr.support || []).slice(0, 1)];
+  const cols = [
+    { label: "種類", render: (x) => <b className={x.kind === "resistance" ? "dn" : "up"}>{x.kind === "resistance" ? "壓力" : "支撐"}</b>, sort: (x) => x.kind },
+    { label: "價位", num: true, render: (x) => <b>{fnum(x.price)}</b>, sort: (x) => nz(x.price) },
+    { label: "距現價", num: true, render: (x) => fpct(x.dist_pct), sort: (x) => nz(x.dist_pct) },
+    { label: "強度", num: true, title: "大量 K 量倍數（上限 5）＋每個缺口 2＋觸及天數", render: (x) => fnum(x.strength, 1), sort: (x) => nz(x.strength) },
+    { label: "觸及", num: true, render: (x) => ((x.touch_dates || []).length ? <span title={(x.touch_dates || []).join("、")}>{x.touches} 天</span> : "0"), sort: (x) => nz(x.touches) },
+    { label: "最後觸及", render: (x) => x.last_touch_date || "—", sort: (x) => x.last_touch_date || "" },
+    { label: "來源", cls: "wrap", render: (x) => (x.sources || []).join("｜") || "—", sort: (x) => (x.sources || []).join("") },
+    { label: "註", cls: "wrap warn", render: (x) => [x.testing ? "正在測試" : "", x.pick_scope === "beyond" ? SR_BEYOND : ""].filter(Boolean).join("、"), sort: (x) => (x.pick_scope === "beyond" ? 1 : 0) + (x.testing ? 2 : 0) },
+  ];
+  return (
+    <div className="ta-block" data-blk="sr">
+      <div className="ta-cap">④ 支撐／壓力 <span className="mut">各只一條：先在今收 ±10% 內挑強度最高的，該側 10% 內沒線才取範圍外最強；容差 {fnum(sr.tol)}（ATR14 {fnum(sr.atr14)}）</span></div>
+      {rows.length ? <div className="ta-hs"><SortTable className="ta-dt" cols={cols} rows={rows} rowKey={(x) => x.kind} rowClass={(x) => (x.kind === "resistance" ? "sr-res" : "sr-sup")} /></div>
+        : <div className="ta-empty">沒有候選價位</div>}
+    </div>
+  );
+}
+
+const RULES = [
+  ["① 前五大量", "近 120 根日 K 裡成交量最大的 5 根（同量取較近的）。量倍數＝當天量 ÷ 當天「之前」20 天的平均量。K 棒：實體占全距 ≥0.6 叫長紅／長黑、≤0.1 叫十字，其餘紅K／黑K。收在：收盤落在當天區間上 1/3＝高檔、下 1/3＝低檔，其餘中間。那根的最高、最低就是關卡：今收高過最高＝在上方、低過最低＝在下方，其餘＝區間內。"],
+  ["② 跳空缺口", "近 120 根的全部跳空，不設門檻。向上＝今天最低高過昨天最高；向下＝今天最高低過昨天最低。之後有 K 碰進缺口＝部分回補（沒碰到的那段叫未補區間），碰到另一邊＝已補。距現價只算還沒補完的：向上缺口一定在現價下方、向下缺口一定在上方。"],
+  ["③ 多空排列", "短線看 SMA5／10／20、中長線看 SMA20／60／120。多頭排列＝收盤 > 第一條 > 第二條 > 第三條，而且三條均線今天都比昨天高；空頭排列完全相反；其他都叫糾結，並寫出是哪個條件不成立。已成立＝目前狀態連續第幾天（含今天）；最接近被破壞＝收盤–第一條、第一條–第二條、第二條–第三條三組裡差距最小的一組。"],
+  ["④ 支撐／壓力", "候選價位三種：前五大量 K 的高與低、未補缺口的邊緣、K 線反覆打到又回來的價位（觸及 ≥3 天）。差距在容差內的併成一條；強度＝大量 K 量倍數（上限 5）＋每個缺口 2＋觸及天數。在今收下方＝支撐（白實線）、上方＝壓力（白虛線），離今收不到 1/4 容差標「正在測試」。支撐、壓力各只留一條：先在今收 ±10% 內挑強度最高的，該側 10% 內一條都沒有才取範圍外最強，並標「10% 內無，取範圍外最強」。"],
+  ["容差", "max(0.5 × ATR14, 0.5% × 今收)；ATR14 是近 14 天平均真實波幅（Wilder）。"],
+  ["距離 %", "(價位 ÷ 今收 − 1) × 100：正數在現價上方、負數在下方。"],
+  ["清單徽章", "量＝今收相對最大量那根 K（上方紅、下方綠、區間灰）；缺＝上方／下方最近的未補缺口距現價（顏色看較近那個：向上缺口紅、向下缺口綠）；排＝短線・中長線排列（多紅、空綠、糾灰）；撐壓＝選中那條壓力／支撐距現價（灰）。"],
+];
+
 function Detail({ d }) {
-  const t = d.trend_state || {}, s = d.structure || {}, a = d.adx || {}, vo = d.vol || {}, vl = d.volume || {}, rel = d.rel || {};
-  const r = d.risk || {}, tg = d.targets || {}, cf = d.confidence || {}, lv = d.levels || {}, ma = d.ma || {}, pr = d.price || {};
-  const side = r.side || "long";
-  const ev = s.last_event || {};
-  const dflt = r.default || {};
-
-  const kvRows = [
-    ["趨勢 長／中／短", <>{[t.long, t.inter, t.short].map((x, i) => <span key={i} className={TREND_CLS[x] || "mut"}>{i ? "／" : ""}{TREND_ZH[x] || "—"}</span>)}<span className="mut">{t.aligned ? "（三層一致）" : "（不一致）"}</span></>],
-    ["結構", <>{s.state || "—"} <span className="mut">{s.state_basis || ""}</span></>],
-    ["最後突破", ev.type ? <>{ev.type} {ev.dir === "up" ? "向上" : ev.dir === "down" ? "向下" : ""} @ {fnum(ev.level)} <span className="mut">{ev.date || ""}</span></> : "—"],
-    ["均線排列", ma.alignment || "—"],
-    ["ADX14", a.status === "ok" ? <>{fnum(a.adx14)}（{a.quality || "—"}）+DI {fnum(a.plus_di)}／−DI {fnum(a.minus_di)}</> : <span className="mut">資料不足{a.why ? "：" + a.why : ""}</span>],
-    ["ATR14／ATR%", <>{fnum(vo.atr14)}／{fpct(vo.atr_pct, false)}</>],
-    ["布林帶寬", <>{fnum(vo.bandwidth)}%{vo.squeeze ? "（壓縮）" : ""}</>],
-    ["量價 1 日／5 日", <>{vl.pv_1d || "—"}（{fnum(vl.ratio_1d)}x）／{vl.pv_5d || "—"}（{fnum(vl.ratio_5d)}x）</>],
-    ["REL5／20／60", <><span className={ud(rel.rel5)}>{fnum(rel.rel5)}</span>／<span className={ud(rel.rel20)}>{fnum(rel.rel20)}</span>／<span className={ud(rel.rel60)}>{fnum(rel.rel60)}</span> <span className="mut">百分點·近 N 日相對{rel.bench || "大盤"}·非漲幅</span></>],
-    ["52 週高／低", <>{fnum(pr.high_52w)}（{fpct(pr.dist_high_52w_pct)}）／{fnum(pr.low_52w)}（{fpct(pr.dist_low_52w_pct)}）</>],
-  ];
-
-  // 停損與目標
-  const stopRows = [];
-  const sideStops = r[side] || {};
-  for (const k of ["swing", "chandelier", "atr2"]) {
-    const x = sideStops[k] || {};
-    stopRows.push({ id: "st-" + k, on: dflt.method === k, item: (dflt.method === k ? "★ " : "") + "停損·" + (METHOD_ZH[k] || k), price: x.price, dist: x.dist_pct, basis: x.basis || "" });
-  }
-  for (const k of ["r1", "r2", "r3"]) {
-    const x = tg[k] || {};
-    stopRows.push({ id: "tg-" + k, item: k.slice(1) + "R 目標", price: x.price, dist: x.dist_pct, basis: x.rr != null ? "R:R " + fnum(x.rr) : "" });
-  }
-  const ns = tg.next_swing;
-  stopRows.push({ id: "ns", item: "前波目標", price: ns && ns.price, dist: ns && ns.dist_pct, basis: ns ? fnum(ns.rr) + " R · " + srcZh(ns.source) : "無" });
-  const ms = tg.measured;
-  stopRows.push({ id: "ms", item: "量測目標", price: ms && ms.price, dist: ms && ms.dist_pct, basis: ms ? fnum(ms.rr) + " R" + (ms.reached ? "（已到）" : "") + " · " + (ms.basis || "") : (tg.measured_why || "無") });
-  const stopCols = [
-    { label: "項目", render: (x) => x.item, sort: (x) => x.item },
-    { label: "價位", num: true, render: (x) => fnum(x.price), sort: (x) => (x.price == null ? null : Number(x.price)) },
-    { label: "距離", num: true, render: (x) => <span className={ud(x.dist)}>{fpct(x.dist)}</span>, sort: (x) => (x.dist == null ? null : Number(x.dist)) },
-    { label: "依據", cls: "wrap mut", render: (x) => x.basis, sort: (x) => x.basis },
-  ];
-
-  // 關鍵價位
-  const lvRows = [];
-  for (const [nm, key] of [["壓力（上方）", "above"], ["支撐（下方）", "below"]]) {
-    (lv[key] || []).forEach((x, i) => lvRows.push({ id: key + i, nm, price: x.price, dist: x.dist_pct, src: (x.sources || []).map(srcZh).join("、") }));
-  }
-  const lvCols = [
-    { label: "上／下", render: (x) => x.nm, sort: (x) => x.nm },
-    { label: "價位", num: true, render: (x) => fnum(x.price), sort: (x) => (x.price == null ? null : Number(x.price)) },
-    { label: "距離", num: true, render: (x) => <span className={ud(x.dist)}>{fpct(x.dist)}</span>, sort: (x) => (x.dist == null ? null : Number(x.dist)) },
-    { label: "來源", cls: "wrap mut", render: (x) => x.src, sort: (x) => x.src },
-  ];
-
-  // 信心分
-  const bdRows = (cf.breakdown || []).map((b, i) => ({ id: i, item: BREAKDOWN_ZH[b.item] || b.item, pts: b.pts, max: b.max, why: b.why || "" }));
-  const bdCols = [
-    { label: "項目", render: (x) => x.item, sort: (x) => x.item },
-    { label: "得分", num: true, render: (x) => fnum(x.pts) + "／" + fnum(x.max), sort: (x) => Number(x.pts) },
-    { label: "依據", cls: "wrap mut", render: (x) => x.why, sort: (x) => x.why },
-  ];
-
   return (
     <>
       <KChart d={d} />
-      <div className="ta-cols">
-        <div className="ta-block">
-          <div className="ta-cap">趨勢與結構</div>
-          <KV rows={kvRows} />
-        </div>
-        <div className="ta-block">
-          <div className="ta-cap">停損與目標（{sideZh(side)}視角，R＝{fnum(tg.R)}）</div>
-          <SortTable cols={stopCols} rows={stopRows} rowKey={(x) => x.id} rowClass={(x) => (x.on ? "on" : "")} />
-          {side === "short" ? (
-            <div className="ta-small">空方視角：停損在上方、目標在下方。只做多的對照停損：{["swing", "chandelier", "atr2"].map((k) => METHOD_ZH[k].split("（")[0] + " " + fnum(g(r, "long", k, "price"))).join("；")}。</div>
-          ) : null}
-        </div>
-        <div className="ta-block">
-          <div className="ta-cap">關鍵價位</div>
-          <SortTable cols={lvCols} rows={lvRows} rowKey={(x) => x.id} />
-          <div className="ta-cap" style={{ marginTop: 14 }}>什麼情況判讀失效</div>
-          <div className="ta-inv">{d.invalidation || "—"}</div>
-        </div>
-        <div className="ta-block">
-          <div className="ta-cap">信心分 {fnum(cf.score)}（多方 {fnum(cf.score_long)}／空方 {fnum(cf.score_short)}）</div>
-          <SortTable cols={bdCols} rows={bdRows} rowKey={(x) => x.id} />
-          {cf.conflict ? <div className="ta-small warn">{cf.conflict}</div> : null}
-          <div className="ta-small">{cf.notes || "分數不是勝率：只衡量各規則訊號與方向同向的程度，未經回測校準。"}</div>
-        </div>
+      <TopVolume d={d} />
+      <Gaps d={d} />
+      <MaAlign d={d} />
+      <SrLevels d={d} />
+      <div className="ta-block ta-rules" data-blk="rules">
+        <div className="ta-cap">怎麼看 <span className="mut">規則寫死、可逐日手算</span></div>
+        <dl>{RULES.map(([k, v]) => <div key={k} className="ta-rule"><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
       </div>
     </>
   );
 }
 
 // ───────── 右欄：單檔明細 ─────────
-function One({ row, item, onRetry }) {
+function One({ row, item, onRetry, old }) {
   const sym = row.sym;
   const d = item && !item.error ? item : null;
   const m = (d && d.meta) || {};
-  const side = row.side || g(d, "risk", "side") || "long";
-  const chg = row.chg1d != null ? row.chg1d : g(d, "price", "chg_1d_pct");
+  const chg = chgOf(row) != null ? chgOf(row) : g(d, "price", "chg_1d_pct");
   const close = row.close != null ? row.close : g(d, "price", "close");
-  const conflict = g(d, "confidence", "conflict");
+  const oldItem = old || (d && !d.signals);
   return (
     <div className="ta-one" id={"c-" + sym} data-sym={sym}>
       <div className="ta-ch">
         <h2><span className="mono">{sym}</span>{row.name || m.name || ""}</h2>
         <span className="ta-px mono">{fnum(close)} <span className={ud(chg)}>{fpct(chg)}</span></span>
-        <span className={"ta-chip " + side}>{sideZh(side)} · 信心 {fnum(row.conf)}</span>
-        <span className="ta-chip">結構 {row.state || "—"}</span>
-        <span className="ta-chip">資料 {row.asof || m.asof || "—"}</span>
+        <span className="ta-chip asof">資料截至 {row.asof || m.asof || "—"}</span>
+        {m.exchange ? <span className="ta-chip">{m.exchange}</span> : null}
         {row.stale || m.stale ? <span className="ta-chip warn">資料可能過期</span> : null}
-        {conflict ? <span className="ta-chip warn">趨勢與結構打架</span> : null}
       </div>
-      {d && m.notes && m.notes.length ? (
-        <div className="ta-notes">資料註記：{m.notes.join("；")}｜來源 {m.source || "—"}｜基準 {m.bench || "—"}</div>
-      ) : null}
-      {d ? <Detail key={sym} d={d} /> : item && item.error ? (
-        <div className="ta-err">
-          <span>這檔明細讀不到：{item.error}</span>
-          <button type="button" className="ta-btn" onClick={onRetry}>重試</button>
-        </div>
+      {oldItem ? (
+        <div className="ta-old">{OLD_MSG}。</div>
       ) : (
-        <div className="ta-ph"><span>明細載入中…</span></div>
+        <>
+          {isSig(row) ? <Badges r={row} full /> : null}
+          {d && m.notes && m.notes.length ? (
+            <div className="ta-notes">資料註記：{m.notes.join("；")}｜來源 {m.source || "—"}</div>
+          ) : null}
+          {d ? <Detail key={sym} d={d} /> : item && item.error ? (
+            <div className="ta-err">
+              <span>這檔明細讀不到：{item.error}</span>
+              <button type="button" className="ta-btn" onClick={onRetry}>重試</button>
+            </div>
+          ) : (
+            <div className="ta-ph"><span>明細載入中…</span></div>
+          )}
+        </>
       )}
     </div>
   );
 }
 
 // ───────── 左欄清單的排序 ─────────
-// 預設「送來的順序」＝報告表格勾選／送出的順序（與改版前總表的預設一致）。
+// 預設「送來的順序」＝報告表格勾選／送出的順序。val 回 null＝排最後；同值照送來的順序。
+// lab：[正向（dir=1）的說明, 反向（dir=−1）的說明]
+const K = (r, f) => nz(g(r, "key", f));
 const SORTS = [
-  { key: "orig", label: "送來的順序", dir: 1, val: (r, i) => i },
-  { key: "conf", label: "信心分", dir: -1, val: (r) => (r.conf == null ? null : Number(r.conf)) },
-  { key: "rel20", label: "REL20", dir: -1, val: (r) => (r.rel20 == null ? null : Number(r.rel20)) },
-  { key: "atr", label: "ATR%", dir: -1, val: (r) => (r.atr_pct == null ? null : Number(r.atr_pct)) },
-  { key: "sym", label: "代號", dir: 1, val: (r) => r.sym },
+  { key: "orig", label: "送來的順序", dir: 1, lab: ["正序", "倒序"], v1: true, val: (r, i) => i },
+  { key: "chg", label: "1D%", dir: -1, lab: ["低→高", "高→低"], v1: true, val: (r) => nz(chgOf(r)) },
+  { key: "vol", label: "大量關係", dir: -1, lab: ["下方→上方", "上方→下方"], val: (r) => K(r, "vol_rel") },
+  { key: "gap", label: "最近未補缺口距離", dir: 1, lab: ["近→遠", "遠→近"], val: (r) => (K(r, "gap_near_pct") === null ? null : Math.abs(K(r, "gap_near_pct"))) },
+  { key: "mas", label: "短線排列", dir: -1, lab: ["空→多", "多→空"], val: (r) => K(r, "ma_short") },
+  { key: "mam", label: "中長線排列", dir: -1, lab: ["空→多", "多→空"], val: (r) => K(r, "ma_mid") },
+  { key: "res", label: "壓力距離", dir: 1, lab: ["近→遠", "遠→近"], val: (r) => (K(r, "sr_res_pct") === null ? null : Math.abs(K(r, "sr_res_pct"))) },
+  { key: "sup", label: "支撐距離", dir: 1, lab: ["近→遠", "遠→近"], val: (r) => (K(r, "sr_sup_pct") === null ? null : Math.abs(K(r, "sr_sup_pct"))) },
+  { key: "sym", label: "代號", dir: 1, lab: ["A→Z", "Z→A"], v1: true, val: (r) => r.sym },
 ];
 const SORT_BY = Object.fromEntries(SORTS.map((s) => [s.key, s]));
-function dirLabel(key, dir) {
-  if (key === "orig") return dir > 0 ? "正序" : "倒序";
-  if (key === "sym") return dir > 0 ? "A→Z" : "Z→A";
-  return dir < 0 ? "高→低" : "低→高";
-}
 function hashSym() {
   try {
     const m = (location.hash || "").match(/[#&]s=([^&]+)/);
     return m ? decodeURIComponent(m[1]).trim().toUpperCase() : "";
   } catch (e) { return ""; }
+}
+const MA_ZH = { 1: "多頭", 0: "糾結", "-1": "空頭" };
+function maCell(v) { return v === 1 || v === 0 || v === -1 ? <span className={toneN(v) || "mut"}>{MA_ZH[v]}</span> : <span className="mut">資料不足</span>; }
+function srCell(v) {
+  if (v === null) return <span className="mut">無</span>;
+  return <>{fpct(v)}{Math.abs(v) > 10 ? <span className="ta-out" title={SR_BEYOND}>外</span> : null}</>;
 }
 
 // ───────── 主頁 ─────────
@@ -428,6 +628,13 @@ export default function TaPage() {
   }, [toGate]);
 
   const rows = useMemo(() => (sum && sum.rows) || [], [sum]);
+  // 新版（三訊號）資料：summary 標 v≥2／schema sig3-*，或列上有 badge／key；舊版（v1：信心分／停損）只列代號清單
+  const v2 = useMemo(() => {
+    if (!sum) return false;
+    if (Number(sum.v) >= 2 || /^sig3/.test(String(sum.schema || ""))) return true;
+    return rows.length > 0 && rows.some(isSig);
+  }, [sum, rows]);
+  const sorts = useMemo(() => SORTS.filter((s) => v2 || s.v1), [v2]);
 
   // 左欄：搜尋（代號／名稱）＋排序；空值一律排最後，同值照送來的順序
   const vis = useMemo(() => {
@@ -451,8 +658,9 @@ export default function TaPage() {
   selRef.current = sel;
 
   // 明細按需取：選中那檔＋清單上它後面 20 檔、前面 4 檔（還沒取過的），一次最多 25 檔；取過的留在 items（頁面記憶體）
+  // 舊版資料不取明細（格式對不上，右欄只顯示「舊版，更新中」）
   const loadFor = useCallback(async (sym) => {
-    if (!ctx || !sum || !sym) return;
+    if (!ctx || !sum || !sym || !v2) return;
     if (itemsRef.current[sym] || inflight.current.has(sym)) return;
     const ord = visRef.current.some((r) => r.sym === sym) ? visRef.current.map((r) => r.sym) : rows.map((r) => r.sym);
     const i = ord.indexOf(sym);
@@ -484,7 +692,7 @@ export default function TaPage() {
       const nx = { ...itemsRef.current, [sym]: { error: String((e && e.message) || e) } };
       itemsRef.current = nx; setItems(nx);
     }
-  }, [ctx, sum, rows, toGate]);
+  }, [ctx, sum, rows, toGate, v2]);
 
   const retry = useCallback((sym) => {
     const nx = { ...itemsRef.current };
@@ -556,23 +764,23 @@ export default function TaPage() {
 
   const pick = useCallback((sym) => { setSel(sym); setTab("one"); }, []);
 
-  const sumCols = useMemo(() => [
-    { label: "代號", cls: "code mono", render: (r) => r.sym, sort: (r) => r.sym },
-    { label: "名稱", render: (r) => <span className="ta-nm" title={r.name || ""}>{r.name || ""}</span>, sort: (r) => r.name || "" },
-    { label: "資料日", render: (r) => <>{r.asof || "—"}{r.stale ? <span className="warn" title="資料可能過期"> ⚠過期</span> : null}</>, sort: (r) => r.asof || "" },
-    { label: "收盤", num: true, render: (r) => fnum(r.close), sort: (r) => (r.close == null ? null : Number(r.close)) },
-    { label: "1日%", num: true, render: (r) => <span className={ud(r.chg1d)}>{fpct(r.chg1d)}</span>, sort: (r) => (r.chg1d == null ? null : Number(r.chg1d)) },
-    { label: "長/中/短", title: "三層趨勢（EMA 規則）：多／中／空。排序依多空淨分", render: (r) => (
-      <span className="ta-tr">{trendArr(r).map((x, i) => <span key={i} className={TREND_CLS[x] || "mut"}>{TREND_ZH[x] || "—"}</span>)}</span>
-    ), sort: (r) => trendScore(trendArr(r)) },
-    { label: "結構", render: (r) => <span className={r.state === "多頭" ? "up" : r.state === "空頭" ? "dn" : ""}>{r.state || "—"}</span>, sort: (r) => r.state || "" },
-    { label: "ADX", num: true, render: (r) => fnum(r.adx, 1), sort: (r) => (r.adx == null ? null : Number(r.adx)) },
-    { label: "ATR%", num: true, render: (r) => fpct(r.atr_pct, false), sort: (r) => (r.atr_pct == null ? null : Number(r.atr_pct)) },
-    { label: "REL20", num: true, title: "近 20 日相對大盤（百分點）·非漲幅", render: (r) => <span className={ud(r.rel20)}>{fnum(r.rel20)}</span>, sort: (r) => (r.rel20 == null ? null : Number(r.rel20)) },
-    { label: "預設停損", num: true, title: "價位（距離收盤 %）；排序依距離", render: (r) => r.stop && r.stop.price != null ? <>{fnum(r.stop.price)} <span className="mut">({fpct(r.stop.dist_pct)})</span></> : "—", sort: (r) => (r.stop && r.stop.dist_pct != null ? Number(r.stop.dist_pct) : null) },
-    { label: "2R 目標", num: true, render: (r) => fnum(r2Price(r)), sort: (r) => (r2Price(r) == null ? null : Number(r2Price(r))) },
-    { label: "信心分", num: true, title: "條件符合幾項（0–100），不是勝率", render: (r) => <><span className={r.side === "short" ? "dn" : "up"}>{r.side === "short" ? "空" : "多"}</span> {fnum(r.conf)}</>, sort: (r) => (r.conf == null ? null : Number(r.conf)) },
-  ], []);
+  const sumCols = useMemo(() => {
+    const base = [
+      { label: "代號", cls: "code mono", render: (r) => r.sym, sort: (r) => r.sym },
+      { label: "名稱", render: (r) => <span className="ta-nm" title={r.name || ""}>{r.name || ""}</span>, sort: (r) => r.name || "" },
+      { label: "收盤", num: true, render: (r) => <>{fnum(r.close)}{r.stale ? <span className="warn" title="資料日早於報告日，價位以該檔資料日為準"> ⚠</span> : null}</>, sort: (r) => nz(r.close) },
+      { label: "1D%", num: true, render: (r) => <span className={ud(chgOf(r))}>{fpct(chgOf(r))}</span>, sort: (r) => nz(chgOf(r)) },
+    ];
+    if (!v2) return base;
+    return base.concat([
+      { label: "量", first: -1, title: "今收相對最大量那根 K：上方／區間／下方（點一下：上方→下方）", render: (r) => <span className={toneN(K(r, "vol_rel")) || "mut"}>{volWord(r)}</span>, sort: (r) => K(r, "vol_rel") },
+      { label: "缺", first: 1, title: "上方／下方最近的未補缺口距現價（點一下：較近那個由近到遠）", render: (r) => <span className={gapTone(r) || "mut"}>{squeeze(g(r, "badge", "gap"))}</span>, sort: (r) => (K(r, "gap_near_pct") === null ? null : Math.abs(K(r, "gap_near_pct"))) },
+      { label: "排(短)", first: -1, title: "SMA5／10／20 排列（點一下：多→糾→空）", render: (r) => maCell(K(r, "ma_short")), sort: (r) => K(r, "ma_short") },
+      { label: "排(中)", first: -1, title: "SMA20／60／120 排列（點一下：多→糾→空）", render: (r) => maCell(K(r, "ma_mid")), sort: (r) => K(r, "ma_mid") },
+      { label: "壓距", num: true, first: 1, title: "選中那條壓力距現價（今收 ±10% 內最強；「外」＝10% 內無，取範圍外最強）。點一下：由近到遠", render: (r) => srCell(K(r, "sr_res_pct")), sort: (r) => (K(r, "sr_res_pct") === null ? null : Math.abs(K(r, "sr_res_pct"))) },
+      { label: "撐距", num: true, first: 1, title: "選中那條支撐距現價（今收 ±10% 內最強；「外」＝10% 內無，取範圍外最強）。點一下：由近到遠", render: (r) => srCell(K(r, "sr_sup_pct")), sort: (r) => (K(r, "sr_sup_pct") === null ? null : Math.abs(K(r, "sr_sup_pct"))) },
+    ]);
+  }, [v2]);
 
   // ───── 閘門／錯誤／載入 ─────
   if (phase === "init" || phase === "loading") {
@@ -606,9 +814,10 @@ export default function TaPage() {
   const errs = sum.errors || {};
   const wm = sum.wm || "會員專屬";
   const selRow = rows.find((r) => r.sym === sel) || null;
+  const sd = SORT_BY[sortKey] || SORTS[0];
 
   return (
-    <main className="ta-root ta-app">
+    <main className={"ta-root ta-app" + (v2 ? "" : " ta-v1")}>
       <div className="ta-wm" aria-hidden="true">{Array.from({ length: 36 }, (_, i) => <span key={i}>{wm}</span>)}</div>
       <header className="ta-head">
         <div className="ta-hrow">
@@ -620,7 +829,8 @@ export default function TaPage() {
           <span className="sep">　</span>本次 <b>{rows.length}</b> 檔{missing.length ? <>（另有 {missing.length} 檔沒有資料）</> : null}
           {sum.generated_at ? <><span className="sep">　</span>計算時間 {String(sum.generated_at).replace("T", " ").slice(0, 16)}</> : null}
         </div>
-        {staleN ? <div className="ta-notice">有 {staleN} 檔的資料日早於報告日（標「⚠過期」），價位以該檔資料日的收盤為準。</div> : null}
+        {!v2 ? <div className="ta-notice ta-oldn">{OLD_MSG}（目前只列代號清單）。</div>
+          : staleN ? <div className="ta-notice">有 {staleN} 檔的資料日早於報告日（標「⚠過期」），價位以該檔資料日的收盤為準。</div> : null}
       </header>
 
       <div className="ta-split">
@@ -633,28 +843,25 @@ export default function TaPage() {
               <span>排序</span>
               <select className="ta-sel" aria-label="排序方式" value={sortKey}
                 onChange={(e) => { const k = e.target.value; setSortKey(k); setSortDir((SORT_BY[k] || SORTS[0]).dir); e.target.blur(); }}>
-                {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+                {sorts.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
               </select>
-              <button type="button" className="ta-dir" title="反轉排序方向" onClick={() => setSortDir((x) => -x)}>{dirLabel(sortKey, sortDir)}</button>
+              <button type="button" className="ta-dir" title="反轉排序方向" onClick={() => setSortDir((x) => -x)}>{sd.lab[sortDir > 0 ? 0 : 1]}</button>
             </div>
           </div>
           <div className="ta-list" ref={listRef} role="listbox" aria-label="代號清單">
             {vis.map((r) => {
               const on = r.sym === sel;
-              const side = r.side === "short" ? "short" : "long";
+              const chg = chgOf(r);
               return (
                 <div key={r.sym} className={"ta-li" + (on ? " on" : "")} data-sym={r.sym} role="option" aria-selected={on} onClick={() => pick(r.sym)}>
                   <div className="l1">
                     <b className="mono">{r.sym}</b>
                     <span className="nm" title={r.name || ""}>{r.name || ""}</span>
-                    <span className={"ta-cf " + side} title={(side === "short" ? "空方" : "多方") + "信心分（條件符合幾項，不是勝率）"}>{side === "short" ? "空" : "多"} {fnum(r.conf)}</span>
+                    <span className="px mono">{fnum(r.close)}</span>
+                    <span className={"pc mono " + ud(chg)}>{fpct(chg)}</span>
+                    {r.stale ? <span className="warn" title="資料日早於報告日">⚠</span> : null}
                   </div>
-                  <div className="l2">
-                    <span className="mono">{fnum(r.close)}</span>
-                    <span className={"mono " + ud(r.chg1d)}>{fpct(r.chg1d)}</span>
-                    <span className={r.state === "多頭" ? "up" : r.state === "空頭" ? "dn" : "mut"}>{r.state || "—"}</span>
-                    {r.stale ? <span className="warn" title="資料可能過期">⚠過期</span> : null}
-                  </div>
+                  {isSig(r) ? <Badges r={r} /> : null}
                 </div>
               );
             })}
@@ -675,22 +882,25 @@ export default function TaPage() {
             <span className="ta-kbd">鍵盤 ↑／↓ 切換股票</span>
           </div>
           <div className="ta-pane" ref={paneRef} hidden={tab !== "one"}>
-            {selRow ? <One row={selRow} item={items[selRow.sym]} onRetry={() => retry(selRow.sym)} />
+            {selRow ? <One row={selRow} item={items[selRow.sym]} old={!v2} onRetry={() => retry(selRow.sym)} />
               : <div className="ta-ph">{rows.length ? "從左邊清單選一檔。" : "這次勾選的代號都沒有資料。"}</div>}
             <div className="ta-foot">
-              以上數字全由寫死的技術規則計算（均線、結構高低點、ADX、ATR、相對強弱），沒有經過回測校準；信心分是條件符合幾項，不是勝率；
-              停損的主要用途是把尾部風險壓住，不是保證獲利。本頁為會員專屬資料，請勿轉傳。
+              以上數字全由寫死的規則計算（成交量、跳空缺口、簡單均線、分形高低點），沒有經過回測校準，只描述過去的價量位置，不是買賣建議。
+              本頁為會員專屬資料，請勿轉傳。
             </div>
           </div>
           <div className="ta-pane ta-pane-all" hidden={tab !== "all"}>
             <div className="ta-allcap">數字總表（點欄名排序、點一列看那一檔的明細）</div>
+            {!v2 ? <div className="ta-old ta-old-all">{OLD_MSG}（目前只列代號、收盤與 1D%）。</div> : null}
             {rows.length ? (
               <SortTable className="ta-sum" cols={sumCols} rows={rows} rowKey={(r) => r.sym} onRowClick={(r) => pick(r.sym)} rowClass={(r) => (r.sym === sel ? "sel" : "")} />
             ) : <div className="ta-ph">這次勾選的代號都沒有資料。</div>}
-            <div className="ta-hint">
-              趨勢「多／中／空」＝長線（EMA50 對 EMA200）、中線（EMA20／50／200）、短線（收盤對 EMA20＋斜率）；REL20＝近 20 日相對大盤的百分點，不是漲幅；
-              預設停損括號內是距離收盤的百分比；信心分是條件符合幾項，不是勝率。
-            </div>
+            {v2 ? (
+              <div className="ta-hint">
+                量＝今收相對最大量那根 K；缺＝上方／下方最近的未補缺口距現價；排(短)＝SMA5／10／20、排(中)＝SMA20／60／120 的排列；
+                壓距／撐距＝選中那條壓力／支撐距現價（今收 ±10% 內強度最高的；標「外」＝10% 內沒有，取範圍外最強）。距離一律＝(價位 ÷ 今收 − 1)×100。
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

@@ -1,11 +1,10 @@
-/* 會員技術分析頁（/ta）。沿用站內色票（--bg --surface --text --dim --red --green --orange），漲紅跌綠。 */
+/* 會員技術分析頁（/ta）。沿用站內色票（--bg --surface --text --dim --red --green --orange），漲紅跌綠。
+   內容＝三訊號（前五大量・跳空缺口・多空排列）＋支撐／壓力各一條（Yoda 2026-09-27）。 */
 .ta-root{
-  --ta-cyan:#56c1d6; --ta-muted:#8a8f99; --ta-head:var(--text);
   min-width:1200px; max-width:1240px; margin:0 auto; padding:64px 20px 90px;
   font-size:calc(15px*var(--scale)); line-height:1.65; color:var(--text);
   position:relative;
 }
-html[data-theme="light"] .ta-root{ --ta-cyan:#00708a; --ta-muted:#5f6670; }
 .ta-root .mono{font-family:'SF Mono',Consolas,Monaco,'Courier New',monospace}
 .ta-root .up{color:var(--red)} .ta-root .dn{color:var(--green)} .ta-root .mut{color:var(--dim)}
 .ta-root .warn{color:var(--yellow)}
@@ -44,21 +43,31 @@ html[data-theme="light"] .ta-root{ --ta-cyan:#00708a; --ta-muted:#5f6670; }
   border-radius:8px;padding:4px 9px;cursor:pointer;white-space:nowrap}
 .ta-dir:hover{border-color:var(--accent)}
 .ta-list{flex:1;min-height:0;overflow-y:auto;position:relative;overscroll-behavior:contain}
-.ta-li{padding:6px 12px 7px 9px;border-bottom:1px solid var(--divider);border-left:3px solid transparent;cursor:pointer;user-select:none}
+.ta-li{padding:6px 10px 7px 9px;border-bottom:1px solid var(--divider);border-left:3px solid transparent;cursor:pointer;user-select:none}
 .ta-li:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}
 .ta-li.on{background:color-mix(in srgb,var(--accent) 20%,transparent);border-left-color:var(--accent)}
-.ta-li .l1{display:flex;align-items:center;gap:8px;min-width:0;line-height:1.45}
+.ta-li .l1{display:flex;align-items:baseline;gap:7px;min-width:0;line-height:1.45}
 .ta-li .l1 b{flex:none;font-weight:700;font-size:calc(14.5px*var(--scale))}
-.ta-li .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dim);font-size:calc(13px*var(--scale))}
-.ta-li .l2{display:flex;align-items:baseline;gap:10px;font-size:calc(13px*var(--scale));line-height:1.45;margin-top:1px}
-.ta-cf{flex:none;font-size:calc(12px*var(--scale));line-height:1.45;padding:0 7px;border-radius:999px;border:1px solid var(--border);
-  background:var(--surface2);white-space:nowrap}
-.ta-cf.long{color:var(--red);border-color:color-mix(in srgb,var(--red) 45%,transparent)}
-.ta-cf.short{color:var(--green);border-color:color-mix(in srgb,var(--green) 45%,transparent)}
+.ta-li .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dim);font-size:calc(12.5px*var(--scale))}
+.ta-li .px,.ta-li .pc{flex:none;font-size:calc(13px*var(--scale))}
+.ta-li .pc{min-width:4.2em;text-align:right}
+.ta-li .ta-bds{margin-top:3px}
 .ta-lempty{padding:18px 12px;color:var(--dim);font-size:calc(13.5px*var(--scale))}
 .ta-lfoot{flex:none;padding:8px 12px;border-top:1px solid var(--border);color:var(--dim);font-size:calc(12.5px*var(--scale));
   max-height:8em;overflow:auto;line-height:1.55}
 .ta-lfoot b{color:var(--text);font-weight:600}
+
+/* 四個小徽章：量・缺・排・撐壓（多頭紅、空頭綠、中性灰） */
+.ta-bds{display:flex;flex-wrap:wrap;gap:3px 4px}
+.ta-bd{display:inline-flex;align-items:baseline;gap:3px;font-size:calc(11.5px*var(--scale));line-height:1.55;padding:0 6px;
+  border-radius:5px;background:var(--surface2);border:1px solid var(--border);color:var(--dim);white-space:nowrap}
+.ta-bd i{font-style:normal;color:var(--dim);opacity:.8;font-size:.92em;margin-right:1px}
+.ta-root .ta-bd.up{color:var(--red);border-color:color-mix(in srgb,var(--red) 40%,transparent)}
+.ta-root .ta-bd.dn{color:var(--green);border-color:color-mix(in srgb,var(--green) 40%,transparent)}
+.ta-bd.ma{color:var(--dim)}
+.ta-bds.full{margin:0 0 10px;gap:6px 8px}
+.ta-bds.full .ta-bd{font-size:calc(13.5px*var(--scale));padding:2px 10px;border-radius:7px;color:var(--text)}
+.ta-bds.full .ta-bd i{margin-right:5px}
 
 /* 右欄：分頁＋內容 */
 .ta-tabs{flex:none;display:flex;align-items:center;gap:2px;padding:7px 12px;border-bottom:1px solid var(--border)}
@@ -68,7 +77,7 @@ html[data-theme="light"] .ta-root{ --ta-cyan:#00708a; --ta-muted:#5f6670; }
 .ta-tab:hover{color:var(--text)}
 .ta-tab.on{color:var(--text);background:var(--surface2);border-color:var(--border);font-weight:700}
 .ta-kbd{margin-left:auto;color:var(--dim);font-size:calc(12px*var(--scale))}
-.ta-pane{flex:1;min-height:0;overflow:auto;padding:14px 20px 18px;container-type:inline-size;overscroll-behavior:contain}
+.ta-pane{flex:1;min-height:0;overflow:auto;padding:14px 20px 18px;overscroll-behavior:contain}
 .ta-pane[hidden]{display:none}
 .ta-pane-all{padding:0}
 .ta-allcap{font-weight:700;font-size:calc(14.5px*var(--scale));padding:10px 14px 8px}
@@ -89,65 +98,81 @@ html[data-theme="light"] .ta-root{ --ta-cyan:#00708a; --ta-muted:#5f6670; }
 .ta-tbl thead th .arr{font-size:.8em;margin-left:3px;opacity:.9}
 .ta-tbl td.r,.ta-tbl th.r{text-align:right;font-family:'SF Mono',Consolas,Monaco,monospace}
 .ta-tbl td.wrap{white-space:normal}
-.ta-tbl tbody tr.on td{font-weight:600;color:var(--text)}
 .ta-cap{font-weight:700;font-size:calc(14.5px*var(--scale));margin:0 0 6px}
+.ta-cap .mut{font-weight:400;font-size:calc(12.5px*var(--scale));margin-left:6px}
 
 /* 全部總表（右欄分頁；表頭黏在分頁頂端） */
 .ta-sum tbody tr{cursor:pointer}
 .ta-sum tbody tr:hover td{background:color-mix(in srgb,var(--accent) 10%,transparent)}
 .ta-sum tbody tr.sel td{background:color-mix(in srgb,var(--accent) 20%,transparent)}
 .ta-sum td.code{font-weight:700}
-.ta-sum th,.ta-sum td{padding-left:5px;padding-right:5px}
+.ta-sum th,.ta-sum td{padding-left:6px;padding-right:6px}
 .ta-sum th:first-child,.ta-sum td:first-child{padding-left:14px}
 .ta-sum th:last-child,.ta-sum td:last-child{padding-right:14px}
-.ta-nm{display:inline-block;max-width:8em;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}  /* 全名看左欄／明細；1280 寬時總表不用橫捲 */
-.ta-tr{display:inline-flex;gap:3px}
-.ta-tr span{display:inline-block;min-width:1.6em;text-align:center;border-radius:4px;padding:0 3px;font-size:.92em;
-  background:var(--surface2)}
+.ta-nm{display:inline-block;max-width:9em;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}  /* 全名看左欄／明細；1280 寬時總表不用橫捲 */
+.ta-out{display:inline-block;margin-left:4px;padding:0 4px;border-radius:4px;font-size:.8em;line-height:1.35;color:var(--yellow);
+  border:1px solid color-mix(in srgb,var(--yellow) 45%,transparent);font-family:var(--sans)}
 .ta-hint{color:var(--dim);font-size:calc(12.5px*var(--scale));margin-top:8px}
 
 /* 單檔明細 */
-.ta-ch{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;border-bottom:1px solid var(--divider);padding-bottom:10px;margin-bottom:12px}
+.ta-ch{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;border-bottom:1px solid var(--divider);padding-bottom:10px;margin-bottom:10px}
 .ta-ch h2{font-size:calc(22px*var(--scale));font-weight:700;margin:0}  /* 蓋掉全站 h2 的 margin-bottom，右欄高度有限 */
 .ta-ch h2 .mono{margin-right:8px}
 .ta-px{font-size:calc(18px*var(--scale))}
 .ta-chip{font-size:calc(12.5px*var(--scale));padding:1px 9px;border-radius:999px;background:var(--surface2);
   border:1px solid var(--border);color:var(--dim)}
-.ta-chip.long{color:var(--red);border-color:color-mix(in srgb,var(--red) 45%,transparent)}
-.ta-chip.short{color:var(--green);border-color:color-mix(in srgb,var(--green) 45%,transparent)}
 .ta-chip.warn{color:var(--yellow);border-color:color-mix(in srgb,var(--yellow) 45%,transparent)}
 .ta-notes{font-size:calc(12.5px*var(--scale));color:var(--dim);margin:-4px 0 8px}
 .ta-ph{padding:16px;border:1px dashed var(--border);border-radius:8px;color:var(--dim);display:flex;align-items:center;gap:14px}
+.ta-old{padding:16px 18px;border:1px dashed color-mix(in srgb,var(--yellow) 55%,transparent);border-radius:8px;color:var(--yellow);
+  font-size:calc(15px*var(--scale));font-weight:600}
+.ta-old-all{margin:0 14px 10px}
 .ta-btn{font:inherit;font-size:calc(13px*var(--scale));color:var(--text);background:var(--surface2);border:1px solid var(--border);
   border-radius:8px;padding:5px 14px;cursor:pointer}
 .ta-btn:hover{border-color:var(--accent)}
 .ta-err{padding:14px;border:1px dashed var(--border);border-radius:8px;color:var(--yellow);display:flex;align-items:center;gap:14px}
-.ta-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px 26px;margin-top:4px}
-@container (max-width:980px){ .ta-cols{grid-template-columns:minmax(0,1fr)} }  /* 右欄不夠寬時四個區塊改單欄，表格不擠 */
-.ta-block{margin-bottom:6px}
-.ta-kv th{color:var(--dim);font-weight:500;width:1%;cursor:default;position:static;background:none;border-bottom:1px solid var(--divider)}
-.ta-inv{background:var(--surface2);border-radius:8px;padding:9px 12px;font-size:calc(13.5px*var(--scale))}
-.ta-small{font-size:calc(12px*var(--scale));color:var(--dim);margin-top:6px}
+.ta-block{margin:0 0 20px}
+.ta-empty{padding:10px 12px;color:var(--dim);border:1px dashed var(--border);border-radius:8px;font-size:calc(13.5px*var(--scale))}
+.ta-dt tr.filled td{color:var(--dim)}
+.ta-dt tr.sr-res td,.ta-dt tr.sr-sup td{vertical-align:middle}
+.ta-mas{display:inline-flex;flex-wrap:wrap;gap:2px 14px;font-size:calc(12.5px*var(--scale))}
+.ta-mas b{font-family:'SF Mono',Consolas,Monaco,monospace;font-weight:600}
+/* 缺口表：十列視窗（表頭黏在視窗頂端） */
+.ta-win10{max-height:calc(11 * (13.5px * 1.65 * var(--scale) + 11px) + 2px);overflow:auto;border-bottom:1px solid var(--border);
+  overscroll-behavior:contain}  /* 一列＝字高 13.5×1.65＋上下 padding 10＋格線 1；表頭＋10 列 */
+/* 預留欄位（缺口類型、大量 K 解讀、島狀）：資料有才出現 */
+.ta-gt{display:inline-block;margin-right:5px;padding:0 4px;border-radius:4px;background:var(--surface2);border:1px solid var(--border);
+  font-size:.9em;line-height:1.35}
+.ta-tip{border-bottom:1px dotted var(--dim);cursor:help}
+.ta-islands{font-size:calc(12.5px*var(--scale));color:var(--dim);margin-top:6px}
+.ta-reads{margin:8px 0 0;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 14px;font-size:calc(13px*var(--scale))}
+.ta-reads dt{color:var(--dim);white-space:nowrap;font-family:'SF Mono',Consolas,Monaco,monospace}
+.ta-reads dd{margin:0}
+/* 明細表：欄距收一點；萬一欄位多到放不下（大字級＋預留欄位），只在表格自己的框裡橫捲，整個右欄不橫捲 */
+.ta-dt th,.ta-dt td{padding-left:6px;padding-right:6px}
+.ta-hs{overflow-x:auto;overscroll-behavior-x:contain}
+/* 怎麼看：詞→解釋兩欄 */
+.ta-rules dl{margin:0;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:7px 18px;font-size:calc(13.5px*var(--scale))}
+.ta-rule{display:contents}
+.ta-rules dt{font-weight:700;color:var(--text);white-space:nowrap}
+.ta-rules dd{margin:0;color:var(--text);line-height:1.7}
 
-/* K 線圖 */
-svg.ta-k{width:100%;height:auto;display:block;background:var(--bg);border:1px solid var(--border);border-radius:8px}
-svg.ta-k .grid{stroke:var(--divider);stroke-width:1}
-svg.ta-k .ax{fill:var(--dim);font-size:11px;font-family:'SF Mono',Consolas,monospace}
-svg.ta-k .wk.up{stroke:var(--red)} svg.ta-k .wk.dn{stroke:var(--green)}
-svg.ta-k .bd.up{fill:var(--red)} svg.ta-k .bd.dn{fill:var(--green)}
-svg.ta-k .ma20{fill:none;stroke:var(--yellow);stroke-width:1.3;opacity:.85}
-svg.ta-k .ma60{fill:none;stroke:var(--accent);stroke-width:1.3;opacity:.85}
-svg.ta-k line.h-stop{stroke:var(--orange);stroke-width:1.6;stroke-dasharray:7 4}
-svg.ta-k line.h-tgt{stroke:var(--ta-cyan);stroke-width:1.6;stroke-dasharray:7 4}
-svg.ta-k line.h-lvl{stroke:var(--ta-muted);stroke-width:1;stroke-dasharray:2 4;opacity:.85}
-svg.ta-k line.lk{stroke-dasharray:none;opacity:.6}
-svg.ta-k text.hl{font-size:12px;font-family:'SF Mono',Consolas,monospace}
-svg.ta-k text.h-stop{fill:var(--orange);font-weight:700}
-svg.ta-k text.h-tgt{fill:var(--ta-cyan);font-weight:700}
-svg.ta-k text.h-lvl{fill:var(--ta-muted)}
-svg.ta-k .lastc{fill:var(--text)}
-.ta-cnote{font-size:calc(12.5px*var(--scale));color:var(--dim);margin:6px 2px 14px}
-.ta-cnote i{font-style:normal;display:inline-block;width:18px;height:0;border-top:2px dashed;vertical-align:middle;margin:0 4px 0 10px}
+/* K 線圖：底色固定深色（淺色主題也一樣），白色支撐實線／壓力虛線才看得見 */
+svg.ta-k{width:100%;height:auto;display:block;background:#0b0f15;border:1px solid #1c2330;border-radius:8px}
+svg.ta-k .grid{stroke:#1c2330;stroke-width:1}
+svg.ta-k .ax{fill:#6d8196;font-size:11px;font-family:'SF Mono',Consolas,monospace}
+svg.ta-k .mk{fill:#ffe08a;font-size:12px;font-weight:700}
+svg.ta-k .srl{fill:#ffffff;font-size:12px;font-family:'SF Mono',Consolas,monospace}
+svg.ta-k .srn{fill:#ffcf70;font-size:11px}
+svg.ta-k .gl{font-size:11px;font-weight:700;paint-order:stroke;stroke:#0b0f15;stroke-width:3px;stroke-linejoin:round}
+svg.ta-k .gl.up{fill:#ff8f96} svg.ta-k .gl.dn{fill:#6fd6a0} svg.ta-k .gl.filled{opacity:.5}
+.ta-cnote{font-size:calc(12.5px*var(--scale));color:var(--dim);margin:6px 2px 16px;line-height:1.65}
+.ta-cnote .sw{display:inline-block;width:16px;height:0;border-top:2px solid;vertical-align:middle;margin:0 3px 0 8px}
+.ta-cnote .sw.dash{border-top-style:dashed}
+.ta-cnote .lg{display:inline-block;background:#0b0f15;border-radius:3px;padding:0 4px 2px 0;margin-left:8px;line-height:10px}
+.ta-cnote .lg .sw{margin:0 0 0 4px}
+.ta-cnote .gd{color:#c9a13a;font-weight:600}
+.ta-cnote .bx{display:inline-block;width:12px;height:10px;vertical-align:middle;margin:0 3px 0 8px;opacity:.6}
 .ta-nochart{padding:30px;text-align:center;color:var(--dim);border:1px dashed var(--border);border-radius:8px}
 
 /* 浮水印（票裡的 wm） */
