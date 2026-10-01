@@ -2116,15 +2116,15 @@ function renderPaidFiles(pd){
     var notifyBtn = un>0
       ? '<button class="mini-act" onclick="doNotify(\''+escJs(x.reportId)+'\')" style="color:var(--gold)">補寄未收到（'+un+'）</button>'
       : '<span style="color:var(--dim);font-size:12px">全員已收</span>';
+    // 「狀態」欄：單筆切換鈕已於 2026-10-01 依 Yoda 要求移除，改用工具列勾選批次處理（⛔ 下架勾選／✅ 上架勾選）。
     var hid=isPaidHidden(x.reportId);
     var stat=hid?'<span style="color:var(--gold,#e0a526);font-weight:800">已下架</span>':'';
-    var hideBtn='<button class="mini-act" onclick="togglePaidHidden(\''+escJs(x.reportId)+'\')" style="color:'+(hid?'var(--green,#30d158)':'var(--gold,#e0a526)')+'">'+(hid?'上架':'下架')+'</button>';
     return '<tr>'
       +'<td><span class="email">'+escH(x.reportId)+'</span></td>'
       +'<td>'+escH(up)+'</td>'
       +'<td>'+stat+'</td>'
       +'<td>'+notified+'</td>'
-      +'<td style="white-space:nowrap">'+notifyBtn+' <button class="mini-act" onclick="viewRecipients(\''+escJs(x.reportId)+'\')" style="color:var(--dim)">名單</button> '+hideBtn+'</td>'
+      +'<td style="white-space:nowrap">'+notifyBtn+' <button class="mini-act" onclick="viewRecipients(\''+escJs(x.reportId)+'\')" style="color:var(--dim)">名單</button></td>'
       +'<td style="text-align:center"><input type="checkbox" class="paid-chk" data-id="'+escH(x.reportId)+'"></td>'
       +'</tr>';
   }).join('');
@@ -2162,19 +2162,6 @@ async function setHiddenSelectedPaid(hide){
   }
   toast((hide?'已下架 ':'已上架 ')+ok+' / '+ids.length+' 份'+(fail?'｜失敗 '+fail:''));
   loadPaidReports();
-}
-/* 單筆切換（每列的「下架／上架」小鈕）*/
-async function togglePaidHidden(reportId){
-  var next=!isPaidHidden(reportId);
-  if(next && !await uiConfirm('下架這份付費報告？\n\n'+prettyPaidTitle(reportId)+'\n\n⚠ 不刪檔：檔案完全不動，只是會員在報告清單看不到，隨時可以按「上架」放回去。\n\n確定下架？'))return;
-  toast('寫入中…');
-  post({action:'adminSetReportOverride',key:KEY,file:paidOvKey(reportId),fields:{hidden:next}}).then(function(res){
-    if(res&&res.ok){
-      var k=paidOvKey(reportId); paidOv[k]=paidOv[k]||{}; paidOv[k].hidden=next;
-      renderPaidFiles({ok:true,reports:paidFiles});
-      toast(next?'已下架（檔案還在，可隨時上架）':'已上架');
-    } else toast((res&&res.error)||'失敗');
-  }).catch(function(){toast('連線失敗');});
 }
 /* 彙整通知：勾選的多份報告，對「還沒收齊的會員」各寄一封（只列每人缺的那幾份）*/
 async function notifyBatchSelected(){
