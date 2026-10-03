@@ -249,11 +249,11 @@ const DEFAULTS = {
   bHeadline: "估值更貴（CAPE 41.3、巴菲特 230%）但 Q2 巨頭盈餘接棒、破底翻洗掉投機浮額——泡沫警戒而非崩盤前夕，最需盯 CapEx ROI 缺口能否收斂。",
   latestBrief: BASE + "/-/",
   cycle: { big_pct:74, big_label:"榮景末段·逼近循環峰", mfg_pct:70, mfg_label:"擴產近過熱·近製造業峰", note:"景氣大循環榮景末段（74%）· 製造業週期近過熱（70%）", updated:"8月更新" },
-  leverage: { url: BASE + "/-/global-leverage.html", updated:"資料截至 2026-07-31", markets:[
-    { flag:"🇰🇷", name:"韓國", index:"KOSPI", pressure:82, trend:"▲ 融資強平螺旋進行中", history:[62,72,74,77,84,82] },
-    { flag:"🇺🇸", name:"美國", index:"S&P 500", pressure:58, trend:"▲ 水位創高·尚未洩壓", history:[52,57,58,58] },
-    { flag:"🇹🇼", name:"台灣", index:"加權指數", pressure:48, trend:"▼ 從高點回落·去槓桿早期", history:[44,51,48,48] },
-    { flag:"🇯🇵", name:"日本", index:"日經225", pressure:44, trend:"— 多方滿載·壓力計待補", history:[40,45,44,44] },
+  leverage: { url: BASE + "/-/global-leverage.html", updated:"資料截至 2026-10-02（台 10-02／韓 9-23／日 9-25／美 8月）", markets:[
+    { flag:"🇺🇸", name:"美國", index:"S&P 500", pressure:52, trend:"→ 高水位、8月小幅回升、未見強平", history:[52,57,58,58,52] },
+    { flag:"🇯🇵", name:"日本", index:"日經225", pressure:48, trend:"— 信用買殘高檔持平、損益率 −5% 上下", history:[40,45,44,44,48] },
+    { flag:"🇹🇼", name:"台灣", index:"加權指數", pressure:32, trend:"▲ 融資創新高、維持率約197%", history:[44,51,48,48,45,32] },
+    { flag:"🇰🇷", name:"韓國", index:"KOSPI", pressure:29, trend:"▼ 強平退潮、信用餘額回補中", history:[62,72,74,77,84,82,75,29] },
   ] },
 };
 
