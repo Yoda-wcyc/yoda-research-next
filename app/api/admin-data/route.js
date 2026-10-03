@@ -44,7 +44,7 @@ export async function POST(req) {
         member_id: m.member_id, pub_id: m.pub_id || '', email: m.email, ref_code: m.ref_code,
         referred_by: m.referred_by, status: m.status,
         in_payments: inPay, paid: active && (inPay || hasNext),
-        plan: m.plan || '創始', fb_name: m.fb_name || '', start_date: fmtDate(m.start_date),
+        plan: String(m.plan || '').trim(), fb_name: m.fb_name || '', start_date: fmtDate(m.start_date),
         paid_periods: m.paid_periods, referred_paid_count: m.referred_paid_count,
         earned_months: computeEarnedMonths(pp, rpc, m.plan || ''), granted: Number(m.earned_free_months) || 0,
         next_charge_date: fmtDate(m.next_charge_date),
