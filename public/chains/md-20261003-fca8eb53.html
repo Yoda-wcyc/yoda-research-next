@@ -1,0 +1,1393 @@
+<!-- 鍊條圖片段 · 勿手改，改資料重跑 -->
+<style>
+.ck-wrap,.ck-modal{
+  --bg:#000;--bg2:#1d1d1f;--bg3:#272729;--border:rgba(255,255,255,.14);--border2:rgba(255,255,255,.22);
+  --accent:#2997ff;--accent2:#ff9f0a;--danger:#ff453a;--gold:#e0b64a;--safe:#2997ff;
+  --text:#f5f5f7;--text2:#a1a1a6;--text3:#8e8e93;
+  /* 2026-10-03 第五十五輪：鍊條元件所有文字對比 ≥ 4.5:1（深色這一組；淺色見淺色主題那一段）。
+     --text3 原 #6e6e73：黑底 4.14:1、面板底 3.32:1 → 同色相提亮 #8e8e93（黑底 6.44、面板底 5.16、卡片底 --bg3 4.57）。
+     --ck-alert：紅底白字的專用底色（衰退模擬鈕、模擬步驟編號圓）。原本直接吃 --danger #ff453a＝白字 3.41:1，
+     同色相壓深到 #d73a31（4.63:1）；hover 原 #ff6b61（2.79:1）→ #bf332b（5.64:1）。
+     --danger 本身不動：斷鍊、起火點、跨環虛線照舊用它。
+     --ck-rowhover：總覽清單列、開牌表列滑過時的底色。原本用 --bg3 #272729，熱度 100 的紅字 #ff453a 在上面只有 4.38:1
+     （熱度色是語意色，深色不動）→ 改成比面板底更深的 #141416（紅字 4.99:1，灰字 --text3 5.9:1）；淺色照舊 #f2f2f5。 */
+  --ck-alert:#d73a31;--ck-alert-hover:#bf332b;--ck-rowhover:#141416;
+  --sans:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei","Segoe UI",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+.ck-wrap *{box-sizing:border-box}
+
+.ck-wrap{max-width:none;margin:0;padding:0;color:var(--text);font-family:var(--sans);line-height:1.7}
+.ck-kicker{font-size:11px;letter-spacing:.22em;color:var(--text3);text-transform:uppercase;margin-bottom:10px}
+.ck-h1{font-size:29px;font-weight:700;letter-spacing:-.01em;margin:0 0 10px}
+.ck-sub{font-size:14.5px;color:var(--text2);max-width:940px;margin:0 0 4px}
+.ck-sub b{color:var(--text);font-weight:600}
+.ck-sub+.ck-sub{margin-top:10px}
+.ck-meta{font-size:11.5px;color:var(--text3);margin-top:8px}
+.ck-warn{margin:14px 0 0;padding:10px 14px;background:rgba(255,159,10,.08);border:1px solid rgba(255,159,10,.34);
+  border-radius:10px;font-size:13px;color:var(--text)}
+.ck-warn b{color:var(--accent2)}
+.ck-fail{display:none;margin:12px 0;padding:10px 14px;background:rgba(255,69,58,.12);border:1px solid var(--danger);
+  border-radius:10px;font-size:13px;color:#ffb4ae}
+
+.ck-ctrl{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin:18px 0 6px;padding:11px 13px;
+  background:var(--bg2);border:1px solid var(--border);border-radius:11px}
+.ck-btn{appearance:none;background:transparent;border:1px solid var(--border2);color:var(--text);
+  font-family:inherit;font-size:12.5px;padding:6px 13px;border-radius:99px;cursor:pointer;transition:.18s;white-space:nowrap}
+.ck-btn:hover{background:var(--bg3);border-color:#5a5a5f}
+.ck-btn.on{background:var(--gold);border-color:var(--gold);color:#1a1200;font-weight:600}
+/* 衰退模擬鈕：大紅慢閃（Yoda 2026-09-04 指定）。動畫關掉或系統要求減少動態時停閃，
+   但仍維持大紅——資訊不得只靠動畫存在。 */
+.ck-btn.ck-alert{background:var(--ck-alert);border-color:var(--ck-alert);color:#fff;font-weight:700;
+  font-size:13px;padding:7px 16px;animation:ck-alertblink 1.7s ease-in-out infinite}
+.ck-btn.ck-alert:hover{background:var(--ck-alert-hover);border-color:var(--ck-alert-hover)}
+.ck-slider{flex:1;min-width:190px;display:flex;align-items:center;gap:10px}
+.ck-slider label{font-size:11.5px;color:var(--text3);white-space:nowrap}
+.ck-wrap input[type=range]{flex:1;min-width:110px;accent-color:var(--gold);height:3px}
+.ck-stage{font-size:11.5px;color:var(--text2);min-width:150px;text-align:right;font-variant-numeric:tabular-nums}
+
+/* 欄寬＝圖 2/3、說明面板 1/3（2026-09-26 Yoda；原本是「圖吃剩下、面板 410px」）。
+   minmax(0,…) 的 0：兩欄都不讓內容撐寬，嚴格照 2:1 分。 */
+.ck-main{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:24px;margin-top:16px;align-items:start}
+.ck-ringbox{position:relative;background:radial-gradient(ellipse at center,rgba(255,159,10,.05),transparent 62%);border-radius:16px}
+svg.ck-svg{width:100%;height:auto;display:block;overflow:visible}
+.ck-seg{cursor:pointer;transition:opacity .3s}
+.ck-seg:focus{outline:none}
+.ck-seg:focus-visible .ck-link{stroke-width:15}
+.ck-seg.dim{opacity:.18}
+.ck-lab{font-size:13.5px;font-weight:600;fill:var(--text);pointer-events:none;letter-spacing:.02em}
+.ck-lag{font-size:10.5px;fill:var(--text3);pointer-events:none;letter-spacing:.06em}
+.ck-num{font-size:11px;font-weight:700;fill:#0b0b0c;pointer-events:none}
+.ck-heat{font-size:12.5px;font-weight:700;pointer-events:none;font-variant-numeric:tabular-nums}
+.ck-brk{font-size:11.5px;fill:var(--text3);letter-spacing:.08em}
+.ck-brk-v{font-size:11px;fill:var(--text3);font-variant-numeric:tabular-nums}
+.ck-seam{font-size:10.5px;fill:var(--text3);letter-spacing:.04em}
+.ck-noteline{font-size:10.5px;fill:var(--accent2)}
+.ck-cen-t{font-size:11px;fill:var(--text3);letter-spacing:.12em}
+.ck-cen-k{font-size:12px;fill:var(--text3);letter-spacing:.06em}
+.ck-cen-v{font-size:14px;font-weight:700;fill:var(--text)}
+.ck-cen-spin{font-size:26px;font-weight:700;fill:var(--accent2)}
+.ck-cen-s{font-size:11.5px;fill:var(--text2)}
+
+.ck-panel{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:19px;position:sticky;top:16px;
+  max-height:calc(100vh - 32px);overflow:auto}
+.ck-p-eye{font-size:10.5px;letter-spacing:.14em;color:var(--text3);text-transform:uppercase;margin-bottom:7px}
+.ck-p-h{font-size:19px;font-weight:700;margin:0 0 3px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.ck-p-badge{font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;color:#0b0b0c}
+.ck-chip{font-size:10.5px;padding:1px 8px;border-radius:99px;border:1px solid var(--border2);color:var(--text2);font-weight:500}
+.ck-cen3{margin:10px 0 4px;border:1px solid var(--border);border-radius:10px;background:var(--bg3);padding:10px 12px}
+.ck-cen3 div{font-size:12.5px;color:var(--text2);line-height:1.75;margin-bottom:5px}
+.ck-cen3 div:last-child{margin-bottom:0}
+.ck-cen3 b{color:var(--accent2);font-weight:700}
+.ck-cen3>div>b:first-child{display:inline-block;min-width:64px;font-size:11px;letter-spacing:.08em}
+.ck-caveat{background:rgba(41,151,255,.07);border-left:2px solid var(--accent);border-radius:0 7px 7px 0;
+  padding:9px 12px;font-size:12.5px;color:var(--text2);margin:11px 0 4px}
+
+/* 雙向溫度計：中央安全、兩端危險（絕不用單向長條，見檔首） */
+.ck-bibar{position:relative;height:9px;border-radius:99px;margin:14px 0 5px;
+  background:linear-gradient(90deg,#ff453a 0%,#ff9f0a 16%,#f0c040 32%,#2997ff 50%,#f0c040 68%,#ff9f0a 84%,#ff453a 100%)}
+.ck-bibar.one{background:linear-gradient(90deg,#2997ff 0%,#f0c040 50%,#ff453a 100%)}
+.ck-bibar i{position:absolute;top:50%;width:3px;height:19px;border-radius:2px;transform:translate(-50%,-50%);
+  box-shadow:0 0 0 2px rgba(0,0,0,.55)}
+.ck-bibar u{position:absolute;top:50%;width:1px;height:13px;background:rgba(255,255,255,.5);transform:translate(-50%,-50%)}
+.ck-bibar-lab{display:flex;justify-content:space-between;font-size:10.5px;color:var(--text3);margin-bottom:4px}
+.ck-revnote{font-size:10.5px;color:var(--text3);margin:-8px 0 12px;line-height:1.6}
+/* 衰退模擬 · 彈出選單（fixed 掛 body，嵌進報告不會被容器裁掉） */
+.ck-modal{position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.68);backdrop-filter:blur(3px);
+  display:flex;align-items:center;justify-content:center;padding:20px;animation:ck-fade .22s ease}
+.ck-modal-box{background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:22px;
+  max-width:580px;width:100%;max-height:86vh;overflow:auto;box-shadow:0 24px 70px rgba(0,0,0,.6);
+  font-family:var(--sans);color:var(--text);line-height:1.7}
+.ck-modal-h{font-size:20px;font-weight:700;margin-bottom:6px}
+.ck-modal-sub{font-size:12.5px;color:var(--text2);line-height:1.8;margin-bottom:14px}
+.ck-modal-act{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}
+@keyframes ck-fade{from{opacity:0}to{opacity:1}}
+.ck-paused .ck-modal{animation:none}
+/* 模擬進行中：環在左、故事在右，才能一起看。欄寬跟平常同一組 2/3：1/3
+   （2026-09-26 Yoda；原本是「環彈性、故事欄 390px」），一按播放圖不會先縮一次 */
+.ck-main.ck-sim{grid-template-columns:minmax(0,2fr) minmax(0,1fr)!important}
+.ck-main.ck-sim .ck-panel{position:sticky!important;top:12px!important;
+  max-height:calc(100vh - 24px)!important;overflow:auto!important;border-left:3px solid var(--danger)}
+.ck-main.ck-sim .ck-svg{max-width:none}
+.ck-sb-sub{font-size:12px;color:var(--text3);line-height:1.7;margin:2px 0 4px}
+.ck-scen-p{display:block;margin-top:5px;color:var(--accent2);font-style:normal;font-weight:600}
+.ck-sb-det{font-size:11.5px;color:var(--text2);line-height:1.78;margin:9px 0 4px;padding:9px 12px;
+  background:var(--bg3);border-radius:8px}
+.ck-sb-off{font-size:11.5px;color:var(--text2);line-height:1.75;margin-top:11px;padding:9px 12px;
+  background:rgba(41,151,255,.07);border:1px solid rgba(41,151,255,.28);border-radius:8px}
+.ck-sb-off b{color:var(--accent)}
+.ck-sb-foot{font-size:11px;color:var(--text3);line-height:1.6;margin-top:10px;padding-top:9px;
+  border-top:1px solid var(--border)}
+.ck-sb-act{display:flex;gap:8px;flex-wrap:wrap;margin-top:11px}
+@media (max-width:900px){
+  .ck-main.ck-sim{grid-template-columns:1fr!important}
+  .ck-main.ck-sim .ck-panel{position:static!important;max-height:none!important}
+  .ck-modal{padding:12px}
+}
+.ck-scen{display:grid;gap:8px;max-height:52vh;overflow-y:auto;padding-right:4px}
+.ck-scen-o{display:flex;gap:9px;align-items:flex-start;padding:9px 11px;border:1px solid var(--border);
+  border-radius:10px;cursor:pointer;transition:.16s;background:var(--bg3)}
+.ck-scen-o:hover{border-color:var(--border2)}
+.ck-scen-o.on{border-color:var(--danger);background:rgba(255,69,58,.07)}
+.ck-scen-o input{margin-top:4px;accent-color:var(--danger)}
+.ck-scen-o b{display:block;font-size:13.5px;color:var(--text);font-weight:700}
+.ck-scen-o i{display:block;font-style:normal;font-size:11.5px;color:var(--text3);line-height:1.6;margin-top:2px}
+.ck-story-wrap{display:grid;gap:10px;margin-top:12px}
+.ck-story{display:grid;grid-template-columns:24px 1fr;gap:10px;padding:10px 12px;border-radius:10px;
+  background:var(--bg3);border-left:2px solid var(--danger);animation:ck-storyin .45s ease}
+@keyframes ck-storyin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.ck-paused .ck-story{animation:none}
+.ck-story-n{width:22px;height:22px;border-radius:50%;background:var(--ck-alert);color:#fff;
+  display:grid;place-items:center;font-size:11px;font-weight:700}
+.ck-story-t{font-size:13.5px;font-weight:700;color:var(--text);line-height:1.6}
+.ck-story-s{font-size:12.5px;color:var(--text2);line-height:1.8;margin-top:4px}
+.ck-story-c{font-size:11.5px;color:var(--text3);line-height:1.6;margin-top:5px}
+.ck-cards{margin-top:22px;padding:16px 18px;background:var(--bg2);border:1px solid var(--border);border-radius:14px}
+.ck-cards-w{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.ck-cardtbl{min-width:660px}
+.ck-cards-h{font-size:15px;font-weight:700;color:var(--text);margin-bottom:3px}
+.ck-cards-sub{font-size:11.5px;color:var(--text3);margin-bottom:9px;line-height:1.6}
+.ck-cardtbl{width:100%;border-collapse:collapse;font-size:12.5px;line-height:1.65}
+.ck-cardtbl th{color:var(--text3);font-weight:500;text-align:left;padding:5px 6px;border-bottom:1px solid var(--border);white-space:nowrap}
+.ck-cardtbl td{padding:6px;border-bottom:1px solid rgba(255,255,255,.06);color:var(--text2);vertical-align:top}
+.ck-cardtbl tr[data-go]{cursor:pointer}
+.ck-cardtbl tr[data-go]:hover td{background:var(--ck-rowhover)}
+.ck-cardtbl td:first-child{color:var(--text);font-weight:600;white-space:nowrap}
+.ck-bibar-th{display:flex;justify-content:space-between;font-size:10.5px;color:var(--text3);margin-bottom:14px;
+  font-variant-numeric:tabular-nums}
+.ck-row{margin-bottom:13px}
+.ck-row-k{font-size:11px;color:var(--text3);letter-spacing:.08em;margin-bottom:3px}
+/* 2026-09-12：跨環直咬虛線＋門檻出處色點（金＝報告、藍＝外部歷史、灰＝鍊條自訂） */
+.ck-cross{fill:none;stroke:var(--danger);stroke-width:1.6;stroke-dasharray:5 4;opacity:.7;marker-end:url(#ck-arr)}
+.ck-src{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.ck-src.rep{background:var(--gold)}.ck-src.ext{background:#2997ff}.ck-src.own{background:var(--text3)}
+.ck-row-v{font-size:13.5px;color:var(--text);line-height:1.72}
+.ck-row-v.sm{font-size:12.5px;color:var(--text2)}
+/* 長文條列（JS bulletize()，2026-09-27 Yoda：「鍊條右邊的判讀，要用圓點分好段落或編號才容易閱讀」）
+   跟報告 §00 ul.pd-ul 同一套視覺：第一層實心圓點、第二層空心圓點、圓點用 accent 色；
+   並列編號那幾條（li.ck-en）不加圓點、保留原編號字（①②③／（1）…），編號字往左懸掛、折行對齊內文。
+   字級與行距一律繼承所在那一格（.ck-row-v／.ck-caveat／.ck-y2k／.ck-feeds／.ck-cen3），不另設。 */
+.ck-ul{display:block;list-style:disc outside;margin:.15em 0 0;padding:0 0 0 1.25em}
+.ck-ul:first-child{margin-top:0}
+.ck-ul>li{margin:0 0 .45em;padding-left:.1em;overflow-wrap:anywhere}
+.ck-ul>li:last-child{margin-bottom:0}
+.ck-ul>li.ck-nolead{list-style:none}
+.ck-ul2{display:block;list-style:circle outside;margin:.3em 0 0;padding:0 0 0 1.2em}
+.ck-ul>li.ck-nolead>.ck-ul2{margin-top:0}
+.ck-ul2>li{margin:0 0 .3em;padding-left:0}
+.ck-ul2>li:last-child{margin-bottom:0}
+.ck-ul2>li.ck-en{list-style:none;margin-left:.5em;padding-left:1.1em;text-indent:-1.1em}
+.ck-ul li::marker{color:var(--accent)}
+/* 總覽「位階／轉向／最接近斷裂」那格：欄名樣式（inline-block、11px）只給每欄第一個粗體 b（.ck-cen3>div>b:first-child）；
+   條列裡的粗體是內文，不吃欄名樣式，否則整句粗體會自成一塊、把後半句擠到下一行。
+   2026-09-27：欄位只有一句、bulletize() 不包清單時，內文粗體以前也會被 .ck-cen3 b 選到而擠行，改成欄名只選第一個粗體（同 AI 版 949198f）。
+   下面這條留著當保險（條列裡的粗體本來就不是 div 的直接子元素）。 */
+.ck-cen3 .ck-ul b{display:inline;min-width:0;font-size:inherit;letter-spacing:normal}
+.ck-math{font-family:var(--mono);font-size:11.5px;color:var(--text2);background:var(--bg3);border-radius:7px;
+  padding:9px 11px;line-height:1.75;white-space:pre-wrap;word-break:break-word}
+.ck-ok{color:#5cae88}.ck-bad{color:#ff8a80}
+/* 開牌表走的是另一條色軸：順風那一欄＝紅、翻案那一欄＝綠（報告漲紅跌綠鐵則，
+   Yoda 2026-09-22）。面板裡的 .ck-ok/.ck-bad 維持原色不動——那是鍊條的風險語意，
+   圖例已經寫明「顏色是風險語意，不是漲跌」，兩條軸不能混。
+   --ckc-up/--ckc-dn 由嵌入版收尾那段 CSS 掛在 .ck-embed（.ck-wrap 外面）接報告的
+   --danger/--good；獨立頁沒有那一層，就吃這裡的 fallback。 */
+.ck-cardtbl .ck-ok{color:var(--ckc-up,#ff453a)}
+.ck-cardtbl .ck-bad{color:var(--ckc-dn,#5cae88)}
+.ck-y2k{background:var(--bg3);border-left:2px solid var(--text3);border-radius:0 7px 7px 0;padding:9px 12px;font-size:12.5px;color:var(--text2)}
+.ck-feeds{margin-top:14px;padding-top:13px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text2)}
+.ck-feeds b{color:var(--accent2)}
+.ck-list{list-style:none;padding:0;margin:0}
+.ck-li{display:grid;grid-template-columns:24px 1fr 46px 68px 40px;gap:8px;align-items:center;padding:6px 7px;border-radius:8px;cursor:pointer;transition:.16s}
+.ck-li:hover{background:var(--ck-rowhover)}
+.ck-li-n{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:10.5px;font-weight:700;color:#0b0b0c}
+.ck-li-t{font-size:12.5px}
+.ck-li-g{font-size:10px;color:var(--text3);text-align:right}
+.ck-li-b{position:relative;height:6px;border-radius:99px;
+  background:linear-gradient(90deg,rgba(255,69,58,.5) 0%,rgba(41,151,255,.5) 50%,rgba(255,69,58,.5) 100%)}
+.ck-li-b i{position:absolute;top:50%;width:3px;height:11px;border-radius:2px;transform:translate(-50%,-50%)}
+.ck-li-v{font-size:12px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.ck-half{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0 6px}
+.ck-half div{background:var(--bg3);border-radius:9px;padding:9px 11px}
+.ck-half b{display:block;font-size:11.5px;color:var(--text3);font-weight:500;margin-bottom:2px}
+.ck-half s{display:block;font-size:19px;font-weight:700;text-decoration:none;font-variant-numeric:tabular-nums}
+.ck-half em{display:block;font-size:10px;color:var(--text3);font-style:normal;line-height:1.5;margin-top:2px}
+
+.ck-legend{margin-top:22px;padding-top:16px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text2);line-height:1.95}
+.ck-legend b{color:var(--text)}
+.ck-legend .lead{color:var(--text);font-size:13.5px}
+.ck-grad{display:inline-block;width:132px;height:8px;border-radius:99px;vertical-align:middle;margin:0 7px;
+  background:linear-gradient(90deg,#ff453a,#ff9f0a 16%,#f0c040 32%,#2997ff 50%,#f0c040 68%,#ff9f0a 84%,#ff453a)}
+.ck-eg{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0 4px}
+.ck-eg div{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--text2)}
+.ck-eg b{color:var(--text)}
+.ck-note{font-size:11.5px;color:var(--text3);margin-top:9px}
+
+@keyframes ck-flow{to{stroke-dashoffset:-60}}
+@keyframes ck-flow-rev{to{stroke-dashoffset:60}}
+@keyframes ck-slip{0%{stroke-dashoffset:0}45%{stroke-dashoffset:-42}55%{stroke-dashoffset:-22}100%{stroke-dashoffset:-60}}
+@keyframes ck-shake{0%,100%{transform:translate(0,0)}25%{transform:translate(.7px,-.5px)}50%{transform:translate(-.6px,.6px)}75%{transform:translate(.5px,.4px)}}
+@keyframes ck-pulse{0%,100%{opacity:.55}50%{opacity:1}}
+/* 「▶ 播放衰退模擬」的提示閃動（2026-10-03 第五十六輪 Yoda）：只動外圈光暈——box-shadow 的擴散與透明度在變，
+   按鈕本體的底色與文字不透明度一律維持 1（原本 50% 那一格 opacity .7，文字對比最暗只剩約 3.7／3.9:1）；
+   動畫每一格的文字對比都跟靜止時一樣（深 4.63:1／淺 5.38:1）。減少動態與「動畫：關」都不閃（下面兩條 animation:none）。 */
+@keyframes ck-alertblink{0%,100%{box-shadow:0 0 0 0 rgba(255,69,58,.55)}
+  50%{box-shadow:0 0 16px 5px rgba(255,69,58,.5)}}
+.ck-spin-fwd{animation:ck-flow var(--spin-dur,2.4s) linear infinite}
+.ck-spin-rev{animation:ck-flow-rev var(--spin-dur,2.4s) linear infinite}
+.ck-spin-slip{animation:ck-slip calc(var(--spin-dur,2.4s) * 1.6) ease-in-out infinite}
+.ck-shake{animation:ck-shake .17s linear infinite}
+.ck-pulse{animation:ck-pulse 1.5s ease-in-out infinite}
+.ck-paused .ck-spin-fwd,.ck-paused .ck-spin-rev,.ck-paused .ck-spin-slip,.ck-paused .ck-shake,.ck-paused .ck-pulse,.ck-paused .ck-btn.ck-alert{animation:none!important}
+
+@media (max-width:1080px){
+  .ck-main{grid-template-columns:1fr}
+  .ck-panel{position:static;max-height:none}
+  .ck-h1{font-size:23px}
+}
+@media (max-width:520px){
+  .ck-wrap{padding:18px 13px 46px}
+  .ck-lag{display:none}
+  .ck-lab{font-size:15px}
+  .ck-eg,.ck-half{grid-template-columns:1fr}
+  .ck-li{grid-template-columns:24px 1fr 60px 40px}
+  .ck-li-g{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .ck-spin-fwd,.ck-spin-rev,.ck-spin-slip,.ck-shake,.ck-pulse,.ck-btn.ck-alert{animation:none!important}
+  .ck-wrap *{transition-duration:.01ms!important}
+}
+
+/* ── 嵌入報告用的收尾 ──
+   2026-09-22 Yoda 改版：**圖在左、詳細內容在右**。
+   原本是「環在上、面板在下」，點一環面板在圖底下展開、要往下捲才看得到，
+   一眼看不到細節；現在點環只換右欄內容，圖不動、整頁也不會被推長。
+
+   2026-09-26 Yoda 再改：欄寬＝**圖 2/3、說明面板 1/3**（minmax(0,2fr) minmax(0,1fr)，
+   播放模擬同一組）。取代 09-22 的「圖釘 520px（--ck-fig）＋面板吃剩下＋面板 min-width:300px」：
+   圖寬不再寫死、跟著容器走；面板下限拿掉（1/3 本身就是規則，不再另設下限）；
+   minmax(0,…) 的 0 讓兩欄都不被內容撐寬，嚴格照 2:1 分。
+   報告的桌機寬度是 1200：扣掉左側 nav 與各層 padding，可用寬
+   §00 這一張 955px、黃金那一張 873px（後者多包一層 .sec-panel-wrap，窄 82px），
+   扣掉中間 16px 再照 2:1 分。
+   實測欄寬（1200 桌機、無頭 Chrome、2026-09-26 量）：九環 ＝ 圖 626 ＋ 面板 313、兩邊都高 599；
+   黃金七環 ＝ 圖 571 ＋ 面板 286、兩邊都高 547。比例 2.00、面板高減圖高＝0。
+
+   面板高度＝圖高，做法＝**grid 列高由圖決定、面板 contain:size＋stretch**：
+     ① .ck-panel 加 contain:size——排版時把面板當成「沒有內容」，面板內容多長都撐不高這一列，
+        這一列的高度只由左邊的圖（.ck-ringbox 裡的 SVG，height:auto 照 viewBox 比例）決定；
+     ② 面板 align-self:stretch＋height:auto——被拉到跟這一列一樣高＝跟圖一樣高；
+     ③ overflow:auto——內容比圖長就在面板裡面捲。
+   不再用 09-22 那招 height:calc(var(--ck-fig)*.9574)：那要圖寬是寫死的已知值才算得出來，
+   而且 .9574（viewBox 900/940）得跟 viewBox 手動同步；改成比例欄寬後圖寬跟著容器變，
+   交給 grid 自己量圖高，換 viewBox 也不用改這裡。
+   **不加 @media 收合**（桌機版面鐵則）——所以這裡每一條都 !important，
+   壓掉引擎獨立頁那兩段 @media (max-width:1080px/900px) 的單欄規則。 */
+.ck-wrap{--ck-shadow:#000}
+.ck-main{grid-template-columns:minmax(0,2fr) minmax(0,1fr)!important;
+  gap:16px!important;align-items:start!important}
+.ck-svg{max-width:none;margin:0}
+.ck-panel{position:static!important;padding:15px!important;contain:size;
+  align-self:stretch!important;height:auto!important;max-height:none!important;overflow:auto!important;
+  scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
+/* 播放模擬：同一組欄寬、同一招高度，免得一按播放整張圖先縮一次 */
+.ck-main.ck-sim{grid-template-columns:minmax(0,2fr) minmax(0,1fr)!important}
+.ck-main.ck-sim .ck-panel{position:static!important;
+  align-self:stretch!important;height:auto!important;max-height:none!important}
+/* 圖從 820 壓到 520（原 viewBox 940 的 .553 倍），SVG 裡的字會跟著縮成 6–8px。
+   字級是 CSS 控的、viewBox 不會跟著縮，所以用 viewBox 單位補回來。
+   **補多少是算出來的**：下面這組數字 ＝ 560 寬那一版驗過的字級 × (560/520)，
+   算完取半格，等於「圖窄了 40px，但讀者看到的字還是同一個大小」——
+   不是重新抓一組，所以不會冒出 560 那版沒驗過的疊字。
+   圓心那疊 text 的 y 是寫死的（cy−74／−55／−22／+8…），字放大會疊在一起，**不動**。
+   .ck-num（環號）是畫在 r=11.5 小圓裡的數字：原本一路沒補過，520 下只剩 6.1px，
+   是整張圖最小的字。補到 13（渲染 7.2px）——單位數字在 r=11.5 的圓裡佔不到一半，
+   量過不會溢出圓外；再大就會頂到圓邊，所以停在 13。
+   2026-09-26 改成 2/3 欄寬後圖變寬（約 626／571），這組字級**不動**：它們是 viewBox 單位，
+   圖變寬只會整張等比放大（渲染後的字跟著大 1.2／1.1 倍），SVG 裡字與字的相對位置不變，
+   520 那版驗過不疊字，放大後也不會疊。 */
+.ck-lab{font-size:20px}
+.ck-lag{font-size:14.5px}
+.ck-heat{font-size:18px}
+.ck-brk{font-size:15.5px}
+.ck-brk-v{font-size:15px}
+.ck-seam{font-size:14.5px}
+.ck-noteline{font-size:16px}
+.ck-num{font-size:13px}
+/* 開牌表配色（見 CSS 主檔 .ck-cardtbl 那兩條）：變數掛在 .ck-embed／.gr-embed，
+   也就是 .ck-wrap 的**外面**——.ck-wrap 自己把 --danger 釘成深色的 #ff453a，
+   在裡面取就拿不到報告淺色主題的 #d70015。報告 .ascii-fig 用的是同一招
+   （--afc-up:var(--danger)／--afc-dn:var(--good)）。 */
+.ck-embed,.gr-embed{--ckc-up:var(--danger,#ff453a);--ckc-dn:var(--good,#5fbf8f)}
+/* 淺色主題：報告有深／淺切換，圖不能只在深色下成立 */
+/* 2026-10-03 第五十五輪：變數同時掛給彈出選單 .ck-modal（掛在 body、在 .ck-wrap 外面），選單才跟著鍊條的淺色配色走。 */
+html[data-theme="light"] .ck-wrap,html[data-theme="light"] .ck-modal{
+  --bg:#ffffff;--bg2:#fafafc;--bg3:#f2f2f5;--border:#e0e0e0;--border2:#d1d1d6;
+  --text:#1d1d1f;--text2:#515154;--text3:#6a6a6a;--gold:#8a6d1f;--accent:#0066cc;--accent2:#965e05;
+  /* 2026-09-28 第二十六輪：--text3 #7a7a7a 在面板底只有 3.8～4.1:1；--accent2 原本沒蓋＝吃深色的 #ff9f0a（1.8:1），
+     ⑤⑥ 註解、轉向字、面板環名都是亮橘。同色相壓深到 ≥ 4.6:1，深色不動。 */
+  /* 2026-09-28 第二十五輪：.ck-wrap 在深色把 --danger 釘成 #ff453a，淺色底只有 3.1:1（模擬的起火點字、跨環虛線、警示鈕）；
+     淺色跟報告的淺色 --danger 對齊。深色不動。 */
+  --danger:#d70015;--ck-shadow:#c8c8cd;
+  /* 2026-10-03 第五十五輪：紅底白字的專用底色（見 CSS 主檔 :root）——淺色接 --danger #d70015（白字 5.38:1）；
+     hover 原 #ff6b61（白字 2.79:1）→ 同色相壓深 #b80012（6.89:1）。清單列滑過的底色＝淺色 --bg3，跟原本一樣。 */
+  --ck-alert:#d70015;--ck-alert-hover:#b80012;--ck-rowhover:#f2f2f5}
+html[data-theme="light"] .ck-ringbox{background:radial-gradient(ellipse at center,rgba(255,159,10,.08),transparent 62%)}
+html[data-theme="light"] .ck-num{fill:#ffffff}
+/* ck-labels 是 <g id="ck-labels">＝id 不是 class：寫成 .ck-labels 選不到，
+   淺色主題下環號會變成白字配 #f5f5f7 的底＝看不見（2026-09-21 修） */
+html[data-theme="light"] #ck-labels circle{fill:#3a3a3c}
+/* 「動畫：開」金底鈕：淺色 --gold #8a6d1f 配深字 #1a1200 只有 3.79:1 → 字改白（4.90:1）。
+   2026-10-03 第五十五輪：上一輪只寫在獨立頁、報告裡的九環沒有；搬到這裡，嵌入版與獨立頁同一條。深色金底深字 9.69:1，不動。 */
+html[data-theme="light"] .ck-btn.on{color:#fff}
+/* 總覽清單環名擠成兩行（2026-09-26 Yoda）：面板改成 1/3 欄寬後（九環約 313px、黃金七環約 286px），
+   主 CSS 那組 24px 1fr 46px 68px 40px＋四個 8px 間距，把環名欄壓到約 59px（九環）／34px（七環），
+   「資產價格與財富效應」這種長名字就折成兩行。只在嵌入版把右側幾欄縮窄（環號 20、領先／同步 22、
+   長條 30、熱度 32），字級不動。最長的名字是九環「資產價格與財富效應」9 字 × 12.5px ＝ 112.5px、七環 4 字 ＝ 50px。
+   實測（1200 桌機、無頭 Chrome、淺深兩色、2026-09-26 量）：九環面板 313px、面板出現捲軸時環名欄 121px
+   （沒捲軸 131px）；七環面板 286px、環名欄 104px——兩張清單的環名都一行、各欄都沒溢出。
+   長條原本想留 36，但九環出捲軸時環名欄只剩 115px、離 112.5 只差 2.5px，所以再收到 30 留餘裕。
+   獨立頁（沒有這段嵌入版 CSS）版面寬，照舊。 */
+.ck-li{grid-template-columns:20px 1fr 22px 30px 32px}
+/* 開牌表表頭不吃報告全域的 thead tr 底色（2026-10-03 第五十五輪）：報告深色表頭底 #272729 上，「✓ 順風」紅字只有 4.38:1；
+   改成透明＝跟獨立頁一樣直接落在卡片底（紅字 4.94:1）。淺色報告表頭底 #fafafc 本來就等於卡片底，看起來不變。 */
+.ck-cardtbl thead tr{background:transparent}
+
+/* ── 自旋＋斷鍊甩飛（2026-10-02 Yoda；只有總經九環輸出這段，黃金七環同一支引擎、不輸出）──
+   碎片會飛出環外：圖框 overflow:hidden 把它們關在圖裡，整頁不會多出橫向捲軸。
+   斷裂一律用 --danger（深色 #ff453a／淺色 #d70015，跟著報告主題走）。
+   第三十九輪（2026-10-02 Yoda）：斷掉的那一段原位不留紅色虛線斷口，就是空缺；只留「斷裂」兩個字。 */
+.ck-ringbox{overflow:hidden}
+.ck-frag path{fill:none;stroke:var(--danger);stroke-linecap:round;stroke-linejoin:round}
+.ck-cut-t{font-size:12.5px;font-weight:700;fill:var(--danger);letter-spacing:.12em;pointer-events:none;
+  paint-order:stroke;stroke:var(--bg);stroke-width:4px;stroke-linejoin:round}
+.ck-embed .ck-cut-t{font-size:17px}
+/* 環上的字會轉過固定的註解字（⑤⑥ 註解、半圈標籤）：帶一圈底色描邊，疊到的那幾秒兩邊都讀得到 */
+.ck-up .ck-lab,.ck-up .ck-lag,.ck-up .ck-heat{paint-order:stroke;stroke:var(--bg);stroke-width:3px;stroke-linejoin:round}
+</style>
+<div class="ck-wrap">
+
+
+  <div class="ck-sub"><ul class="ck-ul"><li>經濟不是一堆各走各的數字，是<b>一條會自己轉的鍊</b>。</li><li>前五環是<b>引擎半圈</b>：<ul class="ck-ul2"><li>有人領到薪水（就業）→ 才有人花錢（消費）→ 錢變成企業的訂單 → 訂單扣掉成本變獲利 → 獲利決定企業添不添設備、增不增人手，回頭餵就業。</li></ul></li><li>後四環是<b>煞車半圈</b>：<ul class="ck-ul2"><li>需求太熱推升通膨 → 通膨綁住利率 → 利率決定錢好不好借 → 資金的成本決定資產值多少，而資產價格又透過財富效應回頭餵就業與消費。</li></ul></li><li><b>同一條鍊，順著轉是擴張、逆著轉就是收縮螺旋；任何一環卡住，整條停轉。</b></li><li>點任一環，看它現在離斷裂多近、兩端各怎麼斷、下一個接不到東西的是誰。</li></ul></div>
+  <div class="ck-meta">各環讀數日期不同，逐環標在卡片裡：就業 10/1（初領 9/26 當週） · 消費 9/25 · 訂單 10/1（ISM 9 月） · 獲利 9/25（Q2 實際值） · 資本支出 8 月 · 通膨 9/30 · Fed 10/2 · 信用 10/1 · 資產價格 10/2 · 每環熱度 0–100 ＝ 離斷裂多近 · ↑↓ ＝ 較上期</div>
+  <div class="ck-fail" id="ck-fail"></div>
+  <div class="ck-ctrl">
+    <button class="ck-btn" id="ck-play">▶ 情境：全部安全 → 現在</button>
+    <button class="ck-btn ck-alert" id="ck-cascade">▶ 播放衰退模擬</button>
+    <button class="ck-btn on" id="ck-motion">動畫：開</button>
+    <div class="ck-slider"><label for="ck-range" title="九環熱度同步縮放的示意，不是歷史回放">情境強度</label>
+      <input type="range" id="ck-range" min="0" max="100" value="100" step="1"></div>
+    <div class="ck-stage" id="ck-stage">現在</div>
+  </div>
+  <div class="ck-main">
+    <div class="ck-ringbox">
+      <svg class="ck-svg" id="ck-svg" viewBox="0 0 940 900" role="img" aria-label="總體經濟九環鍊條圖：引擎半圈與煞車半圈，每環標示離斷裂多近">
+  <defs>
+    <filter id="ck-glow-s" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="ck-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">      <path d="M0,0 L10,5 L0,10 z" fill="var(--danger)"/></marker>
+    <radialGradient id="ck-core">
+      <stop offset="0%" stop-color="rgba(255,159,10,.18)"/>
+      <stop offset="70%" stop-color="rgba(255,159,10,.04)"/>
+      <stop offset="100%" stop-color="transparent"/>
+    </radialGradient>
+  </defs>
+  <circle cx="470" cy="436" r="185" fill="url(#ck-core)"/>
+  <g id="ck-rot">
+  <circle id="ck-flowring" cx="470" cy="436" r="238" fill="none" stroke="var(--text3)" stroke-width="1.4"
+          stroke-dasharray="3 9" opacity=".55"/>
+  <g id="ck-deco"></g>
+  <g id="ck-cross"></g>
+  <g id="ck-l0"></g><g id="ck-l1"></g><g id="ck-l2"></g>
+  </g>
+  <g id="ck-fix"></g>
+  <g id="ck-labels"></g>
+  <g id="ck-center" text-anchor="middle">
+    <text class="ck-cen-k" x="470" y="362">循環位階</text>
+    <text class="ck-cen-v" x="470" y="381">榮景期末端 × 錯配前緣</text>
+    <text class="ck-cen-k" x="470" y="414">轉向</text>
+    <text class="ck-cen-spin" x="470" y="444" id="ck-spin-v">—</text>
+    <text class="ck-cen-s" x="470" y="464" id="ck-spin-s"></text>
+    <text class="ck-cen-k" x="470" y="494">煞車半圈最接近斷裂：</text>
+    <text class="ck-cen-v" x="470" y="513" fill="var(--danger)">⑨ 資產價格 100</text>
+    <text class="ck-cen-v" x="470" y="531" fill="var(--danger)" style="font-size:12px">（引擎半圈的④獲利、⑤資本支出也是 100；⑦ 政策利率 96）</text>
+  </g>
+  <g id="ck-frags" pointer-events="none"></g>
+</svg>
+    </div>
+    <aside class="ck-panel" id="ck-panel">
+      <div class="ck-p-eye" id="ck-p-eye">九環總覽</div>
+      <div id="ck-p-body"></div>
+    </aside>
+  </div>
+  <div class="ck-legend">
+    <div class="lead"><b>熱度＝離斷裂多近，兩端都危險；正中央最安全。</b>不是「經濟愈熱愈紅」——就業火熱到推升薪資會斷，就業掉到裁員也會斷，穩定擴張才是最安全的正中央。</div>
+    <div><span class="ck-grad"></span>左端＝失速斷裂　·　中間＝最安全　·　右端＝過熱斷裂　·　<b>裂口＝熱度</b>：環閉合＝完好，裂口張開＝接縫快脫鉤</div>
+    <div class="ck-eg"><div><b>③ 訂單 3</b>（最低）：ISM 新訂單 55.3，坐在 45–65 的正中央附近——離失速端與過熱端都最遠，所以最安全。<b>不是「動能最強」</b>。</div><div><b>⑨ 資產價格 100</b>：股票對公債的溢價同口徑 10/2 第一次轉負（−0.04）；10 年期 9/15 起站上 5.00、10/2 收 5.28（9/30 收 5.29），分母端兩條已亮。</div></div>
+  </div>
+  <div class="ck-cards">
+    <div class="ck-cards-h">接下來 30 天要開的牌</div>
+    <div class="ck-cards-w"><table class="ck-cardtbl"><thead><tr><th>開牌日</th><th>開什麼</th><th>哪一環</th><th class="ck-ok">✓ 順風</th><th class="ck-bad">✗ 翻案</th></tr></thead><tbody><tr data-go="orders"><td>10/5</td><td>ISM 服務業（9 月）＋S&P 終值</td><td>3 訂單</td><td class="ck-ok">仍在 50 上＝兩具引擎續航</td><td class="ck-bad">跌回 50 下＝第二具引擎熄火</td></tr><tr data-go="orders"><td>10/8 前後</td><td>批發庫存（8 月）（9/30 預估：月增 +0.7%、年增 +6.6%）</td><td>3 訂單</td><td class="ck-ok">年增續留 +5% 上＝回補不是單月</td><td class="ck-bad">回落到 +4% 附近＝單月跳動</td></tr><tr data-go="inflation"><td>10/9</td><td>密西根 10 月初值</td><td>6 通膨</td><td class="ck-ok">五到十年回到 3.3%＝錨沒鬆</td><td class="ck-bad">連兩個月 3.4% 以上＝錨鬆脫，門檻重排</td></tr><tr data-go="inflation"><td>10/14</td><td>CPI（9 月）</td><td>6 通膨</td><td class="ck-ok">租金月增守在 +0.25% 以下＝懸念延長</td><td class="ck-bad">租金月增衝上 +0.3%＝節奏轉逆</td></tr><tr data-go="earnings"><td>10 月起</td><td>Q3 財報季獲利面寬</td><td>4 獲利</td><td class="ck-ok">面寬守過半</td><td class="ck-bad">收窄到一半以下＝鏈條從尾端斷</td></tr><tr data-go="capex"><td>10/27</td><td>耐久財（9 月）核心資本財新訂單</td><td>5 資本支出</td><td class="ck-ok">月增守在 +0.5％ 上＝設備下單續強</td><td class="ck-bad">月增轉負，而且費城、紐約聯準會的六個月後資本支出計畫續降＝計畫面的降溫傳到了下單</td></tr><tr data-go="fed"><td>10/27–28</td><td>FOMC（無點陣圖）</td><td>7 政策利率</td><td class="ck-ok">不升＋2 年期減政策利率往 50bp 內收＝政策路徑重新錨住</td><td class="ck-bad">再升＝一季兩碼、比點陣圖快，折現率再重估一輪</td></tr><tr data-go="inflation"><td>10/29</td><td>核心 PCE（9 月）</td><td>6 通膨</td><td class="ck-ok">月增 0.23 以下＝年增不再往上（去年 9 月基期修成 0.232）</td><td class="ck-bad">連兩個月 0.30 以上＝加速</td></tr><tr data-go="inflation"><td>11/10</td><td>10 月 CPI（11/10）：去年 10 月沒採集，這一期沒有年增率</td><td>6 通膨</td><td class="ck-ok">核心月增 0.25 以下</td><td class="ck-bad">核心月增 0.30 以上</td></tr><tr data-go="fed"><td>12/8–9</td><td>FOMC＋點陣圖</td><td>7 政策利率</td><td class="ck-ok">今年不再多升、明年中位數不上修</td><td class="ck-bad">明年中位數上修＝連續緊縮，首升到末升拉長</td></tr><tr data-go="fed"><td>每週</td><td>2 年期 − 政策利率（確認鐘）</td><td>7 政策利率</td><td class="ck-ok">守 +50bp 上（現在守住）＝首升段、市場仍押升</td><td class="ck-bad">貼近零（+30bp 以內）而且不再彈回＝確認升完了；1990 年後這跟最後一次升息同時發生，是確認不是預告</td></tr><tr data-go="assets"><td>每週</td><td>ERP（同口徑：前瞻盈餘收益率 − 10Y）</td><td>9 資產價格</td><td class="ck-ok">守 0 以上（未兌現：10/2 第一次轉負（−0.04））</td><td class="ck-bad">轉負且 10Y 站上 5.00（10/2 已亮）、或融資餘額掉頭＝兩條齊亮</td></tr><tr data-go="credit"><td>每日</td><td>高收益利差</td><td>8 信用</td><td class="ck-ok">守 3.5％ 下（守住，現在 3.24，10/1）</td><td class="ck-bad">走闊逾 0.5 個百分點、或投資級跟長端利率同漲（9/30 已亮：投資級利差 0.77→0.84，同期 10 年期上升；10/1 0.86）</td></tr></tbody></table></div>
+  </div>
+</div>
+<script>
+(function(){
+"use strict";
+var DATA = {"meta": {"date": "2026-10-03", "geom": {"CX": 470, "CY": 436, "R": 238, "HALF": 29.5, "W": [30, 22, 15], "ROT": 20, "SW": 9}, "halves": [{"from": 1, "to": 5, "label": "引擎半圈 ①–⑤ · 自我強化", "short": "引擎半圈 ①–⑤", "label_at": {"x": 744, "y": 812, "ang": 140}}, {"from": 6, "to": 9, "label": "煞車半圈 ⑥–⑨ · 回頭壓抑", "short": "煞車半圈 ⑥–⑨", "label_at": {"x": 196, "y": 150, "ang": 300}}], "seam": {"label": "迴圈閉合處：⑨資產價格 → ①就業"}, "noteline": {"from": 5, "to": 6, "text": "⑤⑥ 這期一起貼過熱端：企業設備下單 8 月 +1.6％，是預期的三倍；核心 PCE 年度修正後落在 3.0％，短尺在降溫。上一期說「同一支利率在挑對象、⑤先被咬」，9/25 開牌沒有兌現——長端利率這一輪咬到的是房市，不在鍊上這兩環。"}, "center": {"phase": "景氣大循環：榮景期·過熱加速段末端（74％，與上期持平）｜製造業循環：錯配前緣（77％，自 70％ 前移）——循環在延長，不在收尾。（「錯配」＝需求和產能對不上的那一段；74％／77％ 是循環走完的比例，是觀測不是機率。）", "spin_line": "打滑：六個領先環裡順轉三（③⑤⑨）、減速二（①⑧）、逆轉一（⑦），順轉沒有過半。9/25 ⑤資本支出開牌接住了棒，轉向從「打滑」回到「順轉」；這一期換①就業、⑧信用的力道在收——9 月非農只有 +2.9 萬、高收益利差一週走闊 44bp——③訂單 10/1 守回 55.3 回到順轉，順轉從四個變成三個，不到一半，所以又回到「打滑」。還在拖的是⑦政策利率（反向）；⑨資產價格雖然偏燙，傳導方向仍是順轉（股價餵財富效應）。<b>熱度講的是脆，轉向講的是推力，兩件事分開讀</b>；打滑不是逆轉：沒有一環從減速翻成反向，方向還沒反，是推力不夠過半。", "speed": "中", "weakest_line": "最接近斷裂：⑨資產價格（100）——股票對公債的溢價同口徑 10/2 第一次轉負（−0.04），10 年期 10/2 收 5.28%（9/30 收 5.29%）。⑦政策利率 96 在後：2 年期高出政策利率約 +95bp（10/2），比 9/24 收窄——市場在 9/16 升完一碼之後，又把後面的升息押回去了；10/1 收回一點、10/2 又拉開 5bp。⑤資本支出熱度也是 100，但那是單月讀數頂到窄尺——它過熱端的斷法要產能利用率一起到 82–83%，現在 76.3%，離斷裂還遠。④獲利這一期也到 100：Q2 淨利潤率 17.0% 創紀錄，剔除 Alphabet、Amazon 仍有 15.1%——跟⑤不一樣，這一環是真的站在過熱端；它的斷法要營收先鬆，Q3 財報季（10 月起）對答案。⑨⑦一起貼在過熱端講的是同一件事：折現率先動了，分子（獲利）10 月要接得住。", "overview_h": "煞車半圈貼著過熱端，引擎半圈的④⑤也到頂", "overview": "九環一眼看下來，燙的多數在<b>煞車半圈</b>：⑨資產價格 100、⑦政策利率 96、⑧信用 70、⑥通膨 33，四環都貼過熱端。引擎半圈上一期唯一往失速偏的<b>⑤資本支出，9/25 開牌翻到過熱端的頂</b>——8 月設備下單 +1.6％，是預期的三倍；但尺很窄，它是一筆讀數推上去的，過熱端斷法要求的產能利用率還差得遠。④獲利也到頂：Q2 淨利潤率創紀錄，剔除兩家大公司仍是紀錄——這一環是真的熱，不是一筆讀數。①就業請人變慢（9 月 +2.9 萬），但初領連四週往下，熱度回到均衡。翻成白話：壓力不在「東西賣不賣得掉」，在「資金的成本被押到多高」——2 年期高出政策利率約 +95bp（10/2），比 9/24 收窄、10 年期 10/2 收 5.28％（9/30 收 5.29％）、30 年期創 2006 年恢復發行以來新高，股票對公債的溢價同口徑 10/2 第一次轉負（−0.04）。實體那五環還在往前：就業 9/4 解凍、10/2 放慢、庫存 9/10 回補啟動、訂單雙引擎在擴張區、設備下單接住了棒。報告用海水與船講的是同一件事——船（實體五環）引擎自轉；鍊條的煞車半圈量的是<b>水的價格</b>（利率、利差、估值），價格在變貴，不是水位在退。", "overview_foot": "轉向是<b>打滑</b>：六個領先環只剩三個在往前推（③⑤⑨），推力那一邊沒有過半；①就業、⑧信用的力道在收，⑦政策利率還在反向拖，而且煞車半圈的熱度比上一期更高——方向還沒反，但推力不夠過半。<b>經濟鍊條打滑，不等於股市逆風：就業轉弱讓升息預期降低，對股市是順風</b>。<b style=\"color:var(--accent2)\">交叉驗證</b>：同一天另一份報告（AI 泡沫評估表）用完全不同的資料獨立算了一次，最脆的一環落在<b>估值／資產價格</b>那一格，這裡的⑨也只差⑦兩分——兩份報告、不同資料、指到同一個地方，這比任何單一讀數都值得記。"}, "cascade_h": "從哪裡開始出問題？", "cascade_sub": "先選一條起火點，再開始跑。<b>這是條件推演，不是預測</b>——每一步都指得出一張可以對答案的牌。預設那條是本期煞車半圈最貼近的走法；引擎半圈那幾條列在後面，是為了讓你比較「同一條鍊，從不同地方斷，長相不一樣」。", "scenarios": [{"id": "inflation", "label": "通膨飆升，升息預期上升", "from": "⑥ 通膨", "sub": "本期預設——煞車半圈最貼近的一條：價格先動，錢跟著變貴，最後才輪到人。", "steps": [{"ids": ["inflation"], "t": "⑥ 通膨：從「卡住」變成「回頭往上」", "card": "10/14 CPI：租金月增衝上 +0.3%（報告設的線是守不守 +0.25%）", "story": "先動的是價格。房租那台降溫引擎今年三月就熄火了，去年 10 月到今年 3 月的比較基準偏低（房租凍住）——同樣的月增，年增讀數自己會往上走。市場本來把通膨讀成「貴」，這時候開始讀成「回頭」。"}, {"ids": ["fed"], "t": "⑦ 政策利率：升息從一半一半變共識", "card": "10/27–28 FOMC：再升一碼＝一季兩碼", "story": "通膨一往上，十月那一碼就更難不升：2 年期已經高出政策利率約 +95bp（10/2），比 9/24 收窄，等於市場早押了下一碼；票一開，短端再往上，長端利率還要更多保險費。"}, {"ids": ["credit"], "t": "⑧ 信用：保險費開始回頭要", "card": "投資級與高收益利差跟著長端利率一起走闊（每日可對）", "story": "錢變貴的第一個地方不是利率本身，是保險費。高收益信用利差 10/1 走闊到 3.24%（9/24 為 2.80%），一週走闊 44bp，同期 10 年期只升 6bp——利差跑得比利率快，這是這一期第一次；位置升到近三年第 75 百分位，HYG 五天跌 1.3%。借錢開始變難一點，但還沒到銀行收緊放款那一步。只要繼續走闊，體質最弱、利息負擔最重的公司先借不到錢。"}, {"ids": ["assets"], "t": "⑨ 資產價格：溢價從沒有補償變成負補償", "card": "股票對公債的溢價同口徑 10/2 第一次轉負（−0.04），分母端 10 年期 10/2 收 5.28", "story": "股票相對公債的補償同口徑 10/2 第一次轉負（−0.04）——報告說的「同樣一則壞消息會比三個月前更痛」，痛在這一步。"}, {"ids": ["employment"], "t": "① 就業：剛解凍就再凍——8 月 +16.2 萬（10/2 下修為 13.3 萬）若只是單月跳動", "card": "初領失業金 4 週均連四週往上並站上 22 萬（每週四公布）", "story": "到這裡才輪到人。9/4 剛從「不裁人也不請人」解凍（10/2 放慢），撐住它的是訂單還在、股價還高；兩根柱子都軟掉，才解凍的僱用會先縮回去。"}, {"ids": ["consumption"], "t": "② 消費：薪水這條燃料被抽掉", "card": "10 月中的 9 月零售轉負、信心續跌", "story": "繞一圈回到家庭。煞車半圈壓下來的力氣，最後是從薪水單上扣的——到這一步，鍊條才真的整條反著轉。"}], "off_ramp": "停在第一格的條件：10/14 租金月增守 +0.25 以下；停在第二格的條件：10/27–28 不再升、2 年期減政策利率往 50bp 收——通膨端一鬆，後面四步就沒有動力。"}, {"id": "assets", "label": "股價先回落，財富效應反轉", "from": "⑨ 資產價格", "sub": "從煞車半圈最脆的估值那一環起算（98）——它是把煞車半圈接回引擎半圈的閉合點。", "steps": [{"ids": ["assets"], "t": "⑨ 資產價格：溢價歸零之後，股價自己先回落", "card": "標普 500 自 7,722.72（10/2 收盤）明顯回落，融資餘額掉頭", "story": "這一環不需要壞消息就會動——溢價同口徑 10/2 第一次轉負（−0.04）；分母端 10 年期 9/15 起站上 5.00、10/2 收 5.28（9/30 收 5.29），等於價格已經沒有預留犯錯空間。任何一個小意外都足以讓它先跌一段。"}, {"ids": ["employment"], "t": "① 就業：財富效應反轉，招聘先縮", "card": "初領失業金 4 週均連四週往上並站上 22 萬", "story": "股價是企業信心的溫度計，也是家庭的帳面資產。市值一縮，最先被砍的不是既有員工，是還沒發出去的職缺。"}, {"ids": ["consumption"], "t": "② 消費：帳面變薄，先縮的是大額支出", "card": "10 月中的 9 月零售轉負、信心續跌", "story": "2008 年就是這個順序：房價與股價把家庭淨值蒸發掉一塊，消費停下來、儲蓄率反而急拉。那一次訂單與獲利在兩季內一起被拖下去。"}, {"ids": ["orders"], "t": "③ 訂單：需求傳不進接單簿", "card": "10/1 ISM 新訂單守回 55.3，訂單這一環沒有先鬆；下一張看 11/2 的 10 月 ISM", "story": "訂單簿是需求的影子。消費停一季，接單簿要下一季才看得出來——所以這一格永遠是「已經發生的事」的回音。"}, {"ids": ["earnings"], "t": "④ 獲利：營收先掉，成本還沒降", "card": "10 月起 Q3 財報季，獲利面寬收窄過半", "story": "利潤率站在 2009 年開始追蹤以來的最高點（Q2 17.0%），已經在共識（Q3 15.0%）之上。營收一鬆，利潤率的均值回歸會用兩倍速度往下修。"}], "off_ramp": "長端利率回落而盈餘收益率不動，溢價自己長回來（報告給的門檻是買回執行後長端利率不再創前高）；或獲利面寬維持、漲勢擴散到少數權值股以外——分母鬆手、分子撐住，這條路就不成立。"}, {"id": "credit", "label": "信用先關門，再融資變難", "from": "⑧ 信用", "sub": "極窄的利差是位置不是訊號——但它一旦走闊，先咬的是利息負擔最重的那一群。", "steps": [{"ids": ["credit"], "t": "⑧ 信用：利差從歷史極窄開始走闊", "card": "高收益利差自 2.80% 走闊（10/1 已到 3.24%）、投資級跟著長端利率一起漲", "story": "利差窄的時候沒有人覺得有事，因為錢好借。真正的訊號是它「開始變寬」——那代表市場重新開始對違約要價。"}, {"ids": ["assets"], "t": "⑨ 資產價格：抵押品縮水，槓桿被迫收", "card": "融資餘額自 1.50 兆的紀錄高點掉頭下滑", "story": "股票市值同時是信用的抵押品。融資餘額創紀錄，意思是有很多部位是借來的——利差一走闊，那些部位會先被要求補錢或平掉。"}, {"ids": ["employment"], "t": "① 就業：借不到錢的公司先停止招聘", "card": "初領失業金 4 週均連四週往上並站上 22 萬", "story": "借錢最貴的那一群，通常也是最會請人的那一群（中小企業）。這條路的裁員不是從大公司開始的。"}, {"ids": ["consumption"], "t": "② 消費：所得端變薄", "card": "10 月中的 9 月零售轉負、信心續跌", "story": "工作機會少了，加薪的籌碼也沒了。消費不會斷崖式停，是一季一季慢慢薄下去。"}, {"ids": ["orders"], "t": "③ 訂單：接單簿跟著變薄", "card": "10/1 ISM 新訂單守回 55.3，訂單這一環沒有先鬆；下一張看 11/2 的 10 月 ISM", "story": "到這一步，煞車半圈已經完整地把力氣傳進引擎半圈了。"}], "off_ramp": "投資級與高收益利差在長端利率上行時仍然不動——政府借錢變貴、公司沒跟著貴，那是「好的漲」不是信用收縮；再加上企業發債仍被順利接走，這條路就走不下去。"}, {"id": "orders", "label": "訂單先斷，需求傳不進工廠", "from": "③ 訂單", "sub": "現在離斷裂最遠的一環（熱度 3）——但它是領先環，真的鬆掉會最早看到。", "steps": [{"ids": ["orders"], "t": "③ 訂單：新訂單連兩個月失守 55", "card": "10/1 ISM 新訂單守回 55.3，這條路的第一張牌沒有開出來；下一張看 11/2 的 10 月 ISM", "story": "10/1 ISM 新訂單守回 55.3，這條路的第一張牌沒有開出來；下一張看 11/2 的 10 月 ISM。單月失守是雜訊，連兩個月才算訊號——這是報告自己設的規矩，也是這條路的起點。"}, {"ids": ["earnings"], "t": "④ 獲利：營收先掉，工資與利息兩頭夾", "card": "10 月起 Q3 財報季，獲利面寬收窄過半", "story": "訂單先簽、營收後認列，所以財報是最後知道的那一個。等它寫出來，訂單那一格其實已經冷了一季。"}, {"ids": ["capex"], "t": "⑤ 資本支出與招聘：企業轉守", "card": "核心資本財新訂單連兩個月低於 +0.5%", "story": "這張牌 7、8 月都沒亮（+0.6%、+1.6%）。企業轉守不會從裁員開始，會從「不補人、不買機器」開始——所以初領失業金往往是最後才動的那一個。"}, {"ids": ["employment"], "t": "① 就業：解凍沒站穩，又縮回去", "card": "初領失業金 4 週均連四週往上並站上 22 萬", "story": "8 月剛解凍（10/2 放慢），是因為訂單還在。訂單真的薄了，解凍就守不住了。"}, {"ids": ["consumption"], "t": "② 消費：需求端自己把自己收掉", "card": "10 月中的 9 月零售轉負、信心續跌", "story": "這條路最慢，但也最完整：從工廠一路收回家庭，中間沒有一格是跳過的。"}], "off_ramp": "10/1 ISM 新訂單守回 55.3，這條路的第一張牌沒有開出來；下一張看 11/2 的 10 月 ISM。客戶端庫存續留低位、訂單積壓守在 50 上——客戶還缺貨、補庫存的續航力還在，8 月那一格就只是雜訊。"}, {"id": "employment", "label": "裁員先啟動（教科書版）", "from": "① 就業", "sub": "2008 年那一條——最典型，但 9/4 非農開出 +16.2 萬（10/2 下修為 13.3 萬）、前兩月上修之後（10/2 放慢），這是五條裡離現況最遠的一條。", "steps": [{"ids": ["employment"], "t": "① 就業：裁員啟動，不是不請人、是開始減人", "card": "初領失業金 4 週均連四週往上並站上 22 萬（每週四公布）", "story": "2008 年初領 4 週均從 30 萬一路推破 60 萬，裁員→消費縮→訂單減→獲利掉→再裁員的螺旋整整跑了一年。也因為那一次，初領失業金的 U 型反轉被留下來當轉折標記。（9/4 更新：8 月新增 16.2 萬（10/2 下修為 13.3 萬）、勞參率回升，這一條的起點反而更遠了——留著是為了讓你看清楚「最典型」不等於「最可能」。）"}, {"ids": ["consumption"], "t": "② 消費：薪水這條燃料被抽掉，當季就縮", "card": "10 月中的 9 月零售轉負、信心續跌", "story": "這一環是同步的——它不預告，它確認。等零售連兩個月是負的，就業那一格其實已經壞了一季。"}, {"ids": ["orders"], "t": "③ 訂單：需求傳不進接單簿", "card": "10/1 ISM 新訂單守回 55.3，訂單這一環沒有先鬆；下一張看 11/2 的 10 月 ISM", "story": "消費者花掉的錢，到企業帳上就是訂單。家庭停手，訂單簿當季就開始變薄。"}, {"ids": ["earnings"], "t": "④ 獲利：營收先掉，成本還沒降", "card": "10 月起 Q3 財報季，獲利面寬收窄過半", "story": "工資與利息是黏的，營收卻是滑的。兩頭一夾，利潤率就從歷史高點往下修。"}, {"ids": ["capex"], "t": "⑤ 資本支出與招聘：企業轉守，回頭砸就業", "card": "核心資本財新訂單連兩個月低於 +0.5%", "story": "獲利掉了就不買機器、不請人，回到第一環——鍊條反著轉完一整圈，這就是收縮螺旋。"}], "off_ramp": "初領失業金 4 週均不出現連四週往上、續領續降，9 月非農續留正值（10/2），製造業就業續守 50 以上——那是降速換檔，不是熄火。"}], "scenario_default": "inflation", "cross": [{"from": "fed", "to": "assets"}]}, "links": [{"id": "employment", "idx": 1, "name": "就業與薪資", "primary_metric": "初領失業救濟金 · 4 週移動平均（ICSA 4wk MA）", "now": 20.0, "cold": 22, "hot": 17, "unit": "萬件（每週初次申請人數，4 週移動平均）", "heat": 20, "side": "均衡", "trend": "↓", "trend_why": "熱度用初領失業金量：四週均回到 20.0 萬、連四週往下，所以熱度從 28 降到 20、回到均衡帶。但 9 月非農只有 +2.9 萬——這把尺看得到裁員，看不到請人變慢；非農那一半要另外記：請人變慢了，還沒開始裁人。", "reading": "9 月非農 +2.9 萬（7、8 月合計下修 6 萬）；初領失業金四週均 20.0 萬、連四週往下", "mechanism": "就業是整條鍊的第一格，也是家庭收入的源頭：有人領到薪水，才有人去消費，訂單才會進到企業手上。這一環轉得順，後面五格才有燃料。\n\n它有兩種斷法。太緊的時候，企業搶不到人只能加薪，薪資追著物價漲，通膨黏住，Fed 就得繼續把利率壓在高位，鍊條後半的煞車半圈會回頭壓死前半圈。太鬆的時候更直接：裁員一開始，消費當月就縮，訂單跟著減、獲利跟著掉、企業再裁一輪，整條鍊反著轉。這一環 9/4 一度離開凍結（8 月 +16.2 萬，10/2 下修為 13.3 萬）；10/2 的 9 月只 +2.9 萬——僱用端的修復沒有延續，量又慢了下來，但初領沒有往上，價沒有跟上——薪資年增 9 月再降到 3.0%。", "break_hot": "初領失業金 4 週均回落到 17 萬附近，同時時薪年增從 3.0% 重新站上 4%、職缺／失業比自約 1.0 回升到 1.5 以上——那代表缺工又回來推薪資、通膨端被重新點著，十月底那張票就會往「再升一碼」那邊倒：就業這位證人 9/4 已經從投反對票變成不再擋，再燙下去就是替升息添柴，折現率得再重估一輪。", "break_cold": "初領失業金 4 週均連續四週以上往上、並站上 22 萬（報告自訂的 U 型反轉門檻），或非農三個月移動平均轉負的同時失業率在勞參率不再下滑的情況下回升——那代表弱的地方已經從「不請人」變成「開始裁人」，消費會在同一季就縮。", "ok": "✓ 同一張牌（10/2 已開 ◐ 偏 ✗）：9 月非農續留正值＝解凍站穩。旁證（鍊條自訂）：初領 4 週均守在 20 萬附近、不出現連四週往上；勞參率不回頭下滑。", "bad": "✗ 同一張牌（10/2 已開 ◐ 偏 ✗）：非農掉回零軸附近＝8 月是單月跳動；初領四週均連四週往上、逼近 22 萬。旁證（鍊條自訂）：續領站上 190 萬、時薪年增重新站上 4％、職缺／失業比回升到 1.5 以上（過熱端）。", "history": "2008 年這一環先斷：初領 4 週均從 30 萬一路推破 60 萬，裁員→消費縮→訂單減→獲利掉→再裁員的螺旋整整跑了一年，失業率從 5% 被推到 2009 年 10 月的 10%，是戰後最典型的一次整條鍊反轉；也因為那一次，初領失業金的 U 型反轉被留下來當成過去五十年最可靠的轉折標記之一。", "lead_why": "主指標選初領失業金，報告自己把它列在先行指標那一格（「先行＝初領失業金·PMI新訂單·銅金比」），失業率則被歸為滯後。就業這一環在鍊條上是收入的源頭，裁員端一動，消費當月就會反映，所以它領先整條需求鍊；但同一環裡的失業率 4.2% 是回頭確認用的，不能拿來當即時訊號——上一份的分歧（非農 −2.3 萬 vs 失業率反降）就是這個時間差造成的，9 月兩邊又分開：非農放慢、初領回落。", "short": "就業", "lag": "領先", "unit_short": "萬", "feeds": "consumption", "transmit": "減速", "transmit_why": "請人變慢：9 月非農只有 +2.9 萬，初領還沒往上——力道在收，方向還沒反", "scale_note": "申請失業金的件數愈少＝勞動市場愈緊、愈靠近缺工推薪資那一端", "src_tag": "報告（22 萬）＋外部歷史（17 萬）"}, {"id": "consumption", "idx": 2, "name": "家庭所得與消費", "primary_metric": "實質個人消費支出年增率（PCEC96, YoY）", "now": 2.57, "cold": 1, "hot": 4, "unit": "% YoY", "heat": 5, "side": "均衡", "trend": "↓", "trend_why": "回到均衡（熱度 27→5）。往上推風險的只剩軟數據：密西根信心 9 月終值 48.1（史上次低）、一年通膨預期 4.6%、諮商會預期指數 68.2 落在 80 以下的歷史衰退警戒區；GDPNow 的消費格 8/14 曾被砍到 2.5%，9/25 已回到 4.2%。上游的就業 9/4 一度換邊，10/2 又放慢——薪水這條燃料還在，但加柴變慢了；往下壓風險的力量同樣具體：實質可支配所得由負值低點轉正、儲蓄率年度修正後在 4% 以上、信用卡違約率從 2024 高點 3.2% 回落到 2.85%（Q2）、零售年增 +5.4%（8 月，9/28 年度修正後）。所以是「軟數據先動、硬數據未跟」的典型組合——9/30 年度修正後回到均衡：實質消費年增 2.57%、儲蓄率 4.1%，方向判定的第一張牌 9/16 已開：8 月零售月增 +1.1%、年增 +5.4%（9/28 年度修正後），7 月那個坑是促銷移月的失真、回正兌現。", "reading": "實質個人消費年增 2.57%（8 月，9/30 年度修正後；取自報告「三線合判」方框的 PCEC96 月頻年增口徑；報告另有季增年率口徑的讀數，兩把尺不同不可互換）、儲蓄率 4.1%（8 月，7 月 4.6%；年度修正把整條墊高）、實質可支配所得年增 1.30%（8 月），硬數據撐得住；7 月零售月增 −0.5%（促銷移月的坑）已在 8 月補回（+1.1%、年增 +5.4%，9/28 年度修正後）；家庭端的軟數據還在往下：密西根信心 48.1（9 月終值）、諮商會預期指數 68.2。", "mechanism": "家庭領到薪水，決定花掉多少、存下多少——花掉的那一塊佔美國 GDP 約七成，直接變成下一環企業手上的訂單。這一環怎麼轉，看的是「錢從哪來」：所得在增加、儲蓄率不再往下掉的時候，消費是賺來的，可以一直花；所得停滯、只能靠提款和刷卡撐的時候，消費是借來的，撐不了幾季。所以這一環真正的體檢項目不是消費金額本身，而是所得、儲蓄率、違約率這三條線的相對位置。", "break_hot": "過熱端斷法——消費旺到把通膨推回頭：實質個人消費年增站上 4.0%（近三十年只在 1999–2000 與 2021–22 出現，兩次都以聯準會加速緊縮收尾），核心 PCE 從目前 3.0%（9/30 年度修正後）往 3.5% 以上走，這一環就從需求引擎變成通膨的燃料，聯準會那一環會直接踩下去，繞一圈回頭壓抑家庭自己。", "break_cold": "失速端斷法——燃料被抽乾：實質個人消費年增掉破 1.0%（歷史上只在衰退前後出現），同時儲蓄率跌破 3.0% 卻仍撐不住支出、信用卡違約率翻上 2024 高點 3.2% 以上。三者同時成立才算，因為單看儲蓄率下降既可能是消費旺、也可能是存款用完，要靠違約率來分辨是哪一種。", "ok": "✓ 同一張牌（9/16）：8 月零售回正＝單月失真兌現；信心回頭。旁證（鍊條自訂）：實質可支配所得續正、儲蓄率守 3.0％。", "bad": "✗ 同一張牌：零售連兩個月月增為負；信心不回頭（9/11 已開 47.8，這一條半亮）；9/25 終值 48.1。旁證（鍊條自訂）：儲蓄率再破 3.0％、信用卡違約率逼近 3.2％。", "history": "2008 年財富效應反轉：房價下跌把家庭淨值蒸發掉一大塊，實質個人消費年增由正翻負（2008 年第四季一度接近 −2%），儲蓄率反而從 2% 附近急拉到 6% 以上——家庭同時停止消費並急著補存款，訂單與獲利兩環在兩季內一起被拖下去，整條鍊從順轉逆。這也是為什麼儲蓄率急升在這一環要當訊號讀，而不是當成健康的節儉。", "lead_why": "實質個人消費支出是典型的同步指標：它排在就業之後、訂單之前，本身不預告轉折，轉了才確認。真正帶領先性質的是同一環裡的預期分項——諮商會預期指數 68.2、密西根信心 48.1（9 月終值），通常比實際支出早三到六個月動。本期正是「預期先走、支出未跟」的狀態：軟數據已經回頭，硬數據（所得、儲蓄率、違約率）還站在原地。", "short": "消費", "lag": "同步", "unit_short": "%", "feeds": "orders", "transmit": "順轉", "transmit_why": "所得扣掉物價後轉正、儲蓄率年度修正後在 4% 以上，消費是賺來的不是借來的——需求還在往訂單那一格送。", "scale_unit": "實質個人消費年增率（%）", "src_tag": "鍊條自訂（實質 PCE 年增 1％／4％）"}, {"id": "orders", "idx": 3, "name": "企業營收與訂單", "primary_metric": "ISM 製造業新訂單指數（9 月，10/1 發布）", "now": 55.3, "cold": 45, "hot": 65, "unit": "ISM 擴散指數（50 ＝榮枯線）", "heat": 3, "side": "均衡", "trend": "↓", "trend_why": "9 月新訂單守回 55，8 月那盞半盞燈熄了；服務業新訂單 60.9、台灣 PMI 是 2021 年以來最快——訂單這一環離兩端都遠，是九環裡最安全的一格。", "reading": "ISM 製造新訂單 9 月 55.3（8 月 53.7），守回 55", "mechanism": "消費者花掉的錢，到了企業帳上就是訂單。這一環量的是需求有沒有真的傳進工廠與服務業的接單簿：訂單先簽、料才備、人才請、營收才認列，所以它比獲利與招聘早三到六個月動。訂單簿還在加厚，後面每一環就有東西可接；訂單簿一薄，獲利和資本支出只能靠慣性再走一段，然後整條鍊會慢下來。", "break_hot": "訂單多到產能追不上：新訂單站上 65 以上、同時供應商交貨與價格指數一起往上（9 月為 59.0 與 77.9），交期拉長會把成本直接送進通膨那一環——2021 年就是這個走法，訂單衝到 65–68、價格指數 85–92，一年後訂單自己掉回 42。", "break_cold": "訂單自己縮掉：新訂單連兩個月跌破 55 是第一個訊號（9 月 55.3 守回，半盞燈熄了），真正的失速線是跌破 45——歷史上訂單掉到那個位置，多半伴隨企業營收衰退，而不只是製造業降溫。", "ok": "✓ 同一張牌（10/1 已開 ✓ 55.3）：9 月新訂單守回 55 以上；（9/10 已開）批發庫存年增翻頭＝回補啟動。旁證（鍊條自訂）：客戶端庫存續留「太低」、訂單積壓守 50 上；台灣外銷訂單與全球半導體銷售維持正增長。", "bad": "✗ 同一張牌（10/1 已開 ✓ 55.3）：新訂單連兩月失守 55；（10/8）批發庫存年增回落到 +4％ 附近＝回補只是單月。旁證（鍊條自訂）：訂單積壓跌破 50、客戶端庫存回升到 50 附近、台灣外銷訂單轉負。", "history": "2000–2001 年的訂單斷崖：ISM 新訂單從 2000 年年中的 60 附近，半年內一路掉到 2001 年初的 40 出頭，科技業的資本支出與營收隨後同步斷層，鍊條從訂單這一格開始逆轉；2008 年底新訂單更一度跌到 30 以下，是戰後最深的一次訂單真空。", "lead_why": "訂單簿是簽在出貨、營收認列之前的東西。ISM 新訂單問的是採購經理人這個月的接單感受，比工業生產早一個月、比財報營收早一到兩季。報告自己又把更上游的台灣外銷訂單與全球半導體銷售擺在 ISM 前面，理由寫得很白：上游訂單能見度決定三到六個月後的美國生產，再決定製造業就業與資本支出。所以整條鍊上，這一格是最早會動的一格——它轉向的時候，獲利與就業還看不出來。", "short": "訂單", "lag": "領先", "unit_short": "", "feeds": "earnings", "transmit": "順轉", "transmit_why": "訂單往下傳到生產和庫存：批發庫存 8 月預估年增 6.6%，回補在繼續。", "caveat": "先講口徑：熱度 3 是全鍊最低，意思是「離兩端斷裂都最遠」，不是「動能最強」。9 月新訂單 55.3 守回 55，比 8 月的 53.7 更貼近 45–65 的正中央；8 月那一次報告記成半盞燈，9 月守回、半盞燈熄了——半盞燈量的是動能往哪走；熱度量的是離斷裂多遠。兩句同時成立。", "scale_unit": "ISM 擴散指數，50＝榮枯線", "src_tag": "外部歷史（ISM 45／65 的常用帶）"}, {"id": "earnings", "idx": 4, "name": "企業獲利與利潤率", "primary_metric": "S&P 500 淨利潤率（季，FactSet 口徑）", "now": 17.0, "cold": 10, "hot": 15.5, "unit": "%", "heat": 100, "side": "過熱端", "trend": "↑", "trend_why": "熱度從 24 跳到 100：過熱端門檻放在共識之上再一段（15.5%），Q2 實際 17.0% 直接越過；剔除 Alphabet、Amazon 也有 15.1%，代入熱度是 85，仍在過熱端。所以這不是一筆讀數頂到尺，是獲利這一環真的站在歷史最高的利潤率上——漂亮，也最禁不起營收一鬆。要看的是 Q3 財報季（10 月起）利潤率守不守在 15% 上下。", "caveat": "尺的過熱端門檻 15.5% 離共識很近；但就算剔除兩家公司，讀數也在過熱端。", "reading": "2026 Q2 的 S&P 500 淨利潤率 17.0%，FactSet 2009 年開始追蹤以來最高（Q1 為 14.8%）；Alphabet 與 Amazon 兩家墊高了一大塊，但剔除兩家仍有 15.1%，一樣是紀錄（FactSet 8/28 期）。共識預估 Q3 淨利潤率 15.0%，EPS 年增 Q3 +29.1%、Q4 +26.8%，CY2027 +15.4%（FactSet 9/25 期）。", "mechanism": "這一環做的事只有一件：把上一環接到的訂單，扣掉工資、原料與利息，剩下來的才叫獲利。獲利決定企業敢不敢擴廠、敢不敢多請一個人，所以它是引擎那半圈的最後一棒，算完就直接交給下一環的資本支出與招聘。它是落後環——訂單早兩三個月就轉了向，這裡要等財報公布才照實寫出來，所以它的用途是「確認前面幾環講的是真的」，不是拿來提前預告。", "break_hot": "過熱端的斷法是利潤率被墊到不可持續：淨利潤率若在共識上緣 15.0%（Q3）之上還要續墊高，卻同時看到 EPS 年增率往下滑，就代表水準是靠一次性紅利撐住、速度已經先漏氣；歷史上利潤率一旦開始均值回歸，EPS 會用大約兩倍的速度往下修，因為營收與利潤率是相乘的。", "break_cold": "失速端的斷法是工資與利息兩頭夾：淨利潤率跌破 11%、往 2015–16 盈餘衰退期的 10% 靠，同時 Non-IG 利息覆蓋率從現在的 2.89x 再往 2.0x 掉，利息就會在工資之外從獲利裡挖走第二塊；那時候獲利不是成長變慢，是絕對金額往下，鍊條會從這裡開始逆轉。", "ok": "✓ 同一張牌（10 月起）：Q3 財報季獲利面寬守過半（11 部門年增為正的家數）。旁證（鍊條自訂）：實際 EPS 年增守在 +29.1％ 附近、淨利潤率守在 15％ 上下（Q3 共識 15.0％）——做到共識是符合預期，不是引爆。", "bad": "✗ 同一張牌：面寬收窄過半。旁證（鍊條自訂）：利潤率在 17％ 之上還續墊且 EPS 年增下滑；Q3 財報季利潤率季減的板塊擴散到 8 個以上；9/10 PPI 5.4％ 高出 CPI 3.4％ 兩個百分點，成本先於營收反應——第二輪殺的是「賺多少錢」。", "history": "2000 到 2001 年那次，先倒的不是需求而是利潤率——企業利潤率從 1997 年的高點一路被壓縮，S&P 500 盈餘連續數季負成長，科技設備訂單接近腰斬、整體企業投資縮約一成，裁員是再後面才發生的；那一輪的教訓是獲利這一環可以在訂單看起來還好的時候就先斷，因為成本比營收先反應。", "lead_why": "獲利是訂單扣掉成本之後的結果，要等財報才落地：Q2 財報季到 7/31 才收尾，Q2 淨利潤率 17.0%（FactSet 9/25 期）。訂單與就業早兩三個月就轉了向，這一環才把它寫進帳面，所以它確認方向、不預告方向。", "short": "獲利", "lag": "落後", "unit_short": "%", "feeds": "capex", "transmit": "順轉", "transmit_why": "獲利端的推力沒問題——連七季雙位數、11 個部門有 10 個在增長；接棒那一頭也接住了：核心資本財 8 月 +1.6%，是預期 +0.5% 的三倍，7 月也從 +0.2% 修正成 +0.6%。所以是「推得動、也接得住」，④⑤ 這一段沒有卡點。", "scale_unit": "S&P 500 淨利潤率（%）", "src_tag": "鍊條自訂（10％ 外部近似／15.5％ 共識之上）"}, {"id": "capex", "idx": 5, "name": "資本支出與招聘", "primary_metric": "核心資本財新訂單（非國防、扣飛機｜FRED NEWORDER）月增率", "now": 1.6, "cold": 0, "hot": 1, "unit": "% MoM（月增率）", "heat": 100, "side": "過熱端", "trend": "↑", "trend_why": "8 月核心資本財新訂單 +1.6%，是預期 +0.5% 的三倍；7 月也從 +0.2% 修正成 +0.6%。尺很窄（單月月增 0～+1％），7 月 +0.2 讓它貼失速端，8 月 +1.6 又讓它頂到過熱端——熱度是一筆讀數推上去的，兩個月合看是在擴張，還沒到塞車。同期 JOLTS 職缺 8 月 707.9 萬、比 7 月（修正後 733.5 萬）少 25.6 萬，離職率 1.9%；房市開工 8 月再掉 2.6%，是本期唯一明顯轉弱的一格。", "reading": "2026-10-03 這期：企業設備投資的直接前瞻——核心資本財新訂單 8 月 +1.6%，是市場預期 +0.5% 的三倍，7 月也從 +0.2% 修正成 +0.6%；同月耐久財頭條持平（7 月修正成 +0.9%），運輸設備往下，撐盤的換成核心資本財。AI 那一塊還在加速（四大雲端 2026 年資本支出計畫 7,250 億美元、年增 77%，資本財進口 7 月年增 47%）。招聘這半邊則是製造業就業 52.7（9 月）續守擴張、服務業就業 47.8 連兩個月收縮、8 月職缺 707.9 萬（比 7 月修正後少 25.6 萬）、離職率 1.9%（8 月）凍在 2020 年來最低。設備下單沒有被長端利率咬到：企業獲利還在雙位數成長，買機器不必全靠借。", "mechanism": "獲利好不好，最後會變成一個很具體的決定：要不要買新機器、要不要多請一個人。企業點頭，訂單就變成新的產能與新的工作機會，鍊條回到第一環的就業，需求自己推自己往前轉——這是引擎半圈能夠自我強化的關鍵接點。企業搖頭，前面四環再漂亮也只停在帳上，轉不出下一圈。所以這一環是引擎半圈的閉合處：它一鬆手，擴張就從「自我強化」掉回「靠慣性滑行」；滑行還能走一段，但沒有新的燃料進來。　⑤→⑥ 怎麼傳：擴產能是抑價、搶人是推價；本期設備下單在加速，但產能利用率只有 76.3%，工廠離塞車還遠，所以對通膨仍是中性——⑥ 的熱來自能源、房租基期與預期，不是⑤傳過去的。", "break_hot": "過熱端的斷法：資本支出衝過頭，產能超前需求太多，最後變成閒置產能與折舊壓力，等訂單一放緩就整批回吐。可驗證門檻：核心資本財新訂單月增連續站上 +1.0%（年化超過 12%、遠高於長期約 4% 的趨勢），同時產能利用率越過報告標示的 82–83%（工廠開始塞車的水位）。目前讀數是 +1.6% 與 76.3%：月增這一條單月已經過線，但不連續——站上 +1.0% 的只有 6 月與 8 月，中間 7 月 +0.6% 斷開；產能利用率距門檻還差 6～7 個百分點，報告寫的是「擴產仍有餘裕」。這條斷法現在只亮了一半的一半，這一端還不是問題。", "break_cold": "失速端的斷法：企業轉守，同時凍結買設備與請人，回頭砸就業，鍊條從順轉變逆轉。可驗證門檻：核心資本財新訂單月增跌破 0%（由 8 月的 +1.6% 翻負）且連續兩個月，加上 ISM 製造業就業重新跌回 50 以下、初領失業金四週均破 22 萬（目前 20.0 萬，9/26 當週）。報告自己的預警線更早一步：連兩個月低於 +0.5%——9/25 開牌沒有破：7 月修正成 +0.6%、8 月 +1.6%，兩個月都在 +0.5% 上面，這條斷法一個月都沒亮。三條線同時成立，才叫真的凍結；現在一條都沒成立。", "ok": "✓ 順風確認：核心資本財新訂單次月回到 +0.5% 以上（報告的預警線）✓ 已開（9/25：8 月 +1.6%），ISM 製造業就業續守 50 上（10/1 ISM 開牌），資本財進口維持雙位數年增——三件同時成立，代表上一期七月那一格（初值 +0.2%，已修正成 +0.6%）是單月雜訊，引擎半圈完好，訂單照常變成產能與工作機會、接回第一環的就業。次要旁證：出貨跟上（8 月 +0.6%、7 月 +1.4%）＝下單真的變成交貨。", "bad": "✗ 斷裂訊號：核心資本財新訂單連兩個月低於 +0.5%、甚至翻負，同時 ISM 製造業就業跌回 50 以下、JOLTS 職缺續探且離職率不回升——那就不再是「利率在挑對象咬」，而是企業全面轉守。這一組成立的意義是：招聘凍結會在一到兩季後回頭砸就業與消費，鍊條開始逆著轉（不請人 → 消費減 → 訂單減 → 獲利減 → 更不請人）。要注意的是它不會從裁員開始，會從「不補人」開始，所以初領失業金往往是最後才動的那一個。", "history": "2008–09 年金融海嘯：企業獲利崩落後同步凍結設備投資與招聘，核心資本財新訂單連續多個月負成長，資本支出與招聘一起縮手，把原本只是「需求變慢」的局面推成裁員→消費減→訂單減→獲利減→再裁員的收縮螺旋——這是這一環斷掉之後鍊條整條逆轉最完整的一次示範，也是為什麼要盯訂單而不是盯裁員：訂單先停，人才後走。", "lead_why": "核心資本財新訂單是「訂單先簽、機器後交、帳最後才入 GDP」的第一站，領先實際設備投資支出約一到兩季，也領先製造業請人的動作。報告自己的快速索引就把 JOLTS 職位空缺、製造業建築支出放在領先指標那一格，而這一環的下一棒——設備投資入帳、製造業就業人數——全部排在它後面。所以這一環現在的變化，要到下一季才會在 GDP 與非農上看到；反過來說，等到 GDP 的設備投資轉弱才反應，已經晚了一到兩季。", "short": "資本支出", "lag": "領先", "unit_short": "%", "feeds": "inflation", "transmit": "順轉", "transmit_why": "核心資本財 8 月 +1.6% 對預期 +0.5%，7 月修正成 +0.6%，出貨也在增加——設備投資還在把力氣往下一環送。計畫面在降溫（費城、紐約的六個月後資本支出計畫都比 8 月低），是下一個要看的地方，不是現況。", "scale_unit": "核心資本財新訂單月增率（%）", "src_tag": "鍊條自訂（月增 0／+1）", "caveat": "尺很窄（單月月增 0～+1％），一筆讀數就能讓熱度在 0 與 100 之間跳；8 月的 100 要跟過熱端的斷法一起讀：月增衝上去了，產能利用率離塞車還遠。判讀要看連兩月，這一環唯一能證偽的牌 9/25 開了，答案是「沒縮手」；下一張是 9 月耐久財（10/27）。"}, {"id": "inflation", "idx": 6, "name": "通膨", "primary_metric": "核心 PCE 年增率（Fed 政策目標所用口徑）", "now": 3.0, "cold": 1, "hot": 4, "unit": "%（年增率）", "heat": 33, "side": "過熱端", "trend": "↓", "trend_why": "風險下降（熱度 53→33），但主詞換了：不是房租，是能源與預期。房租降溫引擎熄火是舊柱子（房租合成年增（租金＋屋主約當租金）3 月觸底 2.98％，5 月回升到 3.23％、8 月回到 3.01％，新簽要價年增 +2.3％），9/11 那一格租金與屋主等值租金各只有 +0.2％、暫時沒有再加速；新柱子是油站上 100 之後總體 CPI 3.4％、PPI 5.4％、能源年增 16.3％，還有家庭一年預期跳到 4.6％、長錨鬆一格到 3.4％。再加上去年 10 月房租沒採集、被凍在 9 月，今年 4 月才補回，今年 11 月到明年 3 月同樣的月增會被算術墊高。核心 PCE 自己的基期（9/30 年度修正後）：接下來三個月要滾掉的去年 9～11 月（0.16～0.23）不高不低，年增大致原地；12 月起滾掉的是去年最高的三個月（0.32～0.40），只要月增守在 0.25 以下，年增就會往下。要讓 2027 年 1 月年增低於 2.8%，9 月到明年 1 月平均月增要在 0.215 以下；過去十二個月有四個月做到。9/30 年度修正把主指標核心 PCE 從 3.3％ 修成 3.0％，熱度由 53 降到 33——這是讀數被修正，尺沒變（仍是 1％／4％）。兩件會後的事要記：油 9/17 到 9/19 連三天跌，相對大盤的二十日強度從 +21.6 收到 +14.8，「能源型」這根新柱子在鬆；9/16 抗通膨公債輸一般公債，市場把通膨預期往下修了一格（十年期通膨補償 2.38 → 2.33）。但年增讀數這半年不會因此變好看：今年 11 月到明年 3 月，年增拿偏低的去年指數當分母，總體與核心 CPI 年增會一起被推上去：最可能的路是總體從 3.35（季調指數算）爬到明年一、二月的 3.8 到 3.9，明年 3 月數據才因去年 3 月油價暴漲月滾出一次掉 0.6；核心 CPI 會被墊到年底 2.9 上下就停住，其中約 0.1–0.25 是量測的算術；10 月那一期算不出年增。也就是說，到明年三月前 Fed 桌上的年增只會一路變難看，分辨真假加速要看三個月年化（3.5 以上才算）與月增（0.30 連兩月）。", "reading": "核心 PCE 年增 3.0％（8 月，9/30 年度修正後；7 月由 3.3％ 修成 3.0％），三個月年化 2.05％、六個月年化 2.74％。9/11 補牌：8 月 CPI 總體 +0.4％、年增 3.4％，汽油 +3.9％ 一項占了月增三分之一以上、能源年增 +16.3％；核心 +0.3％、年增 2.4％；房租與自有住宅等值租金都是 +0.2％，守住報告設的 +0.25％ 線。9/10 PPI：+0.4％、年增 5.4％，商品端 +1.1％（柴油 +24.1％）、服務端 +0.1％，能源占漲幅四分之三。9/11 密西根：一年通膨預期 4.0→4.6％、五到十年 3.3→3.4％，信心 47.8 是史上次低。一句話：房租那條守住了，能源這條進來了，家庭的預期跟著跑。", "mechanism": "通膨是前面五環把需求推熱之後、留在價格上的痕跡：有人上工、有人花錢、訂單排隊、獲利變好、企業再擴產招人，最後就顯影成物價。它自己不決定任何事，它做的是翻譯——把「需求有多熱」翻成「管利率的人能不能放鬆手」，然後把答案交給下一環。所以這一格黏住，鍊條後半圈的煞車就開始使力；它鬆開，前面的引擎才能安心繼續轉。", "break_hot": "黏在目標之上、把政策的手逼上煞車：核心 PCE 年增站上 4.0%（更早的徵兆是 10/14 公布的 9 月 CPI 起，租金月增連月站上 +0.30%、六個月年化再往 3.5% 以上爬）——升息從「一半一半」變成共識，後面的利率、信用、資產價格三環會依序被壓。", "break_cold": "掉得太快代表需求是真的垮了：核心 PCE 年增快速滑向 1% 以下，而且不是能源單項拖的（房租月增降到 +0.15% 以下、扣掉能源的品項也普遍轉弱）——那不是通膨被打敗，是通縮訊號，代表前面五環的需求已經先斷在上游。", "ok": "✓ 順風確認（下一張牌）：10/9 密西根 10 月初值五到十年回到 3.3%＝錨沒鬆；10/14 CPI 租金月增守在 +0.25% 以下＝懸念延長。9/11 那張（續守 3.3%）開出 3.4，沒兌現。", "bad": "✗（下一張牌）10/9 密西根 10 月初值五到十年連兩個月 3.4% 以上＝錨鬆脫；10/14 CPI 租金月增衝上 +0.3%＝節奏轉逆。9/11 那張開出：長錨 3.4（半盞）、租金與屋主等值租金各 +0.2（守住）。旁證（鍊條自訂）：PPI 年增高出 CPI 兩個百分點以上（現在 5.4 vs 3.4；進口物價 8 月年增 +7.0%、扣燃料 +5.5%，同方向）＝成本在堆、還沒傳到售價，第二輪的壓力在④獲利那一環。", "history": "1970s 停滯性通膨：核心通膨站上 4% 之後就再也沒有靠自己回落，一路拖到 1980–82 年由 Volcker 把政策利率推到 19%、以兩次衰退為代價才壓回去——這一環一旦黏住，帳單是後面整條鍊條分期付的。", "lead_why": "通膨是需求繞完一圈之後才顯影在價格上的痕跡，天生落後。報告自己算過：CPI 房租落後新簽租約 12–18 個月，所以現在讀到的通膨反映的是去年到今年上半年的需求，不是此刻的。它落後於前面五環，卻領先於後面的政策決定——政策的手要不要放上煞車，看的就是這一格。", "short": "通膨", "lag": "落後", "unit_short": "%", "feeds": "fed", "transmit": "逆轉", "transmit_why": "黏著讓政策的手鬆不了——煞車半圈回頭壓引擎半圈，對擴張是逆風。", "scale_unit": "核心 PCE 年增率（%）", "src_tag": "報告（2％ 目標）＋鍊條自訂（1％／4％）"}, {"id": "fed", "idx": 7, "name": "Fed 政策與利率", "primary_metric": "2 年期公債殖利率 − 聯邦基金利率（市場對未來兩年政策路徑的投票）", "now": 95.5, "cold": -100, "hot": 100, "unit": "bp", "heat": 96, "side": "過熱端", "trend": "↓", "trend_why": "熱度 9/11 踩到 100、9/16 升息後因為分母追上去回到 89（9/18：88.5bp），9/24 又回到 100：2 年期自己再升了一段（4.76→4.87），把 Fed 追上來的那一格又拉開了——壓力沒有鬆，反而加了；約 +95bp（10/2）：10/1 收回一點、10/2 又拉開 5bp，熱度 96。要分清兩種縮法：市場退（2 年期往下）是升完的樣子；Fed 追（政策利率往上、2 年期不動或還升）是首升段的樣子，9/16 那次是後者；9/24 則是市場又跑到 Fed 前面。9/16 之後 2 年期還在升，等於市場把點陣圖「今年再一碼」照單全收再加一點。點陣圖畫的是今年一到兩碼、明年一半一半，偏短；但歷史上首升到最後一次升息長短都有（16 輪中位 16.5 個月，最像現在的三輪 0～11 個月，1997 只升一次）。確認鐘的條件：2 年期壓到政策利率貼零（+30bp 以內）且不再彈回，現在還有約 +95bp（10/2），比 9/24 收窄——它響的時候多半已經升完，是確認不是預告。方向轉向下：市場把 Fed 要升多少往下修，壓力這兩週減了一格。", "reading": "9/16 FOMC：升息一碼到 3.75–4.00%，一致決，2023 年以來第一次；點陣圖中位數今年還要再升至少一碼（10 月或 12 月），明年 18 人分成 8 升、6 不動、4 降；主席說通膨「太高、太久」、底層成長「正在增強」，刻意不給指引。當天的順序很重要：決策公布前指數在漲，主席開口後才翻黑，市場在意的不是這一碼，是「還沒完」。會後到 9/18：2 年期 4.659→4.76、10 年期回到 5.01、10 減 2 從 34 縮到 25bp；2 年期減政策利率中值從 100bp 縮到 88.5bp。縮的原因是 Fed 追上來了（分母升一碼），不是市場改押降（2 年期自己還升了 10bp）。9/30 PCE 公布後，10/28 再升一碼的機率降到 38.2%（CME FedWatch 9/30 08:27 CT）；10/1 再降到 24.4%。", "mechanism": "這一環決定「資金的成本」。前面的通膨數字送到 Fed 手上，Fed 用政策利率回答，而市場不等答案——先把它猜出來，寫進 2 年期與 10 年期殖利率裡。價格一旦定了，下一環的信用市場就照這個數字重新報價：房貸、企業債、循環信貸的利率全部跟著改。所以它是煞車那半圈裡最早動、也最早把力道往下傳的一環——Fed 開會往往只是把市場已經寫好的答案蓋章確認。", "break_hot": "過熱端斷裂線是 2 年期高出政策利率 100bp（＋4 碼），9/11 踩到；9/16 的答案是最後那一個分支：升了，而且點陣圖說還沒完。現在看的是「追不追得上」：9/24 2 年期又回到約 100bp（99.5）＝市場又跑到 Fed 前面，長端利率用再創高來補（9/30 10 年期收 5.29、30 年期 5.64）；約 +95bp（10/2）：10/1 收回一點、10/2 又拉開 5bp；接下來要看的是 2 年期往 50bp 收＝政策路徑重新錨住。並行條件：租金月增連兩個月衝上 +0.3％（9/11 租金與屋主等值租金各守在 +0.2％，這條沒亮）。", "break_cold": "被迫急降息——2 年期低於聯邦基金利率 100 個基點以上，代表市場在定價一年內至少 4 碼的救火式降息。那不是好消息：降的理由不會是通膨解除，而是就業或信用先出事。可對照的前兆是初領失業金四週均破 22 萬（現在約 20 萬）、高收益債利差站上 3.5%（現在 3.24%，10/1），兩者任一先動，這一環就往失速端走。", "ok": "✓ 同一張牌（10/27–28，無點陣圖）：不升、且 2 年期減政策利率往 50bp 內收；（9/9 起）買回期間長端利率不再測前高——9/30 10 年期收 5.29、30 年期 5.64 再創高，這條沒守住。旁證（鍊條自訂）：2 年期不再創新高、12 月點陣圖今年不再多升。", "bad": "✗ 同一張牌（9/16 已開）：升息＝抽水、折現率重估一輪——已亮。接下來：10/28 再升＝一季兩碼、比點陣圖快；買回照做、長端利率仍創高，而且兩個期限溢價模型都往上＝供給病加重（長端利率創高 9/9、9/18、9/24、9/30 都發生了；半年看兩個模型沒有一起往上，但 9/23–9/24 紐約 Fed 模型的保險費 +0.15、Fed 理事會那個模型還沒出，這條還不算，但在靠近）。旁證：2 年期減政策利率回到 100bp 且不回頭＝市場又跑到 Fed 前面（9/24 已回到約 100bp；約 +95bp（10/2），比 9/24 收窄）。", "history": "2022 年那一輪是最近的樣本：2 年期在 2021 年底先於 Fed 半年把升息寫進價格，接著 Fed 在 2022 年單年升息 425 個基點，長天期公債與高本益比股票同時吞下 1970 年代以來最深的一次年度回檔——教訓不是「Fed 突然轉向」，而是這一環早在債市裡喊了半年，只是沒人當真。反方向的樣本是 2007 年下半年與 2020 年 3 月：2 年期跌到政策利率下方 100 個基點以上、Fed 隨即急降息，那代表已經出事了。", "lead_why": "這一環的核心讀數是市場對「未來兩年政策利率平均值」的投票，數據還沒公布就先動：2 年期殖利率早在 6 月就爬到政策利率上方，8/28 主席談話當天單日再跳 14 個基點，比任何官方口徑都快一步。它對通膨與就業的真實變化是落後的（要等 CPI、非農開牌才重定價），但對後面的信用與資產價格是領先的——資金的成本先改，信用市場才照著重新報價。", "short": "政策利率", "lag": "領先", "unit_short": "bp", "feeds": "credit", "transmit": "逆轉", "transmit_why": "10/28 再升一碼的機率降到 24.4%（10/1），2 年期高出政策利率收窄到約 +95bp（10/2）。性質要講清楚（9/23 更正）：拆開 10 年期，3/20 以來（到 10/2）漲的 0.89 幾乎全是扣掉通膨後的利率（+0.91），通膨補償反而小降（−0.02）——升的是實質資金成本，不是通膨預期；再拆一層，兩個期限溢價模型一個說幾乎全是 Fed 路徑、一個說路徑和保險費各半，都撐不起「財政沒紀律是主因」。實質資金成本變貴，對估值的殺傷是直接的。2 年期高出政策利率 50–100bp 是歷史上「首升前夕」的形狀；升完的形狀是 2 年期貼近政策利率而且不再彈回——但 1990 年後那時多半已經升完了，是確認，不是預告。", "scale_unit": "2 年期公債殖利率減聯邦基金利率（基點）", "src_tag": "鍊條自訂（±4 碼，政策自己的尺）"}, {"id": "credit", "idx": 8, "name": "信用與流動性", "primary_metric": "高收益債利差 HY OAS（BAMLH0A0HYM2）", "now": 3.24, "cold": 8, "hot": 2.41, "unit": "%", "heat": 70, "side": "過熱端", "trend": "↓", "trend_why": "斷裂風險小降：高收益信用利差 10/1 走闊到 3.24%（9/24 為 2.80%），一週走闊 44bp，同期 10 年期只升 6bp——利差跑得比利率快，這是這一期第一次；位置升到近三年第 75 百分位，HYG 五天跌 1.3%。借錢開始變難一點，但還沒到銀行收緊放款那一步。隔夜利率回到付息之下（10/1 −2bp），7 月 SLOOS 淨緊縮也歸零，銀行端沒有在收。還在累積的只剩槓桿：FINRA 融資餘額 1.45 兆（8 月）從高點回落。", "reading": "高收益利差 9/16 FOMC 當天 2.70（前一天 2.76）；高收益信用利差 10/1 走闊到 3.24%（9/24 為 2.80%），一週走闊 44bp，同期 10 年期只升 6bp——利差跑得比利率快，這是這一期第一次；位置升到近三年第 75 百分位，HYG 五天跌 1.3%。借錢開始變難一點，但還沒到銀行收緊放款那一步。升息後隔夜利率 3.88 對付息利率 3.90＝−2bp（10/1；9/17–9/21 是 −5bp；SOFR 9/30 季底碰到付息利率，0bp，10/1 回到 −3bp），兩者一起上移，隔夜回到付息之下。IG 利息覆蓋 6.38x、Non-IG 2.89x 未更新。", "mechanism": "這一環管的是錢流不流得到企業和家庭手上。利差就是市場對「借錢給體質差的公司」多收的保險費：保險費便宜，公司就借得到錢，繼續投資、發薪水，鍊條順順往下轉到資產價格；保險費一跳高、銀行同時收緊放款標準，最弱的一批公司先借不到錢，鍊條就卡在這裡。它也是利率那一格的影子——政府借錢變貴了以後，公司借款跟不跟著變貴，才是決定引擎會不會慢下來的那把尺。", "break_hot": "保險費便宜到幾乎不存在、槓桿補進那個空位：HY OAS 貼近或跌破 2.41%（2007 年 6 月全序列最窄），同時 FINRA 融資餘額年增續高於 +49.0%、債現比續升過 3.40。這一種不會自己出事，它的斷法是「下一個壞消息來的時候，所有部位同時被重新定價」——報告的說法是槓桿決定振幅、不決定時點。", "break_cold": "保險費跳高、銀行同時收手：HY OAS 站上 3.5%（報告自列的第一道觸發線，本期距離 70%）算開始要重看；真正的融資鏈收縮要看它越過 5% 以上，且 SLOOS 由不再收緊（7 月那一季淨緊縮歸零）轉回加速緊縮、投資級利差也一起走闊——到那時最弱的一批公司借新還舊會先斷，訂單與資本支出兩環跟著卡住。", "ok": "✓ 報告信用列同義（總表無此列，鍊條自訂）：高收益利差守 3.5％ 下、投資級利差不跟長端利率一起走闊——兩條同時成立就算通暢。旁證：10 月財報季企業發債仍被順利接走；SOFR 減付息利率沒有擴到 5 個基點。", "bad": "✗ 斷裂訊號：投資級與高收益利差跟著長端利率同步走闊（這正是報告可證偽觀察點的第四條）、SLOOS 由不再收緊轉回加速緊縮、SOFR 減付息利率站上 5 個基點的警戒門檻。三者同時出現，代表錢真的變貴，而且已經從政府那一段傳到公司——這時要重評的不只是這一環，是整條鍊的轉向。", "history": "2007 年 6 月高收益利差窄到 2.41% 的全序列最低點，隔年一路衝到報告列的歷史高點 21.82%，企業借新還舊斷炊、信用鏈整條斷開；1990 年儲貸緊縮則是反過來的斷法——放款標準先收，商用不動產與中小企業的融資當場斷源，價格還沒喊，錢就已經不流了。", "lead_why": "資金的成本與可得性先動，實體活動才動。利差走闊與銀行收緊放款標準，平均領先企業違約率與衰退數個季度——報告自己在警示框寫得很直接：銀行惜貸比率急升通常領先企業違約率與衰退。反方向也一樣領先：利差窄到極端不會當下出事，但它先決定了下一次壞消息來時的振幅有多大。報告的八格圖也把「信用」列為每日要看的那張牌，而不是等季報才知道的落後格。", "short": "信用", "lag": "領先", "unit_short": "%", "feeds": "assets", "transmit": "減速", "transmit_why": "信用還借得到，但變貴了：高收益利差一週走闊 44bp、跑得比利率快——力道在收，方向還沒反", "caveat": "先講口徑：熱度 70 落在過熱端，報告這一期的判讀是：高收益信用利差 10/1 走闊到 3.24%（9/24 為 2.80%），一週走闊 44bp，同期 10 年期只升 6bp——利差跑得比利率快，這是這一期第一次；位置升到近三年第 75 百分位，HYG 五天跌 1.3%。借錢開始變難一點，但還沒到銀行收緊放款那一步。不是矛盾——報告看的是「現在有沒有壓力」，鍊條看的是「還剩多少犯錯的補償」。高收益利差 3.24% 對 1996 年以來月均約 5.1% 仍偏窄，位置升到近三年第 75 百分位。", "scale_note": "利差愈窄＝借錢給弱公司多收的保險費愈少、愈靠近風險定價消失那一端", "src_tag": "外部歷史（1996 起序列史低 2.41／2008 高點 8）"}, {"id": "assets", "idx": 9, "name": "資產價格與財富效應", "primary_metric": "股票風險溢價 ERP（Fed Model：S&P 500 盈餘收益率 − 10Y 公債殖利率）", "now": -0.04, "cold": 6, "hot": 0, "unit": "%（百分點；S&P 500 盈餘收益率減 10Y 公債殖利率）", "heat": 100, "side": "過熱端", "trend": "↑", "trend_why": "熱度上一期從 100 修正到 90，是尺的修正（分子分母對齊同一天）；這一期又升到 100，是分母真的在動：10 年期 9/15 站上 5.00、10/2 收 5.28（9/30 收 5.29），同口徑溢價從 +0.29 縮到 −0.04（10/2）。所以現在的狀態是：分母端兩條都亮（長端利率創高、10 年期 5.00），溢價端 10/2 第一次轉負（−0.04），槓桿端沒開（融資餘額已補到 8 月：1.45 兆，6 月紀錄 1.50 兆）。分母亮、溢價也亮了（10/2）：盈餘上修的速度跑輸了利率——前瞻盈餘還在上修（9/4 當週 401.75 → 9/18 當週 404.84），但這兩週吃不掉長端利率漲的部分。這條能撐多久，Q3 財報季（10 月起）決定。方向朝上：9/16 升息把折現率重估一輪的引信點了，真實利率往上的那一天股票翻黑，就是第一輪的樣子（黃金當天反而漲，是買盤撐住，見黃金那一節）。", "reading": "ERP 改用同口徑：前瞻盈餘 404.84（9/18 當週，最新可得）除以 S&P 500 的 7,722.72（10/2）＝盈餘收益率 5.24%，減 10 年期 5.28%（10/2）＝約 −0.04 個百分點（9/30 一度貼到 0.00）。上一版寫的 −0.26 是 8/14 的分子配 9/11 的分母，撤回。10/2 第一次轉負（−0.04）：回到 0 要 10 年期降 0.04、或股價在盈餘不動下跌約 0.7%。9/16 FOMC 當天的成分很清楚：抗通膨公債輸給一般公債，通膨預期往下、真實利率往上——這是殺「值多少錢」的那一輪。黃金當天反而漲 1.26%，那是買盤的事，見黃金那一節。融資餘額 8 月 1.45 兆（7 月 1.42 兆），6 月 1.50 兆是紀錄值。席勒本益比 41.38 倍（10/2）、1881 年以來第 99.1 百分位。", "mechanism": "這一環把前面利率與信用的結果，換算成家庭的帳戶餘額和企業的融資條件。股票與房子的價格撐住，家庭覺得有底氣、願意花錢，企業增資與借錢也容易，需求就沿著這條路繞回就業與消費那兩環，整圈才轉得起來。反過來說，它也是整條鍊裡吃水最深的一格：估值本身不決定漲跌，決定的是「同樣一則壞消息，這艘船會摔多重」。", "break_hot": "估值端斷法：溢價轉負（10/2 第一次轉負（−0.04））＋ 10 年期站上 5.00（9/15 已亮，10/2 收 5.28、9/30 收 5.29）＋ Forward P/E 站上 24x ＋ 融資餘額從 1.50 兆掉頭。分母那條已經亮，溢價那條 10/2 也跟了（−0.04）：跟＝分子（EPS 上修）撐不住長端利率，任何壞消息直接從估值扣分，再透過財富效應回頭壓①就業與②消費；不跟＝貴但不脆，只是溢價薄（10/2 之前是這一種）。", "break_cold": "財富端斷法：S&P 500 自 7,722.72（10/2 收盤）明顯回落、FINRA 融資餘額從 1.50 兆的高點掉頭下滑（報告列的「死亡交叉」第二個條件，目前未成立），同時房價由「房價沒崩，新屋是靠降價在撐」轉為實際下跌——當家庭資產減損那一格從未觸發翻成觸發，消費意願與企業融資能力會在數個月內一起縮，鍊條就從這一環倒著轉回去。", "ok": "✓ 同一張牌（9/9 起）：買回期間 10 年期不再測前高——9/30 收 5.29 再創高，沒守住。旁證：盈餘繼續上修、把同口徑溢價拉回 0 以上（10/2 為 −0.04）、融資餘額仍在高檔、還沒確認掉頭——「貴」不是「脆」。", "bad": "✗ 斷裂訊號四條：分母端——長端利率仍創高（9/9 已亮）、10 年期站上 5.00（9/15 已亮，10/2 收 5.28、9/30 收 5.29）；溢價端——同口徑 ERP 轉負（10/2 第一次轉負（−0.04））；槓桿端——融資餘額從 1.50 兆掉頭（6 月紀錄後 7 月回落 5.6%、8 月回升 2.6%——還沒確認）。分母兩條齊了，溢價 10/2 也亮了：三條到齊。", "history": "2000 年 CAPE 升到 44× 之後三年 S&P 500 腰斬，資本支出與招聘隨之凍結；2008 年則是房價先掉頭，家庭資產減損直接把消費與信用一起拖下水——兩次都是這一環先動、就業與消費隔數個月才跟上，這也是它被歸為領先環的原因。", "lead_why": "價格先動、實體後動。估值與資產價格是折現率與信用條件的即時反應，通常領先消費與就業數個月才在數據上兌現。報告本期把估值定位成「整節的底色」，並用「船（五環同向）沒變、吃水（估值）最深」形容——鍊條前八環還在同向往上時，這一環已經先把安全邊際用掉了。它同時是回到①就業的接點：股價與房價決定家庭敢不敢花錢、企業增資與借錢容不容易。", "short": "資產價格", "lag": "領先", "unit_short": "%", "feeds": "employment", "transmit": "順轉", "transmit_why": "股價創高透過財富效應回頭餵就業與消費，傳導方向仍是推力；只是補償已經沒有了。熱度 100 量的是脆度，不是時間表。", "caveat": "先講口徑：100 量的是<b>脆度</b>，不是時間表。它說的是「摔的時候會比較痛」，不是「什麼時候摔」——照報告的定調，這不是賣出訊號，是安全邊際變薄的訊號：同樣一則壞消息，現在會比三個月前更痛。<br><b>交叉驗證：</b>AI 泡沫評估表那份報告用另一套資料（估值面）獨立算出來，最脆的也是這一格——兩邊不同資料、同一個結論。", "scale_note": "溢價愈小＝股票相對公債的補償愈少、愈靠近沒有補償那一端", "src_tag": "外部歷史（2009 谷底／Fed Model 中性線）"}]};
+var M=DATA.meta, G=M.geom, LINKS=DATA.links, CEN=M.center||{};
+/* 環數與模擬名一般化（2026-09-04 · AI 版八環接進來時補）：
+   預設維持總經版字樣，資料層可用 meta.ring_word／meta.sim_word 覆寫，程式不因報告而分家。 */
+var RINGW=M.ring_word||((['','一','二','三','四','五','六','七','八','九','十'][LINKS.length]||LINKS.length)+'環');
+var SIMW=M.sim_word||"衰退模擬";
+var SCEN=M.scenarios||[{id:"default",label:SIMW,from:"①",sub:"",steps:(DATA.cascade||[])}];
+var CX=G.CX, CY=G.CY, R=G.R, N=LINKS.length, STEP=360/N, HALF=G.HALF, WS=G.W, ROT=G.ROT||0, SW=G.SW||9;
+
+var svg=document.getElementById("ck-svg"),
+    gLay=[document.getElementById("ck-l0"),document.getElementById("ck-l1"),document.getElementById("ck-l2")],
+    gLab=document.getElementById("ck-labels"), gDeco=document.getElementById("ck-deco"),
+    panel=document.getElementById("ck-p-body"), pEye=document.getElementById("ck-p-eye"),
+    range=document.getElementById("ck-range"), stage=document.getElementById("ck-stage"),
+    flow=document.getElementById("ck-flowring");
+
+/* ── 熱度色：0 藍（最安全）→ 100 紅（最接近斷裂）。語意是「離斷裂多近」，不是「經濟多熱」 ── */
+var STOPS=[[0,41,151,255],[25,48,213,200],[50,240,192,64],[75,255,159,10],[100,255,69,58]];
+function heatColor(h){
+  h=Math.max(0,Math.min(100,h));
+  for(var i=0;i<STOPS.length-1;i++){
+    var a=STOPS[i],b=STOPS[i+1];
+    if(h>=a[0]&&h<=b[0]){
+      var f=(b[0]-a[0])?(h-a[0])/(b[0]-a[0]):0;
+      return "rgb("+Math.round(a[1]+(b[1]-a[1])*f)+","+Math.round(a[2]+(b[2]-a[2])*f)+","+Math.round(a[3]+(b[3]-a[3])*f)+")";
+    }
+  }
+  return "rgb(255,69,58)";
+}
+/* ── 淺色主題的熱度墨色 heatInk(h,kind)（2026-09-28 第二十五輪）──
+   上面那組 STOPS 是給深色底調的：黃（50）在淺色底只有 1.7:1、紅（100）3.1:1，環上的數字和環身都糊。
+   深色主題（以及沒有 data-theme 的獨立頁）→ 原封不動回 heatColor(h)，一個像素都不變。
+   淺色主題（<html data-theme="light">）→ 同一個色相往黑壓（RGB 等比縮），壓到對淺色底夠對比為止：
+     kind="text"（環上熱度數字、面板上的熱度字）≥ 4.5:1（WCAG 文字）
+     kind="line"（環身、刻度指針）≥ 3:1（WCAG 非文字）
+   對比的底取 INK_BG＝rgb(243,235,226)：面板最深的底 .ck-half（淺色 --bg3 #f2f2f5）再疊上環心那層橘色光暈最濃處（.08），
+   比實際會遇到的底（#fff／#fafafc／#f5f5f7）都深——對它過關＝對哪個底都過關。
+   底色帶深色字的兩處（總覽環號圓 .ck-li-n、單環標頭 .ck-p-badge）字是 #0b0b0c，底要亮才讀得到，照舊用 heatColor()。
+   hk(h,kind) 把熱度與種類記在元素上（data-hk／data-h），切主題時照著重上色（見檔尾「深／淺切換時重上色」）。 */
+var INK_BG=[243,235,226];
+function inkLin(v){v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4);}
+function inkLum(c){return 0.2126*inkLin(c[0])+0.7152*inkLin(c[1])+0.0722*inkLin(c[2]);}
+function inkRatio(a,b){var x=inkLum(a),y=inkLum(b);return (Math.max(x,y)+0.05)/(Math.min(x,y)+0.05);}
+function isLightTheme(){return document.documentElement.getAttribute("data-theme")==="light";}
+function heatInk(h,kind){
+  var c=heatColor(h);
+  if(!isLightTheme())return c;
+  var need=(kind==="line")?3:4.5, m=c.match(/\d+/g).map(Number);
+  if(inkRatio(m,INK_BG)>=need)return c;
+  var lo=0,hi=1,k,d;
+  for(var i=0;i<24;i++){
+    k=(lo+hi)/2; d=m.map(function(v){return Math.floor(v*k);});
+    if(inkRatio(d,INK_BG)>=need)lo=k; else hi=k;
+  }
+  d=m.map(function(v){return Math.floor(v*lo);});
+  return "rgb("+d[0]+","+d[1]+","+d[2]+")";
+}
+function hk(h,kind){return ' data-hk="'+kind+'" data-h="'+h+'"';}
+function el(t,at){var e=document.createElementNS("http://www.w3.org/2000/svg",t);
+  for(var k in at){if(at.hasOwnProperty(k))e.setAttribute(k,at[k]);}return e;}
+function pol(ang,r){var d=(ang-90)*Math.PI/180;return{x:CX+r*Math.cos(d),y:CY+r*Math.sin(d)};}
+function angOf(i){return i*STEP+ROT;}
+function widthOf(i){return WS[i%WS.length];}
+function esc(s){return String(s==null?"":s);}
+
+/* ── 長文自動條列 bulletize(s)（2026-09-27 Yoda：「鍊條右邊的判讀，要用圓點分好段落或編號才容易閱讀」）──
+   渲染層處理：資料（JSON）的字一個都不改，只在外面包清單標籤；去標籤、去空白後的文字跟原字串逐字相同。
+   ① 欄位先依空行（\n\n）切段，每段一個第一層圓點（ul.ck-ul）。
+   ② 段內有並列編號（①②③…／（1）（2）…／(1)(2)…／1）2）…）才拆成編號條：
+      從 1 起連號、至少兩個、出現在段首或「：；。，、」後面、不在括號裡、不在行內標籤裡。
+      所以「⑤真實利率」「（①⑤⑧⑨）」「被①往上推」這類指環的寫法不會被當成清單。
+      每個編號一條（li.ck-en，原編號字保留、不另加圓點）；最後一條收到它後面第一個句號為止。
+   ③ 段內沒有編號：超過約 60 字（去標籤、去空白計）就依「。」切句，一句一條；60 字以內維持一條。
+   ④ 切點只取括號外（「」『』（）()【】〔〕）、行內標籤外（<b>／<strong>／<i>…）的「。」——
+      括號裡的句號不切、標籤不會被切成兩半；句號剛好落在標籤結尾前（「…。</b>」）就切在結束標籤之後。
+   ⑤ 切出來的第一句當第一層圓點的字，其餘各句／各編號當第二層（ul.ck-ul2）——
+      跟報告 §00 ul.pd-ul「一句帶頭＋子條列」同一種寫法。
+   ⑥ 整個欄位只有一段、而且切不出第二條（短句）＝原字串照舊輸出，不包清單。
+   另一版鍊條圖若要同樣效果，照抄本函式＋CSS 那段 .ck-ul／.ck-ul2／.ck-en。 */
+var BL_OPEN="「『（(【〔", BL_CLOSE="」』）)】〕", BL_BND="：:；;。，,、>";
+function blVis(t){return String(t).replace(/<[^>]*>/g,"").replace(/\s/g,"");}
+function blScan(p){
+  /* 逐字走一次：記下句點切點（cuts）與編號候選（marks）；標籤整段跳過、只用來算標籤深度 */
+  var cuts=[], marks=[], bd=0, td=0, i=0, n=p.length, prev="";
+  while(i<n){
+    var ch=p.charAt(i);
+    if(ch==="<"){
+      var j=p.indexOf(">",i);
+      if(j>i){
+        var tg=p.slice(i,j+1), m=tg.match(/^<\s*(\/)?\s*([a-zA-Z][a-zA-Z0-9]*)/);
+        if(m&&!/^(br|wbr|img|hr)$/i.test(m[2])&&!/\/\s*>$/.test(tg)){ if(m[1])td=Math.max(0,td-1); else td++; }
+        if(m)prev=">";
+        i=j+1; continue;
+      }
+    }
+    if(bd===0&&td===0&&(prev===""||BL_BND.indexOf(prev)>=0)){
+      var rest=p.slice(i,i+6), mm;
+      var cc=ch.charCodeAt(0);
+      if(cc>=0x2460&&cc<=0x2473)marks.push({at:i,v:cc-0x245F,st:"c"});
+      else if((mm=rest.match(/^（(\d{1,2})）/)))marks.push({at:i,v:+mm[1],st:"f"});
+      else if((mm=rest.match(/^\((\d{1,2})\)/)))marks.push({at:i,v:+mm[1],st:"a"});
+      else if((mm=rest.match(/^(\d{1,2})[）)]/)))marks.push({at:i,v:+mm[1],st:"d"});
+    }
+    if(BL_OPEN.indexOf(ch)>=0)bd++;
+    else if(BL_CLOSE.indexOf(ch)>=0)bd=Math.max(0,bd-1);
+    else if(ch==="。"&&bd===0){
+      /* 句號後面緊跟的結束標籤一起吃掉，吃完標籤深度回到 0 才算切點 */
+      var k=i+1, d=td, mt;
+      while(d>0&&(mt=p.slice(k).match(/^<\s*\/[^>]*>/))){d--;k+=mt[0].length;}
+      if(d===0)cuts.push(k);
+    }
+    if(!/\s/.test(ch))prev=ch;
+    i++;
+  }
+  return {cuts:cuts,marks:marks};
+}
+function blRuns(marks){
+  /* 從 1 起連號、同一種寫法、至少兩個＝一組並列編號；中間夾的其他候選（指環用的⑤之類）略過 */
+  var runs=[], x=0;
+  while(x<marks.length){
+    if(marks[x].v!==1){x++;continue;}
+    var run=[marks[x]], y;
+    for(y=x+1;y<marks.length;y++){
+      if(marks[y].st===run[0].st&&marks[y].v===run.length+1)run.push(marks[y]);
+    }
+    if(run.length>=2){runs.push(run);
+      var last=run[run.length-1].at; x=0; while(x<marks.length&&marks[x].at<=last)x++;}
+    else x++;
+  }
+  return runs;
+}
+function blUnits(p){
+  var sc=blScan(p), runs=blRuns(sc.marks), U=[];
+  function pushSent(a,b){
+    var s=a;
+    sc.cuts.forEach(function(c){ if(c>a&&c<b){U.push({k:"s",t:p.slice(s,c)}); s=c;} });
+    U.push({k:"s",t:p.slice(s,b)});
+  }
+  if(!runs.length){
+    if(blVis(p).length<=60)return [{k:"s",t:p}];
+    pushSent(0,p.length);
+  }else{
+    var pos=0;
+    runs.forEach(function(run){
+      pushSent(pos,run[0].at);
+      run.forEach(function(mk,q){
+        var end;
+        if(q<run.length-1)end=run[q+1].at;
+        else{ end=p.length; for(var z=0;z<sc.cuts.length;z++){ if(sc.cuts[z]>mk.at){end=sc.cuts[z];break;} } }
+        U.push({k:"e",t:p.slice(mk.at,end)}); pos=end;
+      });
+    });
+    pushSent(pos,p.length);
+  }
+  /* 每條頭尾的空白與 <br> 拿掉（<br> 沒有字，留在條首只會多一行空白；⑨ caveat 的「<br><b>交叉驗證：</b>」就是這種） */
+  return U.map(function(u){return {k:u.k,t:u.t.replace(/^(?:\s|<br\s*\/?>)+|(?:\s|<br\s*\/?>)+$/gi,"")};})
+          .filter(function(u){return blVis(u.t).length>0;});
+}
+function bulletize(s){
+  s=String(s==null?"":s);
+  var paras=s.split(/\n[ \t　]*\n/).map(function(t){return t.replace(/^\s+|\s+$/g,"");})
+             .filter(function(t){return blVis(t).length>0;});
+  if(!paras.length)return s;
+  var P=paras.map(blUnits);
+  if(P.length===1&&P[0].length<=1)return s;
+  var h='<ul class="ck-ul">';
+  P.forEach(function(us){
+    var lead=(us[0]&&us[0].k==="s")?us.shift():null;
+    h+='<li'+(lead?'':' class="ck-nolead"')+'>'+(lead?lead.t:'');
+    if(us.length){
+      h+='<ul class="ck-ul2">';
+      us.forEach(function(u){h+='<li'+(u.k==="e"?' class="ck-en"':'')+'>'+u.t+'</li>';});
+      h+='</ul>';
+    }
+    h+='</li>';
+  });
+  return h+'</ul>';
+}
+
+/* ── 熱度算式（頁內自檢用的同一支）── */
+function calcHeat(L){
+  var p, h, side;
+  if(L.cold===null||L.cold===undefined){
+    p=Math.max(0,Math.min(1,(L.now-(L.safe||0))/(L.hot-(L.safe||0))));
+    h=Math.round(100*p); side=p>0.6?"過熱端":"均衡";
+  }else{
+    p=(L.now-L.cold)/(L.hot-L.cold); p=Math.max(0,Math.min(1,p));
+    h=Math.round(100*(1-2*Math.min(p,1-p)));
+    side=p<0.40?"失速端":(p>0.60?"過熱端":"均衡");
+  }
+  return {p:p,heat:h,side:side};
+}
+/* 步驟③ 熱度自檢閘門：逐筆重算並與資料寫死值比對，不符就頁首紅字 */
+function verifyHeat(loud){
+  var bad=[],rows=[];
+  LINKS.forEach(function(L){
+    var c=calcHeat(L), okv=(c.heat===L.heat&&c.side===L.side);
+    rows.push((okv?"✓":"✗")+" "+L.id+"  now="+L.now+" cold="+L.cold+" hot="+L.hot+
+              "  p="+c.p.toFixed(4)+"  heat="+c.heat+"/"+L.heat+"  side="+c.side+"/"+L.side);
+    if(!okv)bad.push(L.id+"（算得 "+c.heat+"／"+c.side+"，資料寫 "+L.heat+"／"+L.side+"）");
+  });
+  if(loud&&window.console&&console.log)console.log("[鍊條圖] 熱度自檢\n"+rows.join("\n"));
+  var box=document.getElementById("ck-fail");
+  if(bad.length){
+    box.style.display="block";
+    box.textContent="熱度自檢失敗（資料與算式對不上）："+bad.join("；");
+    if(window.console&&console.error)console.error("[鍊條圖] 熱度自檢失敗：",bad);
+  }else{ box.style.display="none"; }
+  return bad.length===0;
+}
+
+/* ── 轉向：只讀 transmit（傳導方向），禁止用 trend（熱度方向）推 ──
+   理由見檔首：heat↑ 是脆度上升，不是需求收縮；用 trend 推會把順轉算成逆轉。 */
+function spinOf(){
+  var lead=LINKS.filter(function(L){return L.lag==="領先";});
+  var f=0,r=0,s=0;
+  lead.forEach(function(L){
+    if(L.transmit==="順轉")f++; else if(L.transmit==="逆轉")r++; else s++;
+  });
+  var n=lead.length;
+  var v = (f>n/2)?"順轉" : (r>n/2)?"逆轉" : "打滑";
+  return {spin:v,fwd:f,rev:r,slip:s,n:n};
+}
+
+/* ── 幾何：三段寬度循環（9＝3×3 整除，無接縫衝突）；窄→中→寬 疊繪＝咬合 ── */
+function linkPath(w,a0,a1){
+  var rO=R+w, rI=R-w;
+  var p1=pol(a0,rO), p2=pol(a1,rO), p3=pol(a1,rI), p4=pol(a0,rI);
+  return "M"+p1.x.toFixed(2)+","+p1.y.toFixed(2)+
+     " A"+rO+","+rO+" 0 0 1 "+p2.x.toFixed(2)+","+p2.y.toFixed(2)+
+     " A"+w+","+w+" 0 0 1 "+p3.x.toFixed(2)+","+p3.y.toFixed(2)+
+     " A"+rI+","+rI+" 0 0 0 "+p4.x.toFixed(2)+","+p4.y.toFixed(2)+
+     " A"+w+","+w+" 0 0 1 "+p1.x.toFixed(2)+","+p1.y.toFixed(2)+" Z";
+}
+
+var segs=[], order=[];
+LINKS.forEach(function(L,i){order.push(i);});
+order.sort(function(a,b){return widthOf(b)-widthOf(a);});   // 寬的排後面＝後畫＝疊在上
+order.forEach(function(i){
+  var L=LINKS[i], ang=angOf(i), w=widthOf(i);
+  var d=linkPath(w,ang-HALF,ang+HALF);
+  var g=el("g",{"class":"ck-seg",tabindex:"0",role:"button","data-id":L.id,
+    "aria-label":L.idx+" "+L.name+"，熱度 "+L.heat+" 之 100，"+L.side+"，"+L.lag+"環"});
+  var inner=el("g",{"class":"ck-inner"});
+  var shadow=el("path",{d:d,fill:"none",stroke:"var(--ck-shadow,#000)","stroke-width":SW+8,"stroke-linejoin":"round"});
+  inner.appendChild(shadow);
+  var link=el("path",{"class":"ck-link",d:d,fill:"none","stroke-width":SW,
+    "stroke-linecap":"round","stroke-linejoin":"round",filter:"url(#ck-glow-s)"});
+  inner.appendChild(link); g.appendChild(inner);
+  var lay=(w===WS[2])?0:(w===WS[1]?1:2);
+  gLay[lay].appendChild(g);
+  segs.push({L:L,i:i,g:g,inner:inner,link:link,shadow:shadow,P:link.getTotalLength(),
+             mid:(HALF*2*Math.PI/180)*(R+w)/2,ang:ang,w:w});
+});
+segs.sort(function(a,b){return a.i-b.i;});
+
+/* 環外標籤：環名一行、時序 chip 一行（375px 時 chip 由 CSS 隱藏，收進面板） */
+segs.forEach(function(s){
+  var L=s.L, ang=s.ang, w=s.w;
+  var lp=pol(ang,R+w+30), c=Math.cos((ang-90)*Math.PI/180);
+  var anch=(Math.abs(c)<0.30)?"middle":(c>0?"start":"end");
+  var dy=(ang>140&&ang<220)?16:((ang<40||ang>320)?-8:4);
+  var dx=(anch==="start"?8:anch==="end"?-8:0);
+  var tx=el("text",{"class":"ck-lab",x:lp.x+dx,y:lp.y+dy,"text-anchor":anch});
+  tx.textContent=L.short; gLab.appendChild(tx);
+  var lg=el("text",{"class":"ck-lag",x:lp.x+dx,y:lp.y+dy+15,"text-anchor":anch});
+  lg.textContent=L.lag+"環"; gLab.appendChild(lg);
+
+  var np=pol(ang,R);
+  gLab.appendChild(el("circle",{cx:np.x,cy:np.y,r:11.5,fill:"#f5f5f7","pointer-events":"none"}));
+  var n=el("text",{"class":"ck-num",x:np.x,y:np.y+3.8,"text-anchor":"middle"});
+  n.textContent=L.idx; gLab.appendChild(n);
+
+  var hp=pol(ang,R-w-22);
+  var h=el("text",{"class":"ck-heat",id:"hv-"+L.id,x:hp.x,y:hp.y+4,"text-anchor":"middle"});
+  gLab.appendChild(h);
+});
+
+/* 兩個半圈的括號＋各自平均熱度（現算，不寫死） */
+function halfAvg(hf){
+  var v=LINKS.filter(function(L){return L.idx>=hf.from&&L.idx<=hf.to;});
+  var s=0;v.forEach(function(L){s+=L.heat;});return Math.round(s/v.length);
+}
+function halfMax(hf){
+  var v=LINKS.filter(function(L){return L.idx>=hf.from&&L.idx<=hf.to;});
+  var m=0;v.forEach(function(L){m=Math.max(m,L.heat);});return m;
+}
+/* 括號＋標籤。標籤一律**橫排**放在圖角空白處＋一條引線接回弧上：
+   沿弧排（textPath）會變直書、中文不好讀；放弧中點又會壓到那一格的環名（第一版壓到「訂單」）。
+   位置由資料的 halves[].label_at 給，換報告只改資料不動程式。*/
+(M.halves||[]).forEach(function(hf,k){
+  var a0=angOf(hf.from-1)-HALF, a1=angOf(hf.to-1)+HALF, rr=R+120;
+  var p0=pol(a0,rr), p1=pol(a1,rr);
+  var big=(((a1-a0)+360)%360>180)?1:0;
+  gDeco.appendChild(el("path",{d:"M"+p0.x.toFixed(1)+","+p0.y.toFixed(1)+" A"+rr+","+rr+" 0 "+big+" 1 "+p1.x.toFixed(1)+","+p1.y.toFixed(1),
+    fill:"none",stroke:"var(--border2)","stroke-width":1.4,"stroke-linecap":"round"}));
+  var la=hf.label_at||{x:pol((a0+a1)/2,rr+30).x,y:pol((a0+a1)/2,rr+30).y,ang:(a0+a1)/2};
+  var hook=pol(la.ang,rr);
+  gDeco.appendChild(el("path",{d:"M"+la.x.toFixed(1)+","+(la.y+(la.y<CY?10:-22)).toFixed(1)+" L"+hook.x.toFixed(1)+","+hook.y.toFixed(1),
+    stroke:"var(--border2)","stroke-width":1,"stroke-dasharray":"2 4",opacity:".8"}));
+  var t=el("text",{"class":"ck-brk",id:"ck-hf-"+k,x:la.x,y:la.y,"text-anchor":"middle"});
+  t.textContent=hf.label; gDeco.appendChild(t);
+  var t2=el("text",{"class":"ck-brk-v",id:"ck-hfv-"+k,x:la.x,y:la.y+16,"text-anchor":"middle"});
+  t2.textContent="離斷裂 平均 "+halfAvg(hf)+" · 最燙 "+halfMax(hf); gDeco.appendChild(t2);
+});
+
+/* ⑨→① 接縫＝迴圈閉合處（ROT 已把它轉到正上方；三段寬度循環讓九環無同寬相鄰，這裡是設計不是破圖）*/
+if(M.seam){
+  var sp=pol(0,R+58), sp2=pol(0,R+76);
+  gDeco.appendChild(el("path",{d:"M"+sp.x.toFixed(1)+","+(sp.y+8).toFixed(1)+" L"+sp.x.toFixed(1)+","+sp.y.toFixed(1),
+    stroke:"var(--text3)","stroke-width":1}));
+  var st=el("text",{"class":"ck-seam",x:sp2.x,y:sp2.y,"text-anchor":"middle"});
+  st.textContent=M.seam.label; gDeco.appendChild(st);
+}
+/* ⑤⑥ 註解線：相鄰卻一冷一熱的解釋。用「徑向引線＋圖外橫排文字」，
+   不沿弧排——弧上那一段正好是⑤的環名位置，第一版壓在一起。*/
+if(M.noteline){
+  var na=angOf(M.noteline.from-1), nb=angOf(M.noteline.to-1), mid=(na+nb)/2, nr=R+56;
+  var q0=pol(na,nr), q1=pol(nb,nr);
+  gDeco.appendChild(el("path",{d:"M"+q0.x.toFixed(1)+","+q0.y.toFixed(1)+" A"+nr+","+nr+" 0 0 1 "+q1.x.toFixed(1)+","+q1.y.toFixed(1),
+    fill:"none",stroke:"var(--accent2)","stroke-width":1.2,"stroke-dasharray":"3 4",opacity:".85"}));
+  var e0=pol(mid,nr), e1=pol(mid,R+150), qt=pol(mid,R+164);
+  gDeco.appendChild(el("path",{d:"M"+e0.x.toFixed(1)+","+e0.y.toFixed(1)+" L"+e1.x.toFixed(1)+","+e1.y.toFixed(1),
+    stroke:"var(--accent2)","stroke-width":1.1,"stroke-dasharray":"3 4",opacity:".85"}));
+  var nt=el("text",{"class":"ck-noteline",x:qt.x,y:qt.y+6,"text-anchor":"middle"});
+  gDeco.appendChild(nt);
+  /* 這句話有一百字上下，單行排會橫向衝出 viewBox（2026-09-22 改成兩欄版之後，
+     衝出去的那一截正好壓在右邊的面板上）。切成多行、**往上疊**——
+     最後一行留在原本的落點，圖下緣沒有多餘空間往下長。
+     每行字數與行高都從實際字級換算：字級是 CSS 控的（獨立頁 10.5、嵌入版放大），
+     寫死會在其中一邊破版。每行寬度上限 540 ＝ 留在 viewBox 940 中間、兩側各有餘裕。 */
+  var fs=parseFloat(getComputedStyle(nt).fontSize)||10.5, LH=Math.round(fs*1.35),
+      NW=Math.max(12,Math.floor(540/fs)), src=String(M.noteline.text), nlines=[];
+  while(src.length>NW){
+    var cut=NW, k=src.slice(0,NW).search(/[，。；：、）]([^，。；：、）]*)$/);
+    if(k>NW*0.55)cut=k+1;              /* 就近切在標點後面，切點太前面就照字數硬切 */
+    nlines.push(src.slice(0,cut)); src=src.slice(cut);
+  }
+  nlines.push(src);
+  nlines.forEach(function(ln,li){
+    var ts=el("tspan",{x:qt.x,dy:(li?LH:-(nlines.length-1)*LH)});
+    ts.textContent=ln; nt.appendChild(ts);
+  });
+}
+
+/* ── 熱度 → 視覺：顏色＋裂口＋咬合退開＋抖動（四件事一起動才看得出瀕臨斷裂）── */
+/* 跨環直咬（2026-09-12）：本期傳導不走主序的那幾條，用虛線畫在環內側；資料層 meta.cross */
+(function(){
+  var gX=document.getElementById("ck-cross"); if(!gX||!(M.cross||[]).length)return;
+  M.cross.forEach(function(c){
+    var a=-1,b=-1; LINKS.forEach(function(L,i){ if(L.id===c.from)a=i; if(L.id===c.to)b=i; });
+    if(a<0||b<0)return;
+    var rr=R-WS[0]-10, p=pol(angOf(a),rr), q=pol(angOf(b),rr);
+    var mx=(p.x+q.x)/2, my=(p.y+q.y)/2; mx=mx+(CX-mx)*0.45; my=my+(CY-my)*0.45;
+    gX.appendChild(el("path",{d:"M"+p.x.toFixed(1)+","+p.y.toFixed(1)+" Q"+mx.toFixed(1)+","+my.toFixed(1)+" "+q.x.toFixed(1)+","+q.y.toFixed(1),"class":"ck-cross"}));
+  });
+})();
+function srcCls(t){t=String(t||"");return t.indexOf("報告")===0?"rep":(t.indexOf("外部")===0?"ext":"own");}
+var broken={}, stress=1;
+function render(){
+  segs.forEach(function(s){
+    var h=Math.round(s.L.heat*stress);
+    if(broken[s.L.id])h=100;
+    var col=heatInk(h,"line"), tcol=heatInk(h,"text");
+    var half=HALF-(h/100)*8.5;                  // 咬合退開：愈燙愈縮短，接縫從緊咬變脫鉤
+    var d=linkPath(s.w,s.ang-half,s.ang+half);
+    s.link.setAttribute("d",d); s.shadow.setAttribute("d",d);
+    s.P=s.link.getTotalLength();
+    s.mid=(half*2*Math.PI/180)*(R+s.w)/2;
+    var gap=Math.max(0,(h-10)/90)*(s.w*5.0);    // 裂口：安全時幾乎閉合
+    if(broken[s.L.id])gap=s.w*5.8;
+    var off=s.P-s.mid-gap/2;
+    s.link.setAttribute("stroke",col);
+    s.link.setAttribute("stroke-dasharray",(s.P-gap).toFixed(1)+" "+gap.toFixed(1));
+    s.link.setAttribute("stroke-dashoffset",off.toFixed(1));
+    s.link.setAttribute("opacity", broken[s.L.id]?".45":"1");
+    s.inner.setAttribute("class","ck-inner"+((h>=80||broken[s.L.id])?" ck-shake":""));
+    var hv=document.getElementById("hv-"+s.L.id);
+    hv.textContent=h+" "+s.L.trend; hv.setAttribute("fill",tcol);
+  });
+  (M.halves||[]).forEach(function(hf,k){
+    var v=LINKS.filter(function(L){return L.idx>=hf.from&&L.idx<=hf.to;});
+    var s=0;v.forEach(function(L){s+=Math.round(L.heat*stress);});
+    var mx=0;v.forEach(function(L){mx=Math.max(mx,Math.round(L.heat*stress));});
+    document.getElementById("ck-hfv-"+k).textContent="離斷裂 平均 "+Math.round(s/v.length)+" · 最燙 "+mx;
+  });
+}
+
+/* ── 面板：總覽 ── */
+function bibar(L){
+  var c=calcHeat(L), one=(L.cold===null||L.cold===undefined);
+  var col=heatInk(L.heat,"line"), tcol=heatInk(L.heat,"text"), left=(c.p*100).toFixed(1);
+  var rev=(!one && (+L.cold > +L.hot));   // 反向刻度：往右數字變小（件數／利差／溢價愈小＝愈靠近過熱端）
+  return '<div class="ck-bibar'+(one?" one":"")+'">'+(one?"":'<u style="left:50%"></u>')+
+         '<i style="left:'+left+'%;background:'+col+'"'+hk(L.heat,"line")+'></i></div>'+
+         '<div class="ck-bibar-lab"><span>'+(one?"安全":"失速端")+'</span><span>'+(one?"":"最安全")+'</span><span>過熱端</span></div>'+
+         '<div class="ck-bibar-th"><span>'+(one?"":esc(L.cold)+esc(L.unit_short||""))+'</span>'+
+         '<span style="color:'+tcol+'"'+hk(L.heat,"text")+'>現在 '+esc(L.now)+esc(L.unit_short||"")+'</span>'+
+         '<span>'+esc(L.hot)+esc(L.unit_short||"")+'</span></div>'+
+         (rev?'<div class="ck-revnote">↔ 這條刻度往右數字變小：'+esc(L.scale_note||"讀數愈小＝愈靠近過熱端")+'</div>':"")+
+         (L.scale_unit?'<div class="ck-revnote">單位：'+esc(L.scale_unit)+'</div>':"");
+}
+/* 換內容時把右欄捲回頂端（見 openLink 結尾的說明） */
+function scrollPanelTop(){var p=document.querySelector(".ck-panel");if(p)p.scrollTop=0;}
+function overview(){
+  var sp=spinOf();
+  pEye.textContent=RINGW+"總覽 · 依鍊條順序 · 點任一環看細節";
+  var h='<div class="ck-p-h">'+esc(CEN.overview_h||"整條鍊現在的樣子")+'</div>'+
+    '<div class="ck-cen3">'+
+      '<div><b>位階</b>'+bulletize(CEN.phase)+'</div>'+
+      '<div><b>轉向</b>'+bulletize(CEN.spin_line)+'</div>'+
+      '<div><b>最接近斷裂</b>'+bulletize(CEN.weakest_line)+'</div>'+
+    '</div>'+
+    '<div class="ck-row-v sm" style="margin:10px 0 4px">'+bulletize(CEN.overview||"")+'</div>'+
+    '<div class="ck-half">';
+  (M.halves||[]).forEach(function(hf){
+    var a=halfAvg(hf), c=heatInk(a,"text");
+    h+='<div><b>'+esc(hf.short||hf.label)+'</b><s style="color:'+c+'"'+hk(a,"text")+'>'+a+'</s>'+
+       '<em>離斷裂的平均距離（不是動能強弱）· 最燙 '+halfMax(hf)+'</em></div>';
+  });
+  h+='</div><ul class="ck-list">';
+  LINKS.forEach(function(L){
+    var c=heatColor(L.heat), p=calcHeat(L).p*100;
+    h+='<li class="ck-li" data-go="'+L.id+'">'+
+       '<span class="ck-li-n" style="background:'+c+'">'+L.idx+'</span>'+
+       '<span class="ck-li-t">'+esc(L.name)+'</span>'+
+       '<span class="ck-li-g">'+esc(L.lag)+'</span>'+
+       '<span class="ck-li-b"><i style="left:'+p.toFixed(1)+'%;background:'+heatInk(L.heat,"line")+'"'+hk(L.heat,"line")+'></i></span>'+
+       '<span class="ck-li-v" style="color:'+heatInk(L.heat,"text")+'"'+hk(L.heat,"text")+'>'+L.heat+' '+L.trend+'</span></li>';
+  });
+  h+='</ul>';
+  h+='<div class="ck-feeds">'+bulletize(CEN.overview_foot||"")+'</div>';
+  panel.innerHTML=h;
+  panel.querySelectorAll("[data-go]").forEach(function(n){
+    n.addEventListener("click",function(){openLink(n.getAttribute("data-go"));});
+  });
+  segs.forEach(function(s){s.g.classList.remove("dim");});
+  scrollPanelTop();
+}
+
+function openLink(id){
+  var L=null,i;for(i=0;i<LINKS.length;i++)if(LINKS[i].id===id)L=LINKS[i];
+  if(!L)return;
+  var c=heatColor(L.heat), nx=null;
+  for(i=0;i<LINKS.length;i++)if(LINKS[i].id===L.feeds)nx=LINKS[i];
+  pEye.textContent="第 "+L.idx+" 環 · 按下方按鈕回總覽";
+  panel.innerHTML=
+   '<div class="ck-p-h">'+esc(L.name)+'<span class="ck-p-badge" style="background:'+c+'">'+L.heat+' '+L.trend+'</span>'+
+     '<span class="ck-chip">'+esc(L.lag)+'環</span><span class="ck-chip">'+esc(L.side)+'</span>'+
+     '<span class="ck-chip">傳導 '+esc(L.transmit)+'</span></div>'+
+   (L.caveat?'<div class="ck-caveat">'+bulletize(L.caveat)+'</div>':"")+
+   bibar(L)+
+   '<div class="ck-row"><div class="ck-row-k">主指標與現值</div><div class="ck-row-v sm"><b>'+esc(L.primary_metric)+'</b>＝'+esc(L.now)+' '+esc(L.unit)+'</div></div>'+
+   '<div class="ck-row"><div class="ck-row-k">當期讀數</div><div class="ck-row-v sm">'+bulletize(L.reading)+'</div></div>'+
+   /* 熱度算式與門檻出處不上版（2026-09-04 Yoda 定：面板留判讀，不放推導過程）。
+      兩個欄位仍留在資料層當出處，交付前由 Python verify() 與頁內 verifyHeat() 逐環重算把關。
+      長文欄位一律過 bulletize()（2026-09-27 Yoda：分段條列才好讀；字不改，只包清單） */
+   '<div class="ck-row"><div class="ck-row-k">在鍊條上做什麼</div><div class="ck-row-v sm">'+bulletize(L.mechanism)+'</div></div>'+
+   '<div class="ck-row"><div class="ck-row-k">過熱端怎麼斷</div><div class="ck-row-v sm ck-bad">'+bulletize(L.break_hot)+'</div></div>'+
+   '<div class="ck-row"><div class="ck-row-k">失速端怎麼斷</div><div class="ck-row-v sm ck-bad">'+bulletize(L.break_cold)+'</div></div>'+
+   (L.src_tag?'<div class="ck-row"><div class="ck-row-k">門檻出處</div><div class="ck-row-v sm"><span class="ck-src '+srcCls(L.src_tag)+'"></span>'+esc(L.src_tag)+'</div></div>':'')+
+   '<div class="ck-row"><div class="ck-row-k">✓ 什麼出現代表轉好</div><div class="ck-row-v sm ck-ok">'+bulletize(L.ok)+'</div></div>'+
+   '<div class="ck-row"><div class="ck-row-k">✗ 什麼出現代表更靠近斷裂</div><div class="ck-row-v sm ck-bad">'+bulletize(L.bad)+'</div></div>'+
+   '<div class="ck-row"><div class="ck-row-k">熱度為什麼是 '+esc(L.trend)+'</div><div class="ck-row-v sm">'+bulletize(L.trend_why)+'</div></div>'+
+   '<div class="ck-row"><div class="ck-row-k">為什麼是'+esc(L.lag)+'環</div><div class="ck-row-v sm">'+bulletize(L.lead_why)+'</div></div>'+
+   '<div class="ck-row"><div class="ck-row-k">歷史上這一環怎麼斷</div><div class="ck-y2k">'+bulletize(L.history)+'</div></div>'+
+   '<div class="ck-feeds">它一停，下一個接不到東西的是：<b>'+(nx?nx.name:"—")+'</b>'+
+     /* 傳導說明變成條列時改用 div 包（<ul> 不放進 <span>）；分隔「　·　」只在同一行（span）時才放——
+        條列時它會落在行尾變殘留（2026-09-27 第十八輪補，Yoda） */
+     (function(tw){return tw.indexOf('<ul')===0?'<div style="color:var(--text3);margin-top:5px">'+tw+'</div>'
+                                              :'　·　<span style="color:var(--text3)">'+tw+'</span>';})(bulletize(L.transmit_why||""))+
+   '</div>'+
+   '<div style="margin-top:14px"><button class="ck-btn" id="ck-back">← 回'+RINGW+'總覽</button></div>';
+  document.getElementById("ck-back").addEventListener("click",overview);
+  segs.forEach(function(s){
+    var on=(s.L.id===L.id||s.L.id===L.feeds);
+    s.g.classList.toggle("dim",!on);
+  });
+  /* 真正會捲的是外面那個 <aside class="ck-panel">（嵌入版 2026-09-22 起釘高度＋內捲），
+     panel 本身是裡面的 #ck-p-body、永遠 scrollTop 0——捲錯對象＝點下一環還停在上一環的捲動位置。*/
+  panel.scrollTop=0; scrollPanelTop();
+}
+
+segs.forEach(function(s){
+  s.g.addEventListener("click",function(){openLink(s.L.id);});
+  s.g.addEventListener("keydown",function(e){
+    if(e.key==="Enter"||e.key===" "){e.preventDefault();openLink(s.L.id);}
+  });
+});
+
+/* 開牌表在鍊條圖外面（§00 最下面），點某一列展開對應的環 */
+[].forEach.call(document.querySelectorAll('.ck-cardtbl tr[data-go]'),function(n){
+  n.addEventListener('click',function(){openLink(n.getAttribute('data-go'));
+    document.querySelector('.ck-panel').scrollIntoView({block:'nearest'});});
+});
+
+/* ── 轉向指示器：順轉／逆轉／打滑（常駐狀態，不是按鈕）── */
+function applySpin(){
+  var sp=spinOf();
+  var dur={"強":"1.6s","中":"2.4s","弱":"3.6s"}[CEN.speed]||"2.4s";
+  flow.style.setProperty("--spin-dur",dur);
+  flow.setAttribute("class", sp.spin==="順轉"?"ck-spin-fwd":(sp.spin==="逆轉"?"ck-spin-rev":"ck-spin-slip"));
+  document.getElementById("ck-spin-v").textContent=sp.spin;
+  document.getElementById("ck-spin-s").textContent="轉速 "+(CEN.speed||"中")+" · 領先環 順轉"+sp.fwd+" 逆轉"+sp.rev+" 減速"+sp.slip;
+  return sp;
+}
+
+/* ── 播放：穩定 → 現在 ── */
+var raf=null;
+function animateStress(from,to,ms,done){
+  if(raf)cancelAnimationFrame(raf);
+  var t0=null;
+  function step(ts){
+    if(t0===null)t0=ts;
+    var k=Math.min(1,(ts-t0)/ms), e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;
+    stress=from+(to-from)*e;
+    range.value=Math.round(stress*100);
+    setStage(); render();
+    if(k<1)raf=requestAnimationFrame(step); else if(done)done();
+  }
+  raf=requestAnimationFrame(step);
+}
+function setStage(){
+  var p=Math.round(stress*100), txt;
+  if(p<=5)txt="示意：全環閉合";
+  else if(p<40)txt="示意：壓力累積中";
+  else if(p<75)txt="示意：接縫開始張開";
+  else if(p<100)txt="示意：煞車半圈繃緊";
+  else txt="現在 · "+(M.date||"");
+  stage.textContent=txt+(p<100?" · "+p+"%":"");
+}
+document.getElementById("ck-play").addEventListener("click",function(){
+  broken={}; overview(); stress=0; render(); setStage();
+  setTimeout(function(){animateStress(0,1,4200);},220);
+});
+range.addEventListener("input",function(){
+  if(raf)cancelAnimationFrame(raf);
+  broken={}; stress=(+range.value)/100; setStage(); render();
+});
+
+/* ── 衰退模擬：點按鈕→彈出選單→選好才跑；跑的時候故事欄在環的右邊並排 ──
+   （Yoda 2026-09-04）選單用 fixed overlay 掛在 <body>：嵌進報告時右側面板被排到環的下面，
+   把選單畫進面板等於在畫面外變動，使用者會以為沒反應。
+   模擬期間 .ck-main 加 .ck-sim 切成兩欄，讓環與故事同時在畫面上。 */
+var casTimer=[], curScen=(M.scenario_default||(SCEN[0]&&SCEN[0].id));
+var mainEl=document.querySelector(".ck-main");
+function scenOf(id){for(var i=0;i<SCEN.length;i++)if(SCEN[i].id===id)return SCEN[i];return SCEN[0];}
+function heatOfRing(sc){
+  var n=String(sc.from).replace(/[^0-9]/g,"");
+  var L=LINKS.filter(function(x){return String(x.idx)===n||sc.from.indexOf(x.short)>-1;})[0];
+  return L?L.heat:null;
+}
+function onEsc(e){ if(e.key==="Escape")endSim(); }
+function killModal(){ var m=document.getElementById("ck-modal"); if(m)m.remove(); }
+function endSim(){
+  casTimer.forEach(clearTimeout); casTimer=[];
+  killModal();
+  if(mainEl)mainEl.classList.remove("ck-sim");
+  broken={}; render();
+  segs.forEach(function(s){s.g.classList.remove("dim");});
+  document.removeEventListener("keydown",onEsc);
+  overview();
+}
+
+/* ① 彈出選單 */
+function chooser(){
+  casTimer.forEach(clearTimeout); casTimer=[]; killModal();
+  var m=document.createElement("div");
+  m.id="ck-modal"; m.className="ck-modal";
+  var h='<div class="ck-modal-box" role="dialog" aria-modal="true" aria-label="選擇模擬的起火點">'+
+        '<div class="ck-modal-h">'+esc(M.cascade_h||"從哪裡開始出問題？")+'</div>'+
+        '<div class="ck-modal-sub">'+(M.cascade_sub||"")+'</div><div class="ck-scen">';
+  SCEN.forEach(function(sc){
+    var hv=heatOfRing(sc);
+    h+='<label class="ck-scen-o'+(sc.id===curScen?" on":"")+'" data-scen="'+sc.id+'">'+
+       '<input type="radio" name="ck-scen" value="'+sc.id+'"'+(sc.id===curScen?' checked':'')+'>'+
+       '<span><b>'+esc(sc.label)+'</b>'+
+       '<i>起火點：'+esc(sc.from)+(hv!==null?'（熱度 '+hv+'）':'')+'　·　'+esc(sc.sub)+
+       (sc.plausibility?'<b class="ck-scen-p">現在多接近：</b>'+esc(sc.plausibility):'')+'</i></span></label>';
+  });
+  h+='</div><div class="ck-modal-act">'+
+     '<button class="ck-btn ck-alert" id="ck-run">▶ 開始模擬</button>'+
+     '<button class="ck-btn" id="ck-cancel">取消</button></div></div>';
+  m.innerHTML=h;
+  document.body.appendChild(m);
+  m.querySelectorAll("[data-scen]").forEach(function(n){
+    n.addEventListener("click",function(){
+      curScen=n.getAttribute("data-scen");
+      m.querySelectorAll("[data-scen]").forEach(function(x){x.classList.toggle("on",x===n);});
+    });
+  });
+  m.addEventListener("click",function(e){ if(e.target===m){killModal();} });
+  document.getElementById("ck-cancel").addEventListener("click",killModal);
+  document.getElementById("ck-run").addEventListener("click",function(){runScen(curScen);});
+  document.addEventListener("keydown",onEsc);
+  var f=document.getElementById("ck-run"); if(f)f.focus();
+}
+
+/* ② 開始模擬：關掉彈窗、切成兩欄（環左／故事右）、一步一步演並說故事 */
+function runScen(id){
+  var sc=scenOf(id);
+  killModal();
+  casTimer.forEach(clearTimeout); casTimer=[];
+  broken={}; stress=1; range.value=100; render(); setStage();
+  segs.forEach(function(s){s.g.classList.remove("dim");});
+  if(mainEl)mainEl.classList.add("ck-sim");
+  pEye.textContent=SIMW+" · 起火點："+sc.from;
+  panel.innerHTML=
+    '<div class="ck-p-h">'+esc(sc.label)+'</div>'+
+    '<div class="ck-sb-sub">起火點 <b style="color:var(--danger)">'+esc(sc.from)+'</b>　·　'+esc(sc.sub)+'</div>'+
+    (sc.detail?'<div class="ck-sb-det">'+esc(sc.detail)+'</div>':'')+
+    '<div class="ck-story-wrap" id="ck-story"></div>'+
+    (sc.off_ramp?'<div class="ck-sb-off"><b>什麼出現代表這條路沒走成：</b>'+esc(sc.off_ramp)+'</div>':'')+
+    '<div class="ck-sb-foot">這是條件推演，不是預測——每一步都對得上一張會開的牌。</div>'+
+    '<div class="ck-sb-act"><button class="ck-btn" id="ck-again">← 換一條起火點</button>'+
+    '<button class="ck-btn" id="ck-done">結束模擬</button></div>';
+  document.getElementById("ck-again").addEventListener("click",chooser);
+  document.getElementById("ck-done").addEventListener("click",endSim);
+  document.addEventListener("keydown",onEsc);
+  try{ mainEl.scrollIntoView({block:"start",behavior:"auto"}); }catch(e){}
+  var box=document.getElementById("ck-story");
+  sc.steps.forEach(function(st,i){
+    casTimer.push(setTimeout(function(){
+      st.ids.forEach(function(x){broken[x]=1;});
+      render();
+      var L=LINKS.filter(function(x){return x.id===st.ids[0];})[0];
+      var div=document.createElement("div");
+      div.className="ck-story";
+      div.innerHTML='<span class="ck-story-n">'+(i+1)+'</span><div>'+
+        '<div class="ck-story-t">'+esc(st.t)+'</div>'+
+        '<div class="ck-story-s">'+esc(st.story)+'</div>'+
+        '<div class="ck-story-c">開牌：'+esc(st.card)+'</div></div>';
+      box.appendChild(div);
+      /* 自動捲到最新一步：模擬時真正的捲動容器是 .ck-panel（.ck-sim 給它 overflow:auto），
+         不是 #ck-p-body，所以捲錯對象會完全沒有作用（Yoda 2026-09-04 指出）。*/
+      /* 最新一步要整個看得到（等同 block:"nearest"）：只在 .ck-panel 裡算位移、只設 scrollTop。
+         不叫 div 自己捲進畫面（block:"nearest" 那支 API）——它會連外層整頁一起捲（§B-42a ⑥；第五十三輪實測 Yoda 2026-10-03）。*/
+      var sc=document.querySelector(".ck-panel");
+      if(sc&&sc.scrollHeight>sc.clientHeight){
+        sc.scrollTop=sc.scrollHeight;
+        var pr=sc.getBoundingClientRect(), dr=div.getBoundingClientRect(), pT=pr.top+sc.clientTop, pB=pT+sc.clientHeight;
+        if(dr.top<pT){ sc.scrollTop-=pT-dr.top; }
+        else if(dr.bottom>pB){ sc.scrollTop+=Math.min(dr.bottom-pB,dr.top-pT); }
+      }
+      if(L){segs.forEach(function(s){s.g.classList.toggle("dim",s.L.id!==L.id&&!broken[s.L.id]);});}
+    },i*2100));
+  });
+  casTimer.push(setTimeout(function(){
+    segs.forEach(function(s){s.g.classList.remove("dim");});
+  },sc.steps.length*2100));
+}
+document.getElementById("ck-cascade").addEventListener("click",chooser);
+
+/* ── 動畫開關（資訊不得只靠動畫存在：轉向另有文字與靜態箭頭）── */
+var motionOn=true, btnM=document.getElementById("ck-motion");
+btnM.addEventListener("click",function(){
+  motionOn=!motionOn;
+  document.body.classList.toggle("ck-paused",!motionOn);
+  btnM.classList.toggle("on",motionOn);
+  btnM.textContent="動畫："+(motionOn?"開":"關");
+});
+if(window.matchMedia&&window.matchMedia("(prefers-reduced-motion:reduce)").matches){
+  motionOn=false;document.body.classList.add("ck-paused");
+  btnM.classList.remove("on");btnM.textContent="動畫：關";
+}
+
+/* ── 深／淺切換時重上色（2026-09-28 第二十五輪）──
+   環身、環上熱度數字、面板熱度字是畫的當下由 heatInk() 算的，報告切主題不會自己變。
+   看 <html data-theme>：深↔淺真的換了才動——環重跑 render()；面板只把帶 data-hk 的那幾格換色（不重畫內容、捲動位置不動）。
+   「真的換了」才動：報告載入時母板會再 setAttribute 一次同樣的 "dark"，那一下不能重畫——
+   render() 在頁面剛載入時與之後各跑一次，九環環身的裂口虛線長度會差一點（引擎原本就這樣，拉滑桿也會），
+   多跑那一次深色主題就會跟改版前差幾個像素。獨立頁沒有主題切換，這段不會觸發。 */
+var inkLight=isLightTheme();
+if(window.MutationObserver){
+  new MutationObserver(function(){
+    var lt=isLightTheme(); if(lt===inkLight)return; inkLight=lt;
+    render();
+    [].forEach.call(panel.querySelectorAll("[data-hk]"),function(n){
+      var kd=n.getAttribute("data-hk"), c=heatInk(+n.getAttribute("data-h"),kd);
+      if(kd==="line")n.style.background=c; else n.style.color=c;
+    });
+  }).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+}
+
+/* ══ 自旋＋斷鍊甩飛（2026-10-02 Yoda）══════════════════════════════
+   只有總經九環（meta.type＝md）輸出這段；黃金七環用同一支引擎，build() 不插這段。
+   ① 自旋：會轉的幾何（環身、跨環虛線、流向虛圈、半圈括號弧、⑤⑥ 註解弧）包在 #ck-rot，以環心為軸 60 秒一圈；
+      方向跟轉向走（順轉＝順時針＝①→②→③ 的方向；逆轉才反過來）。
+      環上的字（環名＋時序、環號、熱度數字、「斷裂」）不轉：每一格自己算位置＝環心沿「現在轉到的角度」推出去，
+      離環的距離用字框在徑向的投影現算（字框橫躺在側邊時推遠一點），環寬取自己與左右鄰環最寬的那一環，
+      轉到哪裡都正立、都不壓到環身。字帶一圈底色描邊：轉過固定註解字的時候，兩邊都還讀得到。
+      註解的字（半圈括號標籤、迴圈閉合處、⑤⑥ 註解）固定在原位；引線一端釘在字、另一端追著轉動中的目標點，
+      目標轉離超過 60° 開始淡、110° 淡完（字一直都在，資訊不靠引線）。
+      暫停＝滑鼠在圖上、鍵盤焦點在環上、點開某一環的面板、鍊條斷了；不跑＝系統要求減少動態、「動畫：關」、
+      圖不在畫面上（IntersectionObserver）、分頁隱藏。暫停再走從原角度接著轉。
+      只用 requestAnimationFrame 改 transform 屬性（最多每秒 30 次），迴圈裡不讀任何版面數值＝不會強迫重排；
+      字框大小只在開機、恢復轉動、斷裂／復原、視窗縮放那幾個時間點量一次。
+   ② 斷鍊甩飛：模擬每一步照原本的邏輯把那一環標進 broken，那一刻那一環從中間裂成兩半——
+      兩半各自沿切線往反方向彈開（像繃緊的鍊子斷掉往回甩）、帶一點向外的離心速度，同時自轉、受重力、1.5 秒淡出；
+      斷口另噴四片小碎片（方向寫死、不用亂數，每次看到的一樣）。原位就是空缺（第三十九輪起不留紅色虛線斷口），
+      只留「斷裂」兩個字（減少動態的讀者靠它知道斷在哪），整條鍊停轉。
+      已斷的段在後續推演步驟都不補回：只要 broken 還標著，每次 render() 之後都把那一段整段藏起來（visibility hidden）。
+      減少動態或「動畫：關」＝不甩飛，該段直接隱藏＋「斷裂」字。
+      重設（結束模擬、重新跑、▶ 情境鈕、拉情境強度，都是把 broken 清空再 render）＝碎片消失、鍊條復原、自旋恢復。 */
+var SPIN={theta:0,total:0,dir:(spinOf().spin==="逆轉"?-1:1),raf:null,last:null,frames:0,
+          hover:false,focus:false,panel:false,broken:false,inView:true,
+          RATE:360/60000,MIN_DT:29,LAB_GAP:14,HEAT_GAP:12};
+var FL={DUR:1500,SH_DUR:1200,VT:230,VR:150,G:480,OM:260,SH_V:300,SH_OM:520,FADE_AT:0.4,CUT_IN:250,CUT_FADE:550};
+var CUT={HB:HALF-8.5};
+var gRot=document.getElementById("ck-rot"), gFix=document.getElementById("ck-fix"),
+    gFrag=document.getElementById("ck-frags"), ringHost=svg.parentNode;
+var RMQ=window.matchMedia?window.matchMedia("(prefers-reduced-motion:reduce)"):null;
+function spinReduced(){return !!(RMQ&&RMQ.matches);}
+function motionAllowed(){return motionOn&&!spinReduced();}
+function f2(p){return p.x.toFixed(2)+","+p.y.toFixed(2);}
+function angAt(x,y){return Math.atan2(y-CY,x-CX)*180/Math.PI+90;}
+function angDist(a,b){var d=((a-b)%360+360)%360;return d>180?360-d:d;}
+function rotPt(p,t){var r=t*Math.PI/180,c=Math.cos(r),s=Math.sin(r),dx=p.x-CX,dy=p.y-CY;
+  return {x:CX+dx*c-dy*s,y:CY+dx*s+dy*c};}
+function radExt(hw,hh,phi){var r=(phi-90)*Math.PI/180;return Math.abs(Math.cos(r))*hw+Math.abs(Math.sin(r))*hh;}
+/* 半個環節（開口的 C 形）：side=-1＝左半、斷口在 a1；side=1＝右半、斷口在 a0。弧的走向跟 linkPath() 同一套 */
+function cPath(w,a0,a1,side){
+  var rO=R+w, rI=R-w;
+  if(side<0)return "M"+f2(pol(a1,rO))+" A"+rO+","+rO+" 0 0 0 "+f2(pol(a0,rO))+
+                   " A"+w+","+w+" 0 0 0 "+f2(pol(a0,rI))+" A"+rI+","+rI+" 0 0 1 "+f2(pol(a1,rI));
+  return "M"+f2(pol(a0,rO))+" A"+rO+","+rO+" 0 0 1 "+f2(pol(a1,rO))+
+         " A"+w+","+w+" 0 0 1 "+f2(pol(a1,rI))+" A"+rI+","+rI+" 0 0 0 "+f2(pol(a0,rI));
+}
+
+/* ── 註解層分家：弧留在 #ck-deco（在 #ck-rot 裡＝跟著轉），字與引線搬到 #ck-fix（不轉）── */
+var LEADS=[];
+[].slice.call(gDeco.childNodes).forEach(function(n){
+  if(n.nodeType!==1)return;
+  if(n.nodeName.toLowerCase()==="text"){gFix.appendChild(n);return;}
+  var mm=String(n.getAttribute("d")||"").match(/^M(-?[\d.]+),(-?[\d.]+) L(-?[\d.]+),(-?[\d.]+)$/);
+  if(!mm)return;
+  var a={x:+mm[1],y:+mm[2]}, b={x:+mm[3],y:+mm[4]},
+      af=Math.hypot(a.x-CX,a.y-CY)>=Math.hypot(b.x-CX,b.y-CY);
+  var fx=af?a:b, tg=af?b:a;
+  LEADS.push({el:n,fix:fx,tgt:tg,fixFirst:af,op:n.hasAttribute("opacity")?+n.getAttribute("opacity"):1,
+              fang:angAt(fx.x,fx.y),cur:null});
+  gFix.insertBefore(n,gFix.firstChild);
+});
+
+/* ── 環上的字：每一環三組（環名＋時序／環號圓／熱度數字），各自包一層 g 元素用 translate 定位、永遠不轉 ── */
+var UP=[];
+(function(){
+  var qLab=gLab.querySelectorAll(".ck-lab"), qLag=gLab.querySelectorAll(".ck-lag"),
+      qCir=gLab.querySelectorAll("circle"), qNum=gLab.querySelectorAll(".ck-num");
+  function wrap(s,kind,kids){
+    var g=el("g",{"class":"ck-up"}), gi=el("g",{});
+    kids.forEach(function(c){gi.appendChild(c);});
+    g.appendChild(gi); gLab.appendChild(g);
+    var o={g:g,gi:gi,s:s,kind:kind,kids:kids,hw:0,hh:0,ok:false}; UP.push(o); return o;
+  }
+  segs.forEach(function(s,k){
+    var tx=qLab[k], lg=qLag[k], ci=qCir[k], nu=qNum[k], hv=document.getElementById("hv-"+s.L.id);
+    s.wmax=Math.max(widthOf(s.i),widthOf((s.i+N-1)%N),widthOf((s.i+1)%N));   /* 鄰環端蓋會伸進來：用三環裡最寬的 */
+    tx.setAttribute("x",0); tx.setAttribute("y",0); tx.setAttribute("text-anchor","middle");
+    lg.setAttribute("x",0); lg.setAttribute("y",15); lg.setAttribute("text-anchor","middle");
+    wrap(s,"lab",[tx,lg]);
+    ci.setAttribute("cx",0); ci.setAttribute("cy",0);
+    nu.setAttribute("x",0); nu.setAttribute("y",3.8);
+    wrap(s,"num",[ci,nu]);
+    hv.setAttribute("x",0); hv.setAttribute("y",4);
+    s.upHeat=wrap(s,"heat",[hv]);
+  });
+})();
+/* 量字框（會讀版面，所以只在開機／恢復轉動／斷裂與復原／視窗縮放時呼叫，轉動迴圈裡不呼叫） */
+function measureUp(){
+  UP.forEach(function(o){
+    if(o.kind==="num"){o.hw=o.hh=12;o.ok=true;return;}
+    var bb=null; try{bb=o.gi.getBBox();}catch(e){bb=null;}
+    if(bb&&bb.width>0&&bb.height>0){
+      o.gi.setAttribute("transform","translate("+(-(bb.x+bb.width/2)).toFixed(2)+","+(-(bb.y+bb.height/2)).toFixed(2)+")");
+      o.hw=bb.width/2; o.hh=bb.height/2; o.ok=true;
+    }else{
+      /* 圖還沒排版（容器被收合）：字數×字級先估，看得到時再量 */
+      var fs=parseFloat(getComputedStyle(o.kids[0]).fontSize)||13, n=0;
+      o.kids.forEach(function(t){n=Math.max(n,String(t.textContent).length);});
+      o.hw=n*fs*0.5; o.hh=(o.kind==="lab")?(fs+8):(fs*0.6); o.ok=false;
+    }
+  });
+}
+function layoutSpin(t){
+  gRot.setAttribute("transform","rotate("+t.toFixed(3)+" "+CX+" "+CY+")");
+  UP.forEach(function(o){
+    var phi=o.s.ang+t, rr;
+    if(o.kind==="lab")rr=R+o.s.wmax+SPIN.LAB_GAP+radExt(o.hw,o.hh,phi);
+    else if(o.kind==="heat")rr=R-o.s.wmax-SPIN.HEAT_GAP-radExt(o.hw,o.hh,phi);
+    else rr=R;
+    o.g.setAttribute("transform","translate("+f2(pol(phi,rr))+")");
+  });
+  LEADS.forEach(function(o){
+    var T=rotPt(o.tgt,t), d=angDist(angAt(T.x,T.y),o.fang), a=o.fixFirst?o.fix:T, b=o.fixFirst?T:o.fix;
+    o.el.setAttribute("d","M"+a.x.toFixed(1)+","+a.y.toFixed(1)+" L"+b.x.toFixed(1)+","+b.y.toFixed(1));
+    var op=o.op*Math.max(0,Math.min(1,(110-d)/50)), s=(op>=o.op)?String(o.op):op.toFixed(3);
+    if(s!==o.cur){o.el.setAttribute("opacity",s);o.cur=s;}
+  });
+}
+
+/* ── 轉動迴圈 ── */
+function spinCan(){return motionAllowed()&&!SPIN.hover&&!SPIN.focus&&!SPIN.panel&&!SPIN.broken&&SPIN.inView&&!document.hidden;}
+function spinTick(ts){
+  SPIN.raf=null;
+  if(!spinCan()){SPIN.last=null;return;}
+  if(SPIN.last===null)SPIN.last=ts;
+  else if(ts-SPIN.last>=SPIN.MIN_DT){
+    var dd=SPIN.dir*(ts-SPIN.last)*SPIN.RATE;
+    SPIN.total+=dd; SPIN.theta=((SPIN.theta+dd)%360+360)%360; SPIN.last=ts;
+    layoutSpin(SPIN.theta); SPIN.frames++;
+  }
+  SPIN.raf=requestAnimationFrame(spinTick);
+}
+function spinSync(){
+  var go=spinCan();
+  if(go&&!SPIN.raf){SPIN.last=null;measureUp();layoutSpin(SPIN.theta);SPIN.raf=requestAnimationFrame(spinTick);}
+  else if(!go&&SPIN.raf){cancelAnimationFrame(SPIN.raf);SPIN.raf=null;SPIN.last=null;}
+}
+ringHost.addEventListener("pointerenter",function(){SPIN.hover=true;spinSync();});
+ringHost.addEventListener("pointerleave",function(){SPIN.hover=false;spinSync();});
+svg.addEventListener("focusin",function(){SPIN.focus=true;spinSync();});
+svg.addEventListener("focusout",function(e){if(!e.relatedTarget||!svg.contains(e.relatedTarget)){SPIN.focus=false;spinSync();}});
+document.addEventListener("visibilitychange",spinSync);
+if(window.IntersectionObserver){
+  new IntersectionObserver(function(es){
+    es.forEach(function(e){SPIN.inView=e.isIntersecting;});
+    if(SPIN.inView&&UP.some(function(o){return !o.ok;})){measureUp();layoutSpin(SPIN.theta);}
+    spinSync();
+  }).observe(ringHost);
+}
+btnM.addEventListener("click",function(){spinSync();if(!motionAllowed())fragTick(performance.now());});
+if(RMQ){var onRM=function(){spinSync();if(!motionAllowed())fragTick(performance.now());};
+  if(RMQ.addEventListener)RMQ.addEventListener("change",onRM); else if(RMQ.addListener)RMQ.addListener(onRM);}
+
+/* 點開某一環的面板＝暫停；回總覽＝放開（包住原本的 openLink／overview，原本的行為一行不改） */
+var _ckOpen=openLink;
+openLink=function(id){
+  _ckOpen(id);
+  if(LINKS.some(function(L){return L.id===id;})){SPIN.panel=true;spinSync();}
+};
+var _ckOverview=overview;
+overview=function(){_ckOverview();SPIN.panel=false;spinSync();};
+
+/* ── 斷鍊：每次 render() 之後看 broken 有沒有新斷／復原的環 ── */
+var FR={list:[],raf:null};
+var _ckRender=render;
+render=function(){_ckRender();cutSync();};
+function cutSync(){
+  var any=false;
+  segs.forEach(function(s){
+    if(broken[s.L.id]){
+      any=true;
+      if(!s.cut)cutOpen(s);
+      /* 斷掉的那一段整段藏起來：原位就是空缺（第三十九輪）。每次 render() 之後都再藏一次，
+         render() 把環身的透明度改回 .45 也好、換主題重畫也好，已斷的段都不會補回來 */
+      s.link.setAttribute("opacity","0"); s.shadow.setAttribute("opacity","0");
+      s.inner.setAttribute("visibility","hidden");
+    }else if(s.cut)cutClose(s);
+  });
+  if(any!==SPIN.broken){SPIN.broken=any;spinSync();}
+}
+function cutOpen(s){
+  var hv=s.upHeat.kids[0], fs=parseFloat(getComputedStyle(hv).fontSize)||12.5;
+  var tag=el("text",{"class":"ck-cut-t","text-anchor":"middle",x:0,y:(4+fs*1.25).toFixed(1)});
+  tag.textContent="斷裂";
+  s.upHeat.gi.appendChild(tag); s.upHeat.kids.push(tag);   /* 熱度數字底下多一行，整組一起定位 */
+  svg.insertBefore(s.upHeat.g,gFrag);   /* 斷了的那一組搬到圓心字上面：圓心最下面那行很寬，轉到側邊會被它蓋住 */
+  s.cut={tag:tag,fadeT0:null};
+  measureUp(); layoutSpin(SPIN.theta);
+  if(motionAllowed()&&!document.hidden){
+    tag.setAttribute("opacity","0");
+    s.cut.fadeT0=performance.now(); fling(s);
+  }
+}
+function cutClose(s){
+  var c=s.cut; s.cut=null;
+  if(c.tag.parentNode)c.tag.parentNode.removeChild(c.tag);
+  s.upHeat.kids=s.upHeat.kids.filter(function(k){return k!==c.tag;});
+  gLab.appendChild(s.upHeat.g);
+  FR.list=FR.list.filter(function(o){if(o.s===s){if(o.g.parentNode)o.g.parentNode.removeChild(o.g);return false;}return true;});
+  s.shadow.removeAttribute("opacity"); s.inner.removeAttribute("visibility");
+  measureUp(); layoutSpin(SPIN.theta);
+}
+function fling(s){
+  var t0=performance.now(), a=s.ang+SPIN.theta, w=s.w;
+  [{a0:a-CUT.HB,a1:a,side:-1},{a0:a,a1:a+CUT.HB,side:1}].forEach(function(h){
+    var g=el("g",{"class":"ck-frag"});
+    g.appendChild(el("path",{d:cPath(w,h.a0,h.a1,h.side),"stroke-width":SW}));
+    gFrag.appendChild(g);
+    var mid=(h.a0+h.a1)/2, c=pol(mid,R), r=(mid-90)*Math.PI/180,
+        ux=Math.cos(r), uy=Math.sin(r), tx=-Math.sin(r), ty=Math.cos(r);   /* 徑向（往外）／順時針切線 */
+    FR.list.push({g:g,s:s,t0:t0,dur:FL.DUR,px:c.x,py:c.y,
+                  vx:h.side*FL.VT*tx+FL.VR*ux, vy:h.side*FL.VT*ty+FL.VR*uy, om:h.side*FL.OM});
+  });
+  var cp=pol(a,R), r0=(a-90)*Math.PI/180, tx0=-Math.sin(r0), ty0=Math.cos(r0);
+  [[-0.95,0.95,-0.55],[-0.35,1.2,0.25],[0.35,1.1,-0.25],[0.95,0.9,0.55]].forEach(function(k,i){
+    var dir=r0+k[0], sp=FL.SH_V*k[1], off=k[2]*w, L2=5+3*(i%2);
+    var px=cp.x+Math.cos(r0)*off, py=cp.y+Math.sin(r0)*off;
+    var g=el("g",{"class":"ck-frag"});
+    g.appendChild(el("path",{d:"M"+(px-tx0*L2).toFixed(2)+","+(py-ty0*L2).toFixed(2)+" L"+(px+tx0*L2).toFixed(2)+","+(py+ty0*L2).toFixed(2),
+                             "stroke-width":3.2}));
+    gFrag.appendChild(g);
+    FR.list.push({g:g,s:s,t0:t0,dur:FL.SH_DUR,px:px,py:py,vx:sp*Math.cos(dir),vy:sp*Math.sin(dir),
+                  om:(i%2?1:-1)*FL.SH_OM});
+  });
+  if(!FR.raf)FR.raf=requestAnimationFrame(fragTick);
+}
+function fragTick(ts){
+  FR.raf=null;
+  var now=performance.now(), live=motionAllowed()&&!document.hidden, keep=[];
+  FR.list.forEach(function(o){
+    var k=(now-o.t0)/o.dur;
+    if(!live||k>=1){if(o.g.parentNode)o.g.parentNode.removeChild(o.g);return;}
+    var t=Math.max(0,now-o.t0)/1000, dx=o.vx*t, dy=o.vy*t+0.5*FL.G*t*t, rot=o.om*t,
+        op=(k<FL.FADE_AT)?1:Math.max(0,1-Math.pow((k-FL.FADE_AT)/(1-FL.FADE_AT),1.6));
+    o.g.setAttribute("transform","translate("+dx.toFixed(2)+","+dy.toFixed(2)+") rotate("+rot.toFixed(2)+" "+o.px.toFixed(2)+" "+o.py.toFixed(2)+")");
+    o.g.setAttribute("opacity",op.toFixed(3));
+    keep.push(o);
+  });
+  FR.list=keep;
+  var fading=false;
+  segs.forEach(function(s){
+    if(!s.cut||s.cut.fadeT0===null)return;
+    var q=live?Math.max(0,Math.min(1,(now-s.cut.fadeT0-FL.CUT_IN)/FL.CUT_FADE)):1;
+    s.cut.tag.setAttribute("opacity",q.toFixed(3));
+    if(q>=1)s.cut.fadeT0=null; else fading=true;
+  });
+  if(FR.list.length||fading)FR.raf=requestAnimationFrame(fragTick);
+}
+/* ── 起始 ── */
+verifyHeat(true); applySpin(); overview(); render(); setStage();
+var m=location.hash.match(/open=([a-z_]+)/); if(m)openLink(m[1]);
+var sm=location.hash.match(/stress=(\d+)/);
+if(sm){stress=(+sm[1])/100;range.value=sm[1];setStage();render();}
+var cm=location.hash.match(/cascade=(\d+)/);
+if(cm){var k=+cm[1],sc0=scenOf(curScen);sc0.steps.slice(0,k).forEach(function(st){st.ids.forEach(function(id){broken[id]=1;});});render();}
+var sm2=location.hash.match(/scenario=([a-z_]+)/); if(sm2){curScen=sm2[1];runScen(curScen);}
+window.chainRing={verifyHeat:verifyHeat,spinOf:spinOf,calcHeat:calcHeat,LINKS:LINKS,open:openLink,
+                  setStress:function(v){stress=v;range.value=Math.round(v*100);setStage();render();}};
+window.chainRing.spin={angle:function(){return SPIN.total;},theta:function(){return SPIN.theta;},
+  running:function(){return !!SPIN.raf;},frames:function(){return SPIN.frames;},
+  frags:function(){return FR.list.length;},
+  seek:function(d){SPIN.theta=((+d%360)+360)%360;layoutSpin(SPIN.theta);return SPIN.theta;},   /* 驗收用：直接排到某個角度 */
+  state:function(){return {hover:SPIN.hover,focus:SPIN.focus,panel:SPIN.panel,broken:SPIN.broken,inView:SPIN.inView,
+    reduced:spinReduced(),motion:motionOn,dir:SPIN.dir,frags:FR.list.length};}};
+(function(){var rt=null;window.addEventListener("resize",function(){clearTimeout(rt);
+  rt=setTimeout(function(){measureUp();layoutSpin(SPIN.theta);},150);});})();
+measureUp(); layoutSpin(SPIN.theta); spinSync();
+})();
+</script>
+<style>
+/* 首頁版面：環在上、面板在下；前言與開牌表不顯示 */
+.ck-embed .ck-sub,.ck-embed .ck-cards{display:none!important}
+.ck-embed .ck-main,.ck-embed .ck-main.ck-sim{grid-template-columns:minmax(0,1fr)!important}
+.ck-embed .ck-panel,.ck-embed .ck-main.ck-sim .ck-panel{contain:none!important;height:320px!important;max-height:320px!important}
+</style>

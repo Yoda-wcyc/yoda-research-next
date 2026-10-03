@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import InstallApp from "../components/InstallApp";
+import CHAINS from "./home-chains.json";
 
 const BASE = "https://yoda-wcyc.github.io";
 const SUBSTACK = "https://iamtwispin.substack.com";
@@ -51,6 +52,53 @@ function TempBar({ name, label, labelColor, pct, bubbleColor }) {
           <div style={{ width:16,height:16,borderRadius:"50%",background:"#fff",
             border:`2.5px solid ${bubbleColor}`,boxShadow:`0 0 8px ${bubbleColor}66`,
             animation:"sig-pulse 2s ease-in-out infinite" }}/>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── 經濟的鏈條：嵌入鍊條產生器的片段（public/chains/*.html，由 Skill\home_chains.py 產出，勿手改） ──
+   片段＝<style>＋HTML＋<script>；innerHTML 不會執行 script，所以載入後逐顆重建 script 讓它跑。
+   深淺主題：片段的引擎看 <html data-theme>，跟首頁的深／淺鈕同一個開關，不用另外接。 */
+function ChainEmbed({ src, wrap }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || el.dataset.src === src) return;
+    el.dataset.src = src;
+    fetch(src)
+      .then(r => { if (!r.ok) throw 0; return r.text(); })
+      .then(html => {
+        el.innerHTML = html;
+        el.querySelectorAll("script").forEach(old => {
+          const s = document.createElement("script");
+          s.textContent = old.textContent;
+          old.replaceWith(s);
+        });
+      })
+      .catch(() => { el.textContent = "鍊條圖載入失敗，請重新整理頁面。"; });
+  }, [src]);
+  return <div ref={ref} className={wrap} style={{ minHeight:"calc(420px*var(--scale))" }} />;
+}
+
+function ChainRow({ c }) {
+  return (
+    <div style={{ display:"grid", gridTemplateColumns:"minmax(0,2fr) minmax(0,1fr)", gap:16, alignItems:"start" }}>
+      <div className="card reveal" style={{ padding:"calc(16px*var(--scale))" }}>
+        <ChainEmbed src={c.file} wrap={c.wrap} />
+      </div>
+      <div className="card reveal" style={{ padding:"calc(24px*var(--scale))", display:"flex", flexDirection:"column", position:"sticky", top:"calc(72px*var(--scale))" }}>
+        <div style={{ fontWeight:700, fontSize:"calc(18px*var(--scale))", color:"var(--text)" }}>{c.name}</div>
+        <div style={{ fontSize:"calc(12px*var(--scale))", color:"var(--text)", opacity:.85, marginTop:4 }}>資料期別：{c.report} {c.date}（讀數截止 {c.cutoff}）</div>
+        <ul style={{ margin:"calc(16px*var(--scale)) 0 0", paddingLeft:"1.2em", display:"flex", flexDirection:"column", gap:"calc(10px*var(--scale))" }}>
+          {c.bullets.map((b, i) => (
+            <li key={i} style={{ fontSize:"calc(14px*var(--scale))", lineHeight:1.65, color:"var(--text)" }}>{b}</li>
+          ))}
+        </ul>
+        <div style={{ marginTop:"calc(20px*var(--scale))", paddingTop:"calc(16px*var(--scale))", borderTop:"1px solid var(--divider)" }}>
+          <a href={BASE + "/-/會員專區.html"} style={{ fontWeight:600, fontSize:"calc(14px*var(--scale))", color:"var(--accent)" }}>看完整報告（會員專區）→</a>
+          <div style={{ fontSize:"calc(13px*var(--scale))", lineHeight:1.65, color:"var(--text)", marginTop:6 }}>替你解決的事：{c.cta}</div>
         </div>
       </div>
     </div>
@@ -531,6 +579,16 @@ export default function Home() {
 
             </div>
 
+          </div>
+        </section>
+
+        {/* 經濟的鏈條：總經九環在上、AI 八環在下；每列 鍊條 2/3＋說明 1/3（資料＝app/home-chains.json） */}
+        <section id="chains">
+          <div className="eyebrow reveal">Chains</div>
+          <h2 className="reveal">經濟的鏈條</h2>
+          <div style={{ display:"flex", flexDirection:"column", gap:24 }}>
+            <ChainRow c={CHAINS.md} />
+            <ChainRow c={CHAINS.ai} />
           </div>
         </section>
 
