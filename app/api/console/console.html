@@ -187,6 +187,19 @@ tr:hover td{background:var(--surface2)}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--green);color:#04210f;font-size:13px;font-weight:700;padding:10px 20px;border-radius:9999px;opacity:0;transition:opacity .3s;z-index:10001}
 .toast.show{opacity:1}
 
+/* ===== 群發通知面板 ===== */
+.bcx-stage{display:flex;gap:20px;align-items:flex-start}
+.bcx-col{flex:1;min-width:0}
+.bcx-lab{display:block;font-size:12px;color:var(--dim);margin-bottom:4px}
+.bcx-in{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);font-family:inherit;font-size:14px;box-sizing:border-box}
+.bcx-ta{min-height:320px;line-height:1.75;resize:vertical;white-space:pre-wrap}
+.bcx-hint{font-size:11.5px;color:var(--dim);line-height:1.8;margin-top:6px}
+.bcx-hint code{font-family:var(--mono,monospace);background:var(--surface2);border-radius:4px;padding:1px 4px}
+.bcx-radio{display:flex;align-items:center;gap:7px;font-size:13.5px;color:var(--text);margin-bottom:8px;cursor:pointer}
+.bcx-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.bcx-prev{width:100%;height:620px;border:1px solid var(--border);border-radius:10px;background:#fff}
+@media(max-width:1000px){.bcx-stage{flex-direction:column}.bcx-prev{height:460px}}
+
 /* ===== 付費牆斷點編輯器（全部 scope 在 #v-paywall,不污染主控台）===== */
 #v-paywall{
   --serif:'Noto Serif TC',serif;--mono:'IBM Plex Mono',monospace;--sans:'Noto Sans TC',sans-serif;
@@ -326,6 +339,7 @@ tr:hover td{background:var(--surface2)}
       <button class="tab" data-v="reports">一般報告管理</button>
       <button class="tab" data-v="paidreports">付費報告管理</button>
       <button class="tab" data-v="paywall">斷點編輯器</button>
+      <button class="tab" data-v="broadcast">群發通知</button>
       <button class="tab" data-v="traffic">流量</button>
     </div>
   </div>
@@ -580,6 +594,54 @@ tr:hover td{background:var(--surface2)}
         <div class="slist" id="split-list"></div>
         <div id="verify-out"></div>
         <div class="hint2">匯出前自動驗：被遮段的<b>真內容 0 字進免費檔</b>（模糊底下是馬賽克填充）。<code>免費檔</code>保留報告完整 CSS／外觀；<code>付費檔</code>是被遮段內容包，給 <code>會員系統\report-shell.html</code>。標題敏感度低、可能出現在 §01 導讀大綱，故驗證以「內容」為準。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 群發通知（純文字進 → 前端套通知信版型 → adminBroadcastHtml 寄出）
+       設計前提：寫信的人只打純文字，不碰 HTML。版型在 bcxFullHtml() 這一支算，
+       預覽與寄出用【同一份字串】（bcxHtml），避免「看到的」跟「寄出的」是兩次各算一遍。 -->
+  <div class="view" id="v-broadcast">
+    <div class="livebar" style="color:var(--gold);border-color:var(--gold);background:rgba(240,165,0,.1)">
+      打純文字就好，右邊即時長出通知信的樣子。名單＝<b>付費有效且沒自己關掉通知</b>的人（跟報告通知同一把尺）。
+      寄出前先用「<b>寄測試給我自己</b>」收一封看版面，再按正式群發。
+    </div>
+    <div class="bcx-stage">
+      <div class="bcx-col">
+        <div class="section-h">內容</div>
+        <label class="bcx-lab">主旨</label>
+        <input id="bcxSubj" class="bcx-in" placeholder="例：總經報告 10/03 期已更新">
+        <label class="bcx-lab" style="margin-top:12px">內文（純文字）</label>
+        <textarea id="bcxBody" class="bcx-in bcx-ta" placeholder="您好，&#10;&#10;今天這一期的重點是…&#10;&#10;總經報告 · 影片版&#10;https://youtu.be/xxxxxxx"></textarea>
+        <div class="bcx-hint">
+          空行＝分段（段內單純換行會變 <code>&lt;br&gt;</code>）　·　<code>**粗體**</code>　·　整行只放一個網址＝自動變連結卡片（上一行有字就當卡片標題）　·　單獨一行 <code>---</code>＝分隔線。
+          <br>你打的 <code>&lt;</code> <code>&gt;</code> <code>&amp;</code> 會被當成字處理，不會變成標籤。
+        </div>
+
+        <div class="section-h" style="margin-top:20px">寄件人</div>
+        <label class="bcx-radio"><input type="radio" name="bcxVia" value="gmail" checked> 我的 Gmail（讀者可直接回信）</label>
+        <label class="bcx-radio"><input type="radio" name="bcxVia" value="resend"> no-reply（Resend，額度大、不能回信）</label>
+
+        <div class="section-h" style="margin-top:20px">去重標籤（tag）</div>
+        <input id="bcxTag" class="bcx-in" placeholder="bc-YYYYMMDD">
+        <div class="bcx-hint">同一個 tag 按第二次只會補寄給還沒收到的人（逐人寫 NotifyLog 去重）。留空＝不去重、每次都全寄。</div>
+
+        <div class="section-h" style="margin-top:20px">寄出</div>
+        <div class="bcx-row">
+          <span class="bcx-lab" style="white-space:nowrap">測試收件人</span>
+          <input id="bcxTestTo" class="bcx-in" style="flex:1;min-width:180px" value="2016yuxinyu@gmail.com">
+        </div>
+        <div class="bcx-row" style="margin-top:12px">
+          <button class="btn-done" id="bcxTestBtn" onclick="bcxSendTest()">✉ 寄測試給我自己</button>
+          <button class="btn-primary" id="bcxSendBtn" onclick="bcxSendReal()">📨 正式群發</button>
+          <span id="bcxWho" style="font-size:12.5px;color:var(--dim)">收件人數：—</span>
+        </div>
+        <div id="bcxResult" style="margin-top:12px"></div>
+      </div>
+
+      <div class="bcx-col">
+        <div class="section-h">即時預覽 <span class="hint">這就是會寄出去的那份 HTML</span></div>
+        <iframe id="bcxPreview" class="bcx-prev" title="通知信預覽"></iframe>
       </div>
     </div>
   </div>
@@ -1668,6 +1730,188 @@ async function bcSend(){
   }).catch(()=>toast('連線失敗'));
 }
 
+/* ===== 群發通知（純文字 → 通知信版型 → adminBroadcastHtml）=====
+   為什麼前端套版：寫信的人只打純文字、不碰 HTML。GAS 那端 adminBroadcastHtml 會把 html
+   原封不動送出（不轉義），所以「把純文字變成信」這件事必須在這裡做完、而且要先跳脫，
+   否則他打一句 <script> 就會變成真的標籤進到別人信箱。
+   預覽與寄出共用同一份字串（bcxHtml）——各算一次的話，看到的就不保證是寄出去的。 */
+var bcxHtml='';          // 最近一次算出來的完整信件 HTML（預覽＝寄出＝這一份）
+var bcxBusy=false;
+
+/* 只跳脫 & < >（引號不動：純文字裡的引號不會跑進屬性，跳了反而在信裡看到 &quot;）*/
+function bcxEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+/* 行內語法：**粗體**。一定在跳脫【之後】才跑，順序反了會把 <b> 自己跳掉 */
+function bcxInline(s){ return String(s).replace(/\*\*([\s\S]+?)\*\*/g,'<b>$1</b>'); }
+
+/* 純文字切塊：空行分段、整行網址＝連結卡片（上一行當標題）、單獨一行 --- ＝分隔線 */
+function bcxBlocks(esc){
+  var lines=String(esc).split('\n'), out=[], buf=[];
+  function flush(){ if(buf.length){ out.push({t:'p',lines:buf.slice()}); buf.length=0; } }
+  for(var i=0;i<lines.length;i++){
+    var t=lines[i].trim();
+    if(t===''){ flush(); continue; }
+    if(/^-{3,}$/.test(t)){ flush(); out.push({t:'hr'}); continue; }
+    if(/^https?:\/\/[^\s]+$/.test(t)){
+      var title=buf.length?String(buf.pop()).trim():'';   // 緊貼在網址上一行的文字＝卡片標題
+      flush();                                            // 標題之前還有別的行 → 先成段
+      out.push({t:'card',url:t,title:title});
+      continue;
+    }
+    buf.push(lines[i]);
+  }
+  flush();
+  return out;
+}
+
+function bcxBodyHtml(text){
+  var esc=bcxEsc(String(text||'').replace(/\r\n?/g,'\n'));
+  return bcxBlocks(esc).map(function(b){
+    if(b.t==='hr') return '<hr style="border:0;border-top:1px solid #e3e7ec;margin:18px 0">';
+    if(b.t==='card') return '<div style="border:1px solid #e3e7ec;border-radius:10px;padding:14px 16px;margin:0 0 18px">'
+      +(b.title?'<div style="font-weight:700;margin:0 0 6px">'+bcxInline(b.title)+'</div>':'')
+      +'<a href="'+b.url+'" style="color:#2c5aa0;text-decoration:none;word-break:break-all">'+b.url+'</a></div>';
+    return '<p style="margin:0 0 18px">'+bcxInline(b.lines.join('\n')).replace(/\n/g,'<br>')+'</p>';
+  }).join('');
+}
+
+/* 固定頁尾：署名／退訂／法遵／版權。文字是原文照抄，不要改寫 */
+function bcxFooterHtml(){
+  return '<p style="margin:0 0 18px">—— Yoda Research</p>'
+    +'<hr style="border:0;border-top:1px solid #e3e7ec;margin:18px 0">'
+    +'<p style="font-size:12px;color:#6b7480;margin:0 0 12px;line-height:1.75">此信寄給目前有效的付費會員。不想再收到新報告通知？登入會員專區 →「帳戶設定」關閉電子報通知即可，不影響你的訂閱與閱讀權限。</p>'
+    +'<p style="font-size:11px;color:#8a929c;margin:0 0 10px;line-height:1.75">本服務提供之所有報告、數據與遊戲內容，均屬財經資訊與投資教育，僅供研究學習參考，不構成投資建議、要約或個別有價證券之買賣推介，亦不構成任何買賣、進出場或部位建議。本服務非證券投資顧問事業，撰稿者未具證券投資分析人員資格，不提供代客操作或獲利保證；文中個股僅為篩選與觀察紀錄，不代表推薦。投資均有風險，決策與盈虧由用戶自行判斷並承擔。</p>'
+    +'<p style="font-size:11px;color:#8a929c;margin:0;line-height:1.75">© 2026 Yoda Research · 獨立研究者，個人觀點與市場資料整理分享</p>';
+}
+
+function bcxFullHtml(subject,text){
+  return '<div style="max-width:560px;margin:0 auto;font-family:-apple-system,\'Noto Sans TC\',sans-serif;color:#1a1d23;line-height:1.85">'
+    +'<div style="font-size:12px;letter-spacing:.12em;color:#c8901c;font-weight:700">YODA RESEARCH · 付費會員</div>'
+    +'<h2 style="font-size:20px;margin:10px 0 18px">'+bcxEsc(subject)+'</h2>'
+    +bcxBodyHtml(text)
+    +bcxFooterHtml()
+    +'</div>';
+}
+
+/* 算一次 → 存進 bcxHtml → 畫預覽。寄出的人只准讀 bcxHtml，不准自己再算 */
+function bcxRender(){
+  var subj=((($('bcxSubj')||{}).value)||'').trim();
+  var text=(($('bcxBody')||{}).value)||'';
+  bcxHtml=bcxFullHtml(subj,text);
+  var ifr=$('bcxPreview');
+  if(ifr) ifr.srcdoc='<!doctype html><html><head><meta charset="utf-8"></head>'
+    +'<body style="margin:0;padding:22px 18px;background:#fff">'+bcxHtml+'</body></html>';
+  return bcxHtml;
+}
+
+/* 收件人數：優先用已載入的訂閱總表 summary.willNotify（跟會員名單摘要同一個數字），
+   手上沒有就現打一次 adminSubscriptionTable。數字拿不到就顯示 ?，不要瞎編 */
+var bcxWillNotify=null;
+function bcxCount(force){
+  var el=$('bcxWho'); if(!el)return Promise.resolve(null);
+  var s=(typeof subsInfo!=='undefined'&&subsInfo&&subsInfo.summary)?subsInfo.summary:null;
+  if(s&&typeof s.willNotify==='number'&&!force){
+    bcxWillNotify=s.willNotify;
+    el.innerHTML='收件人數：<b style="color:var(--gold,#e0a526)">'+bcxWillNotify+'</b> 位（付費有效且沒關通知）';
+    return Promise.resolve(bcxWillNotify);
+  }
+  el.textContent='收件人數：計算中…';
+  return post({action:'adminSubscriptionTable',key:KEY}).then(function(r){
+    if(r&&r.ok&&r.summary&&typeof r.summary.willNotify==='number'){
+      bcxWillNotify=r.summary.willNotify;
+      el.innerHTML='收件人數：<b style="color:var(--gold,#e0a526)">'+bcxWillNotify+'</b> 位（付費有效且沒關通知）';
+    }else{ bcxWillNotify=null; el.textContent='收件人數：?（拿不到訂閱總表）'; }
+    return bcxWillNotify;
+  }).catch(function(){ bcxWillNotify=null; el.textContent='收件人數：?（連線失敗）'; return null; });
+}
+
+function bcxVia(){ var r=document.querySelector('input[name="bcxVia"]:checked'); return (r&&r.value)||'gmail'; }
+function bcxLock(on){
+  bcxBusy=!!on;
+  ['bcxTestBtn','bcxSendBtn'].forEach(function(id){ var b=$(id); if(b)b.disabled=!!on; });
+}
+function bcxShow(html){ var el=$('bcxResult'); if(el)el.innerHTML=html; }
+function bcxCheck(){
+  var subj=((($('bcxSubj')||{}).value)||'').trim();
+  var text=((($('bcxBody')||{}).value)||'').trim();
+  if(!subj){ toast('先填主旨'); return null; }
+  if(!text){ toast('先填內文'); return null; }
+  return {subject:subj};
+}
+function bcxOpts(){
+  var o={}, via=bcxVia();
+  if(via==='gmail') o.via='gmail';                       // 不給 via＝Resend no-reply
+  var tag=((($('bcxTag')||{}).value)||'').trim();
+  if(tag) o.tag=tag;
+  return o;
+}
+
+function bcxSendTest(){
+  if(bcxBusy)return;
+  var c=bcxCheck(); if(!c)return;
+  var to=((($('bcxTestTo')||{}).value)||'').trim();
+  if(!to){ toast('填一個測試收件人'); return; }
+  var html=bcxRender();
+  var opts=bcxOpts(); opts.testTo=to;                    // testTo＝只寄一封、主旨自動加 [測試]、不寫紀錄
+  bcxLock(true); toast('寄測試中…');
+  post({action:'adminBroadcastHtml',key:KEY,subject:c.subject,html:html,opts:opts}).then(function(r){
+    bcxLock(false);
+    if(r&&r.ok){ toast('測試已寄 → '+to+'（去收信確認版面）');
+      bcxShow('<div class="hintbox" style="margin:0">✉ 測試已寄給 <b>'+escH(to)+'</b>（寄法 '+escH(r.via||bcxVia())+'）。這一封不寫 NotifyLog、不佔去重。</div>');
+    }else{ toast((r&&r.error)||'測試寄失敗');
+      bcxShow('<div class="hintbox" style="margin:0;color:var(--red)">測試寄失敗：'+escH((r&&r.error)||'未知原因')+'</div>'); }
+  }).catch(function(){ bcxLock(false); toast('連線失敗'); });
+}
+
+async function bcxSendReal(){
+  if(bcxBusy)return;
+  var c=bcxCheck(); if(!c)return;
+  var html=bcxRender();
+  if(bcxWillNotify===null) await bcxCount(true);         // 數字沒有就先去拿，不要拿「約 ? 位」去問人
+  var n=(bcxWillNotify===null)?'？':bcxWillNotify;
+  var opts=bcxOpts();
+  var ok=await uiConfirm('確認群發這封通知？\n\n'
+    +'將寄給全體付費會員（約 '+n+' 位）\n'
+    +'主旨：'+c.subject+'\n'
+    +'寄法：'+(opts.via==='gmail'?'我的 Gmail（讀者可回信）':'no-reply（Resend）')+'\n'
+    +'tag：'+(opts.tag||'（不去重）')+'\n\n寄出後無法收回。');
+  if(!ok)return;
+  bcxLock(true); toast('寄送中…（人多需要一點時間，請勿關閉）');
+  post({action:'adminBroadcastHtml',key:KEY,subject:c.subject,html:html,opts:opts}).then(function(r){
+    bcxLock(false);
+    if(r&&r.ok){
+      toast('已寄 '+r.sent+' / '+r.total+(r.failed?'（失敗 '+r.failed+'）':''));
+      var rows=[['已寄出',r.sent],['名單總數',r.total],['失敗',r.failed],['已收過·略過',r.skipped],['配額略過',r.skippedQuota],['寄法',r.via],['tag',r.tag],['自行關閉通知',r.optedOut],['今日剩餘額度',r.quotaLeft]];
+      var h='<div class="hintbox" style="margin:0;font-size:12.5px;color:var(--text)"><b>寄送結果</b><div style="display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:8px">'
+        +rows.filter(function(x){return x[1]!==undefined&&x[1]!==null&&x[1]!=='';})
+             .map(function(x){return '<span style="color:var(--dim)">'+escH(x[0])+'　<b style="color:var(--text)">'+escH(x[1])+'</b></span>';}).join('')
+        +'</div>'
+        +(r.skippedQuota?'<div style="margin-top:8px;color:var(--amber,#ff9f0a)">配額略過 '+r.skippedQuota+' 位——明天用同一個 tag 再按一次就會補完。</div>':'')
+        +(r.note?'<div style="margin-top:8px;color:var(--dim)">'+escH(r.note)+'</div>':'')
+        +'</div>';
+      bcxShow(h);
+    }else{
+      toast((r&&r.error)||'寄送失敗');
+      bcxShow('<div class="hintbox" style="margin:0;color:var(--red)">寄送失敗：'+escH((r&&r.error)||'未知原因')+'</div>');
+    }
+  }).catch(function(){ bcxLock(false); toast('連線失敗'); bcxShow('<div class="hintbox" style="margin:0;color:var(--red)">連線失敗，沒有寄出。</div>'); });
+}
+
+/* 第一次切進這個分頁才初始化：預填今天的 tag、算人數、畫一次預覽 */
+var bcxInited=false;
+function bcxInit(){
+  if(!bcxInited){
+    bcxInited=true;
+    var t=$('bcxTag');
+    if(t&&!t.value){
+      var d=new Date(), p=function(n){return (n<10?'0':'')+n;};
+      t.value='bc-'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate());
+    }
+    ['bcxSubj','bcxBody'].forEach(function(id){ var el=$(id); if(el)el.addEventListener('input',bcxRender); });
+  }
+  bcxRender();
+  bcxCount();
+}
+
 /* ===== 渲染：推薦與獎勵 ===== */
 function renderRewards(){
   $('c7List').innerHTML=members.map(m=>{
@@ -1721,6 +1965,7 @@ function switchView(v){
   if(v==='waitlist')loadWaitlist();
   if(v==='reports')loadReports();
   if(v==='paidreports')loadPaidReports();
+  if(v==='broadcast')bcxInit();
 }
 
 /* ===== 創始搶先名單 ===== */
