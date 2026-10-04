@@ -629,7 +629,10 @@ tr:hover td{background:var(--surface2)}
         <div class="section-h" style="margin-top:20px">寄出</div>
         <div class="bcx-row">
           <span class="bcx-lab" style="white-space:nowrap">測試收件人</span>
-          <input id="bcxTestTo" class="bcx-in" style="flex:1;min-width:180px" value="2016yuxinyu@gmail.com">
+          <!-- 預設 iamtwispin@gmail.com：GAS 腳本擁有者就是這個帳號，via:'gmail' 一律從它寄出。
+               2026-10-04 把測試信寄到 2016yuxinyu@gmail.com 時，信只進了 iamtwispin 的寄件備份、Yoda 沒收到，
+               排查一輪才發現是收件地址填錯。Yoda 實際收信的地址＝iamtwispin@gmail.com，不要再改回去。 -->
+          <input id="bcxTestTo" class="bcx-in" style="flex:1;min-width:180px" value="iamtwispin@gmail.com">
         </div>
         <div class="bcx-row" style="margin-top:12px">
           <button class="btn-done" id="bcxTestBtn" onclick="bcxSendTest()">✉ 寄測試給我自己</button>
