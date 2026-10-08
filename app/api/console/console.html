@@ -529,6 +529,14 @@ tr:hover td{background:var(--surface2)}
       <button class="btn-done" style="color:var(--green,#30d158)" onclick="setHiddenSelectedPaid(false)">✅ 上架勾選</button>
       <span id="mailQuota" style="margin-left:auto;font-size:12.5px;color:var(--dim)">今日剩餘寄信額度：<b style="color:var(--text)">—</b></span>
     </div>
+    <!-- 彙整通知：這一批自訂主旨／頁首大標題（選填·只影響這一批，寄出成功後自動清空；空白＝照預設）Yoda 2026-10-08 -->
+    <div class="toolbar" style="align-items:center">
+      <label style="font-size:12.5px;color:var(--dim);white-space:nowrap" for="digestSubject">主旨（選填）</label>
+      <input class="filter" id="digestSubject" type="text" autocomplete="off" style="flex:2 1 320px;min-width:220px" placeholder="預設：Yoda Research｜新報告上線：（勾選的報告名）">
+      <label style="font-size:12.5px;color:var(--dim);white-space:nowrap" for="digestHeader">頁首標題（選填）</label>
+      <input class="filter" id="digestHeader" type="text" autocomplete="off" style="flex:1 1 200px;min-width:160px" placeholder="預設：N 份新報告上線">
+      <span style="font-size:11.5px;color:var(--dim)">只影響這一批；主旨 ≤80 字、頁首 ≤40 字、不能換行；主旨前面自動加「Yoda Research｜」</span>
+    </div>
     <div class="tbl-wrap">
       <table>
         <thead><tr><th>reportId（付費檔）</th><th>最後更新（台北）</th><th>狀態</th><th>已寄出通知</th><th>寄通知</th><th style="width:1%;text-align:center;white-space:nowrap"><input type="checkbox" id="paidChkAll" onclick="toggleAllPaid(this)"> 全選</th></tr></thead>
@@ -2344,6 +2352,7 @@ function prettyPaidTitle(id){ return String(id).replace(/\.html?$/i,'').replace(
 function renderPaidFiles(pd){
   var box=$('paidBody'); if(!box)return;
   var ca=$('paidChkAll'); if(ca)ca.checked=false;
+  setTimeout(refreshDigestPlaceholders,0); // 清單重畫後勾選歸零 → 主旨／頁首 placeholder 回到通用預設
   if(pd&&pd.ok===false){ box.innerHTML='<tr><td colspan="6"><div class="empty">讀取失敗：'+escH(pd.error||'unknown action（GAS 可能尚未部署新版本）')+'</div></td></tr>'; return; }
   if(!paidFiles.length){ box.innerHTML='<tr><td colspan="6"><div class="empty">Drive 目前沒有付費檔</div></td></tr>'; return; }
   box.innerHTML=paidFiles.slice().sort(function(a,b){
@@ -2378,7 +2387,7 @@ function renderPaidFiles(pd){
   }).join('');
 }
 function escJs(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
-function toggleAllPaid(cb){document.querySelectorAll('#paidBody .paid-chk').forEach(function(c){c.checked=cb.checked;});}
+function toggleAllPaid(cb){document.querySelectorAll('#paidBody .paid-chk').forEach(function(c){c.checked=cb.checked;});refreshDigestPlaceholders();}
 async function deleteSelectedPaid(){
   var ids=Array.prototype.slice.call(document.querySelectorAll('#paidBody .paid-chk:checked')).map(function(c){return c.dataset.id;}).filter(Boolean);
   if(!ids.length){toast('先勾選要刪除的付費檔');return;}
@@ -2411,21 +2420,73 @@ async function setHiddenSelectedPaid(hide){
   toast((hide?'已下架 ':'已上架 ')+ok+' / '+ids.length+' 份'+(fail?'｜失敗 '+fail:''));
   loadPaidReports();
 }
+/* ── 彙整通知的自訂主旨／頁首（Yoda 2026-10-08）──
+   規則跟 Code.gs mailOverride_ 同一套（伺服器才是最後把關；這裡先擋、並算出確認視窗要顯示的最終字）：
+   去前後空白；主旨 ≤80 字、頁首 ≤40 字（Unicode 字元計）；換行與控制字元拒收；
+   主旨前面固定加「Yoda Research｜」，已用 Yoda Research 開頭就不重複加。空白＝照預設。 */
+var DIGEST_SUBJECT_MAX=80, DIGEST_HEADER_MAX=40, DIGEST_SUBJECT_PREFIX='Yoda Research｜';
+var DIGEST_LS=String.fromCharCode(0x2028), DIGEST_PS=String.fromCharCode(0x2029), DIGEST_NEL=String.fromCharCode(0x85);
+function digestOvCheck(raw,label,max){
+  raw=String(raw==null?'':raw);
+  if(/[\r\n]/.test(raw)||raw.indexOf(DIGEST_LS)>=0||raw.indexOf(DIGEST_PS)>=0||raw.indexOf(DIGEST_NEL)>=0) return {err:label+'不能有換行，請改成一行'};
+  if(/[\x00-\x1f\x7f]/.test(raw)) return {err:label+'含有看不見的控制字元，請重打一次'};
+  var v=raw.trim(), n=Array.from(v).length;
+  if(n>max) return {err:label+'太長：'+n+' 字，上限 '+max+' 字'};
+  return {v:v};
+}
+/* 預設字：照 Code.gs prettyReportTitle＋combinedFirst_＋buildDigestMail_ 的算法，假設「每個人都缺這批全部」 */
+function digestTitleOf(id){
+  var s=String(id).replace(/\.html?$/i,'').replace(/^付費[_-]?/,'');
+  if(/^綜合_\d{8}$/.test(s)) s=s.replace(/^綜合/,'綜合報告');
+  s=s.replace(/[_-]?(\d{4})(\d{2})(\d{2})$/,function(_,y,m,d){return ' · '+y+'-'+m+'-'+d;});
+  return s.replace(/_/g,' ').trim();
+}
+function digestDefaults(ids){
+  var isC=function(id){return /^綜合_\d{8}$/.test(String(id).replace(/\.html?$/i,'').replace(/^付費[_-]?/,''));};
+  var ord=ids.filter(isC).concat(ids.filter(function(id){return !isC(id);}));
+  var names=ord.map(function(id){return digestTitleOf(id).replace(/\s·\s\d{4}-\d{2}-\d{2}$/,'');});
+  return { subject: 'Yoda Research｜新報告上線：'+(names.length<=3?names.join('・'):names.length+' 份'), header: names.length+' 份新報告上線' };
+}
+function digestCheckedIds(){return Array.prototype.slice.call(document.querySelectorAll('#paidBody .paid-chk:checked')).map(function(c){return c.dataset.id;}).filter(Boolean);}
+function refreshDigestPlaceholders(){
+  var s=$('digestSubject'), h=$('digestHeader'); if(!s||!h)return;
+  var ids=digestCheckedIds();
+  if(!ids.length){ s.placeholder='預設：Yoda Research｜新報告上線：（勾選的報告名）'; h.placeholder='預設：N 份新報告上線'; return; }
+  var d=digestDefaults(ids); s.placeholder='預設：'+d.subject; h.placeholder='預設：'+d.header;
+}
+document.addEventListener('change',function(e){ if(e.target&&e.target.classList&&e.target.classList.contains('paid-chk')) refreshDigestPlaceholders(); });
+
 /* 彙整通知：勾選的多份報告，對「還沒收齊的會員」各寄一封（只列每人缺的那幾份）*/
 async function notifyBatchSelected(){
-  var ids=Array.prototype.slice.call(document.querySelectorAll('#paidBody .paid-chk:checked')).map(function(c){return c.dataset.id;}).filter(Boolean);
+  var ids=digestCheckedIds();
   if(!ids.length){toast('先勾選這批要一起寄的報告');return;}
+  var sIn=$('digestSubject'), hIn=$('digestHeader');
+  var sc=digestOvCheck(sIn?sIn.value:'','主旨',DIGEST_SUBJECT_MAX); if(sc.err){ await uiAlert(sc.err); return; }
+  var hc=digestOvCheck(hIn?hIn.value:'','頁首標題',DIGEST_HEADER_MAX); if(hc.err){ await uiAlert(hc.err); return; }
+  var ovSubject=sc.v, ovHeader=hc.v;
+  var finalSubject=ovSubject?(/^yoda\s*research/i.test(ovSubject)?ovSubject:DIGEST_SUBJECT_PREFIX+ovSubject):'';
+  var dft=digestDefaults(ids);
+  var subjLine=finalSubject?('主旨（自訂）：'+finalSubject):('主旨（預設）：'+dft.subject+'\n　※ 預設主旨依每人缺的報告自動產生，少數人可能只列他缺的那幾份');
+  var headLine=ovHeader?('頁首（自訂）：'+ovHeader):('頁首（預設）：'+dft.header+'\n　※ 預設頁首的份數依每人缺的報告而定');
   var list=ids.map(function(id){return '　· '+prettyPaidTitle(id);}).join('\n');
-  if(!await uiConfirm('這封彙整信包含以下 '+ids.length+' 份報告：\n\n'+list+'\n\n寄給「還沒收到的付費會員」，每人一封、只列他缺的那幾份。\n（已收過的不再列、不重寄；退訂者不寄）\n\n確定寄出？'))return;
+  if(!await uiConfirm('這封彙整信包含以下 '+ids.length+' 份報告：\n\n'+list+'\n\n'+subjLine+'\n'+headLine+'\n\n寄給「還沒收到的付費會員」，每人一封、只列他缺的那幾份。\n（已收過的不再列、不重寄；退訂者不寄）\n\n確定寄出？'))return;
   toast('彙整寄送中…');
-  post({action:'adminNotifyBatchDigest',key:KEY,reportIds:ids,force:false}).then(function(r){
+  var payload={action:'adminNotifyBatchDigest',key:KEY,reportIds:ids,force:false};
+  if(ovSubject)payload.subject=ovSubject;   // 只送 Yoda 打的字；前綴由伺服器加（同一套規則）
+  if(ovHeader)payload.header=ovHeader;
+  post(payload).then(function(r){
     if(!r||!r.ok){ toast((r&&r.error)||'寄送失敗'); return; }
+    // 自訂了卻沒被套用＝GAS 還是舊版（不認 subject/header）——提醒先部署 GAS
+    if((ovSubject&&!r.subjectCustom)||(ovHeader&&!r.headerCustom)) uiAlert('⚠ 信已寄出，但伺服器沒有套用自訂主旨／頁首（GAS 可能還沒部署 2026-10-08-b）。這批用的是預設字。');
+    if(sIn)sIn.value=''; if(hIn)hIn.value='';  // 只影響這一批：寄出後清空，下一批回到預設
     var msg='彙整寄出 '+(r.sent||0)+' 位會員';
     if(r.viaResend!=null||r.viaGmail!=null)msg+='（Resend '+(r.viaResend||0)+'＋Gmail '+(r.viaGmail||0)+'）';
     if(r.alreadyHad)msg+='｜已收齊略過 '+r.alreadyHad;
     if(r.skippedQuota)msg+='｜⚠配額不足略過 '+r.skippedQuota+'（明天再按補寄）';
     if(r.failed)msg+='｜失敗 '+r.failed;
     if(r.optedOut)msg+='｜退訂 '+r.optedOut;
+    if(r.announced)msg+='｜帶公告 '+r.announced;
+    if(r.subjectCustom||r.headerCustom)msg+='｜自訂'+(r.subjectCustom?'主旨':'')+(r.subjectCustom&&r.headerCustom?'＋':'')+(r.headerCustom?'頁首':'');
     toast(msg);
     loadPaidReports();
   }).catch(function(){ toast('連線失敗'); });
