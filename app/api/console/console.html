@@ -2348,6 +2348,10 @@ function upTs(v){ if(!v) return 0; var d=new Date(v); return isNaN(d.getTime())?
 function nameDate(id){ var m=String(id||'').match(/\d{8}/g); return m?parseInt(m[m.length-1],10):0; }
 /* reportId → 好讀短標題（去付費_前綴、底線轉空白）*/
 function prettyPaidTitle(id){ return String(id).replace(/\.html?$/i,'').replace(/^付費[_-]?/,'').replace(/_/g,' '); }
+/* 簡報不寄通知信（Yoda 2026-10-09）：簡報那列保留（看上架狀態、已寄紀錄），但不給勾選框、補寄鈕、名單裡的補寄鈕。
+   判斷規則與 Code.gs reportCat() 一致：去 .html 與「付費_」前綴後以「簡報」開頭；
+   reportCat 先判 AI泡沫（不限開頭），所以檔名同時含 AI泡沫 的算 AI泡沫、不算簡報。GAS 端也會擋（回「簡報不寄通知信」）。*/
+function isBriefReport(id){ var s=String(id||'').replace(/\.html?$/i,'').replace(/^付費[_-]?/,''); return /^簡報/.test(s) && !/AI泡沫/.test(s); }
 /* Drive 付費檔清單：直接列出所有付費檔，每筆自帶【寄通知】（不靠 reports.json 比對）*/
 function renderPaidFiles(pd){
   var box=$('paidBody'); if(!box)return;
@@ -2370,9 +2374,12 @@ function renderPaidFiles(pd){
           ? '<span style="color:var(--dim)">未寄</span>'
           : '<span class="pill '+(un===0?'plan-f':'')+'">已寄 '+sc+' · 未寄 '+un+'</span>'
             + (x.notifiedAt?' <span style="color:var(--dim);font-size:11px">'+escH(x.notifiedAt)+'</span>':''));
-    var notifyBtn = un>0
-      ? '<button class="mini-act" onclick="doNotify(\''+escJs(x.reportId)+'\')" style="color:var(--gold)">補寄未收到（'+un+'）</button>'
-      : '<span style="color:var(--dim);font-size:12px">全員已收</span>';
+    var brief=isBriefReport(x.reportId);
+    var notifyBtn = brief
+      ? '<span style="color:var(--dim);font-size:12px">簡報不寄通知</span>'
+      : (un>0
+        ? '<button class="mini-act" onclick="doNotify(\''+escJs(x.reportId)+'\')" style="color:var(--gold)">補寄未收到（'+un+'）</button>'
+        : '<span style="color:var(--dim);font-size:12px">全員已收</span>');
     // 「狀態」欄：單筆切換鈕已於 2026-10-01 依 Yoda 要求移除，改用工具列勾選批次處理（⛔ 下架勾選／✅ 上架勾選）。
     var hid=isPaidHidden(x.reportId);
     var stat=hid?'<span style="color:var(--gold,#e0a526);font-weight:800">已下架</span>':'';
@@ -2382,7 +2389,9 @@ function renderPaidFiles(pd){
       +'<td>'+stat+'</td>'
       +'<td>'+notified+'</td>'
       +'<td style="white-space:nowrap">'+notifyBtn+' <button class="mini-act" onclick="viewRecipients(\''+escJs(x.reportId)+'\')" style="color:var(--dim)">名單</button></td>'
-      +'<td style="text-align:center"><input type="checkbox" class="paid-chk" data-id="'+escH(x.reportId)+'"></td>'
+      +(brief
+        ? '<td style="text-align:center;color:var(--dim)" title="簡報不寄通知信，不提供勾選">—</td>'
+        : '<td style="text-align:center"><input type="checkbox" class="paid-chk" data-id="'+escH(x.reportId)+'"></td>')
       +'</tr>';
   }).join('');
 }
@@ -2447,7 +2456,7 @@ function digestDefaults(ids){
   var names=ord.map(function(id){return digestTitleOf(id).replace(/\s·\s\d{4}-\d{2}-\d{2}$/,'');});
   return { subject: 'Yoda Research｜新報告上線：'+(names.length<=3?names.join('・'):names.length+' 份'), header: names.length+' 份新報告上線' };
 }
-function digestCheckedIds(){return Array.prototype.slice.call(document.querySelectorAll('#paidBody .paid-chk:checked')).map(function(c){return c.dataset.id;}).filter(Boolean);}
+function digestCheckedIds(){return Array.prototype.slice.call(document.querySelectorAll('#paidBody .paid-chk:checked')).map(function(c){return c.dataset.id;}).filter(function(id){return id && !isBriefReport(id);});} // 簡報本來就沒有勾選框；這裡再擋一次
 function refreshDigestPlaceholders(){
   var s=$('digestSubject'), h=$('digestHeader'); if(!s||!h)return;
   var ids=digestCheckedIds();
@@ -2494,6 +2503,7 @@ async function notifyBatchSelected(){
 
 /* 逐會員去重：只補寄給「還沒收過這份」的 active 會員。之後有新會員加入，再按一次只補寄他們 */
 async function doNotify(paidId){
+  if(isBriefReport(paidId)){ toast('簡報不寄通知信'); return; }
   if(!await uiConfirm('補寄「新付費報告上線」email 給【還沒收過這份】的 active 會員?\n\n報告：'+paidId+'\n(已收過的人不會再收到；已在會員專區關閉通知的人不寄)'))return;
   toast('寄送中…');
   post({action:'adminNotifyReport',key:KEY,reportId:paidId}).then(async function(res){
@@ -2508,6 +2518,7 @@ async function doNotify(paidId){
   }).catch(function(){toast('連線失敗');});
 }
 function forceNotify(paidId){
+  if(isBriefReport(paidId)){ toast('簡報不寄通知信'); return; }
   toast('重寄中…');
   post({action:'adminNotifyReport',key:KEY,reportId:paidId,force:true}).then(function(res){
     if(res&&res.ok){ toast('已重寄：成功 '+res.sent+' / 共 '+res.total); loadPaidReports(); }
@@ -2551,7 +2562,7 @@ function viewRecipients(paidId){
       +'<div><div style="font-weight:700;margin-bottom:6px;color:#e08">🔴 還沒寄（'+pending.length+'）</div>'+fmt(pending)+offBlock+'</div>'
       +'<div><div style="font-weight:700;margin-bottom:6px;color:#4c9">🟢 已經寄（'+sent.length+'）</div>'+fmt(sent)+'</div>'
       +'</div>';
-    var foot = pending.length? '<button class="btn-primary" onclick="closeModal();doNotify(\''+escJs(paidId)+'\')">只補寄給還沒寄的 '+pending.length+' 位</button>' : '';
+    var foot = (pending.length && !isBriefReport(paidId))? '<button class="btn-primary" onclick="closeModal();doNotify(\''+escJs(paidId)+'\')">只補寄給還沒寄的 '+pending.length+' 位</button>' : '';
     openModal('已寄／未寄名單 · '+escH(paidId), html, foot);
   }).catch(function(){toast('連線失敗');});
 }
