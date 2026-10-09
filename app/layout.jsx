@@ -1,6 +1,7 @@
 import "./globals.css";
 import Controls from "../components/Controls";
 import PwaRegister from "../components/PwaRegister";
+import { GT_GUARD } from "../lib/gt-guard";
 
 export const metadata = {
   metadataBase: new URL("https://yoda-research.vercel.app"),
@@ -33,6 +34,15 @@ export default function RootLayout({ children }) {
   return (
     <html lang="zh-Hant" data-theme="dark" data-size="md" suppressHydrationWarning>
       <head>
+        {/* 讀者偏好（與 A 網域同名鍵 yoda-size／yoda-theme）：繪製前先套到 <html>，避免深淺／字級閃一下 */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var r=document.documentElement,s=localStorage.getItem('yoda-size'),t=localStorage.getItem('yoda-theme');if(s==='sm'||s==='md'||s==='lg')r.setAttribute('data-size',s);if(t==='dark'||t==='light')r.setAttribute('data-theme',t)}catch(e){}",
+          }}
+        />
+        {/* React × Google 網頁翻譯相容防護（English 模式不報 removeChild／insertBefore 錯、改字不卡舊譯文）；說明見 lib/gt-guard.js */}
+        <script dangerouslySetInnerHTML={{ __html: GT_GUARD }} />
         {/* 安裝鈕共用樣式(首頁/報告/遊戲同一支 → 改 yoda-btn.css 全同步) */}
         <link rel="stylesheet" href="/yoda-btn.css" />
         {/* Google tag (gtag.js) — GA4 */}

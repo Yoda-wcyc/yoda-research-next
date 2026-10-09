@@ -75,6 +75,23 @@ html[data-theme="light"] .ctrl{background:rgba(255,255,255,.72)}
   font-weight:700;transition:background .15s;
 }
 .ctrl-fan:hover{background:#2a4a6c}
+/* 語言切換（繁體中文｜English）：按鈕由共用 yoda-lang.js 放進 .ctrl-lang；樣式跟著控制列的其他鈕 */
+.ctrl-lang{display:flex;align-items:center}
+.ctrl-lang:empty,.ctrl-lang-sep:has(+ .ctrl-lang:empty){display:none}
+.ctrl .lt-group{gap:2px}
+.ctrl .lt-group .lt-btn{color:var(--dim)!important}
+html body .ctrl .lt-group .lt-btn.lt-on{background:var(--text)!important;color:var(--bg)!important;box-shadow:none!important;font-weight:600}
+/* English 模式（html.lt-en，由 yoda-lang.js 加）：英文比中文長，原本 nowrap 的膠囊鈕允許換行，避免手機被撐寬 */
+html.lt-en a.breathe{white-space:normal!important;max-width:100%}
+html.lt-en body{overflow-wrap:break-word}
+/* 手機：多了語言兩顆鈕，收緊間距、粉專只留圖示，維持一列；真的太窄（≤340px）才換行 */
+@media (max-width:560px){
+  .ctrl{gap:2px;padding:4px 6px;max-width:calc(100vw - 24px);flex-wrap:wrap;justify-content:flex-end;row-gap:2px}
+  .ctrl button,.ctrl .lt-group .lt-btn{padding:5px 7px}
+  .ctrl-fan{padding:5px 8px}
+  .ctrl-fan span{display:none}
+  .ctrl .lt-group{gap:0}
+}
 @media (prefers-reduced-motion:reduce){
   .breathe{animation:none;background:var(--gold-lg)}
   .reveal{opacity:1 !important;transform:none !important}
