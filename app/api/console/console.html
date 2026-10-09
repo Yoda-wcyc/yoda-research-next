@@ -574,7 +574,7 @@ tr:hover td{background:var(--surface2)}
     <div class="empty" id="empty">
       <div class="big">📄</div>
       <h2>請先「匯入要編輯的檔案」</h2>
-      <p>選任一份報告 HTML：<b>關鍵報告 / 簡報 / 市場觀察 / 美股 / 台股 / AI泡沫 / 總經</b> 都支援，匯入時自動判母板類型並切段。<br>拖金軸＝粗調（線以下整批遮內容）；每段下方 <b>［標題］［內容］</b> 鈕＝逐段自由開關；上方滑桿調馬賽克模糊強弱。<br>付費報告免費分享時,自由拖斷點決定放行到哪。</p>
+      <p>選任一份報告 HTML：<b>關鍵報告 / 簡報 / 市場觀察 / 美股 / 台股 / AI泡沫 / 總經 / 綜合報告</b> 都支援，匯入時自動判母板類型並切段。<br>拖金軸＝粗調（線以下整批遮內容）；每段下方 <b>［標題］［內容］</b> 鈕＝逐段自由開關；上方滑桿調馬賽克模糊強弱。<br>付費報告免費分享時,自由拖斷點決定放行到哪。</p>
     </div>
 
     <div id="workspace" class="hidden">
@@ -2595,10 +2595,94 @@ var PROFILES={
   flat:{ label:'美股 / 台股', mode:'delimited',
     headerSel:'.section-header',
     titleSel:'.section-title', bodySel:'.section-desc',
-    paywallSel:null, protectKW:[] }
+    paywallSel:null, protectKW:[] },
+  /* 綜合報告（2026-10-09 改 cbmap 模式）：舊版把整張因果圖 .cb-map 當成「一段」，
+     結果只切得出 2 段（頭條＋整張圖），遮了也只是把 SVG 拿掉——真內容其實在
+     #cb-data JSON（點節點才浮出的證據卡）和 <template id="cb-svg-sm/lg">（字級切換用的
+     備份圖）裡，免費檔照樣全外露，等於沒得斷點編輯。
+     現在：頭條 .cb-concl 一段（保護·免費照給）＋因果圖依「橫帶」(rect.cb-z：原因／結論＋市場反應／
+     支線／寬度與輪動／工具選股／預期…) 每帶一段＋舊版才有的 .cb-more 一段。
+     遮內容＝把該帶節點在 #cb-data 的證據換成鎖頭；遮標題＝三張 SVG（主圖＋兩個 template）
+     的節點字換馬賽克。 */
+  combined:{ label:'綜合報告', mode:'cbmap',
+    titleSel:'.cb-concl-t, .cb-more-h',
+    bodySel:null,
+    headKeepSel:'.cb-concl-t, .cb-more-h', paywallSel:null, protectKW:[] }
 };
+// ── 綜合報告因果圖工具（cbmap 模式）──
+function cbSvgs(d){ // 主圖＋template 裡的備份圖（字級切換時 cb-js 會換上來,一樣要處理）
+  var root=d.getElementById('cb-root')||d.body, out=[], m=root.querySelector('.cb-map .cb-svg');
+  if(m) out.push(m);
+  Array.from(d.querySelectorAll('template')).forEach(function(t){
+    var s=t.content&&t.content.querySelector&&t.content.querySelector('.cb-svg'); if(s) out.push(s);
+  });
+  return out;
+}
+function cbData(d){ var s=d.getElementById('cb-data'); if(!s) return null; try{ return JSON.parse(s.textContent); }catch(e){ return null; } }
+function cbXY(g){
+  var r=g.querySelector('rect')||g.querySelector('text'); if(!r) return null;
+  var t=r.querySelector&&r.querySelector('tspan'), src=(r.getAttribute('x')!=null)?r:t;
+  return src?{x:parseFloat(src.getAttribute('x'))||0, y:parseFloat(src.getAttribute('y'))||0}:null;
+}
+function cbBandOf(bands,p){ // 傳入時已按寬度排序：「預期」那條直欄疊在其他橫帶上，要先比
+  if(!p) return null;
+  for(var i=0;i<bands.length;i++){ var b=bands[i]; if(p.x>=b.x && p.x<b.x+b.w && p.y>=b.y && p.y<b.y+b.h) return b; }
+  return null;
+}
+function cbCollectBands(d){
+  var svg=cbSvgs(d)[0]; if(!svg) return [];
+  var bands=Array.from(svg.querySelectorAll('rect.cb-z')).map(function(r){
+    return {key:r.getAttribute('data-band')||r.getAttribute('class'), x:+r.getAttribute('x')||0, y:+r.getAttribute('y')||0,
+            w:+r.getAttribute('width')||0, h:+r.getAttribute('height')||0, label:'', keys:[]};
+  });
+  var bySize=bands.slice().sort(function(a,b){ return a.w-b.w; }); // 窄的直欄（預期）先比，再比全寬橫帶
+  Array.from(svg.querySelectorAll('text.cb-zl')).forEach(function(t){
+    if(t.getAttribute('class').indexOf('cb-en')>=0) return;
+    var b=cbBandOf(bySize,cbXY({querySelector:function(){return t;}}));
+    if(b && !b.label) b.label=t.getAttribute('aria-label')||t.textContent.trim();
+  });
+  var other={key:'other', label:'', keys:[]}, gtext={};
+  Array.from(svg.querySelectorAll('.cb-node[data-k]')).forEach(function(g){
+    var k=g.getAttribute('data-k'), b=cbBandOf(bySize,cbXY(g))||other; b.keys.push(k);
+    gtext[k]=(g.textContent||'')+' '+(g.getAttribute('aria-label')||''); // 圖上本來就看得到的字（驗洩漏時排除）
+  });
+  bands.forEach(function(b){ b.gtext=gtext; }); other.gtext=gtext;
+  if(other.keys.length){
+    var ex=svg.querySelector('.cb-exit-t.cb-zh, .cb-exit-t'); other.label=ex?ex.textContent.trim():'圖下方';
+    bands.push(other);
+  }
+  return bands.filter(function(b){ return b.keys.length; });
+}
+function cbEvText(dk){ // 一個節點證據卡的「正文」（不含節點標題：標題不遮時本來就留在圖上）
+  if(!dk) return '';
+  var a=[]; if(dk.when) a.push(dk.when);
+  (dk.blocks||[]).forEach(function(b){
+    if(b.ev) b.ev.forEach(function(e){ a.push((e.f?e.f+'——':'')+(e.m||'')); });
+    else if(b.p) a.push(b.p);
+  });
+  if(dk.src) a.push(dk.src);
+  return a.join(' ');
+}
+function cbMaskNodeTitles(d,keys){ // 三張 SVG 的節點字（留「原因／多空」這類標籤）→ 馬賽克＋模糊
+  var set={}; keys.forEach(function(k){ set[k]=1; });
+  cbSvgs(d).forEach(function(svg){
+    Array.from(svg.querySelectorAll('.cb-node[data-k]')).forEach(function(g){
+      if(!set[g.getAttribute('data-k')]) return;
+      Array.from(g.querySelectorAll('text')).forEach(function(t){
+        var c=t.getAttribute('class')||'';
+        if(/\bcb-(kind|tag)\b/.test(c)) return;
+        var n=Math.min((t.textContent||'').length||6,12), tsp=t.querySelector('tspan');
+        if(tsp){ Array.from(t.querySelectorAll('tspan')).forEach(function(s,i){ if(i) s.remove(); }); tsp.textContent=frostFiller(n); }
+        else t.textContent=frostFiller(n);
+        t.setAttribute('style','filter:blur('+Math.max(2,blurPx-3)+'px);user-select:none');
+      });
+      var kind=g.querySelector('.cb-kind.cb-zh'); g.setAttribute('aria-label',(kind?kind.textContent.trim()+'：':'')+'付費內容');
+    });
+  });
+}
 function detectProfile(d){
   var main=d.querySelector('main')||d.body;
+  if(main.querySelector('.cb-concl, .cb-wrap')) return PROFILES.combined; // 綜合報告(cb-* 命名)
   if(main.querySelector('.content-section')) return PROFILES.wrapped; // mw/ai/總經(有容器,內含 section-header)
   if(main.querySelector('.section-header'))   return PROFILES.flat;   // us/tw(扁平,無容器)
   return PROFILES.key;                                                 // 關鍵報告/簡報(.sec-*)
@@ -2606,7 +2690,13 @@ function detectProfile(d){
 // 收集切段「把手」:import 在 doc 上跑、export 在 clone 上跑,索引與 BLOCKS 平行對齊
 function collectHandles(d, prof){
   var main=d.querySelector('main')||d.body, handles=[];
-  if(prof.mode==='element'){
+  if(prof.mode==='cbmap'){ // 綜合報告：頭條(保護) → 因果圖各橫帶 → 舊版 .cb-more
+    var root=d.getElementById('cb-root')||main;
+    var concl=root.querySelector('.cb-concl'); if(concl) handles.push({el:concl, protect:true});
+    var D=cbData(d)||{};
+    cbCollectBands(d).forEach(function(b){ handles.push({band:b, D:D}); });
+    Array.from(root.querySelectorAll('.cb-more')).forEach(function(el){ handles.push({el:el}); });
+  } else if(prof.mode==='element'){
     Array.from(main.querySelectorAll(prof.blockSel)).forEach(function(el){ handles.push({el:el}); });
   } else { // delimited:每個 header 起一段,吃到下一個 header 前
     Array.from(main.querySelectorAll(prof.headerSel)).forEach(function(h){
@@ -2618,6 +2708,19 @@ function collectHandles(d, prof){
   return handles;
 }
 function handleMeta(hnd, prof){
+  if(hnd.band){ // cbmap 橫帶：標題＝帶名＋節點標題；正文＝各節點證據卡
+    /* probes：給 verifyFree 用的「原樣出現在 JSON 裡」的片段（每節點取第一個不含在節點標題裡的證據句；
+       text 是拼過的，在 JSON 裡不連續，拿它驗不出洩漏） */
+    var probes=[];
+    hnd.band.keys.forEach(function(k){
+      var dk=hnd.D[k]; if(!dk) return; var tt=(dk.title||'')+' '+(hnd.band.gtext[k]||''), got=null;
+      (dk.blocks||[]).forEach(function(b){ (b.ev?b.ev.reduce(function(a,e){ return a.concat([e.f,e.m]); },[]):[b.p]).forEach(function(s){
+        if(!got && s && s.length>=6 && tt.replace(/\s+/g,'').indexOf(String(s).replace(/\s+/g,'').slice(0,24))<0) got=s; }); });
+      if(got) probes.push(got);
+    });
+    return {title:(hnd.band.label||'因果圖')+'（'+hnd.band.keys.length+' 個節點）',
+            text:hnd.band.keys.map(function(k){ return cbEvText(hnd.D[k]); }).filter(Boolean).join(' '), probes:probes};
+  }
   var titScope=hnd.el||hnd.header;
   var titEl=titScope.querySelector(prof.titleSel);
   var title=titEl?titEl.textContent.trim():'(未命名段)';
@@ -2647,7 +2750,20 @@ async function importHTML(html){
   doc=new DOMParser().parseFromString(html,'text/html');
   PROFILE=detectProfile(doc);
   var handles=collectHandles(doc,PROFILE);
-  if(!handles.length){ await uiAlert('找不到可切的段落。支援母板:關鍵報告/簡報(.section)、市場觀察/AI/總經(.content-section)、美股/台股(.section-header)。'); return; }
+  /* 偵測失敗時的通用安全網（2026-10-08）：以前這裡 bare return，連「上傳付費檔」
+     都還是灰的（啟用按鈕的程式碼寫在 return 之後），遇到沒收錄的母板就整支卡死。
+     buildPaidDoc() 只吃 doc／.paywall／.yoda-unlock-cta／WM_BAKE，不依賴 BLOCKS 或 N，
+     所以不切段也能正確產出付費檔 → 保留 doc 與 srcName，就地放行上傳相關按鈕，
+     只跳過 buildEditor()（沒有段落可畫，免費試閱版也不產生）。 */
+  if(!handles.length){
+    BLOCKS=[]; N=0; minCut=0; cut=0;
+    await uiAlert('此母板無法自動切段，只能整份上傳付費檔（不產生免費試閱版）。');
+    document.getElementById('btn-free').disabled=true;
+    document.getElementById('btn-paid').disabled=false;
+    document.getElementById('btn-upload').disabled=false;
+    document.getElementById('tb-status').innerHTML='已匯入 <b>'+srcName+'</b> · <b style="color:var(--danger)">無法自動切段</b>　只能整份上傳付費檔（不產生免費試閱版）';
+    return;
+  }
   var paywall=PROFILE.paywallSel?doc.querySelector(PROFILE.paywallSel):null;
   /* ── 2026-09-16 修：金軸「按得下去但一格都動不了」的病根 ────────────────
      .paywall 當初設計成「文章中段的分界標記」：它前面＝§9-5 保護區。
@@ -2668,7 +2784,7 @@ async function importHTML(html){
     var ref=hnd.el||hnd.header;
     var before = pwSplits ? (ref.compareDocumentPosition(paywall) & Node.DOCUMENT_POSITION_FOLLOWING) : false;
     var kw = PROFILE.protectKW.some(function(k){return m.title.indexOf(k)>=0;});
-    return {title:m.title, text:m.text, protect:!!(before||kw), maskTitle:false, maskContent:false};
+    return {title:m.title, text:m.text, probes:m.probes||null, protect:!!(before||kw||hnd.protect), maskTitle:false, maskContent:false};
   });
   N=BLOCKS.length;
   /* minCut 原本取「最後一個保護段 index+1」。只要有一段晚出現的保護段
@@ -2824,9 +2940,23 @@ function lockNote(clone){
 function buildFreeDoc(){
   var clone=doc.cloneNode(true);
   var handles=collectHandles(clone,PROFILE);              // 在 clone 上重收把手,索引與 BLOCKS 對齊
+  var cbD=null, cbDirty=false;                            // cbmap：證據卡 JSON 改完一次寫回
   for(var i=0;i<handles.length;i++){
     var b=BLOCKS[i]; if(!b||b.protect||!isMasked(b)) continue;
     var hnd=handles[i];
+    if(hnd.band){ // 綜合報告因果圖橫帶
+      cbD=cbD||hnd.D; cbDirty=true;
+      hnd.band.keys.forEach(function(k){
+        var dk=cbD[k]; if(!dk) return;
+        if(b.maskContent){
+          dk.blocks=[{h:'🔒 付費內容', he:'🔒 Members only', p:'完整證據為付費版 → 解鎖完整版', pe:'Full evidence is for members → unlock the full report'}];
+          delete dk.src; delete dk.when;
+        }
+        if(b.maskTitle) dk.title=frostFiller(Math.min((dk.title||'').length||8,12));
+      });
+      if(b.maskTitle) cbMaskNodeTitles(clone, hnd.band.keys);
+      continue;
+    }
     if(b.maskContent){
       if(hnd.el){ // element:留表頭、清其餘子節點(連文字節點 {{...}} 一併刪)、塞馬賽克
         var keep=PROFILE.headKeepSel?hnd.el.querySelector(PROFILE.headKeepSel):null;
@@ -2843,6 +2973,7 @@ function buildFreeDoc(){
       if(t){ t.setAttribute('style','filter:blur('+Math.max(3,blurPx)+'px);user-select:none;color:var(--text3,#888);font-family:monospace'); t.textContent=frostFiller(Math.min(b.title.length,12)); }
     }
   }
+  if(cbDirty){ var cbS=clone.getElementById('cb-data'); if(cbS) cbS.textContent=JSON.stringify(cbD).replace(/</g,'\\u003c'); }
   // ── 強制注入【解鎖完整版】CTA → subscribe（固定畫面最下方、寬約 1/3、捲動恆顯示）──
   var head=clone.querySelector('head');
   if(head){
@@ -2894,8 +3025,8 @@ function verifyFree(){
   var free=buildFreeDoc().replace(/\s+/g,''), leaks=[];
   for(var i=0;i<N;i++){
     var b=BLOCKS[i]; if(!b||b.protect||!b.maskContent) continue;
-    var p=b.text.replace(/\s+/g,'').slice(0,24);
-    if(p.length>=6 && free.indexOf(p)>=0) leaks.push(b.title+'(內容)');
+    var hit=(b.probes||[b.text]).some(function(s){ var p=String(s).replace(/\s+/g,'').slice(0,24); return p.length>=6 && free.indexOf(p)>=0; });
+    if(hit) leaks.push(b.title+'(內容)');
   }
   return leaks;
 }
