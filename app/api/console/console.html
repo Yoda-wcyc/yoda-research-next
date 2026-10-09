@@ -2712,10 +2712,17 @@ function handleMeta(hnd, prof){
     /* probes：給 verifyFree 用的「原樣出現在 JSON 裡」的片段（每節點取第一個不含在節點標題裡的證據句；
        text 是拼過的，在 JSON 裡不連續，拿它驗不出洩漏） */
     var probes=[];
+    /* 2026-10-09 修誤報：同一句證據若也出現在「這一帶以外」的節點（例：結論節點 c 的「位階」句和
+       預期帶某節點同一句）或頁面其他可見文字，那句本來就會留在免費檔 → 不能拿來當洩漏探針，跳過。 */
+    var own={}; hnd.band.keys.forEach(function(k){ own[k]=1; });
+    var outside=Object.keys(hnd.D).filter(function(k){ return !own[k]; }).map(function(k){ return JSON.stringify(hnd.D[k]); }).join(' ');
+    if(doc&&doc.body){ var bc=doc.body.cloneNode(true); Array.from(bc.querySelectorAll('script,template,style')).forEach(function(x){ x.remove(); }); outside+=' '+bc.textContent; }
+    outside=outside.replace(/\s+/g,'');
     hnd.band.keys.forEach(function(k){
       var dk=hnd.D[k]; if(!dk) return; var tt=(dk.title||'')+' '+(hnd.band.gtext[k]||''), got=null;
       (dk.blocks||[]).forEach(function(b){ (b.ev?b.ev.reduce(function(a,e){ return a.concat([e.f,e.m]); },[]):[b.p]).forEach(function(s){
-        if(!got && s && s.length>=6 && tt.replace(/\s+/g,'').indexOf(String(s).replace(/\s+/g,'').slice(0,24))<0) got=s; }); });
+        var p=s?String(s).replace(/\s+/g,'').slice(0,24):'';
+        if(!got && s && s.length>=6 && tt.replace(/\s+/g,'').indexOf(p)<0 && outside.indexOf(p)<0) got=s; }); });
       if(got) probes.push(got);
     });
     return {title:(hnd.band.label||'因果圖')+'（'+hnd.band.keys.length+' 個節點）',
