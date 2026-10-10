@@ -632,6 +632,15 @@ export default function Home() {
               <p>用遊戲體會投資世界裡的道理與心法。</p>
               <span className="go">進遊戲庫 →</span>
             </a>
+            {/* 小朋友學習站（固定卡片，不吃 latest 動態資料） */}
+            <a className="card cat reveal"
+               href="https://yoda-wcyc.github.io/Kids-Station/"
+               target="_blank" rel="noopener noreferrer">
+              <span className="tag">給小朋友</span>
+              <h3>🎈 小朋友學習站<span className="ttl-arrow" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span></h3>
+              <p>英文、數學、社會、自然的練習與心智圖。</p>
+              <span className="go">進學習站 →</span>
+            </a>
             {/* 判斷紀錄卡（暫時隱藏，勿刪；要恢復請把下面整段從註解取出）
             <a className="card cat reveal"
                href="https://yoda-wcyc.github.io/-/track-record.html"
