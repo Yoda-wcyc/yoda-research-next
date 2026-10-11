@@ -241,6 +241,11 @@ html[data-theme="light"] .btn-gold{color:#fff}
 .cat h3{font-size:calc(21px*var(--scale));font-weight:600;letter-spacing:-.015em;margin:8px 0 6px}
 .cat p{font-size:calc(15px*var(--scale));color:var(--dim)}
 .cat .go{font-size:calc(14px*var(--scale));color:var(--accent);margin-top:12px;display:inline-block}
+/* 研究卡縮圖（latest[key].thumb；16:9、深色圖底，深淺主題共用；沒 thumb 的卡不受影響） */
+.cat .cat-thumb{display:block;position:relative;aspect-ratio:16/9;margin:0 0 12px;border-radius:10px;overflow:hidden;border:1px solid var(--border);background:#0d1117}
+.cat .cat-thumb img{display:block;width:100%;height:100%;max-width:100%;object-fit:cover;transition:transform .35s ease}
+.cat:hover .cat-thumb img{transform:scale(1.03)}
+@media (prefers-reduced-motion:reduce){.cat .cat-thumb img{transition:none}.cat:hover .cat-thumb img{transform:none}}
 /* ═══ 研究卡片標題 hover 滑出箭頭 ═══ */
 /* 放進首頁全域 CSS，建議貼在「研究分類」段的 .cat .go{...} 之後 */
 /* 注意：選擇器用 .cat（研究卡），不是 .card（儀表板四格） */

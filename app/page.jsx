@@ -614,8 +614,16 @@ export default function Home() {
               const desc = rawDesc.length > 50 ? rawDesc.slice(0, 50) + "…" : rawDesc;
               const go   = c.go ? c.go : (has && e.date ? `閱讀最新(${e.date})→` : "閱讀最新 →");
               const extra = c.ext ? { target: "_blank", rel: "noopener noreferrer" } : {};
+              /* 縮圖（reports.json latest[key].thumb，hub 相對路徑；OPS-deploy §B-9b 更新 latest 時同步換）；沒有 thumb 或載入失敗＝卡片維持原樣 */
+              const thumb = !c.href && has && e.thumb ? (/^https?:/i.test(e.thumb) ? e.thumb : BASE + "/-/" + e.thumb) : "";
               return (
                 <a key={c.key} className="card cat reveal" href={href} {...extra}>
+                  {thumb && (
+                    <span className="cat-thumb">
+                      <img src={thumb} alt={`${c.title}（${e.date}）報告圖表預覽`} loading="lazy" decoding="async" width="640" height="360"
+                        onError={ev => { ev.currentTarget.parentElement.style.display = "none"; }} />
+                    </span>
+                  )}
                   <span className={c.paid ? "tag breathe" : "tag"} style={c.paid ? { display:"inline-block", color:"#080b10", padding:"calc(3px*var(--scale)) calc(10px*var(--scale))", borderRadius:9999, letterSpacing:".04em", fontWeight:700 } : { display:"inline-block", whiteSpace:"pre-line", lineHeight:1.3 }}>{c.tag}</span>
                   <h3>{c.title}<span className="ttl-arrow" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span></h3>
                   <p>{desc}</p>
