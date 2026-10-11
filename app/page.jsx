@@ -32,6 +32,9 @@ const CATS = [
   { key: "專題",    tag: "不定期",  title: "專題研究",   desc: "單一主題深度分析：動能因子、事件驅動、產業結構與市場機制拆解。" },
 ];
 
+/* 研究卡縮圖佔位的報型色（色相；佔位只在「同排有縮圖卡」時出現，見 globals.css「同排齊整」） */
+const PH_HUE = { "簡報":205, "關鍵報告":42, "市場觀察":188, "美股":222, "台股":352, "AI泡沫":275, "總經":150, "專題":28, "遊戲庫":315, "小朋友":95 };
+
 /* ── 市場觀察四條溫度計 ── */
 function TempBar({ name, label, labelColor, pct, bubbleColor }) {
   return (
@@ -622,37 +625,43 @@ export default function Home() {
               /* 縮圖（reports.json latest[key].thumb，hub 相對路徑；OPS-deploy §B-9b 更新 latest 時同步換）；沒有 thumb 或載入失敗＝卡片維持原樣 */
               const thumb = !c.href && has && e.thumb ? (/^https?:/i.test(e.thumb) ? e.thumb : BASE + "/-/" + e.thumb) : "";
               return (
-                <a key={c.key} className="card cat reveal" href={href} {...extra}>
+                <a key={c.key} className="card cat reveal" href={href} data-ph={c.title} style={{ ["--ph-h"]: PH_HUE[c.key] ?? 210 }} {...extra}>
                   {thumb && (
                     <span className="cat-thumb">
                       <img src={thumb} alt={`${c.title}（${e.date}）報告圖表預覽`} loading="lazy" decoding="async" width="640" height="360"
                         onError={ev => { ev.currentTarget.parentElement.style.display = "none"; }} />
                     </span>
                   )}
+                  <span className="cat-body">
                   <span className={c.paid ? "tag breathe" : "tag"} style={c.paid ? { display:"inline-block", color:"#080b10", padding:"calc(3px*var(--scale)) calc(10px*var(--scale))", borderRadius:9999, letterSpacing:".04em", fontWeight:700 } : { display:"inline-block", whiteSpace:"pre-line", lineHeight:1.3 }}>{c.tag}</span>
                   <h3>{c.title}<span className="ttl-arrow" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span></h3>
                   <p>{desc}</p>
                   <span className="go">{go}</span>
+                  </span>
                 </a>
               );
             })}
             {/* 遊戲庫（固定卡片，不吃 latest 動態資料） */}
-            <a className="card cat reveal"
+            <a className="card cat reveal" data-ph="遊戲庫" style={{ ["--ph-h"]: PH_HUE["遊戲庫"] }}
                href="https://yoda-wcyc.github.io/game/"
                target="_blank" rel="noopener noreferrer">
+              <span className="cat-body">
               <span className="tag">玩玩看</span>
               <h3>🎮 遊戲庫<span className="ttl-arrow" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span></h3>
               <p>用遊戲體會投資世界裡的道理與心法。</p>
               <span className="go">進遊戲庫 →</span>
+              </span>
             </a>
             {/* 小朋友學習站（固定卡片，不吃 latest 動態資料） */}
-            <a className="card cat reveal"
+            <a className="card cat reveal" data-ph="小朋友學習站" style={{ ["--ph-h"]: PH_HUE["小朋友"] }}
                href="https://yoda-wcyc.github.io/Kids-Station/"
                target="_blank" rel="noopener noreferrer">
+              <span className="cat-body">
               <span className="tag">給小朋友</span>
               <h3>🎈 小朋友學習站<span className="ttl-arrow" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span></h3>
               <p>英文、數學、社會、自然的練習與心智圖。</p>
               <span className="go">進學習站 →</span>
+              </span>
             </a>
             {/* 判斷紀錄卡（暫時隱藏，勿刪；要恢復請把下面整段從註解取出）
             <a className="card cat reveal"

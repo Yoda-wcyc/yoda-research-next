@@ -1313,7 +1313,7 @@ if(cm){var k=+cm[1],sc0=scenOf(curScen);sc0.steps.slice(0,k).forEach(function(st
 var sm2=location.hash.match(/scenario=([a-z_]+)/); if(sm2){curScen=sm2[1];runScen(curScen);}
 window.chainRingAI={verifyHeat:verifyHeat,spinOf:spinOf,calcHeat:calcHeat,LINKS:LINKS,open:openLink,
                   setStress:function(v){stress=v;range.value=Math.round(v*100);setStage();render();}};
-window.chainRing.spin={angle:function(){return SPIN.total;},theta:function(){return SPIN.theta;},
+window.chainRingAI.spin={angle:function(){return SPIN.total;},theta:function(){return SPIN.theta;},
   running:function(){return !!SPIN.raf;},frames:function(){return SPIN.frames;},
   frags:function(){return FR.list.length;},
   seek:function(d){SPIN.theta=((+d%360)+360)%360;layoutSpin(SPIN.theta);return SPIN.theta;},   /* 驗收用：直接排到某個角度 */
