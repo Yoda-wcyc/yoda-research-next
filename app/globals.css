@@ -208,6 +208,8 @@ html[data-theme="light"] .btn-gold{color:#fff}
 .orbiter:hover{filter:brightness(1.15)}
 @keyframes hexFloat{0%,100%{transform:translate(0,0)}50%{transform:translate(var(--fx,0px),var(--fy,0px))}}
 .hero-cta:hover .hexorbit,.hero-cta:hover .hexarm,.hero-cta:hover .orbiter{animation-play-state:paused}
+/* 六角鈕惡作劇（lib/hex-prank.js）：有鈕逃開後凍結繞行，停下的鈕才不會漂走 */
+.hero-cta.prank-freeze .hexorbit,.hero-cta.prank-freeze .hexarm,.hero-cta.prank-freeze .orbiter{animation-play-state:paused}
 @media (prefers-reduced-motion:reduce){
   .hexorbit{animation:none}
   .hexarm{animation:none}

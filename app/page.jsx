@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import InstallApp from "../components/InstallApp";
 import CHAINS from "./home-chains.json";
+import { initHexPrank } from "../lib/hex-prank";
 
 const BASE = "https://yoda-wcyc.github.io";
 const SUBSTACK = "https://iamtwispin.substack.com";
@@ -343,6 +344,10 @@ export default function Home() {
 
   useEffect(() => { setMounted(true); }, []);
 
+  /* 六角鈕惡作劇：四顆繞行鈕前兩次逃跑（會員專區不參與），規則見 lib/hex-prank.js */
+  const ctaRef = useRef(null);
+  useEffect(() => { if (mounted) return initHexPrank(ctaRef.current); }, [mounted]);
+
   useEffect(() => {
     try { if (localStorage.getItem("hideTabletHint") === "1") setShowTabletHint(false); } catch(e) {}
   }, []);
@@ -400,7 +405,7 @@ export default function Home() {
   <br />
   解碼美股與台股的真實訊號
 </p>
-        <div className="hero-cta reveal" style={{ position:"relative", width:"min(360px, 92vw)", ["--cw"]:"min(360px, 92vw)", ["--R0"]:"calc(var(--cw) * 0.37)", aspectRatio:"1 / 1", margin:"6px auto", overflow:"visible" }}>
+        <div ref={ctaRef} className="hero-cta reveal" style={{ position:"relative", width:"min(360px, 92vw)", ["--cw"]:"min(360px, 92vw)", ["--R0"]:"calc(var(--cw) * 0.37)", aspectRatio:"1 / 1", margin:"6px auto", overflow:"visible" }}>
           {mounted && (() => {
             const KIND = {
               gold:    { stops:["#ffd54a","#c8901c"], stroke:"#c8901c", color:"#000" },
