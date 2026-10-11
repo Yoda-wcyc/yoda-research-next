@@ -210,6 +210,8 @@ html[data-theme="light"] .btn-gold{color:#fff}
 .hero-cta:hover .hexorbit,.hero-cta:hover .hexarm,.hero-cta:hover .orbiter{animation-play-state:paused}
 /* 六角鈕惡作劇（lib/hex-prank.js）：有鈕逃開後凍結繞行，停下的鈕才不會漂走 */
 .hero-cta.prank-freeze .hexorbit,.hero-cta.prank-freeze .hexarm,.hero-cta.prank-freeze .orbiter{animation-play-state:paused}
+/* 繞行的巢狀 rotate 會把逃開鈕的 overflow 外框放大成橫向捲動；鈕本身一定在視窗內，凍結期間 hero 橫向裁切即可 */
+.hero:has(> .hero-cta.prank-freeze){overflow-x:clip}
 @media (prefers-reduced-motion:reduce){
   .hexorbit{animation:none}
   .hexarm{animation:none}
