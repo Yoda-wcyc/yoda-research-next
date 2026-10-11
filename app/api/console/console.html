@@ -732,7 +732,12 @@ var PRICE={'創始':459,'一般':589};   /* 內建預設值＝退路；登入後
 
 let members=[];            // 真資料：由 GAS adminData 載入後 map
 let referrals=[];          // GAS 尚未提供個別免費推薦紀錄 → 保持空
-let granted={};            // 本機暫存：已發放獎勵
+/* ★獎勵角標的「已發放月數」(m.comp) 一律以【正本】為第一順位：
+     GAS adminSubscriptionTable 回傳的 grantedMonths（＝Sheet 的 earned_free_months）。
+   病根：「標記已發放」(adminGrant) 只寫 Google Sheet 正本，Neon 鏡像要等 syncMemberByIdToNeon 才追上；
+         角標以前讀鏡像(/api/admin-data 的 granted 欄) → 同步落差期間角標說謊、重新整理也不熄。
+   正本直供之後就不需要任何本機暫存的「真相副本」（舊版的 compTruth 已拔除，避免第二個真相來源）。
+   舊版 GAS 還沒部署（沒有 grantedMonths）時才退回鏡像值，不會壞掉也不會算成 0／NaN。 */
 let reconDone={};          // 本機暫存：本月對帳結果
 
 /* ===== 登入 → 載入 ===== */
@@ -775,15 +780,27 @@ function login(){
     else{$('loginMsg').style.color='var(--red)';$('loginMsg').textContent='連線失敗或回應異常';}
   }).catch(function(){$('loginBtn').disabled=false;$('loginMsg').style.color='var(--red)';$('loginMsg').textContent='連線失敗（可能是本機 file:// CORS）';});
 }
+/* 正本(GAS/Sheet)的已發放月數。拿不到就回 NaN，呼叫端據此退回 Neon 鏡像值。
+   會回 NaN 的情形：還沒載到訂閱總表（登入第一輪）、這個人正本沒有列、舊版 GAS 還沒回 grantedMonths。
+   資料源跟 m.sub 完全同一包（subsInfo.members），只是 mapMember 跑在 m.sub 掛上之前，所以直接查索引。 */
+var subsById={};
+function subGrantedMonths(id){
+  var s=subsById[id];
+  if(!s)return NaN;
+  var v=Number(s.grantedMonths);
+  return isFinite(v)?v:NaN;
+}
 function mapMember(g){
   const st=g.status==='active'?'有效':g.status==='cancelled'?'已取消':(g.status==='expired'||g.status==='late')?'逾期':(g.status||'有效');
+  const truth=subGrantedMonths(g.member_id);   // ★正本優先
   return {id:g.member_id, pub:g.pub_id||'', name:(String(g.email||'').split('@')[0]||g.member_id), email:g.email||'',
     // ★方案照實帶，不要把空白假造成「創始」——
     //   假造會讓畫面說創始、而算獎勵與核對金額用的是原始空值，兩邊講的不是同一件事。
     plan:String(g.plan||'').trim(), planBlank:String(g.plan||'').trim()==='',
     internal:g.internal===true, fb:g.fb_name||'', start:g.start_date||'', next:g.next_charge_date||'', status:st,
     streak:Number(g.paid_periods)||0, ref:g.referred_by||'', refCode:g.ref_code||'',
-    comp:Number(g.granted)||0, paidRefs:Number(g.referred_paid_count)||0,
+    // ★comp＝已發放月數。第一順位＝正本(grantedMonths)；讀不到（舊版 GAS 未部署）才退回鏡像 g.granted。
+    comp:isFinite(truth)?truth:(Number(g.granted)||0), paidRefs:Number(g.referred_paid_count)||0,
     exFounding:/^(y|yes|true|1)$/i.test(String(g.ex_founding||'').trim()), // 曾取消·排除創始·回頭客
     inPayments:g.in_payments===true,
     ta:g.ta_access===true,   // 技術分析權限（獨立 ta_access 表·LEFT JOIN 帶回；鏡像 TRUNCATE members 不會洗掉）
@@ -888,6 +905,9 @@ function loadFromGAS(){
     //   否則 admin-data 那半邊一失敗就整個 return，版本那一行永遠是空白——
     //   而空白看起來像「這功能沒做」，其實是「還沒跑到」。
     subsInfo=(sub&&sub.ok)?sub:null;
+    // ★正本索引要在 mapMember 之前就重建——角標的 m.comp 是在 mapMember 裡取正本值的。
+    //   拿不到訂閱總表就清空，mapMember 自然退回鏡像值（不要留上一輪的舊索引當真相）。
+    subsById={}; if(subsInfo&&subsInfo.members)subsInfo.members.forEach(function(x){subsById[x.memberId]=x;});
     subsErr=subsInfo?'':((sub&&(sub.__netErr||sub.error))||'GAS 沒有回應或回傳了非預期的內容');
     gasVersion=(subsInfo&&subsInfo.codeVersion)||'';
     renderGasVersion();
@@ -907,7 +927,8 @@ function loadFromGAS(){
         members.push({ id:s.memberId, pub:'', name:(String(s.email||'').split('@')[0]||s.memberId),
           email:s.email, plan:s.plan||'', fb:s.name||'', start:s.startDate||'', next:s.accessUntil||'',
           status:(s.status==='active'?'有效':(s.status==='cancelled'?'已取消':(s.status||''))),
-          streak:s.paidPeriods||0, ref:'', refCode:'', comp:0, paidRefs:0, refTotal:0,
+          // comp 同樣以正本為準（這些人鏡像根本沒有列，沒有鏡像值可退）
+          streak:s.paidPeriods||0, ref:'', refCode:'', comp:Number(s.grantedMonths)||0, paidRefs:0, refTotal:0,
           exFounding:!!s.exFounding, inPayments:!!s.hasEcpayRecord, paid:!!s.inAccess,
           sub:s, mirrorMissing:true });
       });
@@ -935,7 +956,7 @@ function c7Eligible(m){return m.status==='有效'&&earnedMonths(m.streak,m.paidR
 function todos(){
   const out=[];
   members.forEach(m=>{
-    if(c7Eligible(m)&&!granted[m.id+':c7']){
+    if(c7Eligible(m)){
       const owe=earnedMonths(m.streak,m.paidRefs,m.plan)-m.comp;
       out.push({kind:'c7',id:m.id,title:`${escH(m.name)}（${escH(m.id)}）達加碼標準`,
         desc:`連續 <b>${m.streak}</b> 期 ＋ 帶進 <b>${m.paidRefs}</b> 位付費 → 應送 <b>${earnedMonths(m.streak,m.paidRefs,m.plan)}</b> 月（已送 ${m.comp}）→ 去綠界<b>退 ${owe} 期款</b>`,key:'c7'});
@@ -984,7 +1005,18 @@ function markDone(id){
   if(owe<=0){toast('沒有待發月數');return;}
   toast('寫入中…');
   post({action:'adminGrant',key:KEY,memberId:id,months:owe}).then(res=>{
-    if(res&&res.ok){toast(`已標記發放 ${owe} 個月`);loadFromGAS();}else{toast((res&&res.error)||'失敗');}
+    if(res&&res.ok){
+      // ★角標要熄，靠的是「正本回報的新已發放月數」，不是把角標清成 0。
+      //   adminGrantReward → updateMember_ 回傳寫完後的整列(rowToObj)，earned_free_months 就是新值。
+      //   這裡只先更新畫面上這一位的 comp（手感：點完立刻熄），判定條件(earnedMonths > comp)一字不改；
+      //   真正的真相由 loadFromGAS() 重取 adminSubscriptionTable 的 grantedMonths（正本）蓋回來。
+      var nv=(res.member!=null)?Number(res.member.earned_free_months):NaN;
+      if(!isFinite(nv))nv=m.comp+owe;   // 舊版 GAS 沒回整列 → 退回「原值＋本次發放」，仍是同一條判定
+      m.comp=Math.max(m.comp,nv);
+      toast(`已標記發放 ${owe} 個月`);
+      renderDash();                     // 立刻用新 comp 重算 c7Eligible → 角標與待辦同步熄滅
+      loadFromGAS();                    // 重取正本（grantedMonths）對一次，之後就以正本為準
+    }else{toast((res&&res.error)||'失敗');}
   }).catch(()=>toast('連線失敗'));
 }
 
@@ -1926,7 +1958,7 @@ function bcxInit(){
 /* ===== 渲染：推薦與獎勵 ===== */
 function renderRewards(){
   $('c7List').innerHTML=members.map(m=>{
-    const paid=m.paidRefs,owe=earnedMonths(m.streak,paid,m.plan),done=granted[m.id+':c7'];
+    const paid=m.paidRefs,owe=earnedMonths(m.streak,paid,m.plan);
     const nextTier=Math.min(5,Math.floor(m.streak/2));   // 粗略：下一階需求
     return `<div class="reward-row">
       <div class="who">${escH(m.name)} <span class="id">${escH(m.id)}</span> ${owe>m.comp?`<span class="pill plan-f">應送 ${owe-m.comp} 月</span>`:''}</div>
