@@ -18,6 +18,7 @@ function catOf(id) {
   if (/AI泡沫|泡沫評估/.test(s)) return 'AI泡沫';
   if (/^專題/.test(s)) return '專題';
   if (/使用手冊/.test(s)) return '使用手冊';   // 缺這條時會落入下面的 fallback，被誤標成「關鍵報告」
+  if (/綜合/.test(s)) return '綜合';           // 同上：綜合報告原本被 fallback 誤標成「關鍵報告」
   return '關鍵報告';
 }
 
