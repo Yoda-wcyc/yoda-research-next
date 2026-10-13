@@ -169,7 +169,8 @@
     '五日線': '5-day MA', '月線': '20-day MA', '季線': '60-day MA', '年線': '240-day MA',
     '鍊條': 'chain', '領先環': 'leading link', '落後環': 'lagging link', '打滑': 'slipping',
     '名詞解釋': 'Glossary', '動態圖': 'animated chart', '動畫：開': 'Animation: on', '動畫：關': 'Animation: off',
-    '開牌日': 'Check date'
+    '開牌日': 'Check date',
+    '總經報告': 'Macro Report', '總經': 'Macro'
   };
 
   var LIB = 'https://translate.google.com/translate_a/element.js?cb=__ltInit';
