@@ -2314,22 +2314,99 @@ function isPaidHidden(reportId){ var o=paidOv[paidOvKey(reportId)]; return !!(o&
 /* 2026-09-12 根治「剛上傳看不到」：清單以瀏覽器直抓的 Vercel 索引為準（?fresh=<ts> 唯一網址、伺服器回 no-store，
    不吃 CDN 30 秒快取），GAS 的 adminListPaid 只負責疊上寄送狀態。Yoda 14:19 上傳美股 0912、14:20 看清單沒有——
    GAS 那條路吃到的是上傳前那一版快取。現在上傳完切過來就在。*/
+/* 2026-10-15：GAS 偶發卡住時，post 的 promise 可能永遠不回 → 畫面永遠停在「載入中／寄送中」。
+   withTimeout／postT：ms 內沒回就 reject(Error 'TIMEOUT', e.timeout=true)；晚到的回應直接丟掉。 */
+function withTimeout(p, ms){
+  return new Promise(function(resolve,reject){
+    var done=false, t=setTimeout(function(){ if(done)return; done=true; var e=new Error('TIMEOUT'); e.timeout=true; reject(e); }, ms);
+    p.then(function(v){ if(done)return; done=true; clearTimeout(t); resolve(v); },
+           function(e){ if(done)return; done=true; clearTimeout(t); reject(e); });
+  });
+}
+function postT(payload, ms){ return withTimeout(post(payload), ms); }
+var PAID_LOAD_TIMEOUT_MS=30000;     // 清單 30 秒沒回＝逾時
+var PAID_RETRY_BTN=' <button class="mini-act" onclick="loadPaidReports()">重試</button>';
+var _paidSeq=0, _mailBusy=false;
+function paidMsg(html){ var box=$('paidBody'); if(box) box.innerHTML='<tr><td colspan="6"><div class="empty">'+html+'</div></td></tr>'; }
+function toastSticky(msg){ const el=$('toast'); el.textContent=msg; el.classList.add('show'); clearTimeout(toastTimer); }
+/* ===== 寄信自動重送（2026-10-17 · Yoda：「3 分鐘內沒寄出去，就自動重新寄送，直到完成任務為止，並計算總共嘗試了幾次才成功」）=====
+   每次呼叫帶 attempt（第幾次）＋ job（這一輪代號）。伺服器（GAS 2026-10-17-a 起）每段最多寄 2.5 分鐘就先停、回 done:false。
+     · done:false            → 自動再呼叫（接著寄還沒收到的人）
+     · 3 分鐘沒回應（逾時）  → 自動再呼叫；那一段若還在背景寄，伺服器回 busy → 等 20 秒再呼叫
+     · 連線中斷／執行被砍    → 10 秒後再呼叫
+     · 明確錯誤（額度用完、權限錯誤、密碼錯…）→ 停，顯示原因
+     · 上限 30 次
+   不會重複寄：伺服器以 NotifyLog 逐人去重、同時間只跑一批。完成那段的 Notify note 由伺服器寫「｜嘗試 N 次」。
+   ★GAS 主控台（會員系統\_gas_deploy\主控台.html）有同一段，改這裡要一起改。 */
+var MAIL_SEG_TIMEOUT_MS=180000, MAIL_MAX_ATTEMPTS=30, MAIL_BUSY_WAIT_MS=20000, MAIL_NET_WAIT_MS=10000, MAIL_NEXT_WAIT_MS=1500;
+function mailBegin(label){
+  if(_mailBusy){ uiAlert('上一批通知信還在自動寄送中（畫面下方有進度），請等它完成。\n勿重複按。'); return null; }
+  _mailBusy=true; toastSticky(label); return 0;
+}
+function mailEnd(){ _mailBusy=false; }
+/* 回傳 Promise<{ok, done, attempts, sent, total, already, res, error, gaveUp}>，永不 reject */
+function mailAutoRun(payload, label){
+  var job='j'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+  var st={attempt:0, sent:null, total:null, already:null, sumSent:0, t0:0, last:null};
+  function paint(){
+    var sec=st.t0?Math.round((Date.now()-st.t0)/1000):0;
+    toastSticky(label+'｜第 '+st.attempt+' 次嘗試・已寄 '+(st.sent==null?0:st.sent)+' / 共 '+(st.total==null?'計算中':st.total)+'（本次已等 '+sec+' 秒，請勿關閉此頁）');
+  }
+  var tick=setInterval(paint,1000);
+  function absorb(r){
+    if(!r||r.sent==null) return;
+    st.last=r; st.sumSent+=(r.sent||0);
+    if(r.roundSent!=null){ st.sent=r.roundSent; st.total=r.roundTotal; st.already=r.roundAlready; }
+    else { // 舊版伺服器（沒有整輪累計）：自己加總
+      st.sent=st.sumSent;
+      if(st.total==null) st.total=(r.sent||0)+(r.remaining||0)+((r.skippedQuota&&!r.remaining)?r.skippedQuota:0);
+      if(st.already==null) st.already=(r.alreadySent!=null?r.alreadySent:(r.alreadyHad||0));
+    }
+  }
+  function finish(o){ clearInterval(tick); o.attempts=st.attempt; o.sent=st.sent||0; o.total=st.total; o.already=st.already||0; o.res=o.res||st.last; return o; }
+  return new Promise(function(resolve){
+    function next(wait){ setTimeout(step, wait||0); }
+    function step(){
+      if(st.attempt>=MAIL_MAX_ATTEMPTS){ resolve(finish({ok:false, gaveUp:true, error:'已自動嘗試 '+MAIL_MAX_ATTEMPTS+' 次仍未完成'})); return; }
+      st.attempt++; st.t0=Date.now(); paint();
+      postT(Object.assign({},payload,{attempt:st.attempt, job:job}), MAIL_SEG_TIMEOUT_MS).then(function(r){
+        if(r&&r.busy){ next(MAIL_BUSY_WAIT_MS); return; }               // 上一段還在背景寄 → 等一下再接手
+        absorb(r);
+        if(!r||!r.ok){ resolve(finish({ok:false, error:(r&&r.error)||'伺服器回應異常', res:r})); return; }
+        if(r.done===false||(r.done==null&&r.partial)){ next(MAIL_NEXT_WAIT_MS); return; }
+        resolve(finish({ok:true, done:true, res:r}));
+      }).catch(function(e){
+        if(e&&e.timeout){ next(0); return; }                             // 3 分鐘沒回應 → 立刻重送
+        next(MAIL_NET_WAIT_MS);                                          // 連線中斷／執行被砍 → 10 秒後重送
+      });
+    }
+    step();
+  });
+}
+function mailDoneText(o){ return '✅ 完成：共嘗試 '+o.attempts+' 次，寄出 '+o.sent+' 封（略過已寄 '+o.already+' 封）'; }
+function mailStopAlert(o){
+  uiAlert('⛔ 已停止自動重寄（第 '+o.attempts+' 次嘗試）\n\n原因：'+(o.error||'不明')+'\n\n目前已寄 '+o.sent+(o.total!=null?' / 共 '+o.total:'')+' 封。'+(/再按一次/.test(o.error||'')?'':'\n已收過的人不會重寄；排除原因後再按一次會接著寄。'));
+}
 function fetchFreshPaidIds(){
-  return fetch('https://yoda-research-next.vercel.app/api/public-paid-list?fresh='+Date.now(),{cache:'no-store'})
+  return withTimeout(fetch('https://yoda-research-next.vercel.app/api/public-paid-list?fresh='+Date.now(),{cache:'no-store'}), PAID_LOAD_TIMEOUT_MS)
     .then(function(r){ return r.json(); })
     .then(function(d){ return ((d&&d.ok&&d.reports)||[]).map(function(x){ return {reportId:x.reportId, updated:x.uploadedAt||''}; }); })
     .catch(function(){ return null; });
 }
 function loadPaidReports(){
-  var box=$('paidBody'); if(box) box.innerHTML='<tr><td colspan="6"><div class="empty">載入中…</div></td></tr>';
+  var seq=++_paidSeq;
+  paidMsg('載入中…');
   loadMailQuota();
   // 第三支 adminReportOverrides 只為了「狀態」欄；失敗不擋清單（catch→null → 狀態欄留白＋paidStamp 註明）
+  // adminListPaid 逾時 → 標成 {__timeout:true}，下面直接顯示「讀取逾時＋重試」（寄送狀態讀不到時不畫可能誤導的「未寄」數字）
   Promise.all([
-    post({action:'adminListPaid',key:KEY}).catch(function(){ return null; }),
+    postT({action:'adminListPaid',key:KEY},PAID_LOAD_TIMEOUT_MS).catch(function(e){ return (e&&e.timeout)?{__timeout:true}:null; }),
     fetchFreshPaidIds(),
-    post({action:'adminReportOverrides',key:KEY}).catch(function(){ return null; })
+    postT({action:'adminReportOverrides',key:KEY},PAID_LOAD_TIMEOUT_MS).catch(function(){ return null; })
   ]).then(function(rr){
+    if(seq!==_paidSeq)return;   // 使用者已按重試／重新整理，舊回應作廢
     var pd=rr[0], fresh=rr[1], ov=rr[2];
+    if(pd&&pd.__timeout){ paidMsg('讀取逾時，請重新整理或稍後再試'+PAID_RETRY_BTN); stampPaid(0,true); return; }
     paidOv=(ov&&ov.ok&&ov.overrides)||{}; paidOvErr=!(ov&&ov.ok);
     var gas=((pd&&pd.ok&&pd.reports)||[]), byId={}; gas.forEach(function(x){ byId[x.reportId]=x; });
     var at=gas.length?gas[0].activeTotal:null, rows;
@@ -2346,12 +2423,12 @@ function loadPaidReports(){
     var okAny=(pd&&pd.ok)||(fresh&&fresh.length);
     renderPaidFiles(okAny?{ok:true,reports:rows}:(pd||{ok:false,error:'連線失敗'}));
     stampPaid(rows.length, !okAny, paidOvErr);
-  }).catch(function(){ renderPaidFiles({ok:false,error:'連線失敗'}); stampPaid(0,true); });
+  }).catch(function(){ if(seq!==_paidSeq)return; renderPaidFiles({ok:false,error:'連線失敗'}); stampPaid(0,true); });
 }
 /* 今日剩餘寄信額度（Gmail 每日約 100 封，過午夜太平洋時間重置）*/
 function loadMailQuota(){
   var el=$('mailQuota'); if(!el)return;
-  post({action:'adminMailQuota',key:KEY}).then(function(r){
+  postT({action:'adminMailQuota',key:KEY},PAID_LOAD_TIMEOUT_MS).then(function(r){
     if(!r||!r.ok)return;
     var n=r.remaining, col=(n<=0?'#ff6b6b':(n<20?'var(--gold,#e0a526)':'var(--green,#30d158)'));
     if(r.resend){
@@ -2385,11 +2462,16 @@ function prettyPaidTitle(id){ return String(id).replace(/\.html?$/i,'').replace(
    reportCat 先判 AI泡沫（不限開頭），所以檔名同時含 AI泡沫 的算 AI泡沫、不算簡報。GAS 端也會擋（回「簡報不寄通知信」）。*/
 function isBriefReport(id){ var s=String(id||'').replace(/\.html?$/i,'').replace(/^付費[_-]?/,''); return /^簡報/.test(s) && !/AI泡沫/.test(s); }
 /* Drive 付費檔清單：直接列出所有付費檔，每筆自帶【寄通知】（不靠 reports.json 比對）*/
+/* 畫清單出錯（資料欄位異常等）時顯示錯誤，不要讓畫面卡在「載入中」 */
 function renderPaidFiles(pd){
+  try{ renderPaidFiles_(pd); }
+  catch(e){ try{console.error(e);}catch(_){} paidMsg('清單畫面產生失敗：'+escH((e&&e.message)||e)+PAID_RETRY_BTN); }
+}
+function renderPaidFiles_(pd){
   var box=$('paidBody'); if(!box)return;
   var ca=$('paidChkAll'); if(ca)ca.checked=false;
   setTimeout(refreshDigestPlaceholders,0); // 清單重畫後勾選歸零 → 主旨／頁首 placeholder 回到通用預設
-  if(pd&&pd.ok===false){ box.innerHTML='<tr><td colspan="6"><div class="empty">讀取失敗：'+escH(pd.error||'unknown action（GAS 可能尚未部署新版本）')+'</div></td></tr>'; return; }
+  if(pd&&pd.ok===false){ box.innerHTML='<tr><td colspan="6"><div class="empty">讀取失敗：'+escH(pd.error||'unknown action（GAS 可能尚未部署新版本）')+PAID_RETRY_BTN+'</div></td></tr>'; return; }
   if(!paidFiles.length){ box.innerHTML='<tr><td colspan="6"><div class="empty">Drive 目前沒有付費檔</div></td></tr>'; return; }
   box.innerHTML=paidFiles.slice().sort(function(a,b){
     var da=nameDate(a.reportId), db=nameDate(b.reportId);
@@ -2511,51 +2593,56 @@ async function notifyBatchSelected(){
   var headLine=ovHeader?('頁首（自訂）：'+ovHeader):('頁首（預設）：'+dft.header+'\n　※ 預設頁首的份數依每人缺的報告而定');
   var list=ids.map(function(id){return '　· '+prettyPaidTitle(id);}).join('\n');
   if(!await uiConfirm('這封彙整信包含以下 '+ids.length+' 份報告：\n\n'+list+'\n\n'+subjLine+'\n'+headLine+'\n\n寄給「還沒收到的付費會員」，每人一封、只列他缺的那幾份。\n（已收過的不再列、不重寄；退訂者不寄）\n\n確定寄出？'))return;
-  toast('彙整寄送中…');
+  if(mailBegin('彙整寄送中…')===null)return;
   var payload={action:'adminNotifyBatchDigest',key:KEY,reportIds:ids,force:false};
   if(ovSubject)payload.subject=ovSubject;   // 只送 Yoda 打的字；前綴由伺服器加（同一套規則）
   if(ovHeader)payload.header=ovHeader;
-  post(payload).then(function(r){
-    if(!r||!r.ok){ toast((r&&r.error)||'寄送失敗'); return; }
-    // 自訂了卻沒被套用＝GAS 還是舊版（不認 subject/header）——提醒先部署 GAS
+  mailAutoRun(payload,'彙整寄送中').then(function(o){
+    mailEnd();
+    // 停下來時保留自訂主旨／頁首：排除原因後再按一次，續寄的人收到的仍是同一版
+    if(!o.ok){ toast('已停止自動重寄'); mailStopAlert(o); loadPaidReports(); return; }
+    var r=o.res||{};
+    // 自訂了卻沒被套用＝GAS 還是舊版（不認 subject/header）——提醒先部署 GAS（最後一段沒寄任何人時 subjectCustom 仍會照實回）
     if((ovSubject&&!r.subjectCustom)||(ovHeader&&!r.headerCustom)) uiAlert('⚠ 信已寄出，但伺服器沒有套用自訂主旨／頁首（GAS 可能還沒部署 2026-10-08-b）。這批用的是預設字。');
     if(sIn)sIn.value=''; if(hIn)hIn.value='';  // 只影響這一批：寄出後清空，下一批回到預設
-    var msg='彙整寄出 '+(r.sent||0)+' 位會員';
-    if(r.viaResend!=null||r.viaGmail!=null)msg+='（Resend '+(r.viaResend||0)+'＋Gmail '+(r.viaGmail||0)+'）';
-    if(r.alreadyHad)msg+='｜已收齊略過 '+r.alreadyHad;
-    if(r.skippedQuota)msg+='｜⚠配額不足略過 '+r.skippedQuota+'（明天再按補寄）';
+    var msg=mailDoneText(o);
     if(r.failed)msg+='｜失敗 '+r.failed;
     if(r.optedOut)msg+='｜退訂 '+r.optedOut;
-    if(r.announced)msg+='｜帶公告 '+r.announced;
     if(r.subjectCustom||r.headerCustom)msg+='｜自訂'+(r.subjectCustom?'主旨':'')+(r.subjectCustom&&r.headerCustom?'＋':'')+(r.headerCustom?'頁首':'');
-    toast(msg);
+    toast(msg); uiAlert(msg);
     loadPaidReports();
-  }).catch(function(){ toast('連線失敗'); });
+  });
 }
 
 /* 逐會員去重：只補寄給「還沒收過這份」的 active 會員。之後有新會員加入，再按一次只補寄他們 */
 async function doNotify(paidId){
   if(isBriefReport(paidId)){ toast('簡報不寄通知信'); return; }
   if(!await uiConfirm('補寄「新付費報告上線」email 給【還沒收過這份】的 active 會員?\n\n報告：'+paidId+'\n(已收過的人不會再收到；已在會員專區關閉通知的人不寄)'))return;
-  toast('寄送中…');
-  post({action:'adminNotifyReport',key:KEY,reportId:paidId}).then(async function(res){
-    if(!res||!res.ok){ toast((res&&res.error)||'寄送失敗'); return; }
-    if((res.sent||0)===0 && (res.alreadySent||0)>0){
-      if(await uiConfirm('所有付費會員都已收過這份（'+res.alreadySent+' 位）。\n要「強制重寄」給全部人嗎?（含已收過的人）')) forceNotify(paidId);
-      else toast('沒有需要補寄的人');
+  if(mailBegin('寄送中…')===null)return;
+  mailAutoRun({action:'adminNotifyReport',key:KEY,reportId:paidId},'寄送中').then(async function(o){
+    mailEnd();
+    if(!o.ok){ toast('已停止自動重寄'); mailStopAlert(o); loadPaidReports(); return; }
+    var res=o.res||{};
+    if(o.sent===0 && o.attempts===1 && (res.alreadySent||0)>0){
+      if(await uiConfirm('所有付費會員都已收過這份（'+res.alreadySent+' 位）。\n要「強制重寄」給全部人嗎?（含已收過的人）')) { forceNotify(paidId); return; }
+      toast('沒有需要補寄的人');
     }else{
-      toast('已補寄 '+res.sent+' 位新會員｜先前已寄 '+(res.alreadySent||0)+(res.failed?'（失敗 '+res.failed+'）':'')+(res.skippedQuota?'｜配額略過 '+res.skippedQuota:''));
+      var msg=mailDoneText(o)+(res.failed?'｜失敗 '+res.failed:'');
+      toast(msg); uiAlert(msg);
     }
     loadPaidReports();
-  }).catch(function(){toast('連線失敗');});
+  });
 }
 function forceNotify(paidId){
   if(isBriefReport(paidId)){ toast('簡報不寄通知信'); return; }
-  toast('重寄中…');
-  post({action:'adminNotifyReport',key:KEY,reportId:paidId,force:true}).then(function(res){
-    if(res&&res.ok){ toast('已重寄：成功 '+res.sent+' / 共 '+res.total); loadPaidReports(); }
-    else toast((res&&res.error)||'重寄失敗');
-  }).catch(function(){toast('連線失敗');});
+  if(mailBegin('重寄中…')===null)return;
+  mailAutoRun({action:'adminNotifyReport',key:KEY,reportId:paidId,force:true},'強制重寄中').then(function(o){
+    mailEnd();
+    if(!o.ok){ toast('已停止自動重寄'); mailStopAlert(o); loadPaidReports(); return; }
+    var msg=mailDoneText(o).replace('（略過已寄 '+o.already+' 封）','（強制重寄，含已收過的人）')+((o.res&&o.res.failed)?'｜失敗 '+o.res.failed:'');
+    toast(msg); uiAlert(msg);
+    loadPaidReports();
+  });
 }
 /* 查這份報告的已寄/未寄名單，並可對未寄的人一鍵補寄 */
 function viewRecipients(paidId){
