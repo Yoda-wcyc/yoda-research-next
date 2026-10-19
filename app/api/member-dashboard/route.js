@@ -28,6 +28,23 @@ function nextLadderStep(P, R, plan) {
 }
 function fmtDate(v) { const s = String(v || ''); const m = s.match(/(\d{4}-\d{2}-\d{2})/); return m ? m[1] : s; }
 function isTrue(v) { return /^(true|1|yes|on)$/i.test(String(v || '').trim()); }
+// 付款方式（2026-10-19 PayPal 一次付清）：'paypal'＝到期不自動扣款，前端把「下次扣款日」改稱「有效至」。
+// 主判準同 GAS payMethodOf_：Payments 最後一筆的備註以 paypal 開頭。
+// 但 Neon 的 payments 是手動鏡像、可能落後；members.notes 的「PayPal N月 YYYY-MM-DD」是開通當下就同步的，
+// 所以兩者取日期較新的那個。只影響顯示文字，不影響權限。
+async function payMethodOf(m) {
+  const lc = String((m && m.email) || '').trim().toLowerCase();
+  let lastNote = '', lastDay = '';
+  try {
+    const r = await sql`SELECT note, ts FROM payments WHERE lower(email) = ${lc} ORDER BY id DESC LIMIT 1`;
+    if (r[0]) { lastNote = String(r[0].note || ''); lastDay = fmtDate(r[0].ts).slice(0, 10); }
+  } catch (e) {}
+  if (/^\s*paypal/i.test(lastNote)) return 'paypal';
+  const days = [...String((m && m.notes) || '').matchAll(/PayPal \d+月 (\d{4}-\d{2}-\d{2})/g)].map((x) => x[1]).sort();
+  const pp = days.length ? days[days.length - 1] : '';
+  if (pp && !(/^\d{4}-\d{2}-\d{2}$/.test(lastDay) && lastDay > pp)) return 'paypal';
+  return 'ecpay';
+}
 
 async function gasFallback(email, password) {
   try { const r = await fetch(GAS, { method: 'POST', body: JSON.stringify({ action: 'memberDashboard', email, password }) }); return await r.json(); }
@@ -73,6 +90,7 @@ export async function POST(req) {
     ok: true, auth: true, token,
     memberId: m.pub_id || m.member_id, email: m.email, status: m.status,
     startDate: fmtDate(m.start_date), paidPeriods, nextChargeDate: fmtDate(m.next_charge_date),
+    payMethod: await payMethodOf(m),
     refCode: m.ref_code, shareLink: 'https://yoda-wcyc.github.io/-/subscribe.html?ref=' + m.ref_code,
     referredTotal, referredPaid,
     earnedMonths: computeEarnedMonths(paidPeriods, referredPaid, m.plan),

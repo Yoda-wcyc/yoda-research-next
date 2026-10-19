@@ -364,6 +364,7 @@ tr:hover td{background:var(--surface2)}
         <option value="待開通">待開通（註冊未付款）</option>
         <option value="notify">下一封通知信會收到</option>
         <option value="nopay">查無綠界付款紀錄</option>
+        <option value="paypal">PayPal 一次付清（不自動扣款）</option>
         <option value="internal">內部帳號（站方測試用·不計入統計）</option>
         <option value="ta">技術分析名單（已開權限）</option>
       </select>
@@ -887,7 +888,7 @@ var subsInfo=null;
 // ★主控台要求的 GAS 最低版本。GAS 端 CODE_VERSION 比這個舊 → 畫面跳紅字。
 // 為什麼需要：2026-08-22 一整天反覆卡在「畫面不對 → 其實是 GAS 沒貼上／貼到一半斷掉」。
 // 兩邊的版本擺在同一個畫面上，就不用再猜。
-var GAS_MIN_VERSION='2026-08-22-k';
+var GAS_MIN_VERSION='2026-10-19-a';   // 10-19：PayPal 開通（adminPaypalActivate）＋訂閱總表 payMethod
 var gasVersion='';
 var subsErr='';   // 訂閱總表拿不到時的原因，直接顯示在畫面上
 function loadFromGAS(){
@@ -941,7 +942,7 @@ function loadFromGAS(){
 const money=n=>'NT$'+n.toLocaleString();
 function addMonths(str,n){if(!str)return '';const d=new Date(str+'T00:00:00');if(isNaN(d))return str;const day=d.getDate();d.setMonth(d.getMonth()+n);if(d.getDate()<day)d.setDate(0);return d.toISOString().slice(0,10);}
 const monthOf=str=>String(str||'').slice(0,7);
-const dueThisMonth=m=>m.status!=='已取消'&&m.next&&monthOf(m.next)<=CUR_MONTH;
+const dueThisMonth=m=>m.status!=='已取消'&&m.next&&monthOf(m.next)<=CUR_MONTH&&!(m.sub&&m.sub.payMethod==='paypal');   // PayPal 一次付清沒有「這期扣款」可對帳
 const mById=id=>members.find(x=>x.id===id);
 function validRefs(id,type){ if(type==='付費'){const m=mById(id);return m?m.paidRefs:0;} return referrals.filter(r=>r.ref===id&&r.type===type&&r.valid).length; }
 
@@ -1056,7 +1057,9 @@ function membersFiltered(){
     if(sf==='notify'){ if(!(m.sub&&m.sub.willNotify))return false; }
     else if(sf==='nopay'){ if(!m.sub||m.sub.hasEcpayRecord)return false; }
     else if(sf==='ta'){ if(!m.ta)return false; }
-    else if(sf!=='all'&&memState(m)!==sf)return false;
+    else if(sf==='paypal'){ if(!(m.sub&&m.sub.payMethod==='paypal'))return false; }
+    // 「訂閱中」要連 PayPal 一次付清的有效會員一起列（標籤是「訂閱中·PayPal」）
+    else if(sf!=='all'&&memState(m)!==sf&&!(sf==='訂閱中'&&memState(m)==='訂閱中·PayPal'))return false;
     if(q&&!(m.name.toLowerCase().includes(q)||m.email.toLowerCase().includes(q)||m.id.toLowerCase().includes(q)||(m.pub||'').toLowerCase().includes(q)))return false;
     return true;
   }).sort(function(a,b){
@@ -1122,7 +1125,8 @@ function renderMembers(){
   renderMemSummary();
 
   const COL={'訂閱中':'var(--green,#30d158)','已取消·權益到期末':'var(--gold,#e0a526)','已結束':'var(--dim,#a1a1a6)',
-             '逾期未對帳':'var(--amber,#ff9f0a)','訂閱中·缺到期日':'var(--amber,#ff9f0a)','待開通':'var(--dim,#a1a1a6)'};
+             '逾期未對帳':'var(--amber,#ff9f0a)','訂閱中·缺到期日':'var(--amber,#ff9f0a)','待開通':'var(--dim,#a1a1a6)',
+             '訂閱中·PayPal':'var(--green,#30d158)','PayPal·已到期':'var(--dim,#a1a1a6)'};
   const amber='var(--amber,#ff9f0a)';
   $('memBody').innerHTML=rows.map(m=>{
     const s=m.sub, st=memState(m), col=COL[st]||'var(--dim,#a1a1a6)';
@@ -1134,7 +1138,9 @@ function renderMembers(){
       :(s.firstPaidAt?('<span class="id">'+escH(s.firstPaidAt)+'</span><div class="email">'+escH(s.lastPaidAt||s.firstPaidAt)+'</div>')
       :('<span style="color:'+amber+'">查無</span>'));
     const per=!s?('<span class="id">'+m.streak+'</span>')
-      :(s.paidPeriods===s.payCount?('<span class="id">'+s.paidPeriods+' ／ '+s.payCount+'</span>')
+      // PayPal 一次付清：一筆款開通 3／12 期，期數本來就不等於付款筆數，不是對帳異常
+      :(s.payMethod==='paypal'?('<span class="id" title="PayPal 一次付清：一筆款可開通多期，期數≠筆數屬正常">'+s.paidPeriods+' ／ '+s.payCount+'</span>')
+      :s.paidPeriods===s.payCount?('<span class="id">'+s.paidPeriods+' ／ '+s.payCount+'</span>')
       :('<span class="id" style="color:'+amber+'" title="帳面與綠界對不上，需要對帳">'+s.paidPeriods+' ／ '+s.payCount+'</span>'))
       +(s&&s.paidAmount?('<div class="email">NT$'+Number(s.paidAmount).toLocaleString()+'</div>'):'');
     const notify=!s?'—'
@@ -1156,7 +1162,7 @@ function renderMembers(){
       <td>${notify}</td>
       <td>${refCell}</td>
       <td style="text-align:center">${taCell(m)}</td>
-      <td>${st==='已結束'||m.status==='已取消'?'':`<button class="mini-act" onclick="giftMonth('${m.id}')">贈送月</button> <button class="mini-act" style="color:var(--gold,#e0a526)" onclick="cancelSub('${m.id}')">取消訂閱</button> `}<button class="mini-act" style="color:#ff6b6b" onclick="deleteMember('${m.id}')">刪除</button></td>
+      <td>${st==='已結束'||m.status==='已取消'?'':`<button class="mini-act" onclick="giftMonth('${m.id}')">贈送月</button> <button class="mini-act" style="color:var(--gold,#e0a526)" onclick="cancelSub('${m.id}')">取消訂閱</button> `}<button class="mini-act" style="color:var(--accent,#2997ff)" title="PayPal 一次付清 → 手動開通 1／3／12 個月（不碰綠界）" onclick="paypalActivate('${m.id}')">PayPal開通</button> <button class="mini-act" style="color:#ff6b6b" onclick="deleteMember('${m.id}')">刪除</button></td>
     </tr>`;}).join('') || `<tr><td colspan="13"><div class="empty">沒有符合的會員</div></td></tr>`;
 }
 /* 摘要列：一眼看完人數分佈、下一封通知信誰會收到、以及對不上帳的地方 */
@@ -1300,6 +1306,33 @@ async function askSetPlan(id,cur){
     if(res&&res.ok){toast('已改為 '+to);loadFromGAS();}else{toast((res&&res.error)||'失敗');}
   }).catch(()=>toast('連線失敗'));
 }
+/* PayPal 一次付清 → 手動開通（2026-10-19）
+   PayPal 付款連結沒有回拋，收到 PayPal 入帳通知後由這裡開通：選 1／3／12 個月，
+   GAS 會把 status 設 active、到期日 = max(今天, 原到期日) + N 月、期數 +N、notes 記「PayPal N月 日期」，
+   並在 Payments 留一列 paypal 留痕（單號空白 → 綠界比對只列不動）。完全不碰綠界。 */
+var PAYPAL_PRICE={1:18,3:54,12:200};
+async function paypalActivate(id){
+  const m=mById(id)||{};
+  const s=m.sub||{};
+  const v=await uiPrompt('PayPal 開通：會員 '+id+'（'+(m.email||'')+'）\n\n'
+    +'先到 PayPal 確認這筆款項已入帳、付款備註的 email 與會員帳號一致。\n'
+    +'請輸入月數：1 / 3 / 12（分別對應 US$18 / US$54 / US$200）','1');
+  if(v===null||v===undefined)return;
+  const n=Number(String(v).trim());
+  if(!PAYPAL_PRICE[n]){ toast('月數只能填 1、3、12'); return; }
+  const tx=await uiPrompt('PayPal 交易序號（選填，方便日後對帳；沒有就直接按確定）','');
+  if(tx===null||tx===undefined)return;
+  const cur=s.accessUntil||m.next||'';
+  if(!await uiConfirm('確定開通？\n\n會員：'+(m.email||'')+'（'+id+'）\n'
+    +'方案：PayPal '+n+' 個月 · US$'+PAYPAL_PRICE[n]+'\n'
+    +'目前狀態：'+(memState(m)||'—')+(cur?('（到期日 '+cur+'）'):'')+'\n\n'
+    +'到期日 = 今天與原到期日較晚者 + '+n+' 個月；不會建立或終止任何綠界訂單。'))return;
+  toast('開通中…');
+  post({action:'adminPaypalActivate',key:KEY,memberId:id,months:n,txn:String(tx||'').trim()}).then(res=>{
+    if(res&&res.ok){toast('已開通 PayPal '+n+' 個月，有效至 '+res.next_charge_date);loadFromGAS();}
+    else{toast((res&&res.error)||'開通失敗（GAS 可能尚未部署 2026-10-19-a）');}
+  }).catch(()=>toast('連線失敗'));
+}
 function giftMonth(id){
   toast('寫入中…');
   post({action:'adminGift',key:KEY,memberId:id}).then(res=>{
@@ -1351,11 +1384,16 @@ function loadLapsed(){
       +'——多半是<b>在綠界那邊自己取消</b>或<b>卡片失效扣款失敗</b>。他們現在已被系統擋住（讀不到報告、不寄通知），請逐一確認。</div>'
       +'<div class="recon-card">'+r.members.map(function(m){
         return '<div class="recon-row"><div class="recon-info">'
-          +'<div class="n">'+escH(m.name||m.email)+' <span class="id">'+escH(m.memberId)+'</span> <span class="pill late">逾期 '+m.overdueDays+' 天</span></div>'
-          +'<div class="m">'+escH(m.email)+' · 應扣款日 '+escH(m.nextChargeDate)+' · '+escH(m.plan)+' · 連續 '+m.paidPeriods+' 期</div>'
+          +'<div class="n">'+escH(m.name||m.email)+' <span class="id">'+escH(m.memberId)+'</span> '
+          +(m.paypal?'<span class="pill">PayPal·到期未續購</span>':'<span class="pill late">逾期 '+m.overdueDays+' 天</span>')+'</div>'
+          +'<div class="m">'+escH(m.email)+' · '+(m.paypal?'PayPal 有效至 ':'應扣款日 ')+escH(m.nextChargeDate)+' · '+escH(m.plan)+' · 連續 '+m.paidPeriods+' 期'
+          +(m.paypal?'　（一次付清、本來就不會自動扣款；他再付款時按「PayPal開通」）':'')+'</div>'
           +'</div><div class="recon-btns">'
-          +'<button class="rb ok" onclick=\'recon("'+escJs(m.memberId)+'","ok")\'>✓ 補記一期</button> '
-          +'<button class="rb no" onclick=\'cancelSub("'+escJs(m.memberId)+'")\'>終止訂閱</button>'
+          // ★PayPal 會員沒有綠界訂單：「補記一期」「終止訂閱」都是錯的動作，只給 PayPal 開通
+          +(m.paypal
+            ?'<button class="rb ok" onclick=\'paypalActivate("'+escJs(m.memberId)+'")\'>PayPal開通</button>'
+            :('<button class="rb ok" onclick=\'recon("'+escJs(m.memberId)+'","ok")\'>✓ 補記一期</button> '
+             +'<button class="rb no" onclick=\'cancelSub("'+escJs(m.memberId)+'")\'>終止訂閱</button>'))
           +'</div></div>';
       }).join('')+'</div>';
   }).catch(function(){ box.innerHTML='<div class="hintbox">連線失敗</div>'; });
@@ -1454,11 +1492,14 @@ function renderEcpaySync(r,applied){
       +'<div class="recon-card">'+r.noTrade.map(function(m){
         return '<div class="recon-row"><div class="recon-info">'
           +'<div class="n">'+escH(m.email)+' <span class="id">'+escH(m.memberId)+'</span> '
-          +(m.blocked?'<span class="pill late">已被擋住·讀不到報告</span>':'<span class="pill">權益有效</span>')+'</div>'
+          +(m.blocked?'<span class="pill late">已被擋住·讀不到報告</span>':'<span class="pill">權益有效</span>')
+          +(m.paypal?' <span class="pill">PayPal 一次付清·屬正常</span>':'')+'</div>'
           +'<div class="m">'+escH(m.plan||'—')+' · 連續 '+(m.paidPeriods||0)+' 期 · 權益到 '+escH(m.nextChargeDate||'（空白）')
           +(m.overdueDays>0?('　逾期 '+m.overdueDays+' 天'):'')+'</div>'
           +'</div><div class="recon-btns">'
-          +(m.blocked?'<button class="rb ok" onclick=\'giftMonth("'+escJs(m.memberId)+'")\'>贈送 1 月·恢復權益</button>':'')
+          +(m.blocked?(m.paypal
+              ?'<button class="rb ok" onclick=\'paypalActivate("'+escJs(m.memberId)+'")\'>PayPal開通</button>'
+              :'<button class="rb ok" onclick=\'giftMonth("'+escJs(m.memberId)+'")\'>贈送 1 月·恢復權益</button>'):'')
           +'</div></div>';
       }).join('')+'</div>';
     if(blocked.length) h+='<div class="hintbox" style="border-color:var(--amber,#ff9f0a)">⚠ 其中 <b>'+blocked.length+'</b> 位的扣款日已過寬限，'
