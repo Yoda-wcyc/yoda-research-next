@@ -130,6 +130,24 @@ tr:hover td{background:var(--surface2)}
 .audit-note{font-size:12px;color:var(--dim)}
 .streak-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:2px}
 .streak-dot.off{background:var(--surface2)}
+/* 會員名單（2026-10-22）：分頁放寬＋欄位合併、動作收進「⋯」選單 → 1280 以上不必左右捲動；更窄才捲 */
+.wrap:has(#v-members.show){max-width:min(1600px,100%)}
+.mem-tbl{table-layout:fixed;min-width:960px;font-size:12.5px}
+.mem-tbl th{padding:9px 8px;white-space:normal;line-height:1.35;vertical-align:bottom}
+.mem-tbl th .sub{font-weight:400;color:var(--dim)}
+.mem-tbl td{padding:8px 8px;overflow:hidden;text-overflow:ellipsis;vertical-align:top;line-height:1.55}
+.mem-tbl .ln{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mem-tbl .ms{color:var(--dim);font-size:12px}
+.mem-tbl td.c{text-align:center}
+.act-more{font-size:15px;line-height:1;font-weight:700;color:var(--text);background:none;border:1px solid var(--border);border-radius:7px;width:30px;height:26px;cursor:pointer;padding:0}
+.act-more:hover,.act-more[aria-expanded="true"]{background:var(--surface2);border-color:var(--accent)}
+.act-more:focus-visible,.act-menu button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.act-menu{position:fixed;z-index:9000;min-width:170px;max-width:260px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:5px;box-shadow:0 10px 30px rgba(0,0,0,.35);display:none}
+.act-menu.show{display:block}
+.act-menu .h{font-size:12px;color:var(--dim);padding:4px 9px 6px;border-bottom:1px solid var(--divider);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.act-menu button{display:block;width:100%;text-align:left;font-size:13px;font-family:var(--sans);padding:7px 10px;border:none;background:none;border-radius:6px;cursor:pointer;color:var(--text)}
+.act-menu button:hover,.act-menu button:focus{background:var(--surface2);outline:none}
+.act-menu .sep{height:1px;background:var(--divider);margin:4px 2px}
 
 /* 對帳彙總：三個數字並排，一眼看完 */
 .recon-sum{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
@@ -377,15 +395,16 @@ tr:hover td{background:var(--surface2)}
     </div>
     <div id="memSummary"></div>
     <div class="tbl-wrap">
-      <table>
+      <table class="mem-tbl">
+        <colgroup><col style="width:92px"><col><col style="width:136px"><col style="width:148px"><col style="width:96px"><col style="width:96px"><col style="width:124px"><col style="width:64px"><col style="width:46px"></colgroup>
         <thead><tr>
-          <th>編號</th><th>會員</th><th>方案</th><th>狀態</th>
-          <th>訂閱起始</th>
-          <th>綠界付款<br><span style="font-weight:400;color:var(--dim)">首次／最近</span></th>
-          <th title="帳面記的期數 vs 綠界實際扣款筆數，對不上就要對帳">期數<br><span style="font-weight:400;color:var(--dim)">帳面／綠界</span></th>
-          <th>權益到期日</th><th>剩餘</th><th>通知信</th>
-          <th title="推薦人 / 帶進付費 / 應送月">推薦</th>
-          <th id="taTh" title="技術分析權限（少數指定會員）·點一下把已開權限的排到最前面，再點一下恢復" style="cursor:pointer;white-space:nowrap" onclick="toggleTaSort()">技術分析<span id="taSortMark" style="font-weight:400;color:var(--dim)"> ↕</span></th><th></th>
+          <th>編號</th><th>會員</th>
+          <th>狀態<br><span class="sub">方案·通知信</span></th>
+          <th title="訂閱起始日；帳面記的期數 vs 綠界實際扣款筆數，對不上就要對帳">訂閱起始<br><span class="sub">期數 帳面／綠界</span></th>
+          <th>綠界付款<br><span class="sub">首次／最近</span></th>
+          <th>權益到期日<br><span class="sub">剩餘</span></th>
+          <th title="推薦人 / 帶進付費 / 應送月">推薦<br><span class="sub">帶進·應送</span></th>
+          <th id="taTh" title="技術分析權限（少數指定會員）·點一下把已開權限的排到最前面，再點一下恢復" style="cursor:pointer" onclick="toggleTaSort()">技術分析<span id="taSortMark" style="font-weight:400;color:var(--dim)"> ↕</span></th><th aria-label="操作"></th>
         </tr></thead>
         <tbody id="memBody"></tbody>
       </table>
@@ -699,6 +718,7 @@ tr:hover td{background:var(--surface2)}
   </div>
 </div>
 
+<div class="act-menu" id="memActMenu" role="menu" aria-label="會員操作"></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1128,43 +1148,107 @@ function renderMembers(){
              '逾期未對帳':'var(--amber,#ff9f0a)','訂閱中·缺到期日':'var(--amber,#ff9f0a)','待開通':'var(--dim,#a1a1a6)',
              '訂閱中·PayPal':'var(--green,#30d158)','PayPal·已到期':'var(--dim,#a1a1a6)'};
   const amber='var(--amber,#ff9f0a)';
+  closeMemActs(false);   // 名單重畫前先收起「⋯」選單（按鈕會被換掉）
+  // 2026-10-22 欄位合併：狀態＋方案＋通知信／起始＋期數＋金額／到期＋剩餘／推薦＋帶進＋應送，動作收進「⋯」→ 1280 寬不必左右捲動
   $('memBody').innerHTML=rows.map(m=>{
     const s=m.sub, st=memState(m), col=COL[st]||'var(--dim,#a1a1a6)';
     const until=s?s.accessUntil:m.next;
-    const left=(!s||s.daysLeft===null)?'—'
+    const left=(!s||s.daysLeft===null)?'<span class="ms">剩餘 —</span>'
       :(s.daysLeft<0?'<span style="color:var(--red,#ff453a)">已過 '+(-s.daysLeft)+' 天</span>'
-      :(s.daysLeft<=7?'<span style="color:'+amber+'">'+s.daysLeft+' 天</span>':s.daysLeft+' 天'));
-    const pay=!s?'<span class="email">—</span>'
-      :(s.firstPaidAt?('<span class="id">'+escH(s.firstPaidAt)+'</span><div class="email">'+escH(s.lastPaidAt||s.firstPaidAt)+'</div>')
-      :('<span style="color:'+amber+'">查無</span>'));
-    const per=!s?('<span class="id">'+m.streak+'</span>')
+      :(s.daysLeft<=7?'<span style="color:'+amber+'">剩 '+s.daysLeft+' 天</span>':'<span class="ms">剩 '+s.daysLeft+' 天</span>'));
+    const pay=!s?'<span class="ln email">—</span>'
+      :(s.firstPaidAt?('<span class="ln id" title="首次付款">'+escH(s.firstPaidAt)+'</span><span class="ln email" title="最近付款">'+escH(s.lastPaidAt||s.firstPaidAt)+'</span>')
+      :('<span class="ln" style="color:'+amber+'">查無</span>'));
+    const per=!s?('<span class="id" title="期數">'+m.streak+' 期</span>')
       // PayPal 一次付清：一筆款開通 3／12 期，期數本來就不等於付款筆數，不是對帳異常
-      :(s.payMethod==='paypal'?('<span class="id" title="PayPal 一次付清：一筆款可開通多期，期數≠筆數屬正常">'+s.paidPeriods+' ／ '+s.payCount+'</span>')
-      :s.paidPeriods===s.payCount?('<span class="id">'+s.paidPeriods+' ／ '+s.payCount+'</span>')
-      :('<span class="id" style="color:'+amber+'" title="帳面與綠界對不上，需要對帳">'+s.paidPeriods+' ／ '+s.payCount+'</span>'))
-      +(s&&s.paidAmount?('<div class="email">NT$'+Number(s.paidAmount).toLocaleString()+'</div>'):'');
-    const notify=!s?'—'
-      :(s.willNotify?'<span style="color:var(--green,#30d158)">會寄</span>'
-      :(s.notifyOff?'<span style="color:var(--dim)">已退訂</span>':'<span style="color:var(--dim)">不寄</span>'));
-    const refCell=(m.ref?('<span class="id" title="'+escH(m.ref)+'">'+escH(m.refName||m.ref)+'</span>'):'<span class="email">—</span>')
-      +'<div class="email">帶進 '+m.paidRefs+(m.refTotal>m.paidRefs?('/'+m.refTotal):'')
-      +(m.comp?('　應送 <span style="color:var(--gold,#e0a526)">'+m.comp+'</span>'):'')+'</div>';
+      :(s.payMethod==='paypal'?('<span class="id" title="PayPal 一次付清：一筆款可開通多期，期數≠筆數屬正常">'+s.paidPeriods+'／'+s.payCount+'</span>')
+      :s.paidPeriods===s.payCount?('<span class="id" title="期數 帳面／綠界">'+s.paidPeriods+'／'+s.payCount+'</span>')
+      :('<span class="id" style="color:'+amber+'" title="帳面與綠界對不上，需要對帳">'+s.paidPeriods+'／'+s.payCount+'</span>'))
+      +(s&&s.paidAmount?('<span class="ms"> · NT$'+Number(s.paidAmount).toLocaleString()+'</span>'):'');
+    const notify=!s?''
+      :(s.willNotify?' <span style="color:var(--green,#30d158)" title="下一封通知信會寄">會寄</span>'
+      :(s.notifyOff?' <span class="ms" title="自行關閉通知">已退訂</span>':' <span class="ms" title="下一封通知信不會寄">不寄</span>'));
+    const refCell=(m.ref?('<span class="ln id" title="推薦人 '+escH(m.ref)+'">'+escH(m.refName||m.ref)+'</span>'):'<span class="ln email">—</span>')
+      +'<span class="ln ms">帶進 '+m.paidRefs+(m.refTotal>m.paidRefs?('/'+m.refTotal):'')
+      +(m.comp?(' · 應送 <span style="color:var(--gold,#e0a526)">'+m.comp+'</span>'):'')+'</span>';
+    const canSub=!(st==='已結束'||m.status==='已取消');
     return `<tr>
-      <td><span class="id">${escH(m.id)}</span>${m.pub?`<div class="email" style="color:var(--gold)" title="會員端看到的公開亂碼編號">${escH(m.pub)}</div>`:''}</td>
-      <td><div>${escH(m.name)}${m.exFounding?' <span title="🌱 回頭草·曾取消訂閱又回來（已排除創始）" style="cursor:help">🌱</span>':''}</div><div class="email">${escH(m.email)}</div></td>
-      <td>${planBadge(m)}</td>
-      <td><span class="pill" style="border-color:${col};color:${col}">${escH(st)}</span></td>
-      <td>${m.start?'<span class="id">'+escH(m.start)+'</span>':'<span class="email">—</span>'}</td>
+      <td><span class="ln id">${escH(m.id)}</span>${m.pub?`<span class="ln email" style="color:var(--gold)" title="會員端看到的公開亂碼編號 ${escH(m.pub)}">${escH(m.pub)}</span>`:''}</td>
+      <td><span class="ln" title="${escH(m.name)}">${escH(m.name)}${m.exFounding?' <span title="🌱 回頭草·曾取消訂閱又回來（已排除創始）" style="cursor:help">🌱</span>':''}</span><span class="ln email" title="${escH(m.email)}">${escH(m.email)}</span></td>
+      <td><span class="ln"><span class="pill" style="border-color:${col};color:${col}" title="${escH(st)}">${escH(st)}</span></span><span class="ln">${planBadge(m)}${notify}</span></td>
+      <td><span class="ln">${m.start?'<span class="id" title="訂閱起始">'+escH(m.start)+'</span>':'<span class="email">—</span>'}</span><span class="ln">${per}</span></td>
       <td>${pay}</td>
-      <td>${per}</td>
-      <td>${until?'<span class="id">'+escH(until)+'</span>':'<span class="email">—</span>'}</td>
-      <td>${left}</td>
-      <td>${notify}</td>
+      <td><span class="ln">${until?'<span class="id" title="權益到期日">'+escH(until)+'</span>':'<span class="email">—</span>'}</span><span class="ln">${left}</span></td>
       <td>${refCell}</td>
-      <td style="text-align:center">${taCell(m)}</td>
-      <td>${st==='已結束'||m.status==='已取消'?'':`<button class="mini-act" onclick="giftMonth('${m.id}')">贈送月</button> <button class="mini-act" style="color:var(--gold,#e0a526)" onclick="cancelSub('${m.id}')">取消訂閱</button> `}<button class="mini-act" style="color:var(--accent,#2997ff)" title="PayPal 一次付清 → 手動開通 1／3／12 個月（不碰綠界）" onclick="paypalActivate('${m.id}')">PayPal開通</button> <button class="mini-act" style="color:#ff6b6b" onclick="deleteMember('${m.id}')">刪除</button></td>
-    </tr>`;}).join('') || `<tr><td colspan="13"><div class="empty">沒有符合的會員</div></td></tr>`;
+      <td class="c">${taCell(m)}</td>
+      <td class="c">${memActBtn(m.id,canSub)}</td>
+    </tr>`;}).join('') || `<tr><td colspan="9"><div class="empty">沒有符合的會員</div></td></tr>`;
 }
+/* ===== 會員名單「⋯」動作選單（2026-10-22）=====
+   原本每列四顆按鈕（贈送月／取消訂閱／PayPal開通／刪除）把表格撐到要左右捲動，改收進一個選單。
+   選單項目仍直接呼叫原本的 giftMonth／cancelSub／paypalActivate／deleteMember——
+   取消訂閱、刪除、PayPal 開通的二次確認都在那些函式裡，沒動。
+   鍵盤：Tab 到「⋯」→ Enter／空白鍵開啟 → ↑↓ 選擇 → Enter 執行；Esc 關閉並回到「⋯」。 */
+var _memActBtn=null;
+function memActBtn(id,canSub){
+  var e=escH(id);
+  return '<button type="button" class="act-more" aria-haspopup="menu" aria-expanded="false" aria-label="會員 '+e+' 的操作"'
+    +' title="操作：'+(canSub?'贈送月／取消訂閱／':'')+'PayPal開通／刪除" data-id="'+e+'" data-sub="'+(canSub?1:0)+'"'
+    +' onclick="openMemActs(this)" onkeydown="if(event.key===\'ArrowDown\'){event.preventDefault();openMemActs(this);}">⋯</button>';
+}
+function closeMemActs(focusBack){
+  var mn=$('memActMenu'); if(!mn||!mn.classList.contains('show'))return;
+  mn.classList.remove('show'); mn.innerHTML='';
+  var b=_memActBtn; _memActBtn=null;
+  if(b){ b.setAttribute('aria-expanded','false'); if(focusBack&&document.body.contains(b))b.focus(); }
+}
+function openMemActs(btn){
+  if(_memActBtn===btn){ closeMemActs(true); return; }
+  closeMemActs(false);
+  var mn=$('memActMenu'); if(!mn)return;
+  var id=btn.getAttribute('data-id'), canSub=btn.getAttribute('data-sub')==='1';
+  var m=mById(id)||{};
+  var it=function(act,label,color,tip){return '<button type="button" role="menuitem" tabindex="-1" data-act="'+act+'"'
+    +(color?' style="color:'+color+'"':'')+(tip?' title="'+tip+'"':'')+'>'+label+'</button>';};
+  mn.setAttribute('data-id',id);
+  mn.innerHTML='<div class="h" title="'+escH(m.email||'')+'">'+escH(id)+(m.email?' · '+escH(m.email):'')+'</div>'
+    +(canSub?it('gift','🎁 贈送月','')+it('cancel','⏹ 取消訂閱','var(--gold,#e0a526)','終止綠界扣款（會再確認）'):'')
+    +it('paypal','💳 PayPal開通','var(--accent,#2997ff)','PayPal 一次付清 → 手動開通 1／3／12 個月（不碰綠界）')
+    +'<div class="sep"></div>'+it('del','🗑 刪除','#ff6b6b','從 Google Sheet 永久移除（會再確認）');
+  mn.classList.add('show');
+  var r=btn.getBoundingClientRect(), w=mn.offsetWidth, h=mn.offsetHeight;
+  var x=Math.max(8,Math.min(r.right-w,window.innerWidth-w-8));
+  var y=r.bottom+4; if(y+h>window.innerHeight-8) y=Math.max(8,r.top-h-4);
+  mn.style.left=x+'px'; mn.style.top=y+'px';
+  btn.setAttribute('aria-expanded','true'); _memActBtn=btn;
+  var f=mn.querySelector('button[data-act]'); if(f)f.focus();
+}
+function runMemAct(act,id){
+  closeMemActs(true);
+  if(act==='gift')giftMonth(id);
+  else if(act==='cancel')cancelSub(id);
+  else if(act==='paypal')paypalActivate(id);
+  else if(act==='del')deleteMember(id);
+}
+(function(){
+  var mn=document.getElementById('memActMenu'); if(!mn)return;
+  mn.addEventListener('click',function(e){
+    var b=e.target.closest('button[data-act]'); if(b)runMemAct(b.getAttribute('data-act'),mn.getAttribute('data-id'));
+  });
+  mn.addEventListener('keydown',function(e){
+    var items=[].slice.call(mn.querySelectorAll('button[data-act]')), i=items.indexOf(document.activeElement);
+    if(e.key==='ArrowDown'){e.preventDefault();items[(i+1)%items.length].focus();}
+    else if(e.key==='ArrowUp'){e.preventDefault();items[(i-1+items.length)%items.length].focus();}
+    else if(e.key==='Home'){e.preventDefault();items[0].focus();}
+    else if(e.key==='End'){e.preventDefault();items[items.length-1].focus();}
+    else if(e.key==='Escape'||e.key==='Tab'){e.preventDefault();closeMemActs(true);}
+  });
+  document.addEventListener('mousedown',function(e){
+    if(_memActBtn&&!mn.contains(e.target)&&e.target!==_memActBtn)closeMemActs(false);
+  });
+  window.addEventListener('resize',function(){closeMemActs(false);});
+  window.addEventListener('scroll',function(e){ if(!mn.contains(e.target))closeMemActs(false); },true);
+})();
 /* 摘要列：一眼看完人數分佈、下一封通知信誰會收到、以及對不上帳的地方 */
 function renderMemSummary(){
   const box=$('memSummary'); if(!box)return;
