@@ -1,3 +1,5 @@
 node_modules/
 .next/
 .env*
+# graphify 產物（含內容摘要，不可推上線）
+graphify-out/
