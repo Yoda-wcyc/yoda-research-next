@@ -908,7 +908,7 @@ var subsInfo=null;
 // ★主控台要求的 GAS 最低版本。GAS 端 CODE_VERSION 比這個舊 → 畫面跳紅字。
 // 為什麼需要：2026-08-22 一整天反覆卡在「畫面不對 → 其實是 GAS 沒貼上／貼到一半斷掉」。
 // 兩邊的版本擺在同一個畫面上，就不用再猜。
-var GAS_MIN_VERSION='2026-10-19-a';   // 10-19：PayPal 開通（adminPaypalActivate）＋訂閱總表 payMethod
+var GAS_MIN_VERSION='2026-10-26-a';   // 10-26：取消確認信（mailOk）＋設定到期日／立即停權（adminSetNextCharge reason/revoke）
 var gasVersion='';
 var subsErr='';   // 訂閱總表拿不到時的原因，直接顯示在畫面上
 function loadFromGAS(){
@@ -1214,6 +1214,8 @@ function openMemActs(btn){
   mn.innerHTML='<div class="h" title="'+escH(m.email||'')+'">'+escH(id)+(m.email?' · '+escH(m.email):'')+'</div>'
     +(canSub?it('gift','🎁 贈送月','')+it('cancel','⏹ 取消訂閱','var(--gold,#e0a526)','終止綠界扣款（會再確認）'):'')
     +it('paypal','💳 PayPal開通','var(--accent,#2997ff)','PayPal 一次付清 → 手動開通 1／3／12 個月（不碰綠界）')
+    +it('expiry','📅 設定到期日','','只改權益到期日，可填原因（不碰綠界扣款）')
+    +it('revoke','⛔ 立即停權','#ff6b6b','到期日設為今天-4 天，連寬限一起過（不碰綠界扣款；會再確認）')
     +'<div class="sep"></div>'+it('del','🗑 刪除','#ff6b6b','從 Google Sheet 永久移除（會再確認）');
   mn.classList.add('show');
   var r=btn.getBoundingClientRect(), w=mn.offsetWidth, h=mn.offsetHeight;
@@ -1228,6 +1230,8 @@ function runMemAct(act,id){
   if(act==='gift')giftMonth(id);
   else if(act==='cancel')cancelSub(id);
   else if(act==='paypal')paypalActivate(id);
+  else if(act==='expiry')setExpiry(id,false);
+  else if(act==='revoke')setExpiry(id,true);
   else if(act==='del')deleteMember(id);
 }
 (function(){
@@ -1428,9 +1432,40 @@ async function cancelSub(id){
   if(!await uiConfirm('確定終止這位的訂閱扣款？\n\n會員：'+m.email+'（'+id+'）\n\n動作（不可逆）：\n· 綠界停用後續扣款\n· 標記為「已取消」\n· 永久排除創始優惠（她以後回來只給一般價）'))return;
   toast('終止中…（打綠界需幾秒）');
   post({action:'adminCancelMember',key:KEY,memberId:id}).then(res=>{
-    if(res&&res.ok){toast('已終止：綠界「'+(res.ecpayMsg||'停用成功')+'」·已標取消+排除創始');loadFromGAS();}
-    else toast((res&&res.error)||'終止失敗');
-  }).catch(()=>toast('連線失敗'));
+    if(res&&res.ok){
+      // 2026-10-26 起 GAS 停扣成功會自動寄取消確認信；mailOk 沒帶＝舊版 GAS
+      if(res.mailOk===false)uiAlert('已停扣（綠界停用成功），但確認信沒寄出：'+(res.mailError||'未知原因')+'\n\n請手動回信給 '+(res.email||m.email)+'。');
+      else if(res.mailOk===true)toast('已停扣（綠界停用成功）＋已寄取消確認信給 '+(res.email||m.email));
+      else toast('已終止：綠界「'+(res.ecpayMsg||'停用成功')+'」·已標取消+排除創始（GAS 舊版未寄確認信）');
+      loadFromGAS();
+    }
+    else uiAlert('綠界停用失敗，尚未停扣，請勿回覆會員「已取消」。\n\n原因：'+((res&&res.error)||'終止失敗'));
+  }).catch(()=>uiAlert('連線失敗：不確定綠界是否已停用。請重新整理看狀態有沒有變「已取消」；確認前請勿回覆會員「已取消」。'));
+}
+/* 設定到期日／立即停權（2026-10-26）：打 GAS adminSetNextCharge，notes 會記「到期日 A→B 日期 原因」。
+   只改權益到期日，不碰綠界扣款。設成今天擋不住（訂閱中有 3 天寬限、已取消到期日當天仍放行），
+   所以「立即停權」另送 date='revoke'，由 GAS 設成今天-4 天。已發出的登入票仍可用到它的期限（最多 12 小時）。 */
+async function setExpiry(id,revoke){
+  const m=mById(id)||{};
+  const cur=(String(m.next||'').match(/\d{4}-\d{2}-\d{2}/)||[''])[0];
+  const tp=n=>new Date(Date.now()+8*3600e3+n*864e5).toISOString().slice(0,10);   // 台北日期，n 天位移
+  let d='revoke', label=tp(-4)+'（立即停權：連寬限一起過，之後登入即無權限）';
+  if(!revoke){
+    const v=await uiPrompt('設定到期日：會員 '+id+'（'+(m.email||'')+'）\n\n請輸入 YYYY-MM-DD（今天＝'+tp(0)+'）。\n註：設成今天仍有寬限（訂閱中 3 天、已取消到當天），要立刻停權請用「⛔ 立即停權」。',cur||tp(0));
+    if(v===null||v===undefined)return;
+    d=String(v).trim(); label=d;
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){toast('日期格式須為 YYYY-MM-DD');return;}
+  }
+  const why=await uiPrompt('原因（選填，會寫進 notes；沒有就直接按確定）','');
+  if(why===null||why===undefined)return;
+  const ecpayLive=m.status!=='已取消'&&!(m.sub&&m.sub.payMethod==='paypal');
+  if(!await uiConfirm('把 '+id+' 的到期日從 '+(cur||'（空）')+' 改成 '+label+'？'
+    +(ecpayLive?'\n\n⚠ 這位是綠界自動扣款且仍有效：綠界仍會照原本日期扣款，這裡只改權益到期日。':'')))return;
+  toast('寫入中…');
+  post({action:'adminSetNextCharge',key:KEY,memberId:id,date:d,reason:String(why||'').trim()}).then(res=>{
+    if(res&&res.ok){toast('已改到期日：'+(res.prev||'（空）')+' → '+res.next_charge_date);loadFromGAS();}
+    else uiAlert((res&&res.error)||'設定失敗（GAS 可能尚未部署 2026-10-26-a）');
+  }).catch(()=>uiAlert('連線失敗：不確定是否已寫入，請重新整理確認到期日。'));
 }
 async function deleteMember(id){
   if(!await uiConfirm('確定刪除會員 '+id+'？\n此動作會從 Google Sheet 永久移除該列，無法復原。'))return;
