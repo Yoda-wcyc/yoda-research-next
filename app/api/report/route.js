@@ -1,6 +1,6 @@
 import { verifyJwt } from '../../../lib/jwt';
 import { blobPath } from '../../../lib/blob';
-import { CORS, J, preflight } from '../../../lib/cors';
+import { CORS, J, preflight, streamJson } from '../../../lib/cors';
 import { get } from '@vercel/blob';
 import { taMarket, taAllowed, taReady, signTaTicket, injectTaPick, stripTaPick } from '../../../lib/ta';
 
@@ -59,5 +59,5 @@ export async function POST(req) {
     } catch (e) { /* 注入失敗不影響報告 */ }
     if (!injected && html.indexOf('ta-pick.js') >= 0) html = stripTaPick(html);
   }
-  return J({ ok: true, allow: true, html, watermark: wm, memberId: (payload && payload.sub) || '' });
+  return streamJson({ ok: true, allow: true, html, watermark: wm, memberId: (payload && payload.sub) || '' });
 }
