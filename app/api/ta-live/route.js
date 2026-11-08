@@ -19,7 +19,6 @@ export async function POST(req) {
   const p = authOf(req);
   if (!p) return R({ ok: false, reason: 'need-login', error: '請先登入會員' }, 401);
   const sub = String(p.sub);
-  const owner = owners().includes(sub);
   const wm = p.wm || sub;
 
   let body = {};
@@ -27,6 +26,7 @@ export async function POST(req) {
 
   try {
     const st = await store();
+    const owner = owners().includes(sub) || (await st.isOwner(sub));
     if (!owner && !(await st.allowed(sub))) {
       return R({ ok: false, reason: 'not-enabled', error: '技術分析未開通' }, 403);
     }

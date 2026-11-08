@@ -10,7 +10,7 @@ vendor.json 記 sha256，兩邊各有檢查，副本不能偷偷漂移：
 資料  Yahoo chart API v8（純 urllib，不用 yfinance、不讀本機 pkl）。1H＝interval=1h range=730d；日K＝interval=1d 10 年。
       4H＝1H 依「每天開盤起每 4 根」切（台股 09:00–13:00｜13:00–13:30；美股 09:30–13:30｜13:30–16:00）。
       週K＝日K 依週一～週五合併，標在該週最後一個交易日。開高低收依除息事件往前還原（同 Yahoo adjclose 口徑），量不動。
-      Yahoo 1H 的「收盤那一刻」假 K（台股 13:30、美股 16:00、量 0）丟掉；有價動卻量 0 的 K＝缺量，當 NaN（量比／前五大量跳過）。
+      Yahoo 1H 的「收盤那一刻」假 K（台股 13:30、美股 16:00、量 0）丟掉；美股提早收盤日 13:00 那根有價動，併進前一個整點 1H；有價動卻量 0 的 K＝缺量，當 NaN（量比／前五大量跳過）。
 未定  K 棒結束時間還沒到＝盤中未定；收盤那根（日K、週K、盤中最後一段）要收盤＋15 分鐘（週K：該週五收盤＋15 分鐘）。未定那根只上圖，訊號與回測一律只用定案 K。
 訊號  analyze_symbol.compute_signals（前五大量／缺口分類／撐壓）原封不動套在所選週期的 K；均線排列算三組：
       短 SMA5/10/20、中 SMA8/13/34、長 SMA20/60/120（規則同 analyze_symbol._ma_group）。「近 120 天」＝近 120 根。
@@ -212,12 +212,20 @@ def _tod(idx):
 
 
 def bars_1h(df, market):
-    """只留開盤起整點對齊的 1H（丟掉收盤那刻的假 K）；有價動卻量 0＝缺量 → NaN。回 (df, end)。"""
+    """只留開盤起整點對齊的 1H（丟掉收盤那刻的假 K）；有價動卻量 0＝缺量 → NaN。回 (df, end)。
+    盤中沒對齊整點、但有價動的 K（美股提早收盤日 13:00 那根）不丟，併進它所在那根 1H。"""
     o_m, c_m = SESS[market]
     t = _tod(df.index)
-    df = df[(t >= o_m) & (t < c_m) & ((t - o_m) % 60 == 0)].copy()
+    moved = (df['h'] > df['l']) | (df['o'] != df['c'])
+    df = df[(t >= o_m) & (t < c_m) & (((t - o_m) % 60 == 0) | moved)].copy()
     miss = (df['v'] == 0) & ((df['h'] > df['l']) | (df['o'] != df['c']))
     df.loc[miss, 'v'] = np.nan
+    t = _tod(df.index)
+    if ((t - o_m) % 60 != 0).any():
+        key = df.index.normalize() + pd.to_timedelta(o_m + (t - o_m) // 60 * 60, unit='m')
+        g = df.groupby(key)
+        df = pd.DataFrame({'o': g['o'].first(), 'h': g['h'].max(), 'l': g['l'].min(), 'c': g['c'].last(),
+                           'v': g['v'].sum(min_count=1)})
     day = df.index.normalize()
     end = np.minimum(df.index + pd.Timedelta(hours=1), day + pd.Timedelta(minutes=c_m))
     return df, pd.DatetimeIndex(end)
@@ -577,6 +585,14 @@ def selftest():
     ok(len(u1) == 7 and list(u4.index.strftime('%H:%M')) == ['09:30', '13:30'] and u4['o'].iloc[0] == 1 and u4['c'].iloc[0] == 5
        and u4['v'].iloc[0] == 100 and u4['v'].iloc[1] == 50 + 60 + 70 and u4['h'].iloc[1] == 9
        and list(ue4.strftime('%H:%M')) == ['13:30', '16:00'], '4H 美股：09:30–13:30 四根、13:30–16:00 三根；16:00 假 K 丟掉')
+    # 美股提早收盤日：13:00 那根有價動、量 0 → 併進 12:30 那根（高低收跟著更新、量不變），不丟
+    hd = usd.iloc[:4].copy()
+    hd.loc[pd.Timestamp('2026-11-06 13:00')] = [5, 20, 1, 7, 0]
+    h1d, _ = bars_1h(hd.sort_index(), 'us')
+    h4d, _ = bars_4h(h1d, 'us')
+    ok(len(h1d) == 4 and h1d['c'].iloc[-1] == 7 and h1d['h'].iloc[-1] == 20 and h1d['l'].iloc[-1] == 1
+       and h1d['v'].iloc[-1] == 40 and h1d['o'].iloc[-1] == 4 and h4d['c'].iloc[0] == 7 and h4d['h'].iloc[0] == 20,
+       '1H 美股提早收盤：13:00 有價動的 K 併進 12:30 那根，4H 收盤／高低含它')
     # 缺一根（盤中停牌）不錯位
     u4b, _ = bars_4h(u1.drop(u1.index[1]), 'us')
     ok(list(u4b.index.strftime('%H:%M')) == ['09:30', '13:30'] and u4b['v'].iloc[1] == 180, '4H 依時間切：中間缺一根 1H 也不錯位')
