@@ -21,16 +21,21 @@ python "G:\Yoda x Claude\Skill\ta_engine.py" --check-vendor "G:\Yoda x Claude\_d
 
 | 項目 | 值 |
 |---|---|
-| Header | `X-TA-Engine-Key: <hex>`，`hex = HMAC-SHA256(key=JWT_SECRET, msg="ta-engine")` 小寫 hex 64 字 |
+| Header | `X-TA-Engine-Key: <hex>`，`hex = HMAC-SHA256(key=TA_ENGINE_KEY, msg="ta-engine")` 小寫 hex 64 字 |
 | symbol | 台股數字代號（`2330`、`00878`、`6488`，可帶 `.TW`／`.TWO`）；美股英文代號（`NVDA`、`SPY`、`BRK.B`）。大小寫、前後空白不拘 |
 | tf | `1H`、`4H`、`D`（日K）、`W`（週K）；預設 `D` |
 | 回應 | `application/json; charset=utf-8`，`Cache-Control: private, no-store` |
+
+`TA_ENGINE_KEY`＝引擎專用密鑰（2026-11-08 起取代 `JWT_SECRET` 衍生）：Next 專案與 ta-engine 專案設**同一個值**；引擎完全不讀 `JWT_SECRET`。
+選 HMAC 衍生值而不是直接比對原始密鑰：原始密鑰不出現在線路／log 上；引擎用 `hmac.compare_digest` 定時比對。
+任一邊沒設：引擎回 401（log 印 `ta-engine: TA_ENGINE_KEY 沒設，全部請求回 401`）；Next 不打引擎、直接回 502（log 印 `[ta-live] TA_ENGINE_KEY 沒設…`）；
+引擎回 401 時 Next 也回 502，log 印 `[ta-live] 計算引擎回 401：兩邊的 TA_ENGINE_KEY 不一致…`。
 
 Node 端產金鑰：
 
 ```js
 import crypto from 'crypto';
-const key = crypto.createHmac('sha256', process.env.JWT_SECRET).update('ta-engine').digest('hex');
+const key = crypto.createHmac('sha256', process.env.TA_ENGINE_KEY).update('ta-engine').digest('hex');
 const r = await fetch(`${ENGINE}/api/engine?symbol=${encodeURIComponent(sym)}&tf=${tf}`,
                       { headers: { 'X-TA-Engine-Key': key }, cache: 'no-store' });
 ```
@@ -41,7 +46,7 @@ const r = await fetch(`${ENGINE}/api/engine?symbol=${encodeURIComponent(sym)}&tf
 
 | HTTP | code | 什麼時候 |
 |---|---|---|
-| 401 | `unauthorized` | 沒帶／帶錯金鑰，或引擎那邊沒設 `JWT_SECRET` |
+| 401 | `unauthorized` | 沒帶／帶錯金鑰，或引擎那邊沒設 `TA_ENGINE_KEY` |
 | 400 | `bad_symbol` | 格式不對、指數（`^` 開頭）、加密貨幣／外匯格式 |
 | 400 | `bad_tf` | tf 不是 1H／4H／D／W |
 | 404 | `not_found` | Yahoo 查無（台股 `.TW`、`.TWO` 都試過） |
@@ -122,11 +127,11 @@ const r = await fetch(`${ENGINE}/api/engine?symbol=${encodeURIComponent(sym)}&tf
 |---|---|
 | `stop` | 紅虛線 `#ff4d4d`（dash `5 3`）：原始停損，進場→停利一半（沒停利就到出場） |
 | `stop_be` | 紅虛線：停利一半後移到進場價的保本停損，停利那根→出場 |
-| `tp1` | 黃點線 `#ffd23f`（dash `1.5 2.5`）：停利 2R，進場→停利或出場 |
+| `tp1` | 黃點線 `#ffd23f`（dash `1.5 2.5`）：停利 2R，進場→停利或出場（2R 價 ≤ 0 時不給，見 §6） |
 | `add_stop` | 橘虛線 `#ff9f40`（dash `5 3`）：加碼停損，加碼→加碼停損出場（或整筆出場） |
 | `open_entry` | 淡藍實線 `#9ad0ff`：目前持倉進場價，到右緣 |
 | `open_stop` | 紅虛線：目前停損（已停利一半時＝進場價），到右緣；原單已全出時不給 |
-| `open_tp1` | 黃點線：停利一半價位，到右緣（`trade.open.tp1_done` 為 true 時可標「✓已出」） |
+| `open_tp1` | 黃點線：停利一半價位，到右緣（`trade.open.tp1_done` 為 true 時可標「✓已出」）；2R 價 ≤ 0 時不給，右側也不放「停利一半」標籤 |
 | `open_add_stop` | 橘虛線：加碼那份還在時的加碼停損，到右緣 |
 
 持倉中的右側標籤（ta_local 的做法）：`多單進場 x`／`停損 x`／`停利一半 x（✓已出）`／`加碼停損 x`，跟撐壓標籤一起避讓。
@@ -151,10 +156,11 @@ const r = await fetch(`${ENGINE}/api/engine?symbol=${encodeURIComponent(sym)}&tf
 
 | 欄位 | 說明 |
 |---|---|
-| `trades[]` | 全期每一筆（舊到新）：`side, entry_t, entry, stop0, tp1, exit_t, pts, pct, vr, add, legs[]`。④ 表的「最近 10 筆」取最後 10 筆反序，`#`＝在 `trades` 的序號＋1 |
+| `trades[]` | 全期每一筆（舊到新）：`side, entry_t, entry, stop0, tp1, tp1_na, tp1_note, exit_t, pts, pct, vr, add, legs[]`。④ 表的「最近 10 筆」取最後 10 筆反序，`#`＝在 `trades` 的序號＋1 |
 | `trades[].add` | `null` 或 `{t, px, stop, qty}`（qty 0＝加碼那份已出） |
 | `trades[].legs[]` | `{t, px, qty, why, entry_px, is_add, label}`；`why`：停損／保本出／停利一半(2R)／收破10線／爆量反向K／加碼停損；`pts＝Σ side×qty×(px−entry_px)`，`pct＝pts÷原進場×100` |
-| `open` | `null` 或 `{side, entry_t, entry, stop, stop0, tp1, tp1_done, qty, add}`（`qty` 0.5＝已停利一半；0＝原單已出、只剩加碼） |
+| `open` | `null` 或 `{side, entry_t, entry, stop, stop0, tp1, tp1_na, tp1_note, tp1_done, qty, add}`（`qty` 0.5＝已停利一半；0＝原單已出、只剩加碼） |
+| `tp1_na`／`tp1_note` | 2R 停利價 ≤ 0（空單風險大於進場價一半，例：6488 週K）：`tp1=null`、`tp1_na=true`、`tp1_note="2R 停利價低於 0，不適用"`，不畫 `tp1`／`open_tp1` 線；表格該格改寫 `tp1_note`。交易邏輯不變（ta_trade 照算，那個價永遠碰不到）。正常時 `tp1_na=false`、`tp1_note=null` |
 | `stats` | `{n, wins, win_rate, sum_pts, sum_pct, avg_win_pct, avg_loss_pct, max_consec_loss, adds, start, end, bars, n_long, n_short}`（`bars`＝回測用的定案根數；% 已四捨五入兩位） |
 | `banner` | `{bad, min_n:8, win_pct:25, text}`：`n ≥ 8` 且（勝率 <25% 或合計 <0）→ `bad=true`，`text`＝「這套規則在這檔的歷史表現不好（N 筆、勝率 x%、合計 y%），進出場點不適用」 |
 | `note` | `"樣本內統計，不代表未來；未計手續費與滑價"`（放統計旁邊） |
@@ -168,11 +174,22 @@ const r = await fetch(`${ENGINE}/api/engine?symbol=${encodeURIComponent(sym)}&tf
 ## 7. 本機開發
 
 ```
-$env:JWT_SECRET = 'local-dev-only'      # Next dev 也設同一個值
+$env:TA_ENGINE_KEY = 'local-dev-only'   # 沒設時 dev_server 自動用這個；Next 的 .env.local 也放 TA_ENGINE_KEY=local-dev-only
 python "G:\Yoda x Claude\_deploy\yoda-research-next\ta-engine\dev_server.py"      # http://127.0.0.1:8790/api/engine
 ```
 
 Next 端引擎網址：本機 `http://127.0.0.1:8790`；線上＝獨立 Vercel 專案的網址（見 §8）。
+
+## 7.1 環境變數（兩個 Vercel 專案）
+
+| 專案 | 變數 | 值 |
+|---|---|---|
+| Next 正式站（本 repo 根目錄） | `TA_ENGINE_KEY` | 新產的隨機字串（≥32 bytes，例：`python -c "import secrets;print(secrets.token_hex(32))"`） |
+| Next 正式站 | `TA_ENGINE_URL` | ta-engine 專案網址（不設＝`https://yoda-ta-engine.vercel.app`） |
+| ta-engine（Root Directory＝`ta-engine`） | `TA_ENGINE_KEY` | 跟 Next 那邊**一模一樣** |
+| ta-engine | `JWT_SECRET` | 不需要；之前若設過可刪（引擎已不讀） |
+
+改完兩邊都要 Redeploy 才生效；只改一邊＝全部 502（Next log 會寫 401 不一致）。
 
 ## 8. 部署形態（為什麼是獨立專案）
 

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Vercel Python 函式入口：GET /api/engine?symbol=2330&tf=D（tf＝1H／4H／D／W）
-必帶 header X-TA-Engine-Key＝HMAC-SHA256(JWT_SECRET, "ta-engine") hex；契約見 docs/ta-engine-contract.md。"""
+必帶 header X-TA-Engine-Key＝HMAC-SHA256(TA_ENGINE_KEY, "ta-engine") 小寫 hex；契約見 docs/ta-engine-contract.md。
+只讀 TA_ENGINE_KEY（引擎專用密鑰），沒設＝全部 401，並在 log 印一行。"""
 import os, sys, json
 from http.server import BaseHTTPRequestHandler
 
@@ -19,7 +20,7 @@ class handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
-        self._send(*E.handle(self.path, self.headers.get('X-TA-Engine-Key'), os.environ.get('JWT_SECRET')))
+        self._send(*E.handle(self.path, self.headers.get('X-TA-Engine-Key'), os.environ.get(E.KEY_ENV)))
 
     def do_POST(self):
         self._send(405, {'ok': False, 'error': {'code': 'method', 'message': 'GET only'}})

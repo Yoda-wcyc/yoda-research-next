@@ -543,7 +543,7 @@ function Trade({ d }) {
     { label: "進場", render: (t) => t.entry_t, sort: (t) => t.entry_t },
     { label: "進場價", num: true, render: (t) => fnum(t.entry), sort: (t) => nz(t.entry) },
     { label: "停損", num: true, render: (t) => fnum(t.stop0), sort: (t) => nz(t.stop0) },
-    { label: "停利一半", num: true, render: (t) => fnum(t.tp1), sort: (t) => nz(t.tp1) },
+    { label: "停利一半", num: true, render: (t) => (t.tp1_na ? <span className="mut">{t.tp1_note}</span> : fnum(t.tp1)), sort: (t) => nz(t.tp1) },
     { label: "出場（時間 價 原因）", cls: "wrap small", render: legsTxt, sort: (t) => t.exit_t },
     { label: "出場", render: (t) => t.exit_t, sort: (t) => t.exit_t },
     { label: "損益", num: true, render: (t) => <span className={ud(t.pct)}>{fpct(t.pct)}</span>, sort: (t) => nz(t.pct) },
@@ -559,7 +559,7 @@ function Trade({ d }) {
             {p ? (
               <tr>
                 <td>{side(p.side)}</td><td>{p.entry_t}</td><td className="r">{fnum(p.entry)}</td>
-                <td className="r">{p.qty > 0 ? fnum(p.stop) : "—（原單已出）"}</td><td className="r">{fnum(p.tp1)}</td>
+                <td className="r">{p.qty > 0 ? fnum(p.stop) : "—（原單已出）"}</td><td className="r" data-tp1-na={p.tp1_na ? "1" : undefined}>{p.tp1_na ? <span className="mut">{p.tp1_note}</span> : fnum(p.tp1)}</td>
                 <td>{p.tp1_done ? "是（停損已移到進場價）" : "否"}</td><td className="wrap">{addTxt(p.add)}</td>
                 <td className="r">{close && p.qty > 0 ? fpct((p.stop / close - 1) * 100) : "—"}</td>
               </tr>
