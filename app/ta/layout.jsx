@@ -1,9 +1,9 @@
 import "./ta.css";
 
-// 會員技術分析頁：只給名單內會員（票在網址 #k=，由報告裡的勾選模組帶過來）。不收錄、不進 sitemap。
+// 會員技術分析頁（獨立網站版）：會員登入＋開通（或站長）才看得到內容。不收錄、不進 sitemap。
 export const metadata = {
-  title: "技術分析資料｜Yoda Research 會員專屬",
-  description: "Yoda Research 會員專屬技術分析資料。",
+  title: "技術分析｜Yoda Research 會員專屬",
+  description: "Yoda Research 會員專屬技術分析。",
   robots: { index: false, follow: false, nocache: true, googleBot: { index: false, follow: false } },
   referrer: "no-referrer",
 };

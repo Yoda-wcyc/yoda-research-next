@@ -1,0 +1,66 @@
+import { authOf, owners, store, todayTaipei, cleanSym, symKey, callEngine, TFS, DAILY_MAX } from '../../../lib/ta-live';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
+
+// 獨立技術分析頁 /ta 的唯一資料來源（同網域呼叫，不開 CORS）。
+//
+//   POST  Authorization: Bearer <會員登入票>
+//     {action:'status'}            → {ok, owner, quota, wm}           （頁面一進來先問：開通了沒、今天剩幾檔）
+//     {symbol:'2330', tf:'D'}      → {ok, owner, quota, wm, data:<引擎回應>}
+//   失敗 → {ok:false, reason, error, quota?}
+//     reason：need-login 401｜not-enabled 403｜bad-request 400｜quota-exceeded 429｜symbol-not-found 404/422｜upstream 502｜error 500
+function R(data, status) {
+  return Response.json(data, { status: status || 200, headers: { 'Cache-Control': 'private, no-store' } });
+}
+
+export async function POST(req) {
+  const p = authOf(req);
+  if (!p) return R({ ok: false, reason: 'need-login', error: '請先登入會員' }, 401);
+  const sub = String(p.sub);
+  const owner = owners().includes(sub);
+  const wm = p.wm || sub;
+
+  let body = {};
+  try { body = await req.json(); } catch (e) {}
+
+  try {
+    const st = await store();
+    if (!owner && !(await st.allowed(sub))) {
+      return R({ ok: false, reason: 'not-enabled', error: '技術分析未開通' }, 403);
+    }
+    const day = todayTaipei();
+    const used = owner ? [] : await st.used(sub, day);
+    const quota = (n) => (owner ? { unlimited: true } : { used: n, max: DAILY_MAX, left: Math.max(0, DAILY_MAX - n) });
+
+    if (body.action === 'status') return R({ ok: true, owner, quota: quota(used.length), wm });
+
+    const sym = cleanSym(body.symbol);
+    const tf = TFS.includes(body.tf) ? body.tf : '';
+    if (!sym || !tf) return R({ ok: false, reason: 'bad-request', error: '代號或週期格式不對', quota: quota(used.length) }, 400);
+
+    const key = symKey(sym);
+    const fresh = !owner && !used.includes(key);
+    // shortcut: 同一會員同時送多檔時可能多算過 30 檔一兩檔（先查後寫、沒鎖），人工操作不會發生
+    if (fresh && used.length >= DAILY_MAX) {
+      return R({ ok: false, reason: 'quota-exceeded', error: '今天的 ' + DAILY_MAX + ' 檔額度用完了（台灣時間午夜重算）；今天查過的代號仍可再看', quota: quota(used.length) }, 429);
+    }
+
+    const { status, body: eb } = await callEngine(sym, tf);
+    if (status === 200 && eb && eb.ok) {
+      const k2 = symKey((eb.symbol && eb.symbol.yahoo) || sym);
+      let n = used.length;
+      if (!owner && !used.includes(k2)) { await st.add(sub, day, k2); n++; }
+      return R({ ok: true, owner, quota: quota(n), wm, data: eb });
+    }
+    const msg = (eb && eb.error && eb.error.message) || '';
+    if (status === 400 || status === 404 || status === 422) {   // 查無／不支援（指數、加密貨幣、資料太少）：不扣額度
+      return R({ ok: false, reason: 'symbol-not-found', error: msg || '查無此代號', quota: quota(used.length) }, status === 422 ? 422 : 404);
+    }
+    return R({ ok: false, reason: 'upstream', error: status === 401 ? '計算引擎設定有誤（金鑰不符）' : msg || '行情來源暫時沒有回應，請稍後再試', quota: quota(used.length) }, 502);
+  } catch (e) {
+    return R({ ok: false, reason: 'error', error: '伺服器錯誤：' + String((e && e.message) || e).slice(0, 200) }, 500);
+  }
+}
+export async function GET() { return R({ ok: false, error: 'POST only' }, 405); }
