@@ -193,6 +193,9 @@ function KChart({ d, full, smas, a, b, onTip }) {
   for (let i = 0; i < n - every; i += every) els.push(<text key={"d" + i} className="ax" x={X(i)} y={H - 7} textAnchor="middle">{tl(i)}</text>);
   els.push(<text key="dl" className="ax" x={xr} y={H - 7} textAnchor="end">{longD ? String(bars[n - 1].t).slice(0, 10) : md(bars[n - 1].t)}</text>);
   els.push(<text key="vl" className="ax" x={L - 6} y={T + PH + GP + 10} textAnchor="end">{market === "tw" ? "量（張）" : "量"}</text>);
+  // 圖上文字／記號佔的位置（缺口代號、島狀反轉的字、前五大量編號、圖左上線名、進出場記號先放，進出場標籤再找不撞的位置）；tw＝字寬估計（中文 12、英數 6.8）
+  const placed = [];
+  const tw = (s) => [...s].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? 12 : 6.8), 0);
   // 缺口框：未補／部分回補＝剩下的區間畫到右緣（部分回補的原缺口淡淡畫到回補那根）；已補＝缺口那根畫到回補那根
   (ov.gaps || []).forEach((x, k) => {
     if (x.top == null || x.bottom == null) return;
@@ -216,13 +219,12 @@ function KChart({ d, full, smas, a, b, onTip }) {
       }
     }
     if (x.type_short && gi >= 0 && gi < n) {
+      const gy = (Y(x.top) + Y(x.bottom)) / 2 + 4;
+      placed.push([x0 - 3 - tw(String(x.type_short)), gy - 11, x0 - 3, gy + 3]);
       els.push(<text key={"gl" + k} className={"gl " + (x.dir === "up" ? "up" : "dn") + (x.fill === "full" ? " filled" : "")} x={x0 - 3}
         y={(Y(x.top) + Y(x.bottom)) / 2 + 4} textAnchor="end">{String(x.type_short)}{x.type ? <title>{x.type}</title> : null}</text>);
     }
   });
-  // 圖上文字標籤佔的位置（島狀反轉的字先放，進出場標籤撞到就錯開）；tw＝字寬估計（中文 12、英數 6.8）
-  const placed = [];
-  const tw = (s) => [...s].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? 12 : 6.8), 0);
   // 島狀反轉：金色虛線框＋直接標字（頂部島標在框上方、底部島標在框下方；沒有 kind 時看島開頭那個缺口：向上＝頂部）
   (ov.islands || []).forEach((x, k) => {
     if (x.high == null || x.low == null || x.i1 == null) return;
@@ -235,7 +237,7 @@ function KChart({ d, full, smas, a, b, onTip }) {
     els.push(<rect key={"is" + k} className="isl" x={x0} y={yt} width={Math.max(2, x1 - x0)} height={Math.max(2, yb - yt)}
       fill="none" stroke={GOLD} strokeWidth="1.2" strokeDasharray="3 3" clipPath={clip} data-kind={top ? "top" : "bottom"} />);
     const lx = Math.min(xr - 40, Math.max(L + 40, (x0 + x1) / 2)), ly = top ? Math.max(T + 11, yt - 5) : Math.min(T + PH - 3, yb + 14);
-    placed.push([lx - 36, ly - 11, lx + 36, ly + 2]);
+    placed.push([lx - 36, ly - 12, lx + 36, ly + 4]);
     els.push(<text key={"ist" + k} className="isl-t" x={lx} y={ly} textAnchor="middle">{top ? "頂部島狀反轉" : "底部島狀反轉"}</text>);
   });
   // K 棒（收 ≥ 開＝紅）＋量柱：一般的併成 path；前五大量（金框＋金色量柱＋①～⑤）與盤中未定那根單獨畫
@@ -287,9 +289,11 @@ function KChart({ d, full, smas, a, b, onTip }) {
         fill={rk ? GOLD : col} fillOpacity={rk ? 1 : 0.3} />);
     }
     if (rk) {
+      placed.push([x - 7, Y(h) - 17, x + 7, Y(h) - 2]);
       one.push(<text key={"m" + i} className="mk" x={x} y={Y(h) - 5} textAnchor="middle" data-rank={rk}>{mark(rk)}</text>);
       if (v > 0) one.push(<text key={"mv" + i} className="mk mkv" x={x} y={VY(v) - 3} textAnchor="middle">{mark(rk)}</text>);
     }
+    if (unf) { const uy = Y(h) - (rk ? 20 : 6); placed.push([x - tw(d.unfinished_label || "盤中未定"), uy - 11, x, uy + 3]); }
     if (unf) one.push(<text key={"uf" + i} className="unf" x={x} y={Y(h) - (rk ? 20 : 6)} textAnchor="end">{d.unfinished_label || "盤中未定"}</text>);
   });
   els.push(<path key="wu" d={pth.wu} stroke={K_UP} strokeWidth="1" fill="none" />, <path key="wd" d={pth.wd} stroke={K_DN} strokeWidth="1" fill="none" />);
@@ -353,18 +357,9 @@ function KChart({ d, full, smas, a, b, onTip }) {
   }
   if (op) byEntry.set(op.entry_i, op);
   // 記號：▲多進（紅大三角，K 低點下）／▼空進（綠大三角，K 高點上）、✕出場；旁邊標「多進 價格」「原因 價格 報酬%」。
-  // 可見根數 > 250 只留圖形；標籤撞到前面的就往外（多進往下、空進往上）錯開一層
-  const showLab = n <= 250, tlab = [];
-  const put = (x, y, s, anchor, dy, col, cls) => {
-    const w = tw(s), x0 = anchor === "middle" ? x - w / 2 : x;
-    let yy = y;
-    for (let k = 0; k < 4; k++) {
-      if (!placed.some((r) => x0 < r[2] && x0 + w > r[0] && yy - 11 < r[3] && yy + 2 > r[1])) break;
-      yy += dy;
-    }
-    placed.push([x0, yy - 11, x0 + w, yy + 2]);
-    tlab.push(<text key={"tlb" + tlab.length} className={cls} x={x} y={yy} textAnchor={anchor} style={{ fill: col }}>{s}</text>);
-  };
+  // 可見根數 > 250 只留圖形。標籤依序試幾個靠近記號的位置（原位→記號左右→另一側→往外錯開），選第一個不撞任何字／記號的；
+  // 都撞就選重疊最少的。標籤夾在價格區內（右緣不超過 xr，不會蓋到右側撐壓標籤）
+  const showLab = n <= 250, tlab = [], want = [];
   marks.forEach((m) => {
     const li = m.i - a, bb = bars[li], x = X(li);
     const t = m.kind === "entry" ? byEntry.get(m.i) : byExit.get(m.i);
@@ -379,17 +374,23 @@ function KChart({ d, full, smas, a, b, onTip }) {
         <circle cx={x} cy={y + s * 7} r="12" fill="transparent" />
         <path className="mk-entry" d={`M${x.toFixed(1)} ${y.toFixed(1)} l-7 ${s * 12} h14 z`} fill={col} stroke="#0b0f15" strokeWidth="1" />
       </g>);
-      if (showLab) put(x, s === 1 ? y + 26 : y - 16, (s === 1 ? "多進 " : "空進 ") + fpx(t.entry), "middle", s * 13, col, "te");
+      placed.push([x - 7, Math.min(y, y + s * 12), x + 7, Math.max(y, y + s * 12)]);
+      const y0 = s === 1 ? y + 26 : y - 16, ym = y + s * 6 + 4;
+      want.push([(s === 1 ? "多進 " : "空進 ") + fpx(t.entry), col, "te", [[x, y0, "middle"], [x + 10, ym, "start"], [x - 10, ym, "end"],
+        [x, y0 + s * 13, "middle"], [x + 10, ym + s * 13, "start"], [x - 10, ym + s * 13, "end"], [x, y0 + s * 26, "middle"], [x, y0 + s * 39, "middle"]]]);
     } else {
       const col = TONE[m.tone] || "#ffffff", y = Y(m.px);
       els.push(<g key={"mx" + m.i} className="mk-hit" {...hit}>
         <circle cx={x} cy={y} r="11" fill="transparent" />
         <path className="mk-exit" d={`M${(x - 5.5).toFixed(1)} ${(y - 5.5).toFixed(1)}l11 11m0 -11l-11 11`} stroke={col} strokeWidth="2.6" strokeLinecap="round" />
       </g>);
-      if (showLab) put(x + 9, y + (t.side === 1 ? 16 : -9), (t.label || t.why) + " " + fpx(t.exit_px) + " " + fpc(t.pct), "start", t.side === 1 ? 13 : -13, col, "tx");
+      placed.push([x - 6, y - 6, x + 6, y + 6]);
+      const dy = t.side === 1 ? 13 : -13, yb = y + (t.side === 1 ? 16 : -9), yo = y + (t.side === 1 ? -9 : 16);
+      want.push([(t.label || t.why) + " " + fpx(t.exit_px) + " " + fpc(t.pct), col, "tx", [[x + 9, yb, "start"], [x - 9, yb, "end"],
+        [x + 10, y + 4, "start"], [x - 10, y + 4, "end"], [x + 9, yo, "start"], [x - 9, yo, "end"],
+        [x + 9, yb + dy, "start"], [x - 9, yb + dy, "end"], [x + 9, yb + 2 * dy, "start"], [x - 9, yb + 2 * dy, "end"], [x + 9, yb + 3 * dy, "start"]]]);
     }
   });
-  els.push(...tlab);
   // 圖上直接寫線的名字（不用點開圖例）：三條均線、出場線、停損
   const ckey = [...smas.map(([m], k) => ["SMA" + m, MA_COL[k], ""]),
     ...(ch.exit_line ? [["出場線 " + (trd.p ? maName(trd.p, trd.p.exit_k) : ""), EMA_COL, ""]] : []), ...(marks.length || op ? [["停損", TR_STOP, "4 3"]] : [])];
@@ -398,9 +399,24 @@ function KChart({ d, full, smas, a, b, onTip }) {
     if (!s) return;
     els.push(<line key={"ky" + k} x1={kx} x2={kx + 14} y1={T + 9} y2={T + 9} stroke={col} strokeWidth="2" strokeDasharray={dash || undefined} />);
     els.push(<text key={"kyt" + k} className="ckey" x={kx + 18} y={T + 13} style={{ fill: col }}>{s}</text>);
+    placed.push([kx, T + 1, kx + 18 + tw(s), T + 15]);
     kx += 26 + tw(s);
   });
-  // 右側標籤避讓（由上到下排、不重疊、不超出價格區）；圖外的價位貼邊、加 ↑／↓
+  // 重疊面積（四邊各多留 1px，字的描邊才不會貼在一起）
+  const hitArea = (bx) => placed.reduce((z, r) => z + Math.max(0, Math.min(bx[2], r[2] + 1) - Math.max(bx[0], r[0] - 1)) * Math.max(0, Math.min(bx[3], r[3] + 1) - Math.max(bx[1], r[1] - 1)), 0);
+  if (showLab) want.forEach(([s, col, cls, cands]) => {
+    const w = tw(s);
+    let best = null;
+    for (const [x, y, anchor] of cands) {
+      const x0 = Math.min(xr - 2 - w, Math.max(L + 2, anchor === "middle" ? x - w / 2 : anchor === "end" ? x - w : x));
+      const yy = Math.min(T + PH - 2, Math.max(T + 12, y)), bx = [x0, yy - 12, x0 + w, yy + 4], o = hitArea(bx);
+      if (!best || o < best[2]) best = [x0, yy, o, bx];
+      if (o === 0) break;
+    }
+    placed.push(best[3]);
+    tlab.push(<text key={"tlb" + tlab.length} className={cls} x={best[0]} y={best[1]} textAnchor="start" style={{ fill: col }} data-ov={best[2] ? Math.round(best[2]) : undefined}>{s}</text>);
+  });
+  els.push(...tlab);  // 右側標籤避讓（由上到下排、不重疊、不超出價格區）；圖外的價位貼邊、加 ↑／↓
   for (const z of lab) {
     if (z.y < T) { z.y = T; z.t = "↑" + z.t; }
     else if (z.y > T + PH) { z.y = T + PH; z.t = "↓" + z.t; }
