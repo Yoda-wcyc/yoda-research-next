@@ -232,11 +232,53 @@ svg.ta-k .unf{fill:#ffcf70;font-size:11px;font-weight:700;paint-order:stroke;str
 .ta-legend .bx.gold{background:none;border:1.5px solid #ffc94a;opacity:1}
 .ta-legend .bx.unf{background:rgba(224,82,94,.35);border:1px dashed #e0525e;opacity:1}
 
-/* 手機寬（萬一沒吃到 viewport 1200）：改成上下排、整頁捲動 */
+/* 交易規則面板（11-09）：左欄＝查詢卡／規則面板（自己捲動）／最近查過，右欄跨三列 */
+.ta-split{grid-template-rows:auto minmax(0,1fr) auto;row-gap:10px}
+.ta-split>.ta-left{grid-column:1;grid-row:1}
+.ta-split>.ta-rp{grid-column:1;grid-row:2}
+.ta-split>.ta-recent{grid-column:1;grid-row:3;max-height:22vh}
+.ta-split>.ta-right{grid-column:2;grid-row:1 / span 3}
+.ta-rp{min-height:0;overflow-y:auto;overscroll-behavior:contain;background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:8px 10px 12px;font-size:calc(13px*var(--scale));line-height:1.5}
+.ta-rp h3{font-size:calc(14.5px*var(--scale));font-weight:700;margin:0 0 2px;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px}
+.ta-rpst{font-size:calc(12px*var(--scale));font-weight:600;color:var(--accent)}
+.ta-hint0,.ta-rp .hint{color:var(--dim);font-size:calc(11.5px*var(--scale));line-height:1.45}
+.ta-rp fieldset{border:0;border-top:1px solid var(--divider);margin:8px 0 0;padding:6px 0 0;min-width:0}
+.ta-rp legend{font-weight:700;font-size:calc(13.5px*var(--scale));padding:0 6px 0 0}
+.ta-opt{margin:5px 0 7px}
+.ta-opt .row,.ta-strats .row{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px}
+.ta-rp label{display:inline-flex;align-items:center;gap:3px;cursor:pointer;margin-right:4px}
+.ta-rp input[type=radio],.ta-rp input[type=checkbox]{margin:0;accent-color:var(--accent)}
+.ta-n{font:inherit;font-size:calc(13px*var(--scale));color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:6px;
+  padding:1px 5px;width:4.2em;min-width:0;outline:none}
+.ta-n:focus{border-color:var(--accent)}
+.ta-n.bad{border-color:var(--yellow);background:color-mix(in srgb,var(--yellow) 12%,var(--bg))}
+.ta-n.ta-nm{width:auto;flex:1;min-width:6em}
+.ta-sel2{width:auto;cursor:pointer}
+.ta-ferr{color:var(--yellow);font-size:calc(11.5px*var(--scale));margin-top:2px}
+.ta-ferr.ok{color:var(--accent)}
+.ta-strats{margin:8px 0 2px;padding:7px 8px;border:1px solid var(--divider);border-radius:8px;background:var(--bg)}
+.ta-strats .ta-btn{padding:2px 8px}
+.ta-slist{list-style:none;margin:6px 0 0;padding:0}
+.ta-slist li{display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px;padding:3px 4px;border-radius:6px}
+.ta-slist li.on{background:color-mix(in srgb,var(--accent) 16%,transparent)}
+.ta-sname{font:inherit;font-weight:600;color:var(--text);background:none;border:0;padding:0;cursor:pointer;text-align:left;flex:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ta-sname:hover{color:var(--accent)}
+/* ④ 頂端「目前套用的規則」 */
+.ta-cur{margin:0 0 10px;padding:8px 12px;border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:6px;background:var(--surface2)}
+.ta-curh{font-weight:700;font-size:calc(13.5px*var(--scale));margin-bottom:4px}
+.ta-cur dl{margin:0;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:3px 14px;font-size:calc(13px*var(--scale))}
+.ta-cur dt{font-weight:700;color:var(--dim);white-space:nowrap}
+.ta-cur dd{margin:0}
+
+/* 手機寬（萬一沒吃到 viewport 1200）：改成上下排、整頁捲動；規則面板排到圖下方 */
 @media (max-width:760px){
   .ta-root,.ta-root.ta-app{min-width:0;height:auto;overflow:visible;padding:12px 12px 40px}
   .ta-head{padding-right:0}
-  .ta-split{grid-template-columns:minmax(0,1fr)}
+  .ta-split{grid-template-columns:minmax(0,1fr);grid-template-rows:none}
+  .ta-split>.ta-left,.ta-split>.ta-rp,.ta-split>.ta-recent,.ta-split>.ta-right{grid-column:auto;grid-row:auto}
+  .ta-split>.ta-left{order:0} .ta-split>.ta-recent{order:1;max-height:none} .ta-split>.ta-right{order:2} .ta-split>.ta-rp{order:3;overflow:visible}
   .ta-list{max-height:30vh}
-  .ta-legend dl{grid-template-columns:minmax(0,1fr)}
+  .ta-legend dl,.ta-cur dl{grid-template-columns:minmax(0,1fr)}
 }

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 r"""ta_engine.py — 會員技術分析「網站版」計算引擎（Yoda 2026-11-08）
 
-正本在 Skill\；Next repo 的 ta-engine\ 是 `--sync` 出去的副本（連 analyze_symbol.py、ta_trade.py 一起），
+正本在 Skill\；Next repo 的 ta-engine\ 是 `--sync` 出去的副本（連 analyze_symbol.py 一起；11-09 起引擎不用 ta_trade.py），
 vendor.json 記 sha256，兩邊各有檢查，副本不能偷偷漂移：
     python "G:\Yoda x Claude\Skill\ta_engine.py" --sync "G:\Yoda x Claude\_deploy\yoda-research-next\ta-engine"
     python "G:\Yoda x Claude\Skill\ta_engine.py" --check-vendor "G:\Yoda x Claude\_deploy\yoda-research-next\ta-engine"
@@ -14,7 +14,9 @@ vendor.json 記 sha256，兩邊各有檢查，副本不能偷偷漂移：
 未定  K 棒結束時間還沒到＝盤中未定；收盤那根（日K、週K、盤中最後一段）要收盤＋15 分鐘（週K：該週五收盤＋15 分鐘）。未定那根只上圖，訊號與回測一律只用定案 K。
 訊號  analyze_symbol.compute_signals（前五大量／缺口分類／撐壓）原封不動套在所選週期的 K；均線排列算三組：
       短 SMA5/10/20、中 SMA8/13/34、長 SMA20/60/120（規則同 analyze_symbol._ma_group）。「近 120 天」＝近 120 根。
-進出場 ta_trade.trade_signals 跑全部定案 K（整筆進、整筆出，停損固定不動）；圖只給最後 120 根內的記號與線。
+進出場 11-09 起不在引擎算：回應帶 history（全部 K 的開高低收量，價格取 6 位小數；前 bars_completed 根＝定案），
+      瀏覽器用 yoda-research-next/lib/ta-trade.js 依「交易規則控制面板」的參數即時回測（與 ta_trade.py 逐筆一致，
+      tests/ta_trade_parity.py 驗）。引擎不再回 trade，免得兩份打架。
 授權  handle() 第一步就驗 X-TA-Engine-Key＝HMAC-SHA256(TA_ENGINE_KEY, "ta-engine") 小寫 hex（引擎專用密鑰，跟會員登入用的密鑰分開）；
       不對或引擎沒設 TA_ENGINE_KEY 就 401，不碰 Yahoo。原始密鑰不上線路，只傳衍生值。
 """
@@ -27,16 +29,14 @@ if HERE not in sys.path:
 import numpy as np
 import pandas as pd
 import analyze_symbol as A
-from ta_trade import trade_signals
 
-SCHEMA = 'ta-engine-1'
+SCHEMA = 'ta-engine-2'          # 11-09：拿掉 trade／chart.ema10，加 history
 CHART_N = 120
 MIN_BARS = 30
 TFS = {'1H': '1h', '4H': '1h', 'D': '1d', 'W': '1d'}
 MA_SETS = (('short', (5, 10, 20)), ('mid', (8, 13, 34)), ('long', (20, 60, 120)))
 MA_ZH = {'short': '短', 'mid': '中', 'long': '長'}
 SMA_NS = (5, 8, 10, 13, 20, 34, 60, 120)
-BAD_MIN_N, BAD_WIN_PCT = 8, 25          # 同 ta_local：≥8 筆且（勝率 <25% 或合計 <0）→ 規則不適用
 GRACE = 15 * 60                          # 收盤後再等 15 分鐘才算定案（Yahoo 收盤價晚一點進來）
 TTL_INTRA = 15 * 60
 TTL_MISS = 3600
@@ -48,22 +48,15 @@ OK_TYPES = ('EQUITY', 'ETF')
 TW_IN = re.compile(r'^(\d{4,6}[A-Z]?)(\.TWO?)?$')
 US_IN = re.compile(r'^[A-Z][A-Z0-9]{0,5}([.\-][A-Z]{1,2})?$')
 REN = {'o': 'Open', 'h': 'High', 'l': 'Low', 'c': 'Close', 'v': 'Volume'}
-NOTE_STATS = '樣本內統計，不代表未來；未計手續費與滑價'
 UNFINISHED = '盤中未定'
-EMA10_LABEL = 'EMA10（出場線）'
 KEY_ENV = 'TA_ENGINE_KEY'
-LEG_ABBR = {'停損': '停損', '收破10線': '破10線', '爆量反向K': '爆量反K'}
-VENDOR = ('analyze_symbol.py', 'ta_trade.py', 'ta_engine.py')
+VENDOR = ('analyze_symbol.py', 'ta_engine.py')
+HIST_ND = 6                              # history 價格小數位（瀏覽器回測用；tests/ta_engine_check.py --regress 驗跟原始精度交易一致）
 LEGEND = [
     {'key': 'support', 'label': '支撐', 'desc': '白色實線：今收下方最強的一條（±10% 內優先）'},
     {'key': 'resistance', 'label': '壓力', 'desc': '白色虛線：今收上方最強的一條（±10% 內優先）'},
     {'key': 'top_volume', 'label': '前五大量', 'desc': '近 120 根量最大的 5 根，金框；高低點是撐壓候選'},
     {'key': 'gap', 'label': '缺口', 'desc': '方框＝還沒補的缺口區間（部分回補只畫剩下那段）；補滿的畫到回補那根'},
-    {'key': 'ema10', 'label': EMA10_LABEL, 'desc': '收盤跌破（空單站上）就整筆出場'},
-    {'key': 'entry', 'label': '多進／空進', 'desc': '紅箭頭多進、綠箭頭空進：EMA5/10/20 排列剛成立＋量比 ≥1.2＋收在 EMA5 同側'},
-    {'key': 'stop', 'label': '停損', 'desc': '紅虛線：進場時近 3 根最低（空單最高），抱著的期間不動，盤中碰到整筆出'},
-    {'key': 'exit', 'label': '✕ 出場', 'desc': '整筆出場，✕ 旁邊寫原因：停損（紅）／破10線／爆量反K（白）'},
-    {'key': 'open', 'label': '持倉中', 'desc': '還沒出場的線延伸到右緣'},
     {'key': 'unfinished', 'label': UNFINISHED, 'desc': '最後一根還在交易中，只上圖，不進訊號與回測'},
 ]
 
@@ -299,61 +292,9 @@ def ma_sets(c, idx):
     return out
 
 
-def trade_json(trd, n_bars):
-    """ta_trade 原始輸出 → JSON（全部筆數、目前持倉、統計、規則不適用旗標）。"""
-    tt = trd['trades']
-    st = dict(trd['stats'])
-    st.update(start=A._d(st['start']) if st['start'] is not None else None,
-              end=A._d(st['end']) if st['end'] is not None else None, bars=int(n_bars),
-              n_long=sum(1 for t in tt if t['side'] == 1), n_short=sum(1 for t in tt if t['side'] == -1))
-    for k in ('win_rate', 'sum_pct', 'avg_win_pct', 'avg_loss_pct'):
-        st[k] = A._f(st[k], 2)
-    st['sum_pts'] = A._f(st['sum_pts'], 4)
-    bad = st['n'] >= BAD_MIN_N and (st['win_rate'] < BAD_WIN_PCT or st['sum_pct'] < 0)
-    banner = {'bad': bool(bad), 'min_n': BAD_MIN_N, 'win_pct': BAD_WIN_PCT,
-              'text': ('這套規則在這檔的歷史表現不好（%d 筆、勝率 %.1f%%、合計 %+.1f%%），進出場點不適用'
-                       % (st['n'], st['win_rate'], st['sum_pct'])) if bad else None}
-    trades = [{'side': t['side'], 'entry_t': A._d(t['entry_t']), 'entry': A._p(t['entry']), 'stop': A._p(t['stop']),
-               'exit_t': A._d(t['exit_t']), 'exit_px': A._p(t['exit_px']), 'why': t['why'], 'label': LEG_ABBR[t['why']],
-               'pts': A._f(t['pts'], 4), 'pct': A._f(t['pct'], 2), 'vr': A._f(t['vr'], 2)} for t in tt]
-    p = trd['open']
-    opn = None if not p else {'side': p['side'], 'entry_t': A._d(p['entry_t']), 'entry': A._p(p['entry']), 'stop': A._p(p['stop'])}
-    return {'trades': trades, 'open': opn, 'stats': st, 'banner': banner, 'note': NOTE_STATS}
-
-
-def trade_marks(trd, ix):
-    """同 ta_local.trade_marks 的畫法，改成資料：markers（箭頭／✕）＋ lines（i0→i1，i1=None＝延伸到右緣）。
-    ix(t)：該時間在圖上第幾根；-1＝在視窗左邊（線從左緣畫、不畫記號）。出場在視窗之前的整筆不畫。"""
-    mk, ln = [], []
-
-    def seg(kind, i0, i1, y):
-        ln.append({'kind': kind, 'i0': i0, 'i1': i1, 'y': A._p(y)})
-
-    def entry(t, ie):
-        if ie >= 0:
-            mk.append({'kind': 'entry', 'i': ie, 'side': t['side'], 'px': A._p(t['entry']),
-                       'label': '多進' if t['side'] == 1 else '空進'})
-
-    for t in trd['trades']:
-        ie, iz = ix(t['entry_t']), ix(t['exit_t'])
-        if iz < 0:
-            continue
-        seg('stop', ie, iz, t['stop'])
-        entry(t, ie)
-        mk.append({'kind': 'exit', 'i': iz, 'side': t['side'], 'px': A._p(t['exit_px']), 'why': t['why'],
-                   'label': LEG_ABBR[t['why']], 'tone': 'stop' if t['why'] == '停損' else 'exit'})
-    p = trd['open']
-    if p:
-        ie = ix(p['entry_t'])
-        seg('open_stop', ie, None, p['stop'])
-        seg('open_entry', ie, None, p['entry'])
-        entry(p, ie)
-    return mk, ln
-
-
 def analyze_bars(df, market, final=None):
     """純函式。df：o/h/l/c/v（index＝K 棒時間，舊到新）；final：每根是否定案（None＝全部定案；未定只能在尾巴）。
-    訊號、均線排列、進出場回測只用定案 K；圖＝最後 120 根定案 K ＋ 尾巴的盤中未定 K。"""
+    訊號、均線排列只用定案 K；圖＝最後 120 根定案 K ＋ 尾巴的盤中未定 K；history＝全部 K（瀏覽器回測只用前 bars_completed 根）。"""
     df = df[['o', 'h', 'l', 'c', 'v']].astype('float64')
     fin = np.ones(len(df), bool) if final is None else np.asarray(final, bool)
     nf = int(fin.sum())
@@ -365,7 +306,6 @@ def analyze_bars(df, market, final=None):
     sig, _chart = A.compute_signals(dc, market)
     sig['ma_align'] = ma_sets(dc['c'].to_numpy('float64'), dc.index)
     sig['badges']['ma'] = sig['ma_align']['badge']['text']
-    raw = trade_signals(dc.rename(columns=REN))
     k0 = max(0, nf - CHART_N)
     w = df.iloc[k0:]
     wf = fin[k0:]
@@ -378,7 +318,6 @@ def analyze_bars(df, market, final=None):
         return i if i is not None else (-1 if s < first else len(w) - 1)
     c_all = df['c'].to_numpy('float64')
     sma = {str(n): [A._p(x) for x in A.sma(c_all, n)[k0:]] for n in SMA_NS}
-    e10 = df['c'].ewm(span=10, adjust=False).mean().to_numpy()[k0:]       # 同 ta_trade 那條（全歷史 ewm）
     bars = [{'t': A._d(t), 'o': A._p(r.o), 'h': A._p(r.h), 'l': A._p(r.l), 'c': A._p(r.c), 'v': A._f(r.v, 0),
              'final': bool(f)} for t, r, f in zip(w.index, w.itertuples(), wf)]
     tv = [{'rank': x['rank'], 'i': ix(x['date']), 't': x['date'], 'high': x['high'], 'low': x['low'],
@@ -393,9 +332,9 @@ def analyze_bars(df, market, final=None):
     srl = [{'kind': k, 'price': x['price'], 'style': 'solid' if k == 'support' else 'dashed', 'color': '#ffffff',
             'pick_scope': x['pick_scope'], 'dist_pct': x['dist_pct']}
            for k in ('support', 'resistance') for x in sr[k]]
-    mk, ln = trade_marks(raw, ix)
-    trade = trade_json(raw, nf)
-    trade.update(markers=mk, lines=ln)
+    rd = lambda col: [round(float(x), HIST_ND) for x in df[col].to_numpy()]
+    hist = {'n': int(len(df)), 't': [A._d(t) for t in df.index], 'o': rd('o'), 'h': rd('h'), 'l': rd('l'), 'c': rd('c'),
+            'v': [int(x) if x == x else None for x in df['v'].to_numpy()]}
     notes = []
     nv = int(np.isnan(dc['v'].to_numpy()[k0:]).sum())
     if nv:
@@ -403,9 +342,8 @@ def analyze_bars(df, market, final=None):
     out = {'asof': A._d(dc.index[-1]), 'bars_total': int(len(df)), 'bars_completed': nf,
            'unfinished': bool(not wf[-1]), 'unfinished_label': UNFINISHED if not wf[-1] else None,
            'chart': {'n': len(bars), 'bars': bars, 'sma': sma, 'ma_sets': {k: list(ns) for k, ns in MA_SETS},
-                     'ema10': [A._p(x) for x in e10], 'ema10_label': EMA10_LABEL,
                      'overlays': {'sr': srl, 'top_volume': tv, 'gaps': gaps, 'islands': isl}, 'legend': LEGEND},
-           'signals': sig, 'trade': trade, 'notes': notes}
+           'signals': sig, 'history': hist, 'notes': notes}
     return _clean(out)
 
 
@@ -464,7 +402,7 @@ def _sha(p):
 def sync(dst):
     for n in VENDOR:
         shutil.copyfile(os.path.join(HERE, n), os.path.join(dst, n))
-    man = {'note': '這三個檔是 Skill\\ 的副本，不要在這裡改；改 Skill\\ 再 python ta_engine.py --sync',
+    man = {'note': '這些檔是 Skill\\ 的副本，不要在這裡改；改 Skill\\ 再 python ta_engine.py --sync',
            'files': {n: _sha(os.path.join(dst, n)) for n in VENDOR}}
     with open(os.path.join(dst, 'vendor.json'), 'w', encoding='utf-8', newline='\n') as f:
         json.dump(man, f, ensure_ascii=False, indent=2)
@@ -584,10 +522,12 @@ def selftest():
     fin = np.ones(len(base), bool)
     fin[-1] = False
     a1, a2 = analyze_bars(base, 'tw', fin), analyze_bars(base.iloc[:-1], 'tw')
-    ok(a1['signals'] == a2['signals'] and a1['trade'] == a2['trade'] and a1['unfinished'] and not a2['unfinished']
+    h1, h2 = a1['history'], a2['history']
+    ok(a1['signals'] == a2['signals'] and a1['unfinished'] and not a2['unfinished']
        and a1['chart']['bars'][-1]['final'] is False and a1['chart']['n'] == 121 and a2['chart']['n'] == 120
-       and a1['asof'] == a2['asof'] and a1['bars_completed'] == 259,
-       '最後一根盤中未定：只上圖（多一根、final=False），訊號與回測跟拿掉它完全一樣')
+       and a1['asof'] == a2['asof'] and a1['bars_completed'] == 259 and h1['n'] == 260 and h2['n'] == 259
+       and all(h1[k][:259] == h2[k] for k in 'tohlcv') and 'trade' not in a1,
+       '最後一根盤中未定：只上圖（多一根、final=False），訊號跟拿掉它完全一樣；history 帶全部 260 根（瀏覽器回測只用前 259 根）')
     try:
         analyze_bars(base, 'tw', np.r_[fin[:-2], False, True])
         ok(False, '未定在中間要報錯')
@@ -605,8 +545,11 @@ def selftest():
     ok(analyze_bars(sh, 'us')['signals']['ma_align']['long']['state'] == A.MA_NA
        and analyze_bars(sh, 'us')['signals']['ma_align']['mid']['state'] == A.MA_BULL, 'K 不夠 121 根 → 長組資料不足、中組照算')
     js = json.dumps(up, allow_nan=False, ensure_ascii=False)
-    ok(len(up['chart']['ema10']) == 120 and set(up['chart']['sma']) == {str(n) for n in SMA_NS} and len(js) > 1000,
-       '輸出是合法 JSON（無 NaN），EMA10＋8 條 SMA 跟 120 根對齊')
+    hc = _trend_df(260, True)
+    ok(set(up['chart']['sma']) == {str(n) for n in SMA_NS} and len(js) > 1000 and 'ema10' not in up['chart']
+       and up['history']['t'][0] == '2024-01-01' and len(up['history']['c']) == 260
+       and max(abs(a - b) for a, b in zip(up['history']['c'], hc['c'])) < 1e-6 and up['history']['v'][0] == 1400,
+       '輸出是合法 JSON（無 NaN），8 條 SMA 跟 120 根對齊；history＝全部 K（價格 6 位小數、量整數）')
 
     # 除息還原
     dv = pd.DataFrame([[100, 101, 99, 100, 1], [95, 96, 94, 95, 1]], index=pd.to_datetime(['2026-07-01', '2026-07-02']),

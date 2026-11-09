@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DEFAULT_PARAMS, normParams, backtest, chartMarks, exitLine, ruleText, maName } from "../../lib/ta-trade";
 
 // 會員技術分析（獨立網站版·2026-11-08 Yoda 定）
 //
@@ -7,6 +8,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 //   左 1/4：輸入代號（台股上市櫃、美股、ETF；不收指數）＋最近查過＋今日額度（會員每天 30 檔、站長不限）
 //   右 3/4：週期分頁 1H／4H／日K／週K ＋ 均線組 短（5/10/20）中（8/13/34）長（20/60/120）＋ K 線圖（撐壓、前五大量、缺口、
 //           進出場、停損、出場 ✕）＋ ①～④ 四個分頁（前五大量／跳空缺口／多空排列／進出場，所有開通者都看得到）＋ 支撐壓力
+//   左欄「交易規則」面板（11-09）：勾選／填數字 → 瀏覽器用 lib/ta-trade.js 即時重算進出場與回測（不打伺服器、不扣額度）；
+//           設定與命名策略只存在自己的瀏覽器（localStorage）。手機寬（≤760px）面板排到圖下方。
 // 資料全部來自 Python 計算引擎（ta-engine，契約見 docs/ta-engine-contract.md）；最後一根盤中未定只上圖，不進訊號與回測。
 
 const TOK_KEY = "yoda_ta_jwt";
@@ -234,7 +237,7 @@ function KChart({ d, maSet }) {
     }
     if (unf) els.push(<text key={"uf" + i} className="unf" x={x} y={Y(h) - (rk ? 20 : 6)} textAnchor="end">{d.unfinished_label || "盤中未定"}</text>);
   });
-  // 均線（所選那組三條 SMA）＋ EMA10（出場線，細線）
+  // 均線（所選那組三條 SMA）＋ 出場線（面板選的那條，細線）
   const poly = (arr, key, col, w) => {
     const segs = []; let cur = [];
     (arr || []).slice(0, n).forEach((v, i) => {
@@ -247,7 +250,7 @@ function KChart({ d, maSet }) {
   };
   const set = g(ch, "ma_sets", maSet) || [];
   set.forEach((m, k) => poly(g(ch, "sma", String(m)), "sma" + m, MA_COL[k], 1.2));
-  poly(ch.ema10, "ema10", EMA_COL, 1);
+  poly(ch.exit_line, "exit_ma", EMA_COL, 1);
   // 支撐（白實線）／壓力（白虛線）
   const lab = [];   // {y, t, col, nt}
   srl.forEach(([x, side]) => {
@@ -335,7 +338,7 @@ const SW = {
   resistance: <i className="sw dash" style={{ color: "#fff" }} />,
   top_volume: <i className="bx gold" />,
   gap: <><i className="bx" style={{ background: K_UP }} /><i className="bx" style={{ background: K_DN }} /></>,
-  ema10: <i className="sw" style={{ color: EMA_COL }} />,
+  exit_ma: <i className="sw" style={{ color: EMA_COL }} />,
   entry: <><b style={{ color: K_UP }}>▲</b><b style={{ color: K_DN }}>▼</b></>,
   stop: <i className="sw dash" style={{ color: TR_STOP }} />,
   exit: <><b style={{ color: TR_STOP }}>✕</b><b>✕</b></>,
@@ -344,7 +347,8 @@ const SW = {
 };
 function Legend({ d, maSet }) {
   const set = g(d, "chart", "ma_sets", maSet) || [];
-  const items = (g(d, "chart", "legend") || []).filter((x) => x.key !== "unfinished" || d.unfinished);
+  const eng = (g(d, "chart", "legend") || []).filter((x) => x.key !== "unfinished" || d.unfinished);
+  const items = [...eng.filter((x) => x.key !== "unfinished"), ...(d.trade_legend || []), ...eng.filter((x) => x.key === "unfinished")];
   return (
     <div className="ta-legend">
       <dl>
@@ -527,7 +531,18 @@ function Trade({ d }) {
   ];
   return (
     <div className="ta-block" data-blk="trade">
-      <div className="ta-cap">④ 進出場 <span className="mut">EMA5／10／20 排列剛成立＋量比 ≥1.2 進場；停損＝進場時近 3 根低（高），抱著期間不動；收破 EMA10 或爆量反向 K 整筆出</span></div>
+      <div className="ta-cap">④ 進出場 <span className="mut">依左邊「交易規則」面板即時回測（在你的瀏覽器算，不扣額度）</span></div>
+      {d.rules ? (
+        <div className="ta-cur" data-rules>
+          <div className="ta-curh">目前套用的規則</div>
+          <dl>
+            <div className="ta-rule"><dt>進場</dt><dd>{d.rules.entry}</dd></div>
+            <div className="ta-rule"><dt>停損</dt><dd>{d.rules.stop}</dd></div>
+            <div className="ta-rule"><dt>出場</dt><dd>{d.rules.exit}</dd></div>
+            <div className="ta-rule"><dt>成本</dt><dd>{d.rules.cost}</dd></div>
+          </dl>
+        </div>
+      ) : null}
       <BadBanner d={d} />
       <div className="ta-hs">
         <table className="ta-tbl ta-dt">
@@ -544,13 +559,15 @@ function Trade({ d }) {
       </div>
       <div className="ta-hs">
         <table className="ta-tbl ta-dt">
-          <thead><tr><th>回測期間</th><th className="r">筆數</th><th className="r">勝率</th><th className="r">合計</th><th className="r">平均賺</th><th className="r">平均賠</th><th className="r">最大連續虧損</th></tr></thead>
+          <thead><tr><th>回測期間</th><th className="r">筆數</th><th className="r">勝率</th><th className="r">總報酬</th><th className="r" title="各筆報酬累加（不複利）從高點回落最多幾個百分點">最大回撤</th><th className="r">平均賺</th><th className="r">平均賠</th><th className="r" title="平均賺 ÷ 平均賠（絕對值）">賺賠比</th><th className="r">最大連續虧損</th></tr></thead>
           <tbody><tr>
             <td>{st.start || "—"}～{st.end || "—"}（{st.bars || "—"} 根{TF_ZH[d.tf]}）</td>
-            <td className="r">{st.n || 0}（多 {st.n_long || 0}／空 {st.n_short || 0}）</td>
+            <td className="r" data-stat="n">{st.n || 0}（多 {st.n_long || 0}／空 {st.n_short || 0}）</td>
             <td className="r">{st.n ? fpct(st.win_rate, false) + "（" + st.wins + "/" + st.n + "）" : "—"}</td>
-            <td className={"r " + ud(st.sum_pct)}>{fpct(st.sum_pct)}</td>
+            <td className={"r " + ud(st.sum_pct)} data-stat="sum">{fpct(st.sum_pct)}</td>
+            <td className="r" data-stat="mdd">{st.n ? (st.mdd_pct > 0 ? "−" : "") + fnum(st.mdd_pct) + "%" : "—"}</td>
             <td className="r up">{fpct(st.avg_win_pct)}</td><td className="r dn">{fpct(st.avg_loss_pct)}</td>
+            <td className="r">{st.payoff == null ? "—" : fnum(st.payoff)}</td>
             <td className="r">{st.max_consec_loss || 0} 筆</td>
           </tr></tbody>
         </table>
@@ -568,7 +585,7 @@ const BLOCKS = [
   ["vol", "① 前五大量", TopVolume, "近 120 根裡成交量最大的 5 根。量倍數＝這根量 ÷ 這根「之前」20 根的平均量。那根的最高、最低就是關卡：現價高過最高＝在上方、低過最低＝在下方，其餘＝區間內。"],
   ["gap", "② 跳空缺口", Gaps, "近 120 根的全部跳空，不設門檻。向上＝這根最低高過前一根最高；向下＝這根最高低過前一根最低。之後有 K 碰進缺口＝部分回補，碰到另一邊＝已補。類型看缺口前的趨勢與位置：突＝突破、破＝跌破、逃＝逃逸、竭＝竭盡、彈＝空頭裡的反彈、回＝多頭裡的回檔、一＝一般、島＝島狀反轉。"],
   ["ma", "③ 多空排列", MaAlign, "三組均線可切換：短 SMA5／10／20、中 SMA8／13／34、長 SMA20／60／120。多頭排列＝收盤 > 第一條 > 第二條 > 第三條，而且三條都往上；空頭排列完全相反；其他叫糾結，並寫出哪個條件不成立。"],
-  ["trade", "④ 進出場", Trade, "EMA＝指數均線，全部等收盤才算。EMA5／10／20 剛排好（前 3 根還沒全排好）、量比前 10 根均量 ≥1.2、收在 EMA5 同側＝收盤進場。停損＝進場時近 3 根最低（空單最高），抱著的期間都不動，盤中碰到就整筆出。沒碰停損就一直抱，收盤破 EMA10（空單站上）整筆出；或爆量反向 K（量比 ≥2、反向 K、收破 EMA5）整筆出。同一根同時碰停損和其他出場，算停損。"],
+  ["trade", "④ 進出場", Trade, "EMA＝指數均線、SMA＝簡單均線，全部等收盤才算；量比＝本根量 ÷ 前 N 根平均量。整筆進、整筆出，停損抱著的期間都不動。回測用全部定案 K（盤中未定那根不算），損益＝（出場價 − 進場價）÷ 進場價（空單反過來），各筆相加、不複利。規則由左邊「交易規則」面板決定（預設＝站方現行規則），上方「目前套用的規則」就是這張圖與這些數字用的規則；改面板只在你的瀏覽器重算，不扣額度。"],
 ];
 const BLK_KEY = "yoda_ta_blk";
 
@@ -606,6 +623,162 @@ const RULES = [
   ["距離 %", "(價位 ÷ 今收 − 1) × 100：正數在現價上方、負數在下方。"],
 ];
 
+// ───────── 交易規則面板（11-09）：參數 → 瀏覽器回測 ─────────
+const RULES_KEY = "yoda_ta_rules_v1";   // {cur, saved:[{name, p}], active}；只在這台瀏覽器
+const SAVED_MAX = 30, NAME_MAX = 24;
+const copyP = (p) => ({ ...p, ma_n: p.ma_n.slice() });
+const sameP = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const DEF_P = normParams({}).p;
+// 讀回來的東西不信任：壞欄位回預設、壞策略丟掉；JSON 壞掉整個回預設
+function cleanRules(o) {
+  const x = o && typeof o === "object" ? o : {};
+  const saved = (Array.isArray(x.saved) ? x.saved : [])
+    .filter((s) => s && typeof s.name === "string" && s.name.trim())
+    .map((s) => ({ name: s.name.trim().slice(0, NAME_MAX), p: normParams(s.p).p }))
+    .filter((s, i, a) => a.findIndex((y) => y.name === s.name) === i).slice(0, SAVED_MAX);
+  const active = typeof x.active === "string" && saved.some((s) => s.name === x.active) ? x.active : null;
+  return { cur: normParams(x.cur).p, saved, active };
+}
+function readRules() { try { return cleanRules(JSON.parse(lsGet(RULES_KEY) || "null")); } catch (e) { return cleanRules(null); } }
+
+// 引擎回應＋參數 → 給圖與 ④ 用的 trade（記號、線、統計、橫幅、白話規則、圖例）
+function withTrade(d, p) {
+  if (!d || !g(d, "history", "c")) return d;
+  const nf = d.bars_completed, k0 = Math.max(0, nf - 120);
+  const r = backtest(d.history, nf, p);
+  const rt = ruleText(p);
+  const exLab = p.exit_ma ? maName(p, p.exit_k) + "（出場線）" : null;
+  const legend = [
+    exLab ? { key: "exit_ma", label: exLab, desc: "收盤跌破（空單站上）就整筆出場" + (p.exit_delay ? "；進場後第 " + (p.exit_delay + 1) + " 根起才看" : "") } : null,
+    { key: "entry", label: "多進／空進", desc: "紅箭頭多進、綠箭頭空進：" + rt.entry },
+    { key: "stop", label: "停損", desc: "紅虛線：" + rt.stop },
+    { key: "exit", label: "✕ 出場", desc: "整筆出場，✕ 旁邊寫原因：停損（紅）／破N線／爆量反K／到期（白）" },
+    { key: "open", label: "持倉中", desc: "還沒出場的線延伸到右緣" },
+  ].filter(Boolean);
+  return {
+    ...d,
+    chart: { ...d.chart, exit_line: exitLine(d.history, p, k0) },
+    trade: { ...r, ...chartMarks(r, k0), note: "樣本內統計，不代表未來；" + rt.cost },
+    rules: rt, trade_legend: legend,
+  };
+}
+
+// 模組層元件：寫在 RulePanel 裡面的話每次重繪都是新元件，輸入框會掉焦點
+function RuleOpt({ children, hint, k, errors }) {
+  const ks = k ? [].concat(k).filter((x) => errors[x]) : [];
+  return (
+    <div className="ta-opt">
+      <div className="row">{children}</div>
+      {hint ? <div className="hint">{hint}</div> : null}
+      {ks.map((x) => <div key={x} className="ta-ferr" role="alert">{errors[x]}（這格沒套用）</div>)}
+    </div>
+  );
+}
+
+function RulePanel({ draft, set, errors, status, saved, active, nm, setNm, rn, setRn, msg, onSave, onApply, onDel, onRen, onReset }) {
+  const v = (x) => (x === undefined || x === null ? "" : String(x));
+  const put = (k, x) => set({ ...draft, [k]: x });
+  const M = draft.ma === "sma" ? "SMA" : "EMA";
+  const man = (j) => M + v(draft.ma_n[j]);
+  const N = (k, label, w) => (
+    <input type="text" inputMode="decimal" className={"ta-n" + (errors[k] ? " bad" : "")} style={w ? { width: w } : undefined}
+      value={v(draft[k])} onChange={(e) => put(k, e.target.value)} aria-label={label} aria-invalid={!!errors[k]} data-k={k} />
+  );
+  const Rad = (k, x, text) => (
+    <label key={String(x)}><input type="radio" name={"tr-" + k} checked={draft[k] === x} onChange={() => put(k, x)} />{text}</label>
+  );
+  const Chk = (k, text) => <label><input type="checkbox" checked={!!draft[k]} onChange={(e) => put(k, e.target.checked)} data-k={k} />{text}</label>;
+  return (
+    <section className="ta-rp" aria-label="交易規則">
+      <h3>交易規則 <span className="ta-rpst" data-status>{status}</span></h3>
+      <div className="ta-hint0">改任何一格，圖上的進出場、停損線、出場線和 ④ 回測立刻重算；只在你的瀏覽器算，不扣額度。</div>
+
+      <div className="ta-strats">
+        <div className="row">
+          <input type="text" className="ta-n ta-nm" placeholder="策略名稱" aria-label="策略名稱" maxLength={NAME_MAX} value={nm} onChange={(e) => setNm(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onSave(); } }} />
+          <button type="button" className="ta-btn" onClick={onSave}>存成策略</button>
+          <button type="button" className="ta-btn" onClick={onReset} title="回到站方現行規則">還原預設</button>
+        </div>
+        {msg ? <div className="ta-ferr ok">{msg}</div> : null}
+        {saved.length ? (
+          <ul className="ta-slist">
+            {saved.map((s) => (
+              <li key={s.name} className={s.name === active ? "on" : ""}>
+                {rn && rn.old === s.name ? (
+                  <>
+                    <input type="text" className="ta-n ta-nm" aria-label="新名稱" maxLength={NAME_MAX} value={rn.val} autoFocus
+                      onChange={(e) => setRn({ old: s.name, val: e.target.value })}
+                      onKeyDown={(e) => { if (e.key === "Enter") onRen(s.name, rn.val); if (e.key === "Escape") setRn(null); }} />
+                    <button type="button" className="ta-link" onClick={() => onRen(s.name, rn.val)}>確定</button>
+                    <button type="button" className="ta-link" onClick={() => setRn(null)}>取消</button>
+                  </>
+                ) : (
+                  <>
+                    <button type="button" className="ta-sname" onClick={() => onApply(s)} aria-label={"套用策略：" + s.name}>{s.name}</button>
+                    <button type="button" className="ta-link" onClick={() => setRn({ old: s.name, val: s.name })}>改名</button>
+                    <button type="button" className="ta-link" onClick={() => onDel(s.name)}>刪除</button>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : <div className="hint">還沒有存過策略；調好參數、取個名字按「存成策略」。</div>}
+      </div>
+
+      <fieldset>
+        <legend>進場</legend>
+        <RuleOpt errors={errors} hint="EMA 對最近的價格反應快；SMA 每一根一樣重">均線 {Rad("ma", "ema", "EMA")}{Rad("ma", "sma", "SMA")}</RuleOpt>
+        <RuleOpt errors={errors} k="ma_n" hint="由短到長三條；排列＝三條照順序排好（多：短＞中＞長）">
+          週期
+          {[0, 1, 2].map((j) => (
+            <input key={j} type="text" inputMode="numeric" className={"ta-n" + (errors.ma_n ? " bad" : "")} value={v(draft.ma_n[j])} aria-label={"第 " + (j + 1) + " 條均線週期"}
+              aria-invalid={!!errors.ma_n} data-k={"ma_n" + j} onChange={(e) => { const a = draft.ma_n.slice(); a[j] = e.target.value; put("ma_n", a); }} />
+          ))}
+        </RuleOpt>
+        <RuleOpt errors={errors} k="fresh_n" hint="本根排好、前 N 根還沒全排好，才算「剛成立」">排列剛成立：回看 {N("fresh_n", "排列剛成立回看根數")} 根</RuleOpt>
+        <RuleOpt errors={errors} k={["vol_in", "vol_n"]} hint="量比＝本根量 ÷ 前 N 根平均量；不勾＝不看量">
+          {Chk("vol_on", "量比 ≥")}{N("vol_in", "進場量比門檻")}，比前 {N("vol_n", "量比比較根數")} 根
+        </RuleOpt>
+        <RuleOpt errors={errors} hint={"多單收盤要在 " + man(0) + " 上方、空單在下方"}>{Chk("side_ma", "收在第一條均線同側（" + man(0) + "）")}</RuleOpt>
+      </fieldset>
+
+      <fieldset>
+        <legend>停損</legend>
+        <RuleOpt errors={errors} k="stop_n" hint="進場那根往前數 N 根（含進場根）的最低點；空單用最高點">{Rad("stop", "low_n", "近")}{N("stop_n", "停損近幾根")} 根極值</RuleOpt>
+        <RuleOpt errors={errors} k="stop_pct" hint="多單＝進場價 ×（1 − X%）；空單＝進場價 ×（1 + X%）">{Rad("stop", "pct", "固定")}{N("stop_pct", "固定停損百分比")} %</RuleOpt>
+        <RuleOpt errors={errors} k={["atr_k", "atr_n"]} hint="ATR＝平均真實波幅（Wilder）；停損＝進場價往不利方向 K 倍 ATR">
+          {Rad("stop", "atr", "ATR")}{N("atr_n", "ATR 根數")} 的 {N("atr_k", "ATR 倍數")} 倍
+        </RuleOpt>
+        <RuleOpt errors={errors} hint="盤中碰到＝最低（空單最高）碰到就出；收盤破＝收盤價破了才出、用收盤價">
+          觸發 {Rad("stop_on", "touch", "盤中碰到")}{Rad("stop_on", "close", "收盤破")}
+        </RuleOpt>
+      </fieldset>
+
+      <fieldset>
+        <legend>出場</legend>
+        <RuleOpt errors={errors} hint="收盤跌破這條（空單站上）就整筆出；圖上桃紅細線就是它">
+          {Chk("exit_ma", "收破第")}
+          <select className="ta-n ta-sel2" value={draft.exit_k} onChange={(e) => put("exit_k", Number(e.target.value))} aria-label="出場看第幾條均線" data-k="exit_k">
+            {[1, 2, 3].map((k) => <option key={k} value={k}>{k}（{man(k - 1)}）</option>)}
+          </select> 條線
+        </RuleOpt>
+        <RuleOpt errors={errors} k="exit_delay" hint="0＝進場後下一根就開始看；3＝先放 3 根不看，第 4 根起才看">進場後 {N("exit_delay", "出場線延遲根數")} 根才開始看這條</RuleOpt>
+        <RuleOpt errors={errors} k="vol_out" hint={"量比達門檻＋收反向 K（多單收黑）＋收破 " + man(0) + " → 收盤整筆出"}>{Chk("vol_exit", "爆量反向 K，量比 ≥")}{N("vol_out", "爆量反向K量比門檻")}</RuleOpt>
+        <RuleOpt errors={errors} k="max_hold" hint="抱滿 N 根還沒出，就在第 N 根收盤整筆出">{Chk("max_hold_on", "最多持有")}{N("max_hold", "最多持有根數")} 根</RuleOpt>
+      </fieldset>
+
+      <fieldset>
+        <legend>方向＋成本</legend>
+        <RuleOpt errors={errors} hint="雙向＝多頭排列做多、空頭排列做空">{Rad("dir", "both", "雙向")}{Rad("dir", "long", "只做多")}{Rad("dir", "short", "只做空")}</RuleOpt>
+        <RuleOpt errors={errors} k={["fee", "slip"]} hint="每筆來回扣 2 ×（手續費＋滑價）個百分點；0＝不計（站方現行規則未計）">
+          手續費 {N("fee", "手續費百分比（每邊）")} %　滑價 {N("slip", "滑價百分比（每邊）")} %（每邊）
+        </RuleOpt>
+      </fieldset>
+    </section>
+  );
+}
+
 // ───────── 主頁 ─────────
 async function post(url, body, token) {
   const headers = { "Content-Type": "application/json" };
@@ -636,6 +809,49 @@ export default function TaPage() {
   const tok = useRef("");
   const cache = useRef(new Map());              // sym|tf → data（頁面記憶體）
   const seq = useRef(0);
+  // 交易規則：draft＝面板上看到的（可能有打錯的格子）；applied＝實際套用（打錯的格子沿用上一個好的值）
+  const [draft, setDraft] = useState(() => copyP(DEF_P));
+  const [saved, setSaved] = useState([]);
+  const [active, setActive] = useState(null);
+  const [rulesReady, setRulesReady] = useState(false);
+  const [nm, setNm] = useState("");
+  const [rn, setRn] = useState(null);           // 改名中 {old, val}
+  const [pmsg, setPmsg] = useState("");
+  const good = useRef(DEF_P);
+  const norm = useMemo(() => normParams(draft, good.current), [draft]);
+  const applied = norm.p;
+  const hasErr = Object.keys(norm.errors).length > 0;
+  useEffect(() => { good.current = applied; }, [applied]);
+  useEffect(() => {
+    const r = readRules();
+    good.current = r.cur;
+    setDraft(copyP(r.cur)); setSaved(r.saved); setActive(r.active); setRulesReady(true);
+  }, []);
+  useEffect(() => {
+    if (rulesReady) lsSet(RULES_KEY, JSON.stringify({ cur: applied, saved, active }));
+  }, [rulesReady, applied, saved, active]);
+  const dv = useMemo(() => withTrade(data && data.tf === tf ? data : null, applied), [data, tf, applied]);
+  const actS = saved.find((x) => x.name === active);
+  const rstatus = actS ? actS.name + (sameP(actS.p, applied) ? "" : "（已修改）") : sameP(applied, DEF_P) ? "預設（站方現行規則）" : "自訂（未存）";
+  const saveS = () => {
+    const n = nm.trim().slice(0, NAME_MAX);
+    if (!n) { setPmsg("先填策略名稱"); return; }
+    if (hasErr) { setPmsg("有格子不合法，先改好再存"); return; }
+    if (!saved.some((x) => x.name === n) && saved.length >= SAVED_MAX) { setPmsg("最多存 " + SAVED_MAX + " 組，先刪掉幾組"); return; }
+    setSaved((a) => [{ name: n, p: copyP(applied) }, ...a.filter((x) => x.name !== n)]);
+    setActive(n); setNm(""); setPmsg("已存成「" + n + "」");
+  };
+  const applyS = (x) => { setDraft(copyP(x.p)); setActive(x.name); setRn(null); setPmsg("已套用「" + x.name + "」"); };
+  const delS = (n) => { setSaved((a) => a.filter((x) => x.name !== n)); if (active === n) setActive(null); setPmsg("已刪除「" + n + "」"); };
+  const renS = (old, val) => {
+    const n = String(val || "").trim().slice(0, NAME_MAX);
+    if (!n) { setPmsg("名稱不能空白"); return; }
+    if (n !== old && saved.some((x) => x.name === n)) { setPmsg("已經有叫「" + n + "」的策略"); return; }
+    setSaved((a) => a.map((x) => (x.name === old ? { ...x, name: n } : x)));
+    if (active === old) setActive(n);
+    setRn(null); setPmsg("已改名為「" + n + "」");
+  };
+  const resetS = () => { setDraft(copyP(DEF_P)); setActive(null); setRn(null); setPmsg("已還原預設"); };
 
   // 共用的閘門處理：票失效 → 登入；沒開通 → 未開通畫面
   const gate = useCallback((j) => {
@@ -728,7 +944,7 @@ export default function TaPage() {
     );
   }
 
-  const d = data && data.tf === tf ? data : null;
+  const d = dv;
   const bars = g(d, "chart", "bars") || [];
   const fin = bars.filter((b) => b.final !== false);
   const lastB = fin[fin.length - 1], prevB = fin[fin.length - 2];
@@ -764,6 +980,12 @@ export default function TaPage() {
                 <div className="mut">同一檔換週期、均線組不另計；台灣時間 0 點重算</div></>
             ) : "—"}
           </div>
+        </aside>
+
+        <RulePanel draft={draft} set={setDraft} errors={norm.errors} status={rstatus} saved={saved} active={active}
+          nm={nm} setNm={setNm} rn={rn} setRn={setRn} msg={pmsg} onSave={saveS} onApply={applyS} onDel={delS} onRen={renS} onReset={resetS} />
+
+        <div className="ta-left ta-recent">
           <div className="ta-rhead">最近查過</div>
           <div className="ta-list" role="list">
             {recent.map((r) => (
@@ -777,7 +999,7 @@ export default function TaPage() {
             {recent.length ? <button type="button" className="ta-link" onClick={() => { lsSet(RECENT_KEY, null); setRecent([]); }}>清除紀錄</button> : null}
             <button type="button" className="ta-link" onClick={logout}>登出</button>
           </div>
-        </aside>
+        </div>
 
         {/* ── 右 3/4：週期＋均線組＋圖＋表 ── */}
         <div className="ta-right">
