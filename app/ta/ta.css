@@ -1,5 +1,5 @@
 /* 會員技術分析頁（/ta）。沿用站內色票（--bg --surface --text --dim --red --green --orange），漲紅跌綠。
-   內容＝三訊號（前五大量・跳空缺口・多空排列）＋支撐／壓力各一條（Yoda 2026-09-27）。 */
+   內容＝K 線圖＋圖下三個大分頁（①進出場 ②跳空缺口 ③前五大量；Yoda 2026-11-09）＋支撐／壓力各一條。 */
 .ta-root{
   min-width:1200px; max-width:1240px; margin:0 auto; padding:64px 20px 90px;
   font-size:calc(15px*var(--scale)); line-height:1.65; color:var(--text);
@@ -135,8 +135,6 @@
 .ta-empty{padding:10px 12px;color:var(--dim);border:1px dashed var(--border);border-radius:8px;font-size:calc(13.5px*var(--scale))}
 .ta-dt tr.filled td{color:var(--dim)}
 .ta-dt tr.sr-res td,.ta-dt tr.sr-sup td{vertical-align:middle}
-.ta-mas{display:inline-flex;flex-wrap:wrap;gap:2px 14px;font-size:calc(12.5px*var(--scale))}
-.ta-mas b{font-family:'SF Mono',Consolas,Monaco,monospace;font-weight:600}
 /* 缺口表：十列視窗（表頭黏在視窗頂端） */
 .ta-win10{max-height:calc(11 * (13.5px * 1.65 * var(--scale) + 11px) + 2px);overflow:auto;border-bottom:1px solid var(--border);
   overscroll-behavior:contain}  /* 一列＝字高 13.5×1.65＋上下 padding 10＋格線 1；表頭＋10 列 */
@@ -151,11 +149,8 @@
 /* 明細表：欄距收一點；萬一欄位多到放不下（大字級＋預留欄位），只在表格自己的框裡橫捲，整個右欄不橫捲 */
 .ta-dt th,.ta-dt td{padding-left:6px;padding-right:6px}
 .ta-hs{overflow-x:auto;overscroll-behavior-x:contain}
-/* 怎麼看：詞→解釋兩欄 */
-.ta-rules dl{margin:0;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:7px 18px;font-size:calc(13.5px*var(--scale))}
+/* 詞→說明兩欄（圖例、目前套用的規則、浮動說明共用） */
 .ta-rule{display:contents}
-.ta-rules dt{font-weight:700;color:var(--text);white-space:nowrap}
-.ta-rules dd{margin:0;color:var(--text);line-height:1.7}
 
 /* K 線圖：底色固定深色（淺色主題也一樣），白色支撐實線／壓力虛線才看得見 */
 svg.ta-k{width:100%;height:auto;display:block;background:#0b0f15;border:1px solid #1c2330;border-radius:8px}
@@ -214,7 +209,13 @@ svg.ta-k .gl.up{fill:#ff8f96} svg.ta-k .gl.dn{fill:#6fd6a0} svg.ta-k .gl.filled{
 .ta-tabs{gap:14px;flex-wrap:wrap}
 .ta-seg{display:flex;align-items:center;gap:2px}
 .ta-seglab{color:var(--dim);font-size:calc(13px*var(--scale));margin-right:4px}
-.ta-blktabs{flex-wrap:wrap;margin:4px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)}  /* 圖下 ①～④ 分頁，沿用週期分頁的 .ta-tab */
+/* 圖下三個大分頁（11-09）：等寬大按鈕，緊貼圖＋導覽列下方，選中整格亮起 */
+.ta-blktabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0 12px}
+.ta-blktab{font:inherit;font-size:calc(16.5px*var(--scale));font-weight:700;min-height:46px;padding:6px 10px;color:var(--text);cursor:pointer;
+  background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 1px 0 rgba(0,0,0,.25)}
+.ta-blktab:hover{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--surface2))}
+.ta-blktab.on{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 35%,transparent)}
+.ta-blktab:focus-visible{outline:2px solid var(--text);outline-offset:2px}
 .ta-login{display:flex;flex-direction:column;gap:10px;text-align:center}
 .ta-login .ta-q{text-align:left}
 .ta-msg{color:var(--yellow)!important}
@@ -223,18 +224,32 @@ svg.ta-k .gl.up{fill:#ff8f96} svg.ta-k .gl.dn{fill:#6fd6a0} svg.ta-k .gl.filled{
   font-size:calc(14.5px*var(--scale));font-weight:600;border-radius:4px}
 .ta-note{font-size:calc(12.5px*var(--scale));color:var(--yellow);margin:6px 0 12px}
 .ta-sub{margin-top:4px}
-.ta-on{display:inline-block;margin-left:6px;padding:0 6px;border-radius:4px;font-size:.82em;color:var(--accent);
-  border:1px solid color-mix(in srgb,var(--accent) 50%,transparent)}
-.ta-dt tr.sel td{background:color-mix(in srgb,var(--accent) 10%,transparent)}
 .ta-dt td.small{font-size:calc(12.5px*var(--scale))}
 .ta-err{margin-bottom:12px}
 .ta-err.r-quota-exceeded,.ta-err.r-symbol-not-found{color:var(--text)}
 /* 圖上記號（同 ta_local） */
-svg.ta-k .te{font-size:11px;font-weight:700;paint-order:stroke;stroke:#0b0f15;stroke-width:3px}
-svg.ta-k .tx{font-size:10px;paint-order:stroke;stroke:#0b0f15;stroke-width:3px}
+svg.ta-k .te{font-size:12px;font-weight:700;paint-order:stroke;stroke:#0b0f15;stroke-width:3px}
+svg.ta-k .tx{font-size:11px;font-weight:600;paint-order:stroke;stroke:#0b0f15;stroke-width:3px}
+svg.ta-k .isl-t{fill:#ffc94a;font-size:12px;font-weight:700;paint-order:stroke;stroke:#0b0f15;stroke-width:3px}
+svg.ta-k .ckey{font-size:11px;font-weight:600;paint-order:stroke;stroke:#0b0f15;stroke-width:3px}
+svg.ta-k .mk-hit{cursor:pointer;outline:none}
+svg.ta-k .mk-hit:hover path,svg.ta-k .mk-hit:focus-visible path{filter:drop-shadow(0 0 3px #fff)}
+/* 進出場記號的浮動說明（自製，不用原生 title） */
+.ta-tipbox{position:fixed;z-index:50;max-width:min(440px,calc(100vw - 16px));padding:9px 12px 10px;border-radius:9px;background:#141b26;color:#e8edf3;
+  border:1px solid #33415a;border-left:4px solid #e0525e;box-shadow:0 8px 24px rgba(0,0,0,.45);font-size:13px;line-height:1.5;pointer-events:auto}
+.ta-tipbox.short{border-left-color:#3fae7a}
+.ta-tipbox .tt{font-weight:700;font-size:14.5px}
+.ta-tipbox .hold{margin-left:8px;font-size:11.5px;font-weight:600;color:#9ad0ff;border:1px solid #4a6a8a;border-radius:4px;padding:0 5px}
+.ta-tipbox .ts{color:#aab6c4;margin:1px 0 6px;font-family:'SF Mono',Consolas,monospace;font-size:12.5px}
+.ta-tipbox dl{margin:0;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:3px 10px}
+.ta-tipbox dt{color:#aab6c4;white-space:nowrap}
+.ta-tipbox dd{margin:0}
 svg.ta-k .unf{fill:#ffcf70;font-size:11px;font-weight:700;paint-order:stroke;stroke:#0b0f15;stroke-width:3px}
-/* 圖例：記號→說明兩欄 */
-.ta-legend{margin:6px 2px 14px}
+/* 圖例：預設收合，記號→說明兩欄 */
+.ta-legend{margin:4px 2px 14px}
+.ta-legend summary{cursor:pointer;color:var(--dim);font-size:calc(13px*var(--scale));font-weight:600;width:max-content;padding:2px 0}
+.ta-legend summary:hover{color:var(--text)}
+.ta-legend[open] summary{margin-bottom:6px}
 .ta-legend dl{margin:0;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:3px 14px;font-size:calc(12.5px*var(--scale));color:var(--dim)}
 .ta-legend dt{white-space:nowrap;color:var(--text)}
 .ta-legend dd{margin:0}
@@ -245,6 +260,7 @@ svg.ta-k .unf{fill:#ffcf70;font-size:11px;font-weight:700;paint-order:stroke;str
 .ta-legend .bx{display:inline-block;width:11px;height:9px;vertical-align:middle;margin:0 2px;opacity:.7}
 .ta-legend .bx.gold{background:none;border:1.5px solid #ffc94a;opacity:1}
 .ta-legend .bx.unf{background:rgba(224,82,94,.35);border:1px dashed #e0525e;opacity:1}
+.ta-legend .bx.isl{background:none;border:1.4px dashed #ffc94a;opacity:1}
 
 /* 交易規則面板（11-09）：左欄＝查詢卡／規則面板（自己捲動）／最近查過，右欄跨三列 */
 .ta-split{grid-template-rows:auto minmax(0,1fr) auto;row-gap:10px}
@@ -279,7 +295,9 @@ svg.ta-k .unf{fill:#ffcf70;font-size:11px;font-weight:700;paint-order:stroke;str
 .ta-sname{font:inherit;font-weight:600;color:var(--text);background:none;border:0;padding:0;cursor:pointer;text-align:left;flex:1;min-width:0;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ta-sname:hover{color:var(--accent)}
-/* ④ 頂端「目前套用的規則」 */
+.ta-bi{flex:none;font-size:calc(11px*var(--scale));color:var(--dim);border:1px solid var(--border);border-radius:4px;padding:0 5px;line-height:1.5}
+.ta-blist{margin:6px 0 2px}
+/* ① 進出場頂端「目前套用的規則」 */
 .ta-cur{margin:0 0 10px;padding:8px 12px;border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:6px;background:var(--surface2)}
 .ta-curh{font-weight:700;font-size:calc(13.5px*var(--scale));margin-bottom:4px}
 .ta-cur dl{margin:0;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:3px 14px;font-size:calc(13px*var(--scale))}
@@ -296,6 +314,7 @@ svg.ta-k .unf{fill:#ffcf70;font-size:11px;font-weight:700;paint-order:stroke;str
   .ta-split>.ta-left{order:0} .ta-split>.ta-recent{order:1;max-height:none} .ta-split>.ta-right{order:2} .ta-split>.ta-rp{order:3;overflow:visible}
   .ta-list{max-height:30vh}
   .ta-legend dl,.ta-cur dl{grid-template-columns:minmax(0,1fr)}
+  .ta-blktab{min-height:64px}
   .ta-nav{height:84px}   /* 版面 1200 縮到手機寬，導覽列與把手放大才好用手指拖 */
   .ta-navh{width:44px} .ta-navh.l{left:-22px} .ta-navh.r{right:-22px}
   .ta-navh::after{left:18px;width:8px;top:16px;bottom:16px}

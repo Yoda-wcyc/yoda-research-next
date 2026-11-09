@@ -1,15 +1,17 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { DEFAULT_PARAMS, normParams, backtest, chartMarks, exitLine, ruleText, maName, smaSeq } from "../../lib/ta-trade";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { normParams, backtest, chartMarks, exitLine, ruleText, maName, smaSeq, PRESETS, explainEntry, explainExit, fpx, fpc } from "../../lib/ta-trade";
 
 // 會員技術分析（獨立網站版·2026-11-08 Yoda 定）
 //
 //   會員登入（/api/member-login，票存 localStorage）→ /api/ta-live 每次都重驗：站長（OWNER_PUB_IDS）或 ta_access 有開通
 //   左 1/4：輸入代號（台股上市櫃、美股、ETF；不收指數）＋最近查過＋今日額度（會員每天 30 檔、站長不限）
-//   右 3/4：週期分頁 1H／4H／日K／週K ＋ 均線組 短（5/10/20）中（8/13/34）長（20/60/120）＋ K 線圖（撐壓、前五大量、缺口、
-//           進出場、停損、出場 ✕；均線紅黃藍＝短到長；圖下「時間區間導覽列」拖曳看整段歷史）＋ ①～④ 四個分頁（前五大量／跳空缺口／多空排列／進出場，所有開通者都看得到）＋ 支撐壓力
+//   右 3/4：週期分頁 1H／4H／日K／週K ＋ 均線組 短（5/10/20）中（8/13/34）長（20/60/120）＋ K 線圖（撐壓、前五大量、缺口、島狀反轉、
+//           進出場、停損、出場 ✕；均線紅黃藍＝短到長；圖下「時間區間導覽列」拖曳看整段歷史）
+//           ＋ 緊貼圖下三個大分頁 ①進出場 ②跳空缺口 ③前五大量（11-09；原本的均線排列分頁已永久刪除，守門見 Skill\tests\ta_engine_check.py）＋ 圖例（預設收合）＋ 支撐壓力
 //   左欄「交易規則」面板（11-09）：勾選／填數字 → 瀏覽器用 lib/ta-trade.js 即時重算進出場與回測（不打伺服器、不扣額度）；
-//           設定與命名策略只存在自己的瀏覽器（localStorage）。手機寬（≤760px）面板排到圖下方。
+//           5 組內建策略（唯讀）＋自己存的策略，只存在自己的瀏覽器（localStorage）。手機寬（≤760px）面板排到圖下方。
+//   圖上進出場記號：滑過（手機點一下）出自製浮動說明，逐條列進出場條件的實際數值（lib/ta-trade.js explainEntry／explainExit）。
 // 資料全部來自 Python 計算引擎（ta-engine，契約見 docs/ta-engine-contract.md）；最後一根盤中未定只上圖，不進訊號與回測。
 
 const TOK_KEY = "yoda_ta_jwt";
@@ -140,7 +142,7 @@ function fullSeries(d) {
 }
 
 // K 線圖畫整段歷史的 [a, b) 這一段；Y 軸依區間內高低。K 棒與量柱併成幾條 path（1H 五千根拖曳才不卡）
-function KChart({ d, full, smas, a, b }) {
+function KChart({ d, full, smas, a, b, onTip }) {
   const ch = d.chart || {};
   const k0 = full.k0, bars = full.bars.slice(a, b), n = bars.length;
   if (n < 2) return <div className="ta-nochart">沒有 K 線資料</div>;
@@ -218,15 +220,23 @@ function KChart({ d, full, smas, a, b }) {
         y={(Y(x.top) + Y(x.bottom)) / 2 + 4} textAnchor="end">{String(x.type_short)}{x.type ? <title>{x.type}</title> : null}</text>);
     }
   });
-  // 島狀反轉：金色虛線框
+  // 圖上文字標籤佔的位置（島狀反轉的字先放，進出場標籤撞到就錯開）；tw＝字寬估計（中文 12、英數 6.8）
+  const placed = [];
+  const tw = (s) => [...s].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? 12 : 6.8), 0);
+  // 島狀反轉：金色虛線框＋直接標字（頂部島標在框上方、底部島標在框下方；沒有 kind 時看島開頭那個缺口：向上＝頂部）
   (ov.islands || []).forEach((x, k) => {
     if (x.high == null || x.low == null || x.i1 == null) return;
     const i0 = oi(x.i0), i1 = oi(x.i1);
     if (i1 < 0 && x.i1 >= 0) return;   // 整段在區間左邊
     const x0 = i0 < 0 ? L : X(i0) - step / 2;
     if (x0 > xr) return;
-    els.push(<rect key={"is" + k} className="isl" x={x0} y={Y(x.high) - 3} width={Math.max(2, X(i1) + step / 2 - x0)} height={Math.max(2, Y(x.low) - Y(x.high) + 6)}
-      fill="none" stroke={GOLD} strokeWidth="1" strokeDasharray="3 3" clipPath={clip}>{x.name ? <title>{x.name}</title> : null}</rect>);
+    const top = x.kind ? x.kind === "top" : ((ov.gaps || []).find((gp) => gp.island && gp.i === x.i0) || {}).dir === "up";
+    const yt = Y(x.high) - 3, yb = Y(x.low) + 3, x1 = X(i1) + step / 2;
+    els.push(<rect key={"is" + k} className="isl" x={x0} y={yt} width={Math.max(2, x1 - x0)} height={Math.max(2, yb - yt)}
+      fill="none" stroke={GOLD} strokeWidth="1.2" strokeDasharray="3 3" clipPath={clip} data-kind={top ? "top" : "bottom"} />);
+    const lx = Math.min(xr - 40, Math.max(L + 40, (x0 + x1) / 2)), ly = top ? Math.max(T + 11, yt - 5) : Math.min(T + PH - 3, yb + 14);
+    placed.push([lx - 36, ly - 11, lx + 36, ly + 2]);
+    els.push(<text key={"ist" + k} className="isl-t" x={lx} y={ly} textAnchor="middle">{top ? "頂部島狀反轉" : "底部島狀反轉"}</text>);
   });
   // K 棒（收 ≥ 開＝紅）＋量柱：一般的併成 path；前五大量（金框＋金色量柱＋①～⑤）與盤中未定那根單獨畫
   const topI = {};
@@ -324,33 +334,71 @@ function KChart({ d, full, smas, a, b }) {
       strokeDasharray={dash || undefined} clipPath={clip} data-kind={ln.kind} />);
   });
   // 持倉中：右側標籤（跟撐壓一起避讓）
-  const p = trd.open;
-  if (p) {
+  const op = trd.open;
+  if (op) {
     const ly = (kind) => { const ln = (trd.lines || []).find((x) => x.kind === kind); return ln && ln.y != null ? ln.y : null; };
-    const tag = p.side === 1 ? "多" : "空";
+    const tag = op.side === 1 ? "多" : "空";
     for (const [kind, w, col] of [["open_entry", tag + "單進場 ", TR_ENT], ["open_stop", "停損 ", TR_STOP]]) {
       const v = ly(kind);
-      if (v != null) lab.push({ y: Y(v), t: w + fnum(v), col, nt: "" });
+      if (v != null) lab.push({ y: Y(v), t: w + fpx(v), col, nt: "" });
     }
   }
-  // 記號：▲多進（紅，K 低點下）／▼空進（綠，K 高點上）、✕出場（字＝原因）
-  marks.forEach((m, k) => {
-    const li = m.i - a, bb = bars[li], x = X(li);
-    if (m.kind === "entry") {
-      if (m.side === 1) {
-        const y = Y(bb.l) + 6;
-        els.push(<path key={"me" + k} className="mk-entry" d={`M${x.toFixed(1)} ${y.toFixed(1)} l-4 7 h8 z`} fill={K_UP} />);
-        els.push(<text key={"met" + k} className="te" x={x} y={y + 18} textAnchor="middle" style={{ fill: K_UP }}>{m.label || "多進"}</text>);
-      } else {
-        const y = Y(bb.h) - 6;
-        els.push(<path key={"me" + k} className="mk-entry" d={`M${x.toFixed(1)} ${y.toFixed(1)} l-4 -7 h8 z`} fill={K_DN} />);
-        els.push(<text key={"met" + k} className="te" x={x} y={y - 10} textAnchor="middle" style={{ fill: K_DN }}>{m.label || "空進"}</text>);
-      }
-    } else if (m.kind === "exit") {
-      const col = TONE[m.tone] || "#ffffff", y = Y(m.px);
-      els.push(<path key={"mx" + k} className="mk-exit" d={`M${(x - 3.5).toFixed(1)} ${(y - 3.5).toFixed(1)}l7 7m0 -7l-7 7`} stroke={col} strokeWidth="1.8" />);
-      els.push(<text key={"mxt" + k} className="tx" x={x + 5} y={y + (m.side === 1 ? 12 : -6)} style={{ fill: col }}>{m.label || m.why}</text>);
+  // 進出場：每筆進場到出場一條細虛線（這筆賺＝紅、賠＝綠）
+  const byEntry = new Map(), byExit = new Map();
+  for (const t of trd.trades || []) {
+    byEntry.set(t.entry_i, t); byExit.set(t.exit_i, t);
+    if (t.exit_i < a || t.entry_i >= b) continue;
+    els.push(<line key={"trk" + t.entry_i} className="trlink" x1={X(t.entry_i - a)} y1={Y(t.entry)} x2={X(t.exit_i - a)} y2={Y(t.exit_px)}
+      stroke={t.pct > 0 ? K_UP : K_DN} strokeWidth="1" strokeDasharray="4 3" strokeOpacity=".9" clipPath={clip} />);
+  }
+  if (op) byEntry.set(op.entry_i, op);
+  // 記號：▲多進（紅大三角，K 低點下）／▼空進（綠大三角，K 高點上）、✕出場；旁邊標「多進 價格」「原因 價格 報酬%」。
+  // 可見根數 > 250 只留圖形；標籤撞到前面的就往外（多進往下、空進往上）錯開一層
+  const showLab = n <= 250, tlab = [];
+  const put = (x, y, s, anchor, dy, col, cls) => {
+    const w = tw(s), x0 = anchor === "middle" ? x - w / 2 : x;
+    let yy = y;
+    for (let k = 0; k < 4; k++) {
+      if (!placed.some((r) => x0 < r[2] && x0 + w > r[0] && yy - 11 < r[3] && yy + 2 > r[1])) break;
+      yy += dy;
     }
+    placed.push([x0, yy - 11, x0 + w, yy + 2]);
+    tlab.push(<text key={"tlb" + tlab.length} className={cls} x={x} y={yy} textAnchor={anchor} style={{ fill: col }}>{s}</text>);
+  };
+  marks.forEach((m) => {
+    const li = m.i - a, bb = bars[li], x = X(li);
+    const t = m.kind === "entry" ? byEntry.get(m.i) : byExit.get(m.i);
+    if (!t) return;
+    const hit = { "data-tip": m.kind, "data-i": m.i, onMouseEnter: (e) => onTip && onTip(m.kind, t, e, false), onMouseLeave: () => onTip && onTip(null),
+      onClick: (e) => { e.stopPropagation(); onTip && onTip(m.kind, t, e, true); }, onFocus: (e) => onTip && onTip(m.kind, t, e, false),
+      onBlur: () => onTip && onTip(null), tabIndex: 0, role: "button",
+      "aria-label": (t.side === 1 ? "多單" : "空單") + (m.kind === "entry" ? "進場 " + t.entry_t : "出場 " + t.exit_t) };
+    if (m.kind === "entry") {
+      const s = t.side, y = s === 1 ? Y(bb.l) + 5 : Y(bb.h) - 5, col = s === 1 ? K_UP : K_DN;
+      els.push(<g key={"me" + m.i} className="mk-hit" {...hit}>
+        <circle cx={x} cy={y + s * 7} r="12" fill="transparent" />
+        <path className="mk-entry" d={`M${x.toFixed(1)} ${y.toFixed(1)} l-7 ${s * 12} h14 z`} fill={col} stroke="#0b0f15" strokeWidth="1" />
+      </g>);
+      if (showLab) put(x, s === 1 ? y + 26 : y - 16, (s === 1 ? "多進 " : "空進 ") + fpx(t.entry), "middle", s * 13, col, "te");
+    } else {
+      const col = TONE[m.tone] || "#ffffff", y = Y(m.px);
+      els.push(<g key={"mx" + m.i} className="mk-hit" {...hit}>
+        <circle cx={x} cy={y} r="11" fill="transparent" />
+        <path className="mk-exit" d={`M${(x - 5.5).toFixed(1)} ${(y - 5.5).toFixed(1)}l11 11m0 -11l-11 11`} stroke={col} strokeWidth="2.6" strokeLinecap="round" />
+      </g>);
+      if (showLab) put(x + 9, y + (t.side === 1 ? 16 : -9), (t.label || t.why) + " " + fpx(t.exit_px) + " " + fpc(t.pct), "start", t.side === 1 ? 13 : -13, col, "tx");
+    }
+  });
+  els.push(...tlab);
+  // 圖上直接寫線的名字（不用點開圖例）：三條均線、出場線、停損
+  const ckey = [...smas.map(([m], k) => ["SMA" + m, MA_COL[k], ""]),
+    ...(ch.exit_line ? [["出場線 " + (trd.p ? maName(trd.p, trd.p.exit_k) : ""), EMA_COL, ""]] : []), ...(marks.length || op ? [["停損", TR_STOP, "4 3"]] : [])];
+  let kx = L + 6;
+  ckey.forEach(([s, col, dash], k) => {
+    if (!s) return;
+    els.push(<line key={"ky" + k} x1={kx} x2={kx + 14} y1={T + 9} y2={T + 9} stroke={col} strokeWidth="2" strokeDasharray={dash || undefined} />);
+    els.push(<text key={"kyt" + k} className="ckey" x={kx + 18} y={T + 13} style={{ fill: col }}>{s}</text>);
+    kx += 26 + tw(s);
   });
   // 右側標籤避讓（由上到下排、不重疊、不超出價格區）；圖外的價位貼邊、加 ↑／↓
   for (const z of lab) {
@@ -453,7 +501,7 @@ function RangeNav({ bars, a, b, onChange }) {
             aria-valuenow={b} aria-valuetext={dt(b - 1)} onKeyDown={key("r")} />
         </div>
       </div>
-      <div className="ta-navt" data-range>區間 {dt(a)} ～ {dt(b - 1)}，{b - a} 根 <span className="mut">拖中間平移、拖兩邊縮放；④ 回測統計仍算整段歷史</span></div>
+      <div className="ta-navt" data-range>區間 {dt(a)} ～ {dt(b - 1)}，{b - a} 根 <span className="mut">拖中間平移、拖兩邊縮放；① 進出場的回測統計仍算整段歷史</span></div>
     </div>
   );
 }
@@ -466,15 +514,61 @@ function ChartArea({ d, maSet }) {
   const smas = useMemo(() => (g(ch, "ma_sets", maSet) || []).map((m) => [m, smaSeq(full.c, Number(m))]), [full, ch.ma_sets, maSet]);   // eslint-disable-line react-hooks/exhaustive-deps
   const [rng, setRng] = useState(() => [Math.max(0, Math.min(full.k0, N - 2)), N]);   // 預設＝引擎的圖視窗（近 120 根）
   const b = Math.min(rng[1], N), a = Math.max(0, Math.min(rng[0], b - 2));
+  // 進出場記號的浮動說明：滑鼠移上去／鍵盤聚焦就出現、離開就收；點一下（手機）會釘住，點別處或 Esc 才關
+  const [tip, setTip] = useState(null);   // {kind, t, x, y, pin}
+  const box = useRef(null);
+  const onTip = useCallback((kind, t, e, pin) => {
+    if (!kind) { setTip((v) => (v && v.pin ? v : null)); return; }
+    let x = e.clientX, y = e.clientY;
+    if (!x && !y && e.currentTarget) { const r = e.currentTarget.getBoundingClientRect(); x = r.right; y = r.bottom; }
+    setTip({ kind, t, x, y, pin });
+  }, []);
+  useEffect(() => {
+    if (!tip) return undefined;
+    const off = (e) => { if (!(e.target.closest && (e.target.closest("[data-tip]") || e.target.closest(".ta-tipbox")))) setTip(null); };
+    const esc = (e) => { if (e.key === "Escape") setTip(null); };
+    const gone = () => setTip(null);
+    document.addEventListener("pointerdown", off);
+    document.addEventListener("keydown", esc);
+    window.addEventListener("scroll", gone, true);
+    return () => { document.removeEventListener("pointerdown", off); document.removeEventListener("keydown", esc); window.removeEventListener("scroll", gone, true); };
+  }, [tip]);
+  // 量好框的大小再擺：預設在游標右下，超出畫面就翻到左／上，再不行貼邊。
+  // 用 visualViewport＝實際看得到的那塊（手機 viewport 1200、放大後只看得到一部分，框要落在看得到的範圍）
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!tip || !el) return;
+    const vv = window.visualViewport;
+    const ox = vv ? vv.offsetLeft : 0, oy = vv ? vv.offsetTop : 0;
+    const vw = vv ? vv.width : document.documentElement.clientWidth, vh = vv ? vv.height : window.innerHeight;
+    el.style.maxWidth = Math.max(160, Math.min(440, vw - 16)) + "px";
+    const w = el.offsetWidth, h = el.offsetHeight;
+    let x = tip.x + 14, y = tip.y + 14;
+    if (x + w > ox + vw - 8) x = tip.x - 14 - w;
+    if (y + h > oy + vh - 8) y = tip.y - 14 - h;
+    el.style.left = Math.max(ox + 8, Math.min(x, ox + vw - w - 8)) + "px";
+    el.style.top = Math.max(oy + 8, Math.min(y, oy + vh - h - 8)) + "px";
+    el.style.visibility = "visible";
+  }, [tip]);
+  const trd = d.trade || {};
+  useEffect(() => setTip(null), [d.trade]);   // 參數一改、交易就換了，舊的說明作廢
+  const info = tip && trd.ctx && trd.p ? (tip.kind === "entry" ? explainEntry(trd, trd.p, tip.t) : explainExit(trd, trd.p, tip.t)) : null;
   return (
     <>
-      <KChart d={d} full={full} smas={smas} a={a} b={b} />
+      <KChart d={d} full={full} smas={smas} a={a} b={b} onTip={onTip} />
       {N > NAV_MIN ? <RangeNav bars={full.bars} a={a} b={b} onChange={setRng} /> : null}
+      {info ? (
+        <div ref={box} className={"ta-tipbox " + (tip.t.side === 1 ? "long" : "short")} role="tooltip" style={{ left: 0, top: 0, visibility: "hidden" }}>
+          <div className="tt">{info.title}{tip.kind === "entry" && trd.open && trd.open.entry_i === tip.t.entry_i ? <span className="hold">持倉中</span> : null}</div>
+          <div className="ts">{info.sub}</div>
+          <dl>{info.rows.map(([k, v], j) => <div key={j} className="ta-rule"><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+        </div>
+      ) : null}
     </>
   );
 }
 
-// 圖例：引擎給的 legend 逐項列（兩欄：記號→說明）＋目前畫的三條均線
+// 圖例：預設收合（點「圖例」才展開）；引擎給的 legend 逐項列（兩欄：記號→說明）＋目前畫的三條均線
 const SW = {
   support: <i className="sw" style={{ color: "#fff" }} />,
   resistance: <i className="sw dash" style={{ color: "#fff" }} />,
@@ -485,6 +579,8 @@ const SW = {
   stop: <i className="sw dash" style={{ color: TR_STOP }} />,
   exit: <><b style={{ color: TR_STOP }}>✕</b><b>✕</b></>,
   open: <i className="sw" style={{ color: TR_ENT }} />,
+  link: <><i className="sw dash" style={{ color: K_UP }} /><i className="sw dash" style={{ color: K_DN }} /></>,
+  island: <i className="bx isl" />,
   unfinished: <i className="bx unf" />,
 };
 function Legend({ d, maSet }) {
@@ -492,7 +588,8 @@ function Legend({ d, maSet }) {
   const eng = (g(d, "chart", "legend") || []).filter((x) => x.key !== "unfinished" || d.unfinished);
   const items = [...eng.filter((x) => x.key !== "unfinished"), ...(d.trade_legend || []), ...eng.filter((x) => x.key === "unfinished")];
   return (
-    <div className="ta-legend">
+    <details className="ta-legend">
+      <summary>圖例</summary>
       <dl>
         <div className="ta-rule"><dt><span className="lg">{set.map((m, k) => <i key={m} className="sw" style={{ color: MA_COL[k] }} />)}</span>均線</dt>
           <dd>{set.map((m) => "SMA" + m).join("／")}（紅→黃→藍＝短到長；簡單均線，上方「均線組」切換）；K 棒紅漲綠跌，下方是成交量</dd></div>
@@ -501,7 +598,7 @@ function Legend({ d, maSet }) {
         ))}
         <div className="ta-rule"><dt>右側標籤</dt><dd>撐／壓價位＋來源：量＝前五大量 K 的高低、缺＝未補缺口邊緣、觸N＝觸及 N 根、測＝正在測試；缺口旁的一個字＝缺口類型（滑過看全名）</dd></div>
       </dl>
-    </div>
+    </details>
   );
 }
 
@@ -542,7 +639,7 @@ function TopVolume({ d }) {
   const reads = rows.filter((x) => has(x.read));
   return (
     <div className="ta-block" data-blk="vol">
-      <div className="ta-cap">① 前五大量 <span className="mut">近 {wb} 根量最大的 5 根；那根的最高／最低就是關卡，括號＝關卡距現價</span></div>
+      <div className="ta-cap">③ 前五大量 <span className="mut">近 {wb} 根量最大的 5 根；那根的最高／最低就是關卡，括號＝關卡距現價</span></div>
       {rows.length ? <div className="ta-hs"><SortTable className="ta-dt" cols={cols} rows={rows} rowKey={(x) => "v" + x.rank} /></div>
         : <div className="ta-empty">視窗內沒有成交量資料</div>}
       {reads.length ? (
@@ -590,36 +687,6 @@ function Gaps({ d }) {
 }
 
 const MA_NM = { short: "短（SMA5／10／20）", mid: "中（SMA8／13／34）", long: "長（SMA20／60／120）" };
-function MaAlign({ d, maSet }) {
-  const ma = g(d, "signals", "ma_align") || {};
-  const rows = ["short", "mid", "long"].map((k) => ({ k, nm: MA_NM[k], ...(ma[k] || {}) }));
-  const stZh = (s) => (s === "insufficient" ? "資料不足" : s || "—");
-  const stCls = (s) => (s === "多頭排列" ? "up" : s === "空頭排列" ? "dn" : "mut");
-  const note = (x) => {
-    if ((x.state === "多頭排列" || x.state === "空頭排列") && x.nearest_break) {
-      const nb = x.nearest_break;
-      return <>最接近被破壞：{nb.a} {fnum(nb.a_value)} 與 {nb.b} {fnum(nb.b_value)}（差 {fpct(nb.gap_pct, false)}）</>;
-    }
-    return x.why || "—";
-  };
-  const cols = [
-    { label: "組", render: (x) => <>{x.nm}{x.k === maSet ? <span className="ta-on">圖上</span> : null}</>, sort: (x) => x.k },
-    { label: "狀態", render: (x) => <b className={stCls(x.state)}>{stZh(x.state)}</b>, sort: (x) => ({ "多頭排列": 1, "糾結": 0, "空頭排列": -1 })[x.state] },
-    { label: "已成立", title: "目前狀態連續第幾根（含最後一根定案 K）", render: (x) => (x.days == null ? "—" : <>第 {x.days_capped ? "≥" : ""}{x.days} 根 <span className="mut">（{x.since} 起）</span></>), sort: (x) => nz(x.days) },
-    { label: "不成立原因／最接近被破壞", cls: "wrap", render: note, sort: (x) => x.why || "" },
-    { label: "均線值（本根−前根）", cls: "wrap", render: (x) => (
-      <span className="ta-mas">收盤 <b>{fnum(x.close)}</b>{(x.lines || []).map((l) => (
-        <span key={l.name}>{l.name} <b>{fnum(l.value)}</b> <span className={ud(l.slope)}>({Number(l.slope) > 0 ? "+" : ""}{fnum(l.slope, 4)})</span></span>
-      ))}</span>
-    ), sort: (x) => nz(x.close) },
-  ];
-  return (
-    <div className="ta-block" data-blk="ma">
-      <div className="ta-cap">③ 多空排列 <span className="mut">多頭＝收盤 &gt; 第一條 &gt; 第二條 &gt; 第三條，且三條都往上；空頭相反；其他＝糾結</span></div>
-      <div className="ta-hs"><SortTable className="ta-dt" cols={cols} rows={rows} rowKey={(x) => x.k} rowClass={(x) => (x.k === maSet ? "sel" : "")} /></div>
-    </div>
-  );
-}
 
 function SrLevels({ d }) {
   const sr = g(d, "signals", "sr_levels") || {};
@@ -673,7 +740,7 @@ function Trade({ d }) {
   ];
   return (
     <div className="ta-block" data-blk="trade">
-      <div className="ta-cap">④ 進出場 <span className="mut">依左邊「交易規則」面板即時回測（在你的瀏覽器算，不扣額度）</span></div>
+      <div className="ta-cap">① 進出場 <span className="mut">依左邊「交易規則」面板即時回測（在你的瀏覽器算，不扣額度）</span></div>
       {d.rules ? (
         <div className="ta-cur" data-rules>
           <div className="ta-curh">目前套用的規則</div>
@@ -722,16 +789,15 @@ function Trade({ d }) {
   );
 }
 
-// 圖下 ①～④ 四個分頁：[key, 分頁名, 區塊, 怎麼看]
+// 圖下三個大分頁（Yoda 2026-11-09）：[key, 分頁名, 區塊]；預設 ①。舊存的 vol／gap／trade 照對應，其他（含已刪的 ma）回預設
 const BLOCKS = [
-  ["vol", "① 前五大量", TopVolume, "近 120 根裡成交量最大的 5 根。量倍數＝這根量 ÷ 這根「之前」20 根的平均量。那根的最高、最低就是關卡：現價高過最高＝在上方、低過最低＝在下方，其餘＝區間內。"],
-  ["gap", "② 跳空缺口", Gaps, "近 120 根的全部跳空，不設門檻。向上＝這根最低高過前一根最高；向下＝這根最高低過前一根最低。之後有 K 碰進缺口＝部分回補，碰到另一邊＝已補。類型看缺口前的趨勢與位置：突＝突破、破＝跌破、逃＝逃逸、竭＝竭盡、彈＝空頭裡的反彈、回＝多頭裡的回檔、一＝一般、島＝島狀反轉。"],
-  ["ma", "③ 多空排列", MaAlign, "三組均線可切換：短 SMA5／10／20、中 SMA8／13／34、長 SMA20／60／120。多頭排列＝收盤 > 第一條 > 第二條 > 第三條，而且三條都往上；空頭排列完全相反；其他叫糾結，並寫出哪個條件不成立。"],
-  ["trade", "④ 進出場", Trade, "EMA＝指數均線、SMA＝簡單均線，全部等收盤才算；量比＝本根量 ÷ 前 N 根平均量。整筆進、整筆出，停損抱著的期間都不動。回測用全部定案 K（盤中未定那根不算），損益＝（出場價 − 進場價）÷ 進場價（空單反過來），各筆相加、不複利。規則由左邊「交易規則」面板決定（預設＝站方現行規則），上方「目前套用的規則」就是這張圖與這些數字用的規則；改面板只在你的瀏覽器重算，不扣額度。"],
+  ["trade", "① 進出場", Trade],
+  ["gap", "② 跳空缺口", Gaps],
+  ["vol", "③ 前五大量", TopVolume],
 ];
 const BLK_KEY = "yoda_ta_blk";
 
-function BlockTabs({ d, maSet }) {
+function BlockTabs({ d }) {
   const [cur, setCur] = useState(() => { const v = lsGet(BLK_KEY); return BLOCKS.some(([k]) => k === v) ? v : BLOCKS[0][0]; });
   const pick = (k) => { setCur(k); lsSet(BLK_KEY, k); };
   const onKey = (e) => {   // ←／→／Home／End 換分頁（WAI-ARIA tabs）
@@ -742,28 +808,21 @@ function BlockTabs({ d, maSet }) {
     pick(BLOCKS[j][0]);
     document.getElementById("ta-blk-tab-" + BLOCKS[j][0])?.focus();
   };
-  const [, label, Blk, rule] = BLOCKS.find(([k]) => k === cur);
+  const Blk = BLOCKS.find(([k]) => k === cur)[2];
   return (
     <div className="ta-blks">
-      <div className="ta-seg ta-blktabs" role="tablist" aria-label="圖下資料" onKeyDown={onKey}>
+      <div className="ta-blktabs" role="tablist" aria-label="圖下資料" onKeyDown={onKey}>
         {BLOCKS.map(([k, nm]) => (
           <button key={k} id={"ta-blk-tab-" + k} type="button" role="tab" aria-selected={cur === k} aria-controls="ta-blk-panel"
-            tabIndex={cur === k ? 0 : -1} className={"ta-tab" + (cur === k ? " on" : "")} onClick={() => pick(k)}>{nm}</button>
+            tabIndex={cur === k ? 0 : -1} className={"ta-blktab" + (cur === k ? " on" : "")} onClick={() => pick(k)}>{nm}</button>
         ))}
       </div>
       <div id="ta-blk-panel" role="tabpanel" aria-labelledby={"ta-blk-tab-" + cur} tabIndex={0}>
-        <Blk d={d} maSet={maSet} />
-        <div className="ta-block ta-rules"><dl><div className="ta-rule"><dt>怎麼看</dt><dd>{rule}</dd></div></dl></div>
+        <Blk d={d} />
       </div>
     </div>
   );
 }
-
-const RULES = [
-  ["支撐／壓力", "候選價位：前五大量 K 的高與低、未補缺口的邊緣、反覆打到又回來的價位（觸及 ≥3 根）。差距在容差內的併成一條；強度＝大量 K 量倍數（上限 5）＋每個缺口 2＋觸及根數。今收下方＝支撐（白實線）、上方＝壓力（白虛線），各只留一條。"],
-  ["盤中未定", "最後一根還在交易中（收盤那根要收盤後 15 分鐘才定案）：只畫在圖上，訊號、排列、回測都只用定案的 K。"],
-  ["距離 %", "(價位 ÷ 今收 − 1) × 100：正數在現價上方、負數在下方。"],
-];
 
 // ───────── 交易規則面板（11-09）：參數 → 瀏覽器回測 ─────────
 const RULES_KEY = "yoda_ta_rules_v1";   // {cur, saved:[{name, p}], active}；只在這台瀏覽器
@@ -771,19 +830,21 @@ const SAVED_MAX = 30, NAME_MAX = 24;
 const copyP = (p) => ({ ...p, ma_n: p.ma_n.slice() });
 const sameP = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const DEF_P = normParams({}).p;
+const BI = "內建：";   // active＝"內建：名稱"＝目前套用內建策略；自己存的名稱不能用這個開頭
+const BUILTINS = PRESETS.map((x) => ({ name: x.name, p: normParams(x.p).p }));
 // 讀回來的東西不信任：壞欄位回預設、壞策略丟掉；JSON 壞掉整個回預設
 function cleanRules(o) {
   const x = o && typeof o === "object" ? o : {};
   const saved = (Array.isArray(x.saved) ? x.saved : [])
-    .filter((s) => s && typeof s.name === "string" && s.name.trim())
+    .filter((s) => s && typeof s.name === "string" && s.name.trim() && !s.name.trim().startsWith(BI))
     .map((s) => ({ name: s.name.trim().slice(0, NAME_MAX), p: normParams(s.p).p }))
     .filter((s, i, a) => a.findIndex((y) => y.name === s.name) === i).slice(0, SAVED_MAX);
-  const active = typeof x.active === "string" && saved.some((s) => s.name === x.active) ? x.active : null;
+  const active = typeof x.active === "string" && (saved.some((s) => s.name === x.active) || BUILTINS.some((s) => BI + s.name === x.active)) ? x.active : null;
   return { cur: normParams(x.cur).p, saved, active };
 }
 function readRules() { try { return cleanRules(JSON.parse(lsGet(RULES_KEY) || "null")); } catch (e) { return cleanRules(null); } }
 
-// 引擎回應＋參數 → 給圖與 ④ 用的 trade（記號、線、統計、橫幅、白話規則、圖例）
+// 引擎回應＋參數 → 給圖與 ① 進出場用的 trade（記號、線、統計、橫幅、白話規則、圖例）
 function withTrade(d, p) {
   if (!d || !g(d, "history", "c")) return d;
   const nf = d.bars_completed;
@@ -792,16 +853,19 @@ function withTrade(d, p) {
   const exLab = p.exit_ma ? maName(p, p.exit_k) + "（出場線）" : null;
   const legend = [
     exLab ? { key: "exit_ma", label: exLab, desc: "收盤跌破（空單站上）就整筆出場" + (p.exit_delay ? "；進場後第 " + (p.exit_delay + 1) + " 根起才看" : "") } : null,
-    { key: "entry", label: "多進／空進", desc: "紅箭頭多進、綠箭頭空進：" + rt.entry },
+    { key: "entry", label: "多進／空進", desc: "紅色大三角多進、綠色大三角空進，旁邊標進場價：" + rt.entry },
     { key: "stop", label: "停損", desc: "紅虛線：" + rt.stop },
-    { key: "exit", label: "✕ 出場", desc: "整筆出場，✕ 旁邊寫原因：停損（紅）／破N線／爆量反K／到期（白）" },
-    { key: "open", label: "持倉中", desc: "還沒出場的線延伸到右緣" },
+    { key: "exit", label: "✕ 出場", desc: "整筆出場，✕ 旁邊寫「原因 出場價 這筆報酬%」：停損（紅）／破N線／爆量反K／到期（白）；畫面超過 250 根時只留記號、不寫字" },
+    { key: "link", label: "進→出", desc: "細虛線連進場與出場：這筆賺錢紅、賠錢綠" },
+    { key: "island", label: "島狀反轉", desc: "金色虛線框＝懸空的那幾根 K，框上方標頂部島狀反轉、框下方標底部島狀反轉" },
+    { key: "open", label: "持倉中", desc: "還沒出場的線延伸到右緣，右側標進場價與停損價" },
+    { key: "tip", label: "滑過記號", desc: "滑鼠停在三角或 ✕ 上（手機點一下）會列出這筆進出場每個條件的實際數值" },
   ].filter(Boolean);
   return {
     ...d,
     // 記號與出場線用 history 的絕對位置（k0=0），圖依時間區間自己切
     chart: { ...d.chart, exit_line: exitLine(d.history, p, 0) },
-    trade: { ...r, ...chartMarks(r, 0), note:"樣本內統計，不代表未來；" + rt.cost },
+    trade: { ...r, ...chartMarks(r, 0), p, note: "樣本內統計，不代表未來；" + rt.cost },
     rules: rt, trade_legend: legend,
   };
 }
@@ -834,7 +898,7 @@ function RulePanel({ draft, set, errors, status, saved, active, nm, setNm, rn, s
   return (
     <section className="ta-rp" aria-label="交易規則">
       <h3>交易規則 <span className="ta-rpst" data-status>{status}</span></h3>
-      <div className="ta-hint0">改任何一格，圖上的進出場、停損線、出場線和 ④ 回測立刻重算；只在你的瀏覽器算，不扣額度。</div>
+      <div className="ta-hint0">改任何一格，圖上的進出場、停損線、出場線和 ① 進出場的回測立刻重算；只在你的瀏覽器算，不扣額度。</div>
 
       <div className="ta-strats">
         <div className="row">
@@ -844,6 +908,15 @@ function RulePanel({ draft, set, errors, status, saved, active, nm, setNm, rn, s
           <button type="button" className="ta-btn" onClick={onReset} title="回到站方現行規則">還原預設</button>
         </div>
         {msg ? <div className="ta-ferr ok">{msg}</div> : null}
+        <ul className="ta-slist ta-blist" aria-label="內建策略">
+          {BUILTINS.map((s) => (
+            <li key={s.name} className={BI + s.name === active ? "on" : ""}>
+              <span className="ta-bi">內建</span>
+              <button type="button" className="ta-sname" onClick={() => onApply(s, true)} aria-label={"套用內建策略：" + s.name}>{s.name}</button>
+            </li>
+          ))}
+        </ul>
+        <div className="hint">內建策略唯讀；套用後改任何一格就是「未存的修改」，可以填名字另存成自己的。</div>
         {saved.length ? (
           <ul className="ta-slist">
             {saved.map((s) => (
@@ -974,21 +1047,25 @@ export default function TaPage() {
     if (rulesReady) lsSet(RULES_KEY, JSON.stringify({ cur: applied, saved, active }));
   }, [rulesReady, applied, saved, active]);
   const dv = useMemo(() => withTrade(data && data.tf === tf ? data : null, applied), [data, tf, applied]);
-  const actS = saved.find((x) => x.name === active);
-  const rstatus = actS ? actS.name + (sameP(actS.p, applied) ? "" : "（已修改）") : sameP(applied, DEF_P) ? "預設（站方現行規則）" : "自訂（未存）";
+  const actB = BUILTINS.find((x) => BI + x.name === active);
+  const actS = actB || saved.find((x) => x.name === active);
+  const rstatus = actS ? (actB ? "內建・" : "") + actS.name + (sameP(actS.p, applied) ? "" : "（未存的修改）") : sameP(applied, DEF_P) ? "預設（站方現行規則）" : "自訂（未存）";
+  const badName = (n) => (n.startsWith(BI) ? "「" + BI + "」開頭的名稱保留給內建策略" : "");
   const saveS = () => {
     const n = nm.trim().slice(0, NAME_MAX);
     if (!n) { setPmsg("先填策略名稱"); return; }
+    if (badName(n)) { setPmsg(badName(n)); return; }
     if (hasErr) { setPmsg("有格子不合法，先改好再存"); return; }
     if (!saved.some((x) => x.name === n) && saved.length >= SAVED_MAX) { setPmsg("最多存 " + SAVED_MAX + " 組，先刪掉幾組"); return; }
     setSaved((a) => [{ name: n, p: copyP(applied) }, ...a.filter((x) => x.name !== n)]);
     setActive(n); setNm(""); setPmsg("已存成「" + n + "」");
   };
-  const applyS = (x) => { setDraft(copyP(x.p)); setActive(x.name); setRn(null); setPmsg("已套用「" + x.name + "」"); };
+  const applyS = (x, bi) => { setDraft(copyP(x.p)); setActive((bi ? BI : "") + x.name); setRn(null); setPmsg("已套用" + (bi ? "內建" : "") + "「" + x.name + "」"); };
   const delS = (n) => { setSaved((a) => a.filter((x) => x.name !== n)); if (active === n) setActive(null); setPmsg("已刪除「" + n + "」"); };
   const renS = (old, val) => {
     const n = String(val || "").trim().slice(0, NAME_MAX);
     if (!n) { setPmsg("名稱不能空白"); return; }
+    if (badName(n)) { setPmsg(badName(n)); return; }
     if (n !== old && saved.some((x) => x.name === n)) { setPmsg("已經有叫「" + n + "」的策略"); return; }
     setSaved((a) => a.map((x) => (x.name === old ? { ...x, name: n } : x)));
     if (active === old) setActive(n);
@@ -1190,14 +1267,10 @@ export default function TaPage() {
                 ) : null}
                 <BadBanner d={d} />
                 <ChartArea key={(symInfo.yahoo || sym) + "|" + d.tf} d={d} maSet={maSet} />
+                <BlockTabs d={d} />
                 <Legend d={d} maSet={maSet} />
                 {(d.notes || []).length ? <div className="ta-notes">資料註記：{d.notes.join("；")}</div> : null}
-                <BlockTabs d={d} maSet={maSet} />
                 <SrLevels d={d} />
-                <div className="ta-block ta-rules">
-                  <div className="ta-cap">怎麼看 <span className="mut">規則寫死、每一根都可以手算</span></div>
-                  <dl>{RULES.map(([k, v]) => <div key={k} className="ta-rule"><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
-                </div>
               </div>
             ) : null}
             <div className="ta-foot">
