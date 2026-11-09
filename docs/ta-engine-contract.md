@@ -148,7 +148,7 @@ const r = await fetch(`${ENGINE}/api/engine?symbol=${encodeURIComponent(sym)}&tf
 
 ## 6. `trade`（ta_trade；所有開通者都看得到）
 
-2026-11-09 Yoda 拍板：整筆進、整筆出，停損固定不動；分批出場、移動停損、加倉都已永久刪除（`tests	a_engine_check.py` 守門）。
+2026-11-09 Yoda 拍板：整筆進、整筆出，停損固定不動；分批出場、移動停損、加倉都已永久刪除（`tests/ta_engine_check.py` 守門）。
 
 | 欄位 | 說明 |
 |---|---|
