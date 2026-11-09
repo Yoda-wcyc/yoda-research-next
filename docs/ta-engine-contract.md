@@ -1,4 +1,7 @@
-# ta-engine 回應契約（schema `ta-engine-2`，2026-11-09）
+# ta-engine 回應契約（schema `ta-engine-3`，2026-11-09）
+
+> 11-09 晚（`ta-engine-2` → `ta-engine-3`，Yoda 定）：`overlays.gaps`／`overlays.islands` 改算**整段歷史**、`i` 改成 `history` 的絕對位置，缺口改欄位表格式（§4）；
+> `overlays.top_volume` 拿掉——前五大量改在瀏覽器依「目前可見區間」算（只算定案 K；量倍數＝這根量 ÷ 之前 20 根均量，用整段 history）。`signals`（近 120 根）不變。
 
 > 11-09 改版（`ta-engine-1` → `ta-engine-2`）：回應拿掉 `trade` 與 `chart.ema10`／`ema10_label`、圖例拿掉進出場那幾項，改帶 `history`（全部 K）。
 > 進出場回測改在瀏覽器用 `lib/ta-trade.js` 依「交易規則控制面板」的參數即時算（§6），免得引擎與瀏覽器兩份結果打架。
@@ -80,7 +83,7 @@ const r = await fetch(`${ENGINE}/api/engine?symbol=${encodeURIComponent(sym)}&tf
 
 ```jsonc
 {
-  "ok": true, "schema": "ta-engine-2", "tf": "D",
+  "ok": true, "schema": "ta-engine-3", "tf": "D",
   "symbol": { "input": "6488", "code": "6488", "yahoo": "6488.TWO", "market": "tw|us",
               "type": "EQUITY|ETF", "name": "GlobalWafers Co., Ltd.",   // Yahoo longName（台股是英文名），可能為 null
               "exchange": "Taipei Exchange", "currency": "TWD", "timezone": "Asia/Taipei" },
@@ -98,7 +101,7 @@ const r = await fetch(`${ENGINE}/api/engine?symbol=${encodeURIComponent(sym)}&tf
 ## 4. `chart`（畫圖需要的全部東西）
 
 視窗＝最後 120 根**定案** K ＋ 尾巴的未定 K（所以 `n` 是 120 或 121；歷史不足 120 時更少）。
-下面所有 `i`＝`bars` 陣列的 index；**`i = -1` 表示在視窗左邊**（線從左緣畫起、不畫記號）。
+`bars`／`sma` 只有這 120 根；`overlays.gaps`／`islands` 的 `i` 是 `history` 的絕對位置（整段歷史），頁面依時間區間自己切。
 
 | 欄位 | 型別 | 說明 |
 |---|---|---|
@@ -107,9 +110,8 @@ const r = await fetch(`${ENGINE}/api/engine?symbol=${encodeURIComponent(sym)}&tf
 | `sma` | `{"5":[…],"8":[…],"10":[…],"13":[…],"20":[…],"34":[…],"60":[…],"120":[…]}` | 跟 `bars` 對齊，暖身不足為 null |
 | `ma_sets` | `{short:[5,10,20], mid:[8,13,34], long:[20,60,120]}` | UI 切「短／中／長」時畫哪三條（預設 short） |
 | `overlays.sr[]` | `{kind:"support"\|"resistance", price, style:"solid"\|"dashed", color:"#ffffff", pick_scope:"within10"\|"beyond", dist_pct}` | 每側最多一條。support＝白實線、resistance＝白虛線；`beyond`＝±10% 內沒有、取範圍外最強（ta_local 會標「10% 內無，取範圍外最強」） |
-| `overlays.top_volume[]` | `{rank, i, t, high, low, vol_ratio, read}` | 前五大量 K：K 棒金框＋金色量柱（`#ffc94a`）；`read`＝大量K 解讀 |
-| `overlays.gaps[]` | `{i, t, dir:"up"\|"down", top, bottom, fill:"none"\|"partial"\|"full", fill_i, open_top, open_bottom, type, type_short, island}` | 缺口框：`full`＝從 `i` 畫到 `fill_i`、`top～bottom`；`none`／`partial`＝從 `i` 畫到右緣、只畫剩下的 `open_bottom～open_top`。`type_short`（突／逃／竭／彈／回／普／島…）可標在框上 |
-| `overlays.islands[]` | `{kind:"top"\|"bottom", name, i0, i1, high, low}` | 島狀反轉區段 |
+| `overlays.gaps` | `{cols:[…], enums:{欄:[字…]}, rows:[[…], …]}` | **整段歷史**的全部缺口（分類只用缺口那根以前的 K，回補／距現價看到最後一根定案 K；口徑＝`signals.gaps` 把視窗放到整段，最近 120 根那段跟 `signals.gaps` 逐欄一樣）。`cols`＝`i, dir, bottom, top, fill, fill_i, open_bottom, open_top, type, type_short, island, trend, position_zh, seq, vol_ratio, size_pct, dist_pct, notes`；`enums` 裡有的欄（`dir`／`fill`／`type`／`type_short`／`trend`／`position_zh`）存序號，`enums[欄][序號]` 換回字（null 照舊）。`i`、`fill_i`＝`history` 絕對位置。順序同 `signals.gaps.items`（未補依離現價近到遠、已補依時間新到舊）。畫法：`full`＝從 `i` 畫到 `fill_i`、`top～bottom`；`none`／`partial`＝從 `i` 畫到右緣、只畫剩下的 `open_bottom～open_top`；`island=true` 時框旁標「島」 |
+| `overlays.islands[]` | `{kind:"top"\|"bottom", name, i0, i1, start, end, bars, high, low}` | **整段歷史**的島狀反轉（`i0`／`i1`＝`history` 絕對位置）。唯一跟 `signals.gaps.islands` 可能不同的地方：A 缺口在近 120 根左邊、B 在裡面的島，整段版有、視窗版沒有 |
 | `legend[]` | `{key, label, desc}` | 圖例說明文字（support／resistance／top_volume／gap／unfinished）；進出場那幾項（出場線、多進空進、停損、✕ 出場、持倉中）由頁面依面板參數產生 |
 
 ### 4.1 進出場記號（瀏覽器 `chartMarks()` 產生，格式同改版前的 `trade.markers[]`）

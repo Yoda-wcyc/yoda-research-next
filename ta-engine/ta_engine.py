@@ -30,7 +30,7 @@ import numpy as np
 import pandas as pd
 import analyze_symbol as A
 
-SCHEMA = 'ta-engine-2'          # 11-09：拿掉 trade／chart.ema10，加 history
+SCHEMA = 'ta-engine-3'          # 11-09：拿掉 trade／chart.ema10，加 history；11-09 晚：缺口／島狀反轉改整段、前五大量改瀏覽器依區間算
 CHART_N = 120
 MIN_BARS = 30
 TFS = {'1H': '1h', '4H': '1h', 'D': '1d', 'W': '1d'}
@@ -51,11 +51,14 @@ REN = {'o': 'Open', 'h': 'High', 'l': 'Low', 'c': 'Close', 'v': 'Volume'}
 UNFINISHED = '盤中未定'
 KEY_ENV = 'TA_ENGINE_KEY'
 VENDOR = ('analyze_symbol.py', 'ta_engine.py')
+GAP_COLS = ('i', 'dir', 'bottom', 'top', 'fill', 'fill_i', 'open_bottom', 'open_top', 'type', 'type_short', 'island',
+            'trend', 'position_zh', 'seq', 'vol_ratio', 'size_pct', 'dist_pct', 'notes')   # overlays.gaps 精簡格式的欄位
+GAP_ENUMS = ('dir', 'fill', 'type', 'type_short', 'trend', 'position_zh')
 HIST_ND = 6                              # history 價格小數位（瀏覽器回測用；tests/ta_engine_check.py --regress 驗跟原始精度交易一致）
 LEGEND = [
     {'key': 'support', 'label': '支撐', 'desc': '白色實線：今收下方最強的一條（±10% 內優先）'},
     {'key': 'resistance', 'label': '壓力', 'desc': '白色虛線：今收上方最強的一條（±10% 內優先）'},
-    {'key': 'top_volume', 'label': '前五大量', 'desc': '近 120 根量最大的 5 根，金框；高低點是撐壓候選'},
+    {'key': 'top_volume', 'label': '前五大量', 'desc': '目前可見區間（只算定案 K）量最大的 5 根，金框＋①～⑤；高低點是撐壓候選'},
     {'key': 'gap', 'label': '缺口', 'desc': '方框＝還沒補的缺口區間（部分回補只畫剩下那段）；補滿的畫到回補那根'},
     {'key': 'unfinished', 'label': UNFINISHED, 'desc': '最後一根還在交易中，只上圖，不進訊號與回測'},
 ]
@@ -292,6 +295,19 @@ def ma_sets(c, idx):
     return out
 
 
+def gaps_full(dc):
+    """整段定案 K 的缺口（含分類、回補到最後一根）與島狀反轉；口徑＝analyze_symbol.compute_signals 把視窗放到整段（k0=0、tx=0）。
+    分類只看缺口那根以前的 K（趨勢／位置／第幾個／當時壓力），回補與距現價看到最後一根，所以最近 120 根那段＝signals.gaps
+    （tests/ta_engine_check.py --regress 驗）。唯一可能的差：島的 A 缺口在 120 根視窗左邊、B 在視窗內 → 整段版會標成島、視窗版不會。"""
+    idx = dc.index
+    o_raw, h_raw, l_raw, c_raw, v = (dc[k].to_numpy('float64') for k in ('o', 'h', 'l', 'c', 'v'))
+    rnd = lambda a: np.array([np.nan if A._p(x) is None else A._p(x) for x in a], 'float64')
+    O, H, L, Cc = rnd(o_raw), rnd(h_raw), rnd(l_raw), rnd(c_raw)
+    gp = A._sig_gaps(idx, H, L, Cc, v, 0)
+    A._classify(gp, {'items': []}, A._gap_ctx(H, L, Cc, c_raw, h_raw, l_raw, 0), idx, O, H, L, Cc, v, 0)
+    return gp
+
+
 def analyze_bars(df, market, final=None):
     """純函式。df：o/h/l/c/v（index＝K 棒時間，舊到新）；final：每根是否定案（None＝全部定案；未定只能在尾巴）。
     訊號、均線排列只用定案 K；圖＝最後 120 根定案 K ＋ 尾巴的盤中未定 K；history＝全部 K（瀏覽器回測只用前 bars_completed 根）。"""
@@ -309,25 +325,27 @@ def analyze_bars(df, market, final=None):
     k0 = max(0, nf - CHART_N)
     w = df.iloc[k0:]
     wf = fin[k0:]
-    pos = {A._d(t): i for i, t in enumerate(w.index)}
-    first = A._d(w.index[0])
-
-    def ix(t):
-        s = t if isinstance(t, str) else A._d(t)
-        i = pos.get(s)
-        return i if i is not None else (-1 if s < first else len(w) - 1)
     c_all = df['c'].to_numpy('float64')
     sma = {str(n): [A._p(x) for x in A.sma(c_all, n)[k0:]] for n in SMA_NS}
     bars = [{'t': A._d(t), 'o': A._p(r.o), 'h': A._p(r.h), 'l': A._p(r.l), 'c': A._p(r.c), 'v': A._f(r.v, 0),
              'final': bool(f)} for t, r, f in zip(w.index, w.itertuples(), wf)]
-    tv = [{'rank': x['rank'], 'i': ix(x['date']), 't': x['date'], 'high': x['high'], 'low': x['low'],
-           'vol_ratio': x['vol_ratio'], 'read': x.get('read')} for x in sig['top_volume']['items']]
-    gaps = [{'i': ix(g['date']), 't': g['date'], 'dir': g['dir'], 'top': g['top'], 'bottom': g['bottom'],
-             'fill': g['fill'], 'fill_i': ix(g['fill_date']) if g['fill_date'] else None,
-             'open_top': g['open_top'], 'open_bottom': g['open_bottom'], 'type': g.get('type'),
-             'type_short': g.get('type_short'), 'island': g.get('island')} for g in sig['gaps']['items']]
-    isl = [{'kind': x['kind'], 'name': x['name'], 'i0': ix(x['start']), 'i1': ix(x['end']), 'high': x['high'],
-            'low': x['low']} for x in sig['gaps'].get('islands', [])]
+    # 缺口／島狀反轉：整段歷史（i、fill_i、i0、i1＝history 的絕對位置）；1H 缺口幾百個，用欄位表（cols＋rows）省 payload
+    hi = {A._d(t): i for i, t in enumerate(df.index)}
+    gf = gaps_full(dc)
+    # 文字欄（方向、回補、類型、趨勢、位置）存成 enums[欄] 的序號：日K 十年五百多個缺口，省三成 payload
+    en = {c: sorted({g.get(c) for g in gf['items']} - {None}) for c in GAP_ENUMS}
+    code = {c: {x: k for k, x in enumerate(v)} for c, v in en.items()}
+
+    def col(g, c):
+        if c == 'i':
+            return hi[g['date']]
+        if c == 'fill_i':
+            return hi.get(g['fill_date'])
+        x = g.get(c)
+        return code[c][x] if c in code and x is not None else x
+    gaps = {'cols': list(GAP_COLS), 'enums': en, 'rows': [[col(g, c) for c in GAP_COLS] for g in gf['items']]}
+    isl = [{'kind': x['kind'], 'name': x['name'], 'i0': hi[x['start']], 'i1': hi[x['end']], 'start': x['start'], 'end': x['end'],
+            'bars': x['bars'], 'high': x['high'], 'low': x['low']} for x in gf['islands']]
     sr = sig['sr_levels']
     srl = [{'kind': k, 'price': x['price'], 'style': 'solid' if k == 'support' else 'dashed', 'color': '#ffffff',
             'pick_scope': x['pick_scope'], 'dist_pct': x['dist_pct']}
@@ -342,7 +360,7 @@ def analyze_bars(df, market, final=None):
     out = {'asof': A._d(dc.index[-1]), 'bars_total': int(len(df)), 'bars_completed': nf,
            'unfinished': bool(not wf[-1]), 'unfinished_label': UNFINISHED if not wf[-1] else None,
            'chart': {'n': len(bars), 'bars': bars, 'sma': sma, 'ma_sets': {k: list(ns) for k, ns in MA_SETS},
-                     'overlays': {'sr': srl, 'top_volume': tv, 'gaps': gaps, 'islands': isl}, 'legend': LEGEND},
+                     'overlays': {'sr': srl, 'gaps': gaps, 'islands': isl}, 'legend': LEGEND},
            'signals': sig, 'history': hist, 'notes': notes}
     return _clean(out)
 
@@ -551,8 +569,22 @@ def selftest():
        and max(abs(a - b) for a, b in zip(up['history']['c'], hc['c'])) < 1e-6 and up['history']['v'][0] == 1400,
        '輸出是合法 JSON（無 NaN），8 條 SMA 跟 120 根對齊；history＝全部 K（價格 6 位小數、量整數）')
 
+    # 缺口／島狀反轉整段：第 20 根往上跳 50、第 23 根跳回來（20～22 懸空＝頂部島）；第 200 根往上跳 50 → 視窗內也有
+    gd = _trend_df(260, True)
+    gd.iloc[20:23, :4] += 50
+    gd.iloc[200:, :4] += 50
+    og = analyze_bars(gd, 'us')
+    G = og['chart']['overlays']['gaps']
+    rows = [dict(zip(G['cols'], r)) for r in G['rows']]
+    ts = og['history']['t']
+    ok(sorted(ts[r['i']] for r in rows) == ['2024-01-29', '2024-02-01', '2024-10-07']
+       and [ts[r['i']] for r in rows if r['i'] >= 259 - CHART_N] == [x['date'] for x in og['signals']['gaps']['items']]
+       and og['chart']['overlays']['islands'][0]['i0'] == 20 and og['chart']['overlays']['islands'][0]['i1'] == 22
+       and 'top_volume' not in og['chart']['overlays'],
+       '缺口／島狀反轉算整段（i＝history 絕對位置、欄位表格式）；視窗內那段＝signals.gaps；前五大量不在 overlays（瀏覽器依區間算）')
+
     # 除息還原
-    dv = pd.DataFrame([[100, 101, 99, 100, 1], [95, 96, 94, 95, 1]], index=pd.to_datetime(['2026-07-01', '2026-07-02']),
+    dv =pd.DataFrame([[100, 101, 99, 100, 1], [95, 96, 94, 95, 1]], index=pd.to_datetime(['2026-07-01', '2026-07-02']),
                       columns=['o', 'h', 'l', 'c', 'v'], dtype='float64')
     t_ex = int(pd.Timestamp('2026-07-02 09:00', tz='Asia/Taipei').timestamp())
     ad = div_adjust(dv, {str(t_ex): {'amount': 5.0, 'date': t_ex}}, 'Asia/Taipei')

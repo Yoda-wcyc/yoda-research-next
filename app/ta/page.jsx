@@ -141,16 +141,47 @@ function fullSeries(d) {
   return { bars, c: h.c.map(Number), k0: N - cb.length };
 }
 
+// 引擎 overlays.gaps（cols＋enums＋rows，整段歷史、i＝history 絕對位置）→ 每筆一個物件，補上日期
+function decodeGaps(G, bars) {
+  if (!G || !Array.isArray(G.cols) || !Array.isArray(G.rows)) return [];
+  const en = G.enums || {}, tAt = (i) => (i != null && bars[i] ? bars[i].t : null);
+  return G.rows.map((r) => {
+    const x = {};
+    G.cols.forEach((c, k) => { const v = r[k]; x[c] = en[c] && v != null ? en[c][v] : v; });
+    x.date = tAt(x.i); x.fill_date = tAt(x.fill_i);
+    return x;
+  });
+}
+
+// 前五大量（Yoda 11-09）：[a, b) 可見區間裡「已定案」的 K 量最大 5 根（同量取較近）；量倍數＝這根量 ÷ 之前 20 根均量（整段 history 算、缺量不計）
+function topVolume(full, a, b, nf, eng) {
+  const bars = full.bars, idx = [];
+  for (let i = a; i < Math.min(b, nf); i++) if (Number(bars[i].v) > 0) idx.push(i);
+  idx.sort((x, y) => Number(bars[y].v) - Number(bars[x].v) || y - x);
+  const C = nf > 0 ? Number(bars[nf - 1].c) : NaN, pct = (p) => (Number.isFinite(C) && C ? (p / C - 1) * 100 : null);
+  const byDate = new Map((eng || []).map((x) => [x.date, x]));   // 近 120 根才有引擎的 K 棒型態、趨勢位置、解讀
+  return idx.slice(0, 5).map((i, k) => {
+    const x = bars[i], pv = [];
+    for (let j = Math.max(0, i - 20); j < i; j++) if (bars[j].v != null) pv.push(Number(bars[j].v));
+    const avg = i >= 20 && pv.length ? pv.reduce((s0, v) => s0 + v, 0) / pv.length : null;
+    const e = byDate.get(x.t) || {};
+    return {
+      rank: k + 1, i, date: x.t, days_ago: nf - 1 - i, volume: Number(x.v), vol_ratio: avg ? Number(x.v) / avg : null,
+      chg_pct: i > 0 && bars[i - 1].c ? (x.c / bars[i - 1].c - 1) * 100 : null, high: x.h, low: x.l,
+      dist_high_pct: pct(x.h), dist_low_pct: pct(x.l), relation: C > x.h ? "在上方" : C < x.l ? "在下方" : "區間內",
+      candle: e.candle, close_pos: e.close_pos, close_pos_ratio: e.close_pos_ratio, trend: e.trend, position_zh: e.position_zh || e.position, read: e.read,
+    };
+  });
+}
+
 // K 線圖畫整段歷史的 [a, b) 這一段；Y 軸依區間內高低。K 棒與量柱併成幾條 path（1H 五千根拖曳才不卡）
-function KChart({ d, full, smas, a, b, onTip }) {
+function KChart({ d, full, smas, a, b, onTip, gaps, islands, top }) {
   const ch = d.chart || {};
-  const k0 = full.k0, bars = full.bars.slice(a, b), n = bars.length;
+  const bars = full.bars.slice(a, b), n = bars.length;
   if (n < 2) return <div className="ta-nochart">沒有 K 線資料</div>;
   const market = g(d, "symbol", "market");
   const intra = d.tf === "1H" || d.tf === "4H";
-  const ov = ch.overlays || {};
-  // shortcut: 引擎 overlays 的 i=-1（在近 120 根視窗左邊、確切位置不知）一律從區間左緣畫；要精確得引擎給絕對位置
-  const oi = (i) => (i == null || i < 0 ? -1 : i + k0 - a);
+  const oi = (i) => (i == null ? null : i - a);   // 缺口、島、前五大量的 i 都是整段 history 的絕對位置
   const sr = g(d, "signals", "sr_levels") || {};
   const srl = [...(sr.support || []).slice(0, 1).map((x) => [x, "sup"]), ...(sr.resistance || []).slice(0, 1).map((x) => [x, "res"])];
   const trd = d.trade || {};
@@ -196,9 +227,10 @@ function KChart({ d, full, smas, a, b, onTip }) {
   // 圖上文字／記號佔的位置（缺口代號、島狀反轉的字、前五大量編號、圖左上線名、進出場記號先放，進出場標籤再找不撞的位置）；tw＝字寬估計（中文 12、英數 6.8）
   const placed = [];
   const tw = (s) => [...s].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? 12 : 6.8), 0);
-  // 缺口框：未補／部分回補＝剩下的區間畫到右緣（部分回補的原缺口淡淡畫到回補那根）；已補＝缺口那根畫到回補那根
-  (ov.gaps || []).forEach((x, k) => {
-    if (x.top == null || x.bottom == null) return;
+  // 缺口框（整段歷史，只畫跟區間有交集的）：未補／部分回補＝剩下的區間畫到右緣（部分回補的原缺口淡淡畫到回補那根）；已補＝缺口那根畫到回補那根。
+  // 缺口旁的類型字：區間超過 250 根就不寫（同進出場 ✕ 的規則，十年日K 五百多個缺口字會糊成一片），框照畫
+  (gaps || []).forEach((x, k) => {
+    if (x.top == null || x.bottom == null || x.i >= b) return;
     const gi = oi(x.i), fi = x.fill_i != null ? oi(x.fill_i) : null;
     const fill = x.dir === "up" ? K_UP : K_DN;
     const x0 = gi < 0 ? L : X(gi) - step / 2;
@@ -207,7 +239,7 @@ function KChart({ d, full, smas, a, b, onTip }) {
     if (x.fill === "full") {
       if (xf < L) return;
       els.push(<rect key={"gf" + k} className="gapbox0" x={x0} y={Y(x.top)} width={Math.max(1, xf - x0)} height={Math.max(1, Y(x.bottom) - Y(x.top))}
-        fill={fill} fillOpacity=".10" clipPath={clip} data-t={x.t} />);
+        fill={fill} fillOpacity=".10" clipPath={clip} data-t={x.date} />);
     } else {
       if (x.fill === "partial" && fi != null && xf >= L) {
         els.push(<rect key={"ga" + k} className="gapbox0" x={x0} y={Y(x.top)} width={Math.max(1, xf - x0)} height={Math.max(1, Y(x.bottom) - Y(x.top))}
@@ -215,34 +247,36 @@ function KChart({ d, full, smas, a, b, onTip }) {
       }
       if (x.open_top != null && x.open_bottom != null) {
         els.push(<rect key={"gb" + k} className="gapbox" x={x0} y={Y(x.open_top)} width={Math.max(1, xr - x0)} height={Math.max(1, Y(x.open_bottom) - Y(x.open_top))}
-          fill={fill} fillOpacity=".22" clipPath={clip} data-t={x.t} data-dir={x.dir} data-fill={x.fill} />);
+          fill={fill} fillOpacity=".22" clipPath={clip} data-t={x.date} data-dir={x.dir} data-fill={x.fill} />);
       }
     }
-    if (x.type_short && gi >= 0 && gi < n) {
+    const ts = x.type_short;   // 島狀反轉的兩個缺口引擎已改成「島」
+    if (ts && gi >= 0 && gi < n && n <= 250) {
       const gy = (Y(x.top) + Y(x.bottom)) / 2 + 4;
-      placed.push([x0 - 3 - tw(String(x.type_short)), gy - 11, x0 - 3, gy + 3]);
+      placed.push([x0 - 3 - tw(String(ts)), gy - 11, x0 - 3, gy + 3]);
       els.push(<text key={"gl" + k} className={"gl " + (x.dir === "up" ? "up" : "dn") + (x.fill === "full" ? " filled" : "")} x={x0 - 3}
-        y={(Y(x.top) + Y(x.bottom)) / 2 + 4} textAnchor="end">{String(x.type_short)}{x.type ? <title>{x.type}</title> : null}</text>);
+        y={(Y(x.top) + Y(x.bottom)) / 2 + 4} textAnchor="end">{String(ts)}{x.type ? <title>{x.type}</title> : null}</text>);
     }
   });
   // 島狀反轉：金色虛線框＋直接標字（頂部島標在框上方、底部島標在框下方；沒有 kind 時看島開頭那個缺口：向上＝頂部）
-  (ov.islands || []).forEach((x, k) => {
-    if (x.high == null || x.low == null || x.i1 == null) return;
+  (islands || []).forEach((x, k) => {
+    if (x.high == null || x.low == null || x.i0 == null || x.i1 == null || x.i1 < a || x.i0 >= b) return;   // 跟區間沒交集
     const i0 = oi(x.i0), i1 = oi(x.i1);
-    if (i1 < 0 && x.i1 >= 0) return;   // 整段在區間左邊
     const x0 = i0 < 0 ? L : X(i0) - step / 2;
-    if (x0 > xr) return;
-    const top = x.kind ? x.kind === "top" : ((ov.gaps || []).find((gp) => gp.island && gp.i === x.i0) || {}).dir === "up";
+    const top = x.kind ? x.kind === "top" : ((gaps || []).find((gp) => gp.i === x.i0) || {}).dir === "up";
     const yt = Y(x.high) - 3, yb = Y(x.low) + 3, x1 = X(i1) + step / 2;
     els.push(<rect key={"is" + k} className="isl" x={x0} y={yt} width={Math.max(2, x1 - x0)} height={Math.max(2, yb - yt)}
       fill="none" stroke={GOLD} strokeWidth="1.2" strokeDasharray="3 3" clipPath={clip} data-kind={top ? "top" : "bottom"} />);
-    const lx = Math.min(xr - 40, Math.max(L + 40, (x0 + x1) / 2)), ly = top ? Math.max(T + 11, yt - 5) : Math.min(T + PH - 3, yb + 14);
+    const lx = Math.min(xr - 40, Math.max(L + 40, (x0 + x1) / 2));
+    let ly = top ? Math.max(T + 11, yt - 5) : Math.min(T + PH - 3, yb + 14);
+    const busy = (y) => placed.some((p) => lx - 36 < p[2] && lx + 36 > p[0] && y - 12 < p[3] && y + 4 > p[1]);
+    for (let k = 0; k < 4 && busy(ly); k++) ly = Math.min(T + PH - 3, Math.max(T + 11, ly + (top ? -14 : 14)));   // 島挨太近：字往外疊開
     placed.push([lx - 36, ly - 12, lx + 36, ly + 4]);
     els.push(<text key={"ist" + k} className="isl-t" x={lx} y={ly} textAnchor="middle">{top ? "頂部島狀反轉" : "底部島狀反轉"}</text>);
   });
   // K 棒（收 ≥ 開＝紅）＋量柱：一般的併成 path；前五大量（金框＋金色量柱＋①～⑤）與盤中未定那根單獨畫
   const topI = {};
-  for (const t of ov.top_volume || []) if (t.i >= 0) topI[t.i + k0 - a] = t.rank;
+  for (const t of top || []) topI[t.i - a] = t.rank;
   const pth = { wu: "", wd: "", bu: "", bd: "", vu: "", vd: "" };
   const one = [];
   const f1d = (x) => x.toFixed(1);
@@ -522,7 +556,7 @@ function RangeNav({ bars, a, b, onChange }) {
   );
 }
 
-// 圖＋導覽列：區間狀態放這裡，拖曳只重畫圖；父層用 key＝代號|週期，換代號或週期就重新掛載＝回到預設區間
+// 圖＋導覽列＋圖下三個分頁：區間狀態放這裡（② 缺口、③ 前五大量的表跟著區間變）；父層用 key＝代號|週期，換代號或週期就重新掛載＝回到預設區間
 function ChartArea({ d, maSet }) {
   const ch = d.chart || {};
   const full = useMemo(() => fullSeries(d), [d.history, ch.bars, d.bars_completed]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -530,6 +564,14 @@ function ChartArea({ d, maSet }) {
   const smas = useMemo(() => (g(ch, "ma_sets", maSet) || []).map((m) => [m, smaSeq(full.c, Number(m))]), [full, ch.ma_sets, maSet]);   // eslint-disable-line react-hooks/exhaustive-deps
   const [rng, setRng] = useState(() => [Math.max(0, Math.min(full.k0, N - 2)), N]);   // 預設＝引擎的圖視窗（近 120 根）
   const b = Math.min(rng[1], N), a = Math.max(0, Math.min(rng[0], b - 2));
+  const nf = d.bars_completed != null ? Math.min(d.bars_completed, N) : N;
+  const gapsAll = useMemo(() => decodeGaps(g(ch, "overlays", "gaps"), full.bars), [ch.overlays, full]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const islAll = g(ch, "overlays", "islands") || [];
+  const top = useMemo(() => topVolume(full, a, b, nf, g(d, "signals", "top_volume", "items")), [full, a, b, nf, d.signals]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const view = useMemo(() => ({
+    a, b, from: full.bars[a] ? full.bars[a].t : "", to: full.bars[b - 1] ? full.bars[b - 1].t : "", top,
+    gaps: gapsAll.filter((x) => x.i >= a && x.i < b), islands: islAll.filter((x) => x.i1 >= a && x.i0 < b),
+  }), [a, b, full, top, gapsAll, islAll]);
   // 進出場記號的浮動說明：滑鼠移上去／鍵盤聚焦就出現、離開就收；點一下（手機）會釘住，點別處或 Esc 才關
   const [tip, setTip] = useState(null);   // {kind, t, x, y, pin}
   const box = useRef(null);
@@ -571,8 +613,9 @@ function ChartArea({ d, maSet }) {
   const info = tip && trd.ctx && trd.p ? (tip.kind === "entry" ? explainEntry(trd, trd.p, tip.t) : explainExit(trd, trd.p, tip.t)) : null;
   return (
     <>
-      <KChart d={d} full={full} smas={smas} a={a} b={b} onTip={onTip} />
+      <KChart d={d} full={full} smas={smas} a={a} b={b} onTip={onTip} gaps={gapsAll} islands={islAll} top={top} />
       {N > NAV_MIN ? <RangeNav bars={full.bars} a={a} b={b} onChange={setRng} /> : null}
+      <BlockTabs d={d} view={view} />
       {info ? (
         <div ref={box} className={"ta-tipbox " + (tip.t.side === 1 ? "long" : "short")} role="tooltip" style={{ left: 0, top: 0, visibility: "hidden" }}>
           <div className="tt">{info.title}{tip.kind === "entry" && trd.open && trd.open.entry_i === tip.t.entry_i ? <span className="hold">持倉中</span> : null}</div>
@@ -625,7 +668,7 @@ function optCols(rows, specs) {
   return specs.filter((c) => rows.some((x) => has(x[c.f]))).map((c) => ({
     label: c.label, title: c.title, num: c.num, cls: c.cls,
     render: c.render || ((x) => txt(x[c.f])),
-    sort: (x) => (has(x[c.f]) ? (typeof x[c.f] === "number" ? x[c.f] : String(x[c.f])) : null),
+    sort: c.sort || ((x) => (has(x[c.f]) ? (typeof x[c.f] === "number" ? x[c.f] : String(x[c.f])) : null)),
   }));
 }
 function islandText(x) {
@@ -633,11 +676,10 @@ function islandText(x) {
   return [x.name, (x.start || "?") + "～" + (x.end || "?"), has(x.bars) ? x.bars + " 根" : ""].filter(Boolean).join(" ");
 }
 
-function TopVolume({ d }) {
-  const tv = g(d, "signals", "top_volume") || {};
+const rangeTxt = (v) => (v.from === v.to ? v.from : v.from + " ～ " + v.to) + "（" + (v.b - v.a) + " 根）";
+function TopVolume({ d, view }) {
   const market = g(d, "symbol", "market");
-  const rows = tv.items || [];
-  const wb = g(d, "signals", "window_bars") || "—";
+  const rows = view.top;
   const cols = [
     { label: "#", render: (x) => mark(x.rank), sort: (x) => x.rank },
     { label: "時間", render: (x) => x.date, sort: (x) => x.date },
@@ -645,19 +687,18 @@ function TopVolume({ d }) {
     { label: market === "tw" ? "量（張）" : "量（股）", num: true, render: (x) => fvol(x.volume, market), sort: (x) => nz(x.volume) },
     { label: "量倍數", num: true, title: "這根量 ÷ 之前 20 根均量", render: (x) => (x.vol_ratio == null ? "—" : f1(x.vol_ratio) + "x"), sort: (x) => nz(x.vol_ratio) },
     { label: "漲跌", num: true, render: (x) => <span className={ud(x.chg_pct)}>{fpct(x.chg_pct)}</span>, sort: (x) => nz(x.chg_pct) },
-    { label: "K 棒", render: (x) => x.candle || "—", sort: (x) => x.candle || "" },
-    { label: "收在", title: "收盤落在這根區間的哪一段", render: (x) => x.close_pos || "—", sort: (x) => nz(x.close_pos_ratio) },
+    ...optCols(rows, [{ f: "candle", label: "K 棒" }, { f: "close_pos", label: "收在", title: "收盤落在這根區間的哪一段", sort: (x) => nz(x.close_pos_ratio) }]),
     { label: "最高＝關卡", num: true, render: (x) => <>{fnum(x.high)} <span className="mut">({fpct(x.dist_high_pct)})</span></>, sort: (x) => nz(x.high) },
     { label: "最低＝關卡", num: true, render: (x) => <>{fnum(x.low)} <span className="mut">({fpct(x.dist_low_pct)})</span></>, sort: (x) => nz(x.low) },
     { label: "現價在", render: (x) => <b className={REL_CLS[x.relation] || ""}>{x.relation || "—"}</b>, sort: (x) => ({ "在上方": 1, "區間內": 0, "在下方": -1 })[x.relation] },
-    { label: "趨勢／位置", render: (x) => txt(x.trend) + "／" + txt(x.position_zh || x.position), sort: (x) => txt(x.trend) + txt(x.position_zh) },
+    ...(rows.some((x) => has(x.trend) || has(x.position_zh)) ? [{ label: "趨勢／位置", render: (x) => txt(x.trend) + "／" + txt(x.position_zh), sort: (x) => txt(x.trend) + txt(x.position_zh) }] : []),
   ];
   const reads = rows.filter((x) => has(x.read));
   return (
     <div className="ta-block" data-blk="vol">
-      <div className="ta-cap">③ 前五大量 <span className="mut">近 {wb} 根量最大的 5 根；那根的最高／最低就是關卡，括號＝關卡距現價</span></div>
+      <div className="ta-cap">③ 前五大量 <span className="mut">區間 {rangeTxt(view)} 已定案 K 量最大的 {rows.length} 根（拖導覽列會重算）；那根的最高／最低就是關卡，括號＝關卡距現價；K 棒、趨勢位置與解讀只有近 120 根有</span></div>
       {rows.length ? <div className="ta-hs"><SortTable className="ta-dt" cols={cols} rows={rows} rowKey={(x) => "v" + x.rank} /></div>
-        : <div className="ta-empty">視窗內沒有成交量資料</div>}
+        : <div className="ta-empty">區間內沒有成交量資料</div>}
       {reads.length ? (
         <dl className="ta-reads">{reads.map((x) => <div key={x.rank} className="ta-rule"><dt>{mark(x.rank)} {x.date}</dt><dd>{txt(x.read)}</dd></div>)}</dl>
       ) : null}
@@ -665,10 +706,9 @@ function TopVolume({ d }) {
   );
 }
 
-function Gaps({ d }) {
-  const gp = g(d, "signals", "gaps") || {};
-  const rows = gp.items || [];
-  const wb = g(d, "signals", "window_bars") || "—";
+function Gaps({ view }) {
+  const rows = view.gaps, isl = view.islands;   // 整段歷史裡落在區間的缺口；順序同引擎（未補依離現價近到遠、已補依時間新到舊）
+  const nOpen = rows.filter((x) => x.fill !== "full").length;
   const cols = [
     { label: "時間", render: (x) => x.date, sort: (x) => x.date },
     { label: "方向", render: (x) => <span className={x.dir === "up" ? "up" : "dn"}>{x.dir === "up" ? "向上" : "向下"}</span>, sort: (x) => x.dir },
@@ -691,12 +731,12 @@ function Gaps({ d }) {
   ];
   return (
     <div className="ta-block" data-blk="gap">
-      <div className="ta-cap">② 跳空缺口 <span className="mut">近 {wb} 根全部 {gp.n || 0} 個（未補／部分回補 {gp.n_open || 0}、已補 {gp.n_filled || 0}）；未補依離現價近到遠、已補依時間新到舊</span></div>
+      <div className="ta-cap">② 跳空缺口 <span className="mut">區間 {rangeTxt(view)} 全部 {rows.length} 個（未補／部分回補 {nOpen}、已補 {rows.length - nOpen}）；未補依離現價近到遠、已補依時間新到舊；回補狀態算到最後一根</span></div>
       {rows.length ? (
         <div className="ta-win10"><SortTable className="ta-dt" cols={cols} rows={rows} rowKey={(x) => x.date + x.dir} rowClass={(x) => (x.fill === "full" ? "filled" : "")} /></div>
-      ) : <div className="ta-empty">近 {wb} 根沒有跳空缺口</div>}
-      {Array.isArray(gp.islands) && gp.islands.length ? (
-        <div className="ta-islands">島狀反轉 {gp.islands.length} 個：{gp.islands.map((x, i) => <span key={i}>{i ? "；" : ""}{islandText(x)}</span>)}</div>
+      ) : <div className="ta-empty">區間內沒有跳空缺口</div>}
+      {isl.length ? (
+        <div className="ta-islands">區間內島狀反轉 {isl.length} 個：{isl.map((x, i) => <span key={i}>{i ? "；" : ""}{islandText(x)}</span>)}</div>
       ) : null}
     </div>
   );
@@ -813,7 +853,7 @@ const BLOCKS = [
 ];
 const BLK_KEY = "yoda_ta_blk";
 
-function BlockTabs({ d }) {
+function BlockTabs({ d, view }) {
   const [cur, setCur] = useState(() => { const v = lsGet(BLK_KEY); return BLOCKS.some(([k]) => k === v) ? v : BLOCKS[0][0]; });
   const pick = (k) => { setCur(k); lsSet(BLK_KEY, k); };
   const onKey = (e) => {   // ←／→／Home／End 換分頁（WAI-ARIA tabs）
@@ -834,7 +874,7 @@ function BlockTabs({ d }) {
         ))}
       </div>
       <div id="ta-blk-panel" role="tabpanel" aria-labelledby={"ta-blk-tab-" + cur} tabIndex={0}>
-        <Blk d={d} />
+        <Blk d={d} view={view} />
       </div>
     </div>
   );
@@ -1283,7 +1323,6 @@ export default function TaPage() {
                 ) : null}
                 <BadBanner d={d} />
                 <ChartArea key={(symInfo.yahoo || sym) + "|" + d.tf} d={d} maSet={maSet} />
-                <BlockTabs d={d} />
                 <Legend d={d} maSet={maSet} />
                 {(d.notes || []).length ? <div className="ta-notes">資料註記：{d.notes.join("；")}</div> : null}
                 <SrLevels d={d} />
