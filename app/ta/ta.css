@@ -272,8 +272,9 @@ svg.ta-k .unf{fill:#ffcf70;font-size:11px;font-weight:700;paint-order:stroke;str
 .ta-cur dt{font-weight:700;color:var(--dim);white-space:nowrap}
 .ta-cur dd{margin:0}
 
-/* 手機寬（萬一沒吃到 viewport 1200）：改成上下排、整頁捲動；規則面板排到圖下方 */
-@media (max-width:760px){
+/* 手機：改成上下排、整頁捲動；規則面板排到圖下方。
+   viewport 固定 1200（桌機版面），版面寬永遠 1200，所以另用 max-device-width（螢幕實寬）認手機 */
+@media (max-width:760px),(max-device-width:760px){
   .ta-root,.ta-root.ta-app{min-width:0;height:auto;overflow:visible;padding:12px 12px 40px}
   .ta-head{padding-right:0}
   .ta-split{grid-template-columns:minmax(0,1fr);grid-template-rows:none}
