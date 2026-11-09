@@ -173,6 +173,20 @@ svg.ta-k .gl.up{fill:#ff8f96} svg.ta-k .gl.dn{fill:#6fd6a0} svg.ta-k .gl.filled{
 .ta-cnote .lg .sw{margin:0 0 0 4px}
 .ta-cnote .gd{color:#c9a13a;font-weight:600}
 .ta-cnote .bx{display:inline-block;width:12px;height:10px;vertical-align:middle;margin:0 3px 0 8px;opacity:.6}
+/* 時間區間導覽列（11-09）：整段收盤縮圖＋可拖視窗；窗外用大 box-shadow 壓暗，touch-action:none 讓觸控拖曳不捲頁 */
+.ta-navw{margin:6px 0 2px}
+.ta-nav{position:relative;height:46px;background:#0b0f15;border:1px solid #1c2330;border-radius:8px;overflow:hidden;touch-action:none;user-select:none;cursor:pointer}
+.ta-nav svg{position:absolute;left:0;top:4px;width:100%;height:calc(100% - 8px);pointer-events:none}
+.ta-navwin{position:absolute;top:0;bottom:0;min-width:2px;background:rgba(61,139,253,.14);border:solid rgba(154,208,255,.75);border-width:0 1px;
+  box-shadow:0 0 0 9999px rgba(11,15,21,.6);cursor:grab;outline:none}
+.ta-navwin:active{cursor:grabbing}
+.ta-navwin:focus-visible{background:rgba(61,139,253,.3)}
+.ta-navh{position:absolute;top:0;bottom:0;width:16px;cursor:ew-resize;outline:none;z-index:1}
+.ta-navh.l{left:-8px} .ta-navh.r{right:-8px}
+.ta-navh::after{content:"";position:absolute;left:6px;top:11px;bottom:11px;width:4px;border-radius:2px;background:#9ad0ff;pointer-events:none}
+.ta-navh:focus-visible::after{background:#fff;box-shadow:0 0 0 2px var(--accent)}
+.ta-navt{font-size:calc(12px*var(--scale));color:var(--text);margin:3px 2px 0}
+.ta-navt .mut{margin-left:8px}
 .ta-nochart{padding:30px;text-align:center;color:var(--dim);border:1px dashed var(--border);border-radius:8px}
 
 /* 浮水印（票裡的 wm） */
@@ -282,4 +296,7 @@ svg.ta-k .unf{fill:#ffcf70;font-size:11px;font-weight:700;paint-order:stroke;str
   .ta-split>.ta-left{order:0} .ta-split>.ta-recent{order:1;max-height:none} .ta-split>.ta-right{order:2} .ta-split>.ta-rp{order:3;overflow:visible}
   .ta-list{max-height:30vh}
   .ta-legend dl,.ta-cur dl{grid-template-columns:minmax(0,1fr)}
+  .ta-nav{height:84px}   /* 版面 1200 縮到手機寬，導覽列與把手放大才好用手指拖 */
+  .ta-navh{width:44px} .ta-navh.l{left:-22px} .ta-navh.r{right:-22px}
+  .ta-navh::after{left:18px;width:8px;top:16px;bottom:16px}
 }

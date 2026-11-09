@@ -1,13 +1,13 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { DEFAULT_PARAMS, normParams, backtest, chartMarks, exitLine, ruleText, maName } from "../../lib/ta-trade";
+import { DEFAULT_PARAMS, normParams, backtest, chartMarks, exitLine, ruleText, maName, smaSeq } from "../../lib/ta-trade";
 
 // 會員技術分析（獨立網站版·2026-11-08 Yoda 定）
 //
 //   會員登入（/api/member-login，票存 localStorage）→ /api/ta-live 每次都重驗：站長（OWNER_PUB_IDS）或 ta_access 有開通
 //   左 1/4：輸入代號（台股上市櫃、美股、ETF；不收指數）＋最近查過＋今日額度（會員每天 30 檔、站長不限）
 //   右 3/4：週期分頁 1H／4H／日K／週K ＋ 均線組 短（5/10/20）中（8/13/34）長（20/60/120）＋ K 線圖（撐壓、前五大量、缺口、
-//           進出場、停損、出場 ✕）＋ ①～④ 四個分頁（前五大量／跳空缺口／多空排列／進出場，所有開通者都看得到）＋ 支撐壓力
+//           進出場、停損、出場 ✕；均線紅黃藍＝短到長；圖下「時間區間導覽列」拖曳看整段歷史）＋ ①～④ 四個分頁（前五大量／跳空缺口／多空排列／進出場，所有開通者都看得到）＋ 支撐壓力
 //   左欄「交易規則」面板（11-09）：勾選／填數字 → 瀏覽器用 lib/ta-trade.js 即時重算進出場與回測（不打伺服器、不扣額度）；
 //           設定與命名策略只存在自己的瀏覽器（localStorage）。手機寬（≤760px）面板排到圖下方。
 // 資料全部來自 Python 計算引擎（ta-engine，契約見 docs/ta-engine-contract.md）；最後一根盤中未定只上圖，不進訊號與回測。
@@ -109,7 +109,7 @@ function SortTable({ cols, rows, rowKey, className, rowClass }) {
 
 // ───────── K 線圖（同 ta_local 的記號語言；底色固定深色，白色撐壓線才看得見）─────────
 const K_UP = "#e0525e", K_DN = "#3fae7a", GOLD = "#ffc94a";
-const MA_COL = ["#f0c040", "#56c1d6", "#c78be8"];
+const MA_COL = ["#ff4d4f", "#f5c518", "#3d8bfd"];   // 均線由短到長：紅、黃、藍（Yoda 2026-11-09）
 const EMA_COL = "#ff5ce1";
 const TR_STOP = "#ff4d4d", TR_ENT = "#9ad0ff";
 const LINE_STYLE = { stop: [TR_STOP, "5 3"], open_entry: [TR_ENT, ""], open_stop: [TR_STOP, "5 3"] };
@@ -130,23 +130,34 @@ function srcAbbr(sources) {
   return out.join("·");
 }
 
-function KChart({ d, maSet }) {
+// 整段歷史（history 每欄一個陣列）→ 圖用的 K；沒有 history 就只有引擎的 chart.bars。k0＝chart.bars[0] 在整段裡的位置
+function fullSeries(d) {
+  const cb = g(d, "chart", "bars") || [], h = d.history;
+  if (!h || !Array.isArray(h.c) || h.c.length < cb.length) return { bars: cb, c: cb.map((b) => Number(b.c)), k0: 0 };
+  const N = h.c.length, nf = d.bars_completed != null ? d.bars_completed : N, bars = new Array(N);
+  for (let i = 0; i < N; i++) bars[i] = { t: h.t[i], o: h.o[i], h: h.h[i], l: h.l[i], c: h.c[i], v: h.v ? h.v[i] : null, final: i < nf };
+  return { bars, c: h.c.map(Number), k0: N - cb.length };
+}
+
+// K 線圖畫整段歷史的 [a, b) 這一段；Y 軸依區間內高低。K 棒與量柱併成幾條 path（1H 五千根拖曳才不卡）
+function KChart({ d, full, smas, a, b }) {
   const ch = d.chart || {};
-  const bars = ch.bars || [];
-  const n = bars.length;
+  const k0 = full.k0, bars = full.bars.slice(a, b), n = bars.length;
   if (n < 2) return <div className="ta-nochart">沒有 K 線資料</div>;
   const market = g(d, "symbol", "market");
   const intra = d.tf === "1H" || d.tf === "4H";
   const ov = ch.overlays || {};
+  // shortcut: 引擎 overlays 的 i=-1（在近 120 根視窗左邊、確切位置不知）一律從區間左緣畫；要精確得引擎給絕對位置
+  const oi = (i) => (i == null || i < 0 ? -1 : i + k0 - a);
   const sr = g(d, "signals", "sr_levels") || {};
   const srl = [...(sr.support || []).slice(0, 1).map((x) => [x, "sup"]), ...(sr.resistance || []).slice(0, 1).map((x) => [x, "res"])];
   const trd = d.trade || {};
-  const tlines = trd.lines || [];
-  const marks = trd.markers || [];
+  const tlines = (trd.lines || []).filter((ln) => (ln.i1 == null || ln.i1 >= a) && (ln.i0 == null || ln.i0 < b));
+  const marks = (trd.markers || []).filter((m) => m.i != null && m.i >= a && m.i < b);
   const W = 1000, L = 62, R = 178, T = 16, PH = 400, GP = 14, VH = 72, B = 24;
   const H = T + PH + GP + VH + B, pw = W - L - R, xr = L + pw;
   const vals = [];
-  for (const b of bars) { if (b.h != null) vals.push(b.h); if (b.l != null) vals.push(b.l); }
+  for (const x of bars) { if (x.h != null) vals.push(x.h); if (x.l != null) vals.push(x.l); }
   if (!vals.length) return <div className="ta-nochart">沒有 K 線資料</div>;
   let lo = Math.min(...vals), hi = Math.max(...vals);
   // 撐壓、進出場的線離 K 棒太遠就不撐大座標：線裁掉、右側標籤貼邊加 ↑／↓
@@ -159,35 +170,41 @@ function KChart({ d, maSet }) {
   const step = pw / n, bw = Math.max(1.2, step * 0.62);
   const Y = (p) => T + ((hi - p) / (hi - lo)) * PH;
   const X = (i) => L + step * (i + 0.5);
-  const XL = (i) => (i == null || i < 0 ? L : X(i));   // i=-1＝在視窗左邊 → 從左緣畫起
-  const vmax = Math.max(1, ...bars.map((b) => Number(b.v) || 0));
+  const XL = (i) => (i == null || i < 0 ? L : X(i));   // 在區間左邊 → 從左緣畫起
+  let vmax = 1;
+  for (const x of bars) { const v = Number(x.v) || 0; if (v > vmax) vmax = v; }
   const VB = T + PH + GP + VH;
   const VY = (v) => VB - (v / vmax) * VH;
   const cid = "tac-" + String(g(d, "symbol", "yahoo") || "x").replace(/[^0-9A-Za-z]/g, "_") + d.tf;
   const clip = "url(#" + cid + ")";
   const els = [];
-  // 格線＋價格軸＋時間軸
+  // 格線＋價格軸＋時間軸（標籤間距跟著區間根數變）
   for (let k = 0; k < 6; k++) {
     const p = lo + ((hi - lo) * (k + 0.5)) / 6, y = Y(p);
     els.push(<line key={"g" + k} className="grid" x1={L} x2={xr} y1={y} y2={y} />);
     els.push(<text key={"gt" + k} className="ax" x={L - 6} y={y + 4} textAnchor="end">{fnum(p, hi - lo < 50 ? 1 : 0)}</text>);
   }
   els.push(<line key="vbase" className="grid" x1={L} x2={xr} y1={VB} y2={VB} />);
-  const tl = (i) => { const t = String(bars[i].t || ""); return intra ? md(t) : i === 0 ? t.slice(2) : md(t); };
-  for (let i = 0; i < n - 10; i += 20) els.push(<text key={"d" + i} className="ax" x={X(i)} y={H - 7} textAnchor="middle">{tl(i)}</text>);
-  els.push(<text key="dl" className="ax" x={xr} y={H - 7} textAnchor="end">{md(bars[n - 1].t)}</text>);
+  const longD = !intra && n > 250;
+  const tl = (i) => { const t = String(bars[i].t || ""); return intra ? (n > 200 ? t.slice(2, 10) : md(t)) : longD ? t.slice(0, 7) : i === 0 ? t.slice(2) : md(t); };
+  const every = Math.max(1, Math.ceil((n * 100) / pw));
+  for (let i = 0; i < n - every; i += every) els.push(<text key={"d" + i} className="ax" x={X(i)} y={H - 7} textAnchor="middle">{tl(i)}</text>);
+  els.push(<text key="dl" className="ax" x={xr} y={H - 7} textAnchor="end">{longD ? String(bars[n - 1].t).slice(0, 10) : md(bars[n - 1].t)}</text>);
   els.push(<text key="vl" className="ax" x={L - 6} y={T + PH + GP + 10} textAnchor="end">{market === "tw" ? "量（張）" : "量"}</text>);
   // 缺口框：未補／部分回補＝剩下的區間畫到右緣（部分回補的原缺口淡淡畫到回補那根）；已補＝缺口那根畫到回補那根
   (ov.gaps || []).forEach((x, k) => {
     if (x.top == null || x.bottom == null) return;
+    const gi = oi(x.i), fi = x.fill_i != null ? oi(x.fill_i) : null;
     const fill = x.dir === "up" ? K_UP : K_DN;
-    const x0 = x.i == null || x.i < 0 ? L : X(x.i) - step / 2;
-    const xf = x.fill_i != null ? X(x.fill_i) + step / 2 : x0 + step;
+    const x0 = gi < 0 ? L : X(gi) - step / 2;
+    if (x0 > xr) return;
+    const xf = fi != null ? X(fi) + step / 2 : x0 + step;
     if (x.fill === "full") {
+      if (xf < L) return;
       els.push(<rect key={"gf" + k} className="gapbox0" x={x0} y={Y(x.top)} width={Math.max(1, xf - x0)} height={Math.max(1, Y(x.bottom) - Y(x.top))}
         fill={fill} fillOpacity=".10" clipPath={clip} data-t={x.t} />);
     } else {
-      if (x.fill === "partial" && x.fill_i != null) {
+      if (x.fill === "partial" && fi != null && xf >= L) {
         els.push(<rect key={"ga" + k} className="gapbox0" x={x0} y={Y(x.top)} width={Math.max(1, xf - x0)} height={Math.max(1, Y(x.bottom) - Y(x.top))}
           fill={fill} fillOpacity=".10" clipPath={clip} />);
       }
@@ -196,7 +213,7 @@ function KChart({ d, maSet }) {
           fill={fill} fillOpacity=".22" clipPath={clip} data-t={x.t} data-dir={x.dir} data-fill={x.fill} />);
       }
     }
-    if (x.type_short && x.i >= 0) {
+    if (x.type_short && gi >= 0 && gi < n) {
       els.push(<text key={"gl" + k} className={"gl " + (x.dir === "up" ? "up" : "dn") + (x.fill === "full" ? " filled" : "")} x={x0 - 3}
         y={(Y(x.top) + Y(x.bottom)) / 2 + 4} textAnchor="end">{String(x.type_short)}{x.type ? <title>{x.type}</title> : null}</text>);
     }
@@ -204,60 +221,95 @@ function KChart({ d, maSet }) {
   // 島狀反轉：金色虛線框
   (ov.islands || []).forEach((x, k) => {
     if (x.high == null || x.low == null || x.i1 == null) return;
-    const x0 = x.i0 == null || x.i0 < 0 ? L : X(x.i0) - step / 2;
-    els.push(<rect key={"is" + k} className="isl" x={x0} y={Y(x.high) - 3} width={Math.max(2, X(x.i1) + step / 2 - x0)} height={Math.max(2, Y(x.low) - Y(x.high) + 6)}
+    const i0 = oi(x.i0), i1 = oi(x.i1);
+    if (i1 < 0 && x.i1 >= 0) return;   // 整段在區間左邊
+    const x0 = i0 < 0 ? L : X(i0) - step / 2;
+    if (x0 > xr) return;
+    els.push(<rect key={"is" + k} className="isl" x={x0} y={Y(x.high) - 3} width={Math.max(2, X(i1) + step / 2 - x0)} height={Math.max(2, Y(x.low) - Y(x.high) + 6)}
       fill="none" stroke={GOLD} strokeWidth="1" strokeDasharray="3 3" clipPath={clip}>{x.name ? <title>{x.name}</title> : null}</rect>);
   });
-  // K 棒（收 ≥ 開＝紅）＋量柱；前五大量：金框 K 棒＋金色量柱＋①～⑤；盤中未定那根淡色＋標字
+  // K 棒（收 ≥ 開＝紅）＋量柱：一般的併成 path；前五大量（金框＋金色量柱＋①～⑤）與盤中未定那根單獨畫
   const topI = {};
-  for (const t of ov.top_volume || []) if (t.i >= 0) topI[t.i] = t.rank;
-  bars.forEach((b, i) => {
-    const c = b.c;
+  for (const t of ov.top_volume || []) if (t.i >= 0) topI[t.i + k0 - a] = t.rank;
+  const pth = { wu: "", wd: "", bu: "", bd: "", vu: "", vd: "" };
+  const one = [];
+  const f1d = (x) => x.toFixed(1);
+  const addBar = (x, w, op, h, l, c, v) => {
+    const s = c >= op ? "u" : "d", y1 = Y(Math.max(op, c)), bh = Math.max(1, Y(Math.min(op, c)) - y1);
+    pth["w" + s] += "M" + f1d(x) + " " + f1d(Y(h)) + "V" + f1d(Y(l));
+    pth["b" + s] += "M" + f1d(x - w / 2) + " " + f1d(y1) + "h" + w.toFixed(2) + "v" + f1d(bh) + "h" + (-w).toFixed(2) + "z";
+    if (v > 0) pth["v" + s] += "M" + f1d(x - w / 2) + " " + f1d(VY(v)) + "h" + w.toFixed(2) + "v" + Math.max(0.5, VB - VY(v)).toFixed(1) + "h" + (-w).toFixed(2) + "z";
+  };
+  // 一個寬度單位塞超過一根時，每 grp 根併成一根（開＝第一根開、收＝最後一根收、高低取極值、量取最大），path 才不會長到拖曳卡頓
+  const grp = Math.max(1, Math.floor(1 / step));
+  if (grp > 1) {
+    for (let i0 = 0; i0 < n; i0 += grp) {
+      const i9 = Math.min(n, i0 + grp);
+      let o = null, h = -Infinity, l = Infinity, c = null, v = 0;
+      for (let i = i0; i < i9; i++) {
+        const x = bars[i];
+        if (x.c == null) continue;
+        const op = x.o != null ? x.o : x.c;
+        if (o == null) o = op;
+        c = x.c; h = Math.max(h, x.h != null ? x.h : Math.max(op, x.c)); l = Math.min(l, x.l != null ? x.l : Math.min(op, x.c));
+        v = Math.max(v, Number(x.v) || 0);
+      }
+      if (c != null) addBar(L + step * ((i0 + i9) / 2), Math.max(1, (i9 - i0) * step * 0.7), o, h, l, c, v);
+    }
+  }
+  bars.forEach((x0b, i) => {
+    const c = x0b.c;
     if (c == null) return;
-    const op = b.o != null ? b.o : c;
-    const h = b.h != null ? b.h : Math.max(op, c);
-    const l = b.l != null ? b.l : Math.min(op, c);
-    const col = c >= op ? K_UP : K_DN;
-    const x = X(i);
-    const rk = topI[i];
-    const unf = b.final === false;
-    els.push(<line key={"w" + i} x1={x} x2={x} y1={Y(h)} y2={Y(l)} stroke={col} strokeWidth="1" opacity={unf ? 0.55 : 1} />);
-    const y1 = Y(Math.max(op, c)), y2 = Y(Math.min(op, c));
-    els.push(<rect key={"b" + i} className={"bd" + (rk ? " top" : "") + (unf ? " unf" : "")} x={x - bw / 2} y={y1} width={bw} height={Math.max(1, y2 - y1)}
+    const op = x0b.o != null ? x0b.o : c;
+    const h = x0b.h != null ? x0b.h : Math.max(op, c);
+    const l = x0b.l != null ? x0b.l : Math.min(op, c);
+    const up = c >= op, col = up ? K_UP : K_DN;
+    const x = X(i), rk = topI[i], unf = x0b.final === false;
+    const y1 = Y(Math.max(op, c)), bh = Math.max(1, Y(Math.min(op, c)) - y1);
+    const v = Number(x0b.v);
+    if (!rk && !unf) { if (grp === 1) addBar(x, bw, op, h, l, c, v); return; }
+    one.push(<line key={"w" + i} x1={x} x2={x} y1={Y(h)} y2={Y(l)} stroke={col} strokeWidth="1" opacity={unf ? 0.55 : 1} />);
+    one.push(<rect key={"b" + i} className={"bd" + (rk ? " top" : "") + (unf ? " unf" : "")} x={x - bw / 2} y={y1} width={bw} height={bh}
       fill={col} fillOpacity={unf ? 0.35 : 1} stroke={rk ? GOLD : unf ? col : undefined} strokeWidth={rk ? 1.6 : unf ? 1 : undefined}
-      strokeDasharray={unf && !rk ? "2 2" : undefined} data-t={b.t} data-rank={rk || undefined} />);
-    const v = Number(b.v);
+      strokeDasharray={unf && !rk ? "2 2" : undefined} data-t={x0b.t} data-rank={rk || undefined} />);
     if (v > 0) {
-      els.push(<rect key={"v" + i} className={"vb" + (rk ? " top" : "")} x={x - bw / 2} y={VY(v)} width={bw} height={Math.max(0.5, VB - VY(v))}
-        fill={rk ? GOLD : col} fillOpacity={rk ? 1 : unf ? 0.3 : 0.55} />);
+      one.push(<rect key={"v" + i} className={"vb" + (rk ? " top" : "")} x={x - bw / 2} y={VY(v)} width={bw} height={Math.max(0.5, VB - VY(v))}
+        fill={rk ? GOLD : col} fillOpacity={rk ? 1 : 0.3} />);
     }
     if (rk) {
-      els.push(<text key={"m" + i} className="mk" x={x} y={Y(h) - 5} textAnchor="middle" data-rank={rk}>{mark(rk)}</text>);
-      if (v > 0) els.push(<text key={"mv" + i} className="mk mkv" x={x} y={VY(v) - 3} textAnchor="middle">{mark(rk)}</text>);
+      one.push(<text key={"m" + i} className="mk" x={x} y={Y(h) - 5} textAnchor="middle" data-rank={rk}>{mark(rk)}</text>);
+      if (v > 0) one.push(<text key={"mv" + i} className="mk mkv" x={x} y={VY(v) - 3} textAnchor="middle">{mark(rk)}</text>);
     }
-    if (unf) els.push(<text key={"uf" + i} className="unf" x={x} y={Y(h) - (rk ? 20 : 6)} textAnchor="end">{d.unfinished_label || "盤中未定"}</text>);
+    if (unf) one.push(<text key={"uf" + i} className="unf" x={x} y={Y(h) - (rk ? 20 : 6)} textAnchor="end">{d.unfinished_label || "盤中未定"}</text>);
   });
-  // 均線（所選那組三條 SMA）＋ 出場線（面板選的那條，細線）
-  const poly = (arr, key, col, w) => {
+  els.push(<path key="wu" d={pth.wu} stroke={K_UP} strokeWidth="1" fill="none" />, <path key="wd" d={pth.wd} stroke={K_DN} strokeWidth="1" fill="none" />);
+  els.push(<path key="bu" className="bd" d={pth.bu} fill={K_UP} />, <path key="bd" className="bd" d={pth.bd} fill={K_DN} />);
+  els.push(<path key="vu" className="vb" d={pth.vu} fill={K_UP} fillOpacity=".55" />, <path key="vd" className="vb" d={pth.vd} fill={K_DN} fillOpacity=".55" />);
+  els.push(...one);
+  // 均線（所選那組三條 SMA，紅黃藍＝短到長，底下墊一條深色描邊才不會跟紅 K 糊在一起）＋ 出場線（面板選的那條，細線）
+  const poly = (arr, key, col, w, casing) => {
     const segs = []; let cur = [];
-    (arr || []).slice(0, n).forEach((v, i) => {
-      if (v == null) { if (cur.length > 1) segs.push(cur); cur = []; }
-      else cur.push(X(i).toFixed(1) + "," + Y(v).toFixed(1));
-    });
+    for (let i = 0; i < n; i = i + grp < n || i === n - 1 ? i + grp : n - 1) {   // K 棒有合併時線也每 grp 根取一點（含最後一根）
+      const v = arr ? arr[a + i] : null;
+      if (v == null || !Number.isFinite(v)) { if (cur.length > 1) segs.push(cur); cur = []; }
+      else cur.push(f1d(X(i)) + "," + f1d(Y(v)));
+    }
     if (cur.length > 1) segs.push(cur);
-    segs.forEach((sg, k) => els.push(<polyline key={key + k} className="ma" data-ma={key} points={sg.join(" ")} fill="none" stroke={col}
-      strokeWidth={w} strokeOpacity=".9" clipPath={clip} />));
+    segs.forEach((sg, k) => {
+      const pts = sg.join(" ");
+      if (casing) els.push(<polyline key={key + "c" + k} points={pts} fill="none" stroke="#0b0f15" strokeWidth={w + 2} strokeOpacity=".7" clipPath={clip} />);
+      els.push(<polyline key={key + k} className="ma" data-ma={key} points={pts} fill="none" stroke={col} strokeWidth={w} strokeOpacity=".95" clipPath={clip} />);
+    });
   };
-  const set = g(ch, "ma_sets", maSet) || [];
-  set.forEach((m, k) => poly(g(ch, "sma", String(m)), "sma" + m, MA_COL[k], 1.2));
-  poly(ch.exit_line, "exit_ma", EMA_COL, 1);
+  smas.forEach(([m, arr], k) => poly(arr, "sma" + m, MA_COL[k], 1.6, true));
+  poly(ch.exit_line, "exit_ma", EMA_COL, 1, false);
   // 支撐（白實線）／壓力（白虛線）
   const lab = [];   // {y, t, col, nt}
   srl.forEach(([x, side]) => {
     if (x.price == null) return;
     const y = Y(x.price);
     els.push(<line key={"sr" + side} className={"sr-line " + side} x1={L} x2={xr} y1={y} y2={y} stroke="#ffffff" strokeWidth="1.8"
-      strokeDasharray={side === "res" ? "7 5" : undefined} data-kind={side} data-price={x.price} />);
+      strokeDasharray={side === "res" ? "7 5" : undefined} clipPath={clip} data-kind={side} data-price={x.price} />);
     lab.push({ y, t: (side === "sup" ? "撐 " : "壓 ") + fnum(x.price) + (srcAbbr(x.sources) ? " " + srcAbbr(x.sources) : "") + (x.testing ? " 測" : ""),
       col: "#ffffff", nt: x.pick_scope === "beyond" ? SR_BEYOND : "" });
   });
@@ -266,7 +318,7 @@ function KChart({ d, maSet }) {
     if (ln.y == null) return;
     const [col, dash] = LINE_STYLE[ln.kind] || ["#ffffff", ""];
     const open = String(ln.kind).startsWith("open_");
-    const x0 = XL(ln.i0), x1 = ln.i1 == null ? xr : X(ln.i1);
+    const x0 = XL(ln.i0 == null ? null : ln.i0 - a), x1 = ln.i1 == null ? xr : X(ln.i1 - a);
     if (x1 <= x0 && ln.i1 != null) return;
     els.push(<line key={"tl" + k} className={"trl " + ln.kind} x1={x0} x2={x1} y1={Y(ln.y)} y2={Y(ln.y)} stroke={col} strokeWidth={open ? 1.6 : 1.3}
       strokeDasharray={dash || undefined} clipPath={clip} data-kind={ln.kind} />);
@@ -274,7 +326,7 @@ function KChart({ d, maSet }) {
   // 持倉中：右側標籤（跟撐壓一起避讓）
   const p = trd.open;
   if (p) {
-    const ly = (kind) => { const ln = tlines.find((x) => x.kind === kind); return ln && ln.y != null ? ln.y : null; };
+    const ly = (kind) => { const ln = (trd.lines || []).find((x) => x.kind === kind); return ln && ln.y != null ? ln.y : null; };
     const tag = p.side === 1 ? "多" : "空";
     for (const [kind, w, col] of [["open_entry", tag + "單進場 ", TR_ENT], ["open_stop", "停損 ", TR_STOP]]) {
       const v = ly(kind);
@@ -283,15 +335,14 @@ function KChart({ d, maSet }) {
   }
   // 記號：▲多進（紅，K 低點下）／▼空進（綠，K 高點上）、✕出場（字＝原因）
   marks.forEach((m, k) => {
-    if (m.i == null || m.i < 0 || m.i >= n) return;
-    const b = bars[m.i], x = X(m.i);
+    const li = m.i - a, bb = bars[li], x = X(li);
     if (m.kind === "entry") {
       if (m.side === 1) {
-        const y = Y(b.l) + 6;
+        const y = Y(bb.l) + 6;
         els.push(<path key={"me" + k} className="mk-entry" d={`M${x.toFixed(1)} ${y.toFixed(1)} l-4 7 h8 z`} fill={K_UP} />);
         els.push(<text key={"met" + k} className="te" x={x} y={y + 18} textAnchor="middle" style={{ fill: K_UP }}>{m.label || "多進"}</text>);
       } else {
-        const y = Y(b.h) - 6;
+        const y = Y(bb.h) - 6;
         els.push(<path key={"me" + k} className="mk-entry" d={`M${x.toFixed(1)} ${y.toFixed(1)} l-4 -7 h8 z`} fill={K_DN} />);
         els.push(<text key={"met" + k} className="te" x={x} y={y - 10} textAnchor="middle" style={{ fill: K_DN }}>{m.label || "空進"}</text>);
       }
@@ -306,7 +357,7 @@ function KChart({ d, maSet }) {
     if (z.y < T) { z.y = T; z.t = "↑" + z.t; }
     else if (z.y > T + PH) { z.y = T + PH; z.t = "↓" + z.t; }
   }
-  lab.sort((a, b) => a.y - b.y);
+  lab.sort((u, w) => u.y - w.y);
   const hs = lab.map((z) => 14 + (z.nt ? 13 : 0));
   const ys = []; let last = -1e9, lh = 0;
   lab.forEach((z, k) => { const ny = Math.max(z.y, last + lh); ys.push(ny); last = ny; lh = hs[k]; });
@@ -322,13 +373,104 @@ function KChart({ d, maSet }) {
     if (z.nt) els.push(<text key={"ln" + k} className="srn" x={xr + 10} y={ty + 17}>{z.nt}</text>);
   });
   const lc = bars[n - 1].c;
-  if (lc != null) els.push(<circle key="lc" className="lastc" cx={X(n - 1)} cy={Y(lc)} r="3" fill="#ffffff" />);
+  if (lc != null && b === full.bars.length) els.push(<circle key="lc" className="lastc" cx={X(n - 1)} cy={Y(lc)} r="3" fill="#ffffff" />);
   return (
-    <svg className="ta-k" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label={TF_ZH[d.tf] + "線圖"} data-n={n}>
+    <svg className="ta-k" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label={TF_ZH[d.tf] + "線圖"} data-n={n} data-a={a} data-b={b}>
       <rect x="0" y="0" width={W} height={H} fill="#0b0f15" />
       <defs><clipPath id={cid}><rect x={L} y={T} width={pw} height={PH} /></clipPath></defs>
       {els}
     </svg>
+  );
+}
+
+// 時間區間導覽列：整段收盤縮圖＋可拖的視窗（拖中間＝平移、拖兩邊把手＝縮放、點軌道＝跳過去）；鍵盤 ←→、Shift 加大步距
+const NAV_MIN = 20;
+function RangeNav({ bars, a, b, onChange }) {
+  const N = bars.length, MIN = Math.min(NAV_MIN, N);
+  const box = useRef(null), drag = useRef(null), raf = useRef(0), pend = useRef(null);
+  useEffect(() => () => cancelAnimationFrame(raf.current), []);
+  const line = useMemo(() => {
+    let lo = Infinity, hi = -Infinity;
+    for (const x of bars) { const c = Number(x.c); if (Number.isFinite(c)) { if (c < lo) lo = c; if (c > hi) hi = c; } }
+    const st = Math.max(1, Math.ceil(N / 600)), pts = [];
+    for (let i = 0; i < N; i += st) {
+      const c = Number(bars[i].c);
+      if (Number.isFinite(c)) pts.push(((i / Math.max(1, N - 1)) * 1000).toFixed(1) + "," + (38 - ((c - lo) / (hi - lo || 1)) * 34).toFixed(1));
+    }
+    return pts.join(" ");
+  }, [bars, N]);
+  const fix = (m, x, y) => {
+    if (m === "p") { const w = y - x; x = Math.max(0, Math.min(x, N - w)); return [x, x + w]; }
+    if (m === "l") return [Math.max(0, Math.min(x, y - MIN)), y];
+    return [x, Math.min(N, Math.max(y, x + MIN))];
+  };
+  const push = (r) => {   // 拖曳時每個畫面最多重畫一次
+    pend.current = r;
+    if (!raf.current) raf.current = requestAnimationFrame(() => { raf.current = 0; onChange(pend.current); });
+  };
+  const down = (e) => {
+    if (e.button !== 0 || !box.current) return;
+    const rc = box.current.getBoundingClientRect();
+    let m = e.target.dataset ? e.target.dataset.nav : undefined, a0 = a, b0 = b;
+    if (m) e.target.focus({ preventScroll: true });
+    else {   // 點在軌道上：視窗中心跳過去，接著可以直接拖
+      const w = b - a, c = Math.round(((e.clientX - rc.left) / rc.width) * N) - Math.round(w / 2);
+      [a0, b0] = fix("p", c, c + w);
+      onChange([a0, b0]); m = "p";
+    }
+    e.preventDefault();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (er) {}
+    drag.current = { m, x: e.clientX, a: a0, b: b0, w: rc.width || 1 };
+  };
+  const move = (e) => {
+    const s = drag.current;
+    if (!s) return;
+    const db = Math.round(((e.clientX - s.x) / s.w) * N);
+    push(fix(s.m, s.a + (s.m !== "r" ? db : 0), s.b + (s.m !== "l" ? db : 0)));
+  };
+  const up = () => { drag.current = null; };
+  const key = (m) => (e) => {
+    const dir = { ArrowLeft: -1, ArrowDown: -1, ArrowRight: 1, ArrowUp: 1 }[e.key];
+    if (!dir) return;
+    e.preventDefault(); e.stopPropagation();
+    const st = dir * Math.max(1, Math.round((b - a) / 20)) * (e.shiftKey ? 5 : 1);
+    onChange(fix(m, a + (m !== "r" ? st : 0), b + (m !== "l" ? st : 0)));
+  };
+  const dt = (i) => String(bars[Math.max(0, Math.min(N - 1, i))].t || "").slice(0, 10);
+  const pa = (a / N) * 100, pb = (b / N) * 100;
+  const tip = "（左右鍵調整，Shift 加大步距）";
+  return (
+    <div className="ta-navw">
+      <div ref={box} className="ta-nav" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
+        <svg viewBox="0 0 1000 40" preserveAspectRatio="none" aria-hidden="true">
+          <polyline points={line} fill="none" stroke="#6d8196" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+        </svg>
+        <div className="ta-navwin" data-nav="p" role="slider" tabIndex={0} aria-label={"平移時間區間" + tip} aria-valuemin={0} aria-valuemax={N - (b - a)}
+          aria-valuenow={a} aria-valuetext={dt(a) + " 到 " + dt(b - 1)} onKeyDown={key("p")} style={{ left: pa + "%", width: pb - pa + "%" }}>
+          <span className="ta-navh l" data-nav="l" role="slider" tabIndex={0} aria-label={"區間起點" + tip} aria-valuemin={0} aria-valuemax={b - MIN}
+            aria-valuenow={a} aria-valuetext={dt(a)} onKeyDown={key("l")} />
+          <span className="ta-navh r" data-nav="r" role="slider" tabIndex={0} aria-label={"區間終點" + tip} aria-valuemin={a + MIN} aria-valuemax={N}
+            aria-valuenow={b} aria-valuetext={dt(b - 1)} onKeyDown={key("r")} />
+        </div>
+      </div>
+      <div className="ta-navt" data-range>區間 {dt(a)} ～ {dt(b - 1)}，{b - a} 根 <span className="mut">拖中間平移、拖兩邊縮放；④ 回測統計仍算整段歷史</span></div>
+    </div>
+  );
+}
+
+// 圖＋導覽列：區間狀態放這裡，拖曳只重畫圖；父層用 key＝代號|週期，換代號或週期就重新掛載＝回到預設區間
+function ChartArea({ d, maSet }) {
+  const ch = d.chart || {};
+  const full = useMemo(() => fullSeries(d), [d.history, ch.bars, d.bars_completed]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const N = full.bars.length;
+  const smas = useMemo(() => (g(ch, "ma_sets", maSet) || []).map((m) => [m, smaSeq(full.c, Number(m))]), [full, ch.ma_sets, maSet]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const [rng, setRng] = useState(() => [Math.max(0, Math.min(full.k0, N - 2)), N]);   // 預設＝引擎的圖視窗（近 120 根）
+  const b = Math.min(rng[1], N), a = Math.max(0, Math.min(rng[0], b - 2));
+  return (
+    <>
+      <KChart d={d} full={full} smas={smas} a={a} b={b} />
+      {N > NAV_MIN ? <RangeNav bars={full.bars} a={a} b={b} onChange={setRng} /> : null}
+    </>
   );
 }
 
@@ -353,7 +495,7 @@ function Legend({ d, maSet }) {
     <div className="ta-legend">
       <dl>
         <div className="ta-rule"><dt><span className="lg">{set.map((m, k) => <i key={m} className="sw" style={{ color: MA_COL[k] }} />)}</span>均線</dt>
-          <dd>{set.map((m) => "SMA" + m).join("／")}（簡單均線，上方「均線組」切換）；K 棒紅漲綠跌，下方是成交量</dd></div>
+          <dd>{set.map((m) => "SMA" + m).join("／")}（紅→黃→藍＝短到長；簡單均線，上方「均線組」切換）；K 棒紅漲綠跌，下方是成交量</dd></div>
         {items.map((x) => (
           <div key={x.key} className="ta-rule"><dt><span className="lg">{SW[x.key] || null}</span>{x.label}</dt><dd>{x.desc}</dd></div>
         ))}
@@ -644,7 +786,7 @@ function readRules() { try { return cleanRules(JSON.parse(lsGet(RULES_KEY) || "n
 // 引擎回應＋參數 → 給圖與 ④ 用的 trade（記號、線、統計、橫幅、白話規則、圖例）
 function withTrade(d, p) {
   if (!d || !g(d, "history", "c")) return d;
-  const nf = d.bars_completed, k0 = Math.max(0, nf - 120);
+  const nf = d.bars_completed;
   const r = backtest(d.history, nf, p);
   const rt = ruleText(p);
   const exLab = p.exit_ma ? maName(p, p.exit_k) + "（出場線）" : null;
@@ -657,8 +799,9 @@ function withTrade(d, p) {
   ].filter(Boolean);
   return {
     ...d,
-    chart: { ...d.chart, exit_line: exitLine(d.history, p, k0) },
-    trade: { ...r, ...chartMarks(r, k0), note: "樣本內統計，不代表未來；" + rt.cost },
+    // 記號與出場線用 history 的絕對位置（k0=0），圖依時間區間自己切
+    chart: { ...d.chart, exit_line: exitLine(d.history, p, 0) },
+    trade: { ...r, ...chartMarks(r, 0), note:"樣本內統計，不代表未來；" + rt.cost },
     rules: rt, trade_legend: legend,
   };
 }
@@ -1046,7 +1189,7 @@ export default function TaPage() {
                   </div>
                 ) : null}
                 <BadBanner d={d} />
-                <KChart d={d} maSet={maSet} />
+                <ChartArea key={(symInfo.yahoo || sym) + "|" + d.tf} d={d} maSet={maSet} />
                 <Legend d={d} maSet={maSet} />
                 {(d.notes || []).length ? <div className="ta-notes">資料註記：{d.notes.join("；")}</div> : null}
                 <BlockTabs d={d} maSet={maSet} />
