@@ -116,8 +116,7 @@ const r = await fetch(`${ENGINE}/api/engine?symbol=${encodeURIComponent(sym)}&tf
 | kind | 欄位 | 畫法（同 ta_local） |
 |---|---|---|
 | `entry` | `i, side(1\|-1), px, label("多進"\|"空進")` | 多＝紅（`#e0525e`）三角箭頭在 K 低點下方＋「多進」；空＝綠（`#3fae7a`）箭頭在 K 高點上方＋「空進」 |
-| `add` | `i, side, px, label("加碼")` | 菱形畫在 `px`（加碼成交價），多紅空綠，字放 K 棒外側 |
-| `exit` | `i, side, px, why, label, tone, stack` | ✕ 畫在 `px`；`label` 是縮寫原因（停損／保本／停利½／破10線／爆量反K／加碼停損，加碼那段一起出時前面加「加碼」）；顏色依 `tone`：`tp`＝黃 `#ffd23f`、`stop`＝紅 `#ff4d4d`、`add_stop`＝橘 `#ff9f40`、`exit`＝白；同一筆第幾段 `stack`（0,1,2…）用來把字錯開 |
+| `exit` | `i, side, px, why, label, tone` | ✕ 畫在 `px`（整筆出場價）；`label` 是縮寫原因（停損／破10線／爆量反K）；顏色依 `tone`：`stop`＝紅 `#ff4d4d`、`exit`＝白 |
 
 ### 4.2 線 `trade.lines[]`：`{kind, i0, i1, y}`
 
@@ -125,16 +124,11 @@ const r = await fetch(`${ENGINE}/api/engine?symbol=${encodeURIComponent(sym)}&tf
 
 | kind | 畫法 |
 |---|---|
-| `stop` | 紅虛線 `#ff4d4d`（dash `5 3`）：原始停損，進場→停利一半（沒停利就到出場） |
-| `stop_be` | 紅虛線：停利一半後移到進場價的保本停損，停利那根→出場 |
-| `tp1` | 黃點線 `#ffd23f`（dash `1.5 2.5`）：停利 2R，進場→停利或出場（2R 價 ≤ 0 時不給，見 §6） |
-| `add_stop` | 橘虛線 `#ff9f40`（dash `5 3`）：加碼停損，加碼→加碼停損出場（或整筆出場） |
+| `stop` | 紅虛線 `#ff4d4d`（dash `5 3`）：停損，進場→出場（抱著期間不動） |
 | `open_entry` | 淡藍實線 `#9ad0ff`：目前持倉進場價，到右緣 |
-| `open_stop` | 紅虛線：目前停損（已停利一半時＝進場價），到右緣；原單已全出時不給 |
-| `open_tp1` | 黃點線：停利一半價位，到右緣（`trade.open.tp1_done` 為 true 時可標「✓已出」）；2R 價 ≤ 0 時不給，右側也不放「停利一半」標籤 |
-| `open_add_stop` | 橘虛線：加碼那份還在時的加碼停損，到右緣 |
+| `open_stop` | 紅虛線：目前持倉的停損，到右緣 |
 
-持倉中的右側標籤（ta_local 的做法）：`多單進場 x`／`停損 x`／`停利一半 x（✓已出）`／`加碼停損 x`，跟撐壓標籤一起避讓。
+持倉中的右側標籤（ta_local 的做法）：`多單進場 x`／`停損 x`，跟撐壓標籤一起避讓。
 
 ## 5. `signals`（sig3-2 原樣，套在所選週期）
 
@@ -152,24 +146,22 @@ const r = await fetch(`${ENGINE}/api/engine?symbol=${encodeURIComponent(sym)}&tf
 
 注意：本機 ta_local／analyze_symbol 的 `ma_align.mid` 是 20/60/120；網站版的 `mid` 是 8/13/34、`long` 才是 20/60/120。
 
-## 6. `trade`（ta_trade，含加碼；所有開通者都看得到）
+## 6. `trade`（ta_trade；所有開通者都看得到）
+
+2026-11-09 Yoda 拍板：整筆進、整筆出，停損固定不動；分批出場、移動停損、加倉都已永久刪除（`tests	a_engine_check.py` 守門）。
 
 | 欄位 | 說明 |
 |---|---|
-| `trades[]` | 全期每一筆（舊到新）：`side, entry_t, entry, stop0, tp1, tp1_na, tp1_note, exit_t, pts, pct, vr, add, legs[]`。④ 表的「最近 10 筆」取最後 10 筆反序，`#`＝在 `trades` 的序號＋1 |
-| `trades[].add` | `null` 或 `{t, px, stop, qty}`（qty 0＝加碼那份已出） |
-| `trades[].legs[]` | `{t, px, qty, why, entry_px, is_add, label}`；`why`：停損／保本出／停利一半(2R)／收破10線／爆量反向K／加碼停損；`pts＝Σ side×qty×(px−entry_px)`，`pct＝pts÷原進場×100` |
-| `open` | `null` 或 `{side, entry_t, entry, stop, stop0, tp1, tp1_na, tp1_note, tp1_done, qty, add}`（`qty` 0.5＝已停利一半；0＝原單已出、只剩加碼） |
-| `tp1_na`／`tp1_note` | 2R 停利價 ≤ 0（空單風險大於進場價一半，例：6488 週K）：`tp1=null`、`tp1_na=true`、`tp1_note="2R 停利價低於 0，不適用"`，不畫 `tp1`／`open_tp1` 線；表格該格改寫 `tp1_note`。交易邏輯不變（ta_trade 照算，那個價永遠碰不到）。正常時 `tp1_na=false`、`tp1_note=null` |
-| `stats` | `{n, wins, win_rate, sum_pts, sum_pct, avg_win_pct, avg_loss_pct, max_consec_loss, adds, start, end, bars, n_long, n_short}`（`bars`＝回測用的定案根數；% 已四捨五入兩位） |
+| `trades[]` | 全期每一筆（舊到新）：`side, entry_t, entry, stop, exit_t, exit_px, why, label, pts, pct, vr`。`why`：停損／收破10線／爆量反向K；`label`＝縮寫（停損／破10線／爆量反K）；`pts＝side×(exit_px−entry)`、`pct＝pts÷entry×100`。④ 表的「最近 10 筆」取最後 10 筆反序，`#`＝在 `trades` 的序號＋1 |
+| `open` | `null` 或 `{side, entry_t, entry, stop}` |
+| `stats` | `{n, wins, win_rate, sum_pts, sum_pct, avg_win_pct, avg_loss_pct, max_consec_loss, start, end, bars, n_long, n_short}`（`bars`＝回測用的定案根數；% 已四捨五入兩位） |
 | `banner` | `{bad, min_n:8, win_pct:25, text}`：`n ≥ 8` 且（勝率 <25% 或合計 <0）→ `bad=true`，`text`＝「這套規則在這檔的歷史表現不好（N 筆、勝率 x%、合計 y%），進出場點不適用」 |
 | `note` | `"樣本內統計，不代表未來；未計手續費與滑價"`（放統計旁邊） |
 | `markers[]`、`lines[]` | §4.1、§4.2 |
 
-規則全文（ta_local 的白話規則可照搬）：EMA5/10/20 排列剛成立（本根成立、前 3 根不是全部成立）＋量比 ≥1.2（對前 10 根均量）＋收在 EMA5 同側進場；
-停損＝近 3 根最低（空單最高），盤中碰到成交 `min(開盤, 停損)`；2R 先出一半（成交在 2R 價）、停損移到進場價；
-剩下收破 EMA10 或爆量反向K（量比 ≥2、反向K、收破 EMA5）出；同一根同時碰停損與停利算停損。
-加碼：停利一半之後，某根碰 EMA10 但沒收破、下一根收在 EMA5 外側且量比 ≥1.2 → 收盤加 0.5（最多一次）；加碼停損＝近 3 根最低（空單最高），碰到只出加碼那份；之後剩下的一起照出場規則出。
+規則全文：EMA5/10/20 排列剛成立（本根成立、前 3 根不是全部成立）＋量比 ≥1.2（對前 10 根均量）＋收在 EMA5 同側，收盤進場；
+停損＝進場時近 3 根最低（空單最高），整筆持有期間固定不動，盤中碰到整筆出、成交 `min(開盤, 停損)`（空單 max）；
+沒碰停損時看收盤：收破 EMA10（空單站上）或爆量反向K（量比 ≥2、反向K、收破 EMA5）→ 收盤價整筆出。同一根同時碰停損與其他出場算停損。
 
 ## 7. 本機開發
 

@@ -14,11 +14,9 @@ vendor.json 記 sha256，兩邊各有檢查，副本不能偷偷漂移：
 未定  K 棒結束時間還沒到＝盤中未定；收盤那根（日K、週K、盤中最後一段）要收盤＋15 分鐘（週K：該週五收盤＋15 分鐘）。未定那根只上圖，訊號與回測一律只用定案 K。
 訊號  analyze_symbol.compute_signals（前五大量／缺口分類／撐壓）原封不動套在所選週期的 K；均線排列算三組：
       短 SMA5/10/20、中 SMA8/13/34、長 SMA20/60/120（規則同 analyze_symbol._ma_group）。「近 120 天」＝近 120 根。
-進出場 ta_trade.trade_signals（含加碼，pyramid 預設開）跑全部定案 K；圖只給最後 120 根內的記號與線。
+進出場 ta_trade.trade_signals 跑全部定案 K（整筆進、整筆出，停損固定不動）；圖只給最後 120 根內的記號與線。
 授權  handle() 第一步就驗 X-TA-Engine-Key＝HMAC-SHA256(TA_ENGINE_KEY, "ta-engine") 小寫 hex（引擎專用密鑰，跟會員登入用的密鑰分開）；
       不對或引擎沒設 TA_ENGINE_KEY 就 401，不碰 Yahoo。原始密鑰不上線路，只傳衍生值。
-停利  2R 停利價 ≤ 0（空單風險大於進場價一半）：交易邏輯不動（ta_trade 照算、永遠碰不到），輸出 tp1=null、tp1_na=true、
-      tp1_note＝TP1_NA，圖上不畫那條黃點線。
 """
 import os, re, sys, json, time, hmac, hashlib, shutil, urllib.request, urllib.parse, urllib.error
 
@@ -53,23 +51,18 @@ REN = {'o': 'Open', 'h': 'High', 'l': 'Low', 'c': 'Close', 'v': 'Volume'}
 NOTE_STATS = '樣本內統計，不代表未來；未計手續費與滑價'
 UNFINISHED = '盤中未定'
 EMA10_LABEL = 'EMA10（出場線）'
-TP1_NA = '2R 停利價低於 0，不適用'
 KEY_ENV = 'TA_ENGINE_KEY'
-LEG_ABBR = {'停損': '停損', '保本出': '保本', '停利一半(2R)': '停利½', '收破10線': '破10線', '爆量反向K': '爆量反K',
-            '加碼停損': '加碼停損'}
+LEG_ABBR = {'停損': '停損', '收破10線': '破10線', '爆量反向K': '爆量反K'}
 VENDOR = ('analyze_symbol.py', 'ta_trade.py', 'ta_engine.py')
 LEGEND = [
     {'key': 'support', 'label': '支撐', 'desc': '白色實線：今收下方最強的一條（±10% 內優先）'},
     {'key': 'resistance', 'label': '壓力', 'desc': '白色虛線：今收上方最強的一條（±10% 內優先）'},
     {'key': 'top_volume', 'label': '前五大量', 'desc': '近 120 根量最大的 5 根，金框；高低點是撐壓候選'},
     {'key': 'gap', 'label': '缺口', 'desc': '方框＝還沒補的缺口區間（部分回補只畫剩下那段）；補滿的畫到回補那根'},
-    {'key': 'ema10', 'label': EMA10_LABEL, 'desc': '停利一半後，收盤跌破（空單站上）就出剩下的'},
+    {'key': 'ema10', 'label': EMA10_LABEL, 'desc': '收盤跌破（空單站上）就整筆出場'},
     {'key': 'entry', 'label': '多進／空進', 'desc': '紅箭頭多進、綠箭頭空進：EMA5/10/20 排列剛成立＋量比 ≥1.2＋收在 EMA5 同側'},
-    {'key': 'add', 'label': '加碼', 'desc': '停利一半後回測 EMA10 沒收破、下一根帶量收回 EMA5 外側，加 0.5 單位（最多一次）'},
-    {'key': 'stop', 'label': '停損', 'desc': '紅虛線：近 3 根最低（空單最高）；停利一半後移到進場價（保本）'},
-    {'key': 'add_stop', 'label': '加碼停損', 'desc': '橘虛線：加碼那根起近 3 根最低（空單最高），碰到只出加碼那份'},
-    {'key': 'tp1', 'label': '停利 2R', 'desc': '黃點線：進場 ± 2 倍風險，碰到先出一半'},
-    {'key': 'exit', 'label': '✕ 出場', 'desc': '✕ 旁邊寫原因：停損／保本／停利½／破10線／爆量反K／加碼停損'},
+    {'key': 'stop', 'label': '停損', 'desc': '紅虛線：進場時近 3 根最低（空單最高），抱著的期間不動，盤中碰到整筆出'},
+    {'key': 'exit', 'label': '✕ 出場', 'desc': '整筆出場，✕ 旁邊寫原因：停損（紅）／破10線／爆量反K（白）'},
     {'key': 'open', 'label': '持倉中', 'desc': '還沒出場的線延伸到右緣'},
     {'key': 'unfinished', 'label': UNFINISHED, 'desc': '最後一根還在交易中，只上圖，不進訊號與回測'},
 ]
@@ -89,10 +82,6 @@ def engine_key(secret):
 
 def check_key(key, secret):
     return bool(secret) and bool(key) and hmac.compare_digest(str(key), engine_key(secret))
-
-
-def tp1_ok(y):
-    return y is not None and y > 0
 
 
 # ═════════════════════════ Yahoo ═════════════════════════
@@ -310,24 +299,6 @@ def ma_sets(c, idx):
     return out
 
 
-def _leg_json(t, leg):
-    lt, px, q, why, e = leg
-    # shortcut: 同 ta_local，用「該段進場價≠原進場價」認加碼段；兩價剛好相同時只會少標「加碼」二字（損益不受影響）
-    is_add = why == '加碼停損' or e != t['entry']
-    ab = LEG_ABBR.get(why, why)
-    return {'t': A._d(lt), 'px': A._p(px), 'qty': q, 'why': why, 'entry_px': A._p(e), 'is_add': bool(is_add),
-            'label': ab if (why == '加碼停損' or not is_add) else '加碼' + ab}
-
-
-def _add_json(a):
-    return None if not a else {'t': A._d(a['t']), 'px': A._p(a['px']), 'stop': A._p(a['stop']), 'qty': a['qty']}
-
-
-def _tp1_json(y):
-    ok = tp1_ok(y)
-    return {'tp1': A._p(y) if ok else None, 'tp1_na': not ok, 'tp1_note': None if ok else TP1_NA}
-
-
 def trade_json(trd, n_bars):
     """ta_trade 原始輸出 → JSON（全部筆數、目前持倉、統計、規則不適用旗標）。"""
     tt = trd['trades']
@@ -342,71 +313,41 @@ def trade_json(trd, n_bars):
     banner = {'bad': bool(bad), 'min_n': BAD_MIN_N, 'win_pct': BAD_WIN_PCT,
               'text': ('這套規則在這檔的歷史表現不好（%d 筆、勝率 %.1f%%、合計 %+.1f%%），進出場點不適用'
                        % (st['n'], st['win_rate'], st['sum_pct'])) if bad else None}
-    trades = [{'side': t['side'], 'entry_t': A._d(t['entry_t']), 'entry': A._p(t['entry']), 'stop0': A._p(t['stop0']),
-               **_tp1_json(t['tp1']), 'exit_t': A._d(t['exit_t']), 'pts': A._f(t['pts'], 4), 'pct': A._f(t['pct'], 2),
-               'vr': A._f(t['vr'], 2), 'add': _add_json(t.get('add')), 'legs': [_leg_json(t, g) for g in t['legs']]}
-              for t in tt]
+    trades = [{'side': t['side'], 'entry_t': A._d(t['entry_t']), 'entry': A._p(t['entry']), 'stop': A._p(t['stop']),
+               'exit_t': A._d(t['exit_t']), 'exit_px': A._p(t['exit_px']), 'why': t['why'], 'label': LEG_ABBR[t['why']],
+               'pts': A._f(t['pts'], 4), 'pct': A._f(t['pct'], 2), 'vr': A._f(t['vr'], 2)} for t in tt]
     p = trd['open']
-    opn = None if not p else {'side': p['side'], 'entry_t': A._d(p['entry_t']), 'entry': A._p(p['entry']),
-                              'stop': A._p(p['stop']), 'stop0': A._p(p['stop0']), **_tp1_json(p['tp1']),
-                              'tp1_done': bool(p['tp1_done']), 'qty': p['qty'], 'add': _add_json(p.get('add'))}
+    opn = None if not p else {'side': p['side'], 'entry_t': A._d(p['entry_t']), 'entry': A._p(p['entry']), 'stop': A._p(p['stop'])}
     return {'trades': trades, 'open': opn, 'stats': st, 'banner': banner, 'note': NOTE_STATS}
 
 
 def trade_marks(trd, ix):
-    """同 ta_local.trade_marks 的畫法，改成資料：markers（箭頭／菱形／✕）＋ lines（i0→i1，i1=None＝延伸到右緣）。
+    """同 ta_local.trade_marks 的畫法，改成資料：markers（箭頭／✕）＋ lines（i0→i1，i1=None＝延伸到右緣）。
     ix(t)：該時間在圖上第幾根；-1＝在視窗左邊（線從左緣畫、不畫記號）。出場在視窗之前的整筆不畫。"""
     mk, ln = [], []
 
     def seg(kind, i0, i1, y):
         ln.append({'kind': kind, 'i0': i0, 'i1': i1, 'y': A._p(y)})
 
+    def entry(t, ie):
+        if ie >= 0:
+            mk.append({'kind': 'entry', 'i': ie, 'side': t['side'], 'px': A._p(t['entry']),
+                       'label': '多進' if t['side'] == 1 else '空進'})
+
     for t in trd['trades']:
         ie, iz = ix(t['entry_t']), ix(t['exit_t'])
         if iz < 0:
             continue
-        itp = next((ix(lt) for lt, _p, _q, w, _e in t['legs'] if w.startswith('停利')), None)
-        seg('stop', ie, itp if itp is not None else iz, t['stop0'])
-        if itp is not None and itp < iz:
-            seg('stop_be', itp, iz, t['entry'])                      # 停利一半後停損移到進場價
-        if tp1_ok(t['tp1']):
-            seg('tp1', ie, itp if itp is not None else iz, t['tp1'])
-        if ie >= 0:
-            mk.append({'kind': 'entry', 'i': ie, 'side': t['side'], 'px': A._p(t['entry']),
-                       'label': '多進' if t['side'] == 1 else '空進'})
-        a = t.get('add')
-        if a:
-            ia = ix(a['t'])
-            ast = next((lt for lt, _p, _q, w, _e in t['legs'] if w == '加碼停損'), None)
-            seg('add_stop', ia, ix(ast) if ast is not None else iz, a['stop'])
-            if ia >= 0:
-                mk.append({'kind': 'add', 'i': ia, 'side': t['side'], 'px': A._p(a['px']), 'label': '加碼'})
-        for k, leg in enumerate(t['legs']):
-            i = ix(leg[0])
-            if i >= 0:
-                j = _leg_json(t, leg)
-                w = leg[3]
-                mk.append({'kind': 'exit', 'i': i, 'side': t['side'], 'px': j['px'], 'why': w, 'label': j['label'],
-                           'tone': 'tp' if w.startswith('停利') else 'stop' if w == '停損' else
-                           'add_stop' if w == '加碼停損' else 'exit', 'stack': k})
+        seg('stop', ie, iz, t['stop'])
+        entry(t, ie)
+        mk.append({'kind': 'exit', 'i': iz, 'side': t['side'], 'px': A._p(t['exit_px']), 'why': t['why'],
+                   'label': LEG_ABBR[t['why']], 'tone': 'stop' if t['why'] == '停損' else 'exit'})
     p = trd['open']
     if p:
         ie = ix(p['entry_t'])
-        if p['qty'] > 0:
-            seg('open_stop', ie, None, p['stop'])
+        seg('open_stop', ie, None, p['stop'])
         seg('open_entry', ie, None, p['entry'])
-        if tp1_ok(p['tp1']):
-            seg('open_tp1', ie, None, p['tp1'])
-        if ie >= 0:
-            mk.append({'kind': 'entry', 'i': ie, 'side': p['side'], 'px': A._p(p['entry']),
-                       'label': '多進' if p['side'] == 1 else '空進'})
-        a = p.get('add')
-        if a:
-            ia = ix(a['t'])
-            if a['qty'] > 0:
-                seg('open_add_stop', ia, None, a['stop'])
-            if ia >= 0:
-                mk.append({'kind': 'add', 'i': ia, 'side': p['side'], 'px': A._p(a['px']), 'label': '加碼'})
+        entry(p, ie)
     return mk, ln
 
 
@@ -723,22 +664,6 @@ def selftest():
     s2, b2 = handle('/api/engine?symbol=2330&tf=D', good, sec, now, mock)
     s3, b3 = handle('/api/engine?symbol=%5ETWII', good, sec, now, mock)
     ok(s2 == 200 and b2['ok'] and s3 == 400 and b3['error']['code'] == 'bad_symbol', '對的金鑰 → 200；壞代號 → 400 帶錯誤碼')
-
-    # 2R 停利價 ≤ 0：輸出 null＋旗標＋說明，不畫線（交易邏輯不動）
-    fake = {'trades': [{'side': -1, 'entry_t': base.index[200], 'entry': 50.0, 'stop0': 90.0, 'tp1': -30.0,
-                        'exit_t': base.index[210], 'pts': -1.0, 'pct': -2.0, 'vr': 1.5, 'add': None,
-                        'legs': [(base.index[210], 51.0, 1.0, '停損', 50.0)]}],
-            'open': {'side': -1, 'entry_t': base.index[230], 'entry': 50.0, 'stop': 80.0, 'stop0': 80.0, 'tp1': -10.0,
-                     'tp1_done': False, 'qty': 1.0, 'add': None},
-            'stats': {'n': 1, 'wins': 0, 'win_rate': 0.0, 'sum_pts': -1.0, 'sum_pct': -2.0, 'avg_win_pct': 0.0,
-                      'avg_loss_pct': -2.0, 'max_consec_loss': 1, 'adds': 0, 'start': base.index[0], 'end': base.index[-1]}}
-    pos = {A._d(t): i - 140 for i, t in enumerate(base.index)}
-    tj = trade_json(fake, 260)
-    _mk, tl = trade_marks(fake, lambda t: pos[A._d(t)])
-    ok(tj['open']['tp1'] is None and tj['open']['tp1_na'] and tj['open']['tp1_note'] == TP1_NA
-       and tj['trades'][0]['tp1'] is None and tj['trades'][0]['tp1_na'] and not any(x['kind'] in ('tp1', 'open_tp1') for x in tl)
-       and any(x['kind'] == 'open_stop' for x in tl), '2R 停利價 ≤ 0 → tp1=null＋tp1_na＋說明，tp1／open_tp1 線不畫，其他線照畫')
-    ok(a2['trade']['open'] is None or a2['trade']['open']['tp1_na'] is False, '正常 2R 價 → tp1_na=false')
 
     # 副本：在 Next repo 的 ta-engine\ 跑時驗 vendor.json
     if os.path.exists(os.path.join(HERE, 'vendor.json')):

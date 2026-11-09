@@ -200,6 +200,7 @@ svg.ta-k .gl.up{fill:#ff8f96} svg.ta-k .gl.dn{fill:#6fd6a0} svg.ta-k .gl.filled{
 .ta-tabs{gap:14px;flex-wrap:wrap}
 .ta-seg{display:flex;align-items:center;gap:2px}
 .ta-seglab{color:var(--dim);font-size:calc(13px*var(--scale));margin-right:4px}
+.ta-blktabs{flex-wrap:wrap;margin:4px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)}  /* 圖下 ①～④ 分頁，沿用週期分頁的 .ta-tab */
 .ta-login{display:flex;flex-direction:column;gap:10px;text-align:center}
 .ta-login .ta-q{text-align:left}
 .ta-msg{color:var(--yellow)!important}
@@ -227,7 +228,6 @@ svg.ta-k .unf{fill:#ffcf70;font-size:11px;font-weight:700;paint-order:stroke;str
 .ta-legend .lg b{font-size:11px;margin:0 1px}
 .ta-legend .sw{display:inline-block;width:14px;height:0;border-top:2px solid;vertical-align:middle;margin:0 2px}
 .ta-legend .sw.dash{border-top-style:dashed}
-.ta-legend .sw.dot{border-top-style:dotted}
 .ta-legend .bx{display:inline-block;width:11px;height:9px;vertical-align:middle;margin:0 2px;opacity:.7}
 .ta-legend .bx.gold{background:none;border:1.5px solid #ffc94a;opacity:1}
 .ta-legend .bx.unf{background:rgba(224,82,94,.35);border:1px dashed #e0525e;opacity:1}

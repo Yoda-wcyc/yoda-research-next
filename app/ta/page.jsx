@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 //   會員登入（/api/member-login，票存 localStorage）→ /api/ta-live 每次都重驗：站長（OWNER_PUB_IDS）或 ta_access 有開通
 //   左 1/4：輸入代號（台股上市櫃、美股、ETF；不收指數）＋最近查過＋今日額度（會員每天 30 檔、站長不限）
 //   右 3/4：週期分頁 1H／4H／日K／週K ＋ 均線組 短（5/10/20）中（8/13/34）長（20/60/120）＋ K 線圖（撐壓、前五大量、缺口、
-//           進出場、加碼、停損、停利 2R、出場 ✕）＋ 三訊號表 ＋ ④ 進出場（所有開通者都看得到）
+//           進出場、停損、出場 ✕）＋ ①～④ 四個分頁（前五大量／跳空缺口／多空排列／進出場，所有開通者都看得到）＋ 支撐壓力
 // 資料全部來自 Python 計算引擎（ta-engine，契約見 docs/ta-engine-contract.md）；最後一根盤中未定只上圖，不進訊號與回測。
 
 const TOK_KEY = "yoda_ta_jwt";
@@ -108,12 +108,9 @@ function SortTable({ cols, rows, rowKey, className, rowClass }) {
 const K_UP = "#e0525e", K_DN = "#3fae7a", GOLD = "#ffc94a";
 const MA_COL = ["#f0c040", "#56c1d6", "#c78be8"];
 const EMA_COL = "#ff5ce1";
-const TR_STOP = "#ff4d4d", TR_TP = "#ffd23f", TR_ADD = "#ff9f40", TR_ENT = "#9ad0ff";
-const LINE_STYLE = {
-  stop: [TR_STOP, "5 3"], stop_be: [TR_STOP, "5 3"], tp1: [TR_TP, "1.5 2.5"], add_stop: [TR_ADD, "5 3"],
-  open_entry: [TR_ENT, ""], open_stop: [TR_STOP, "5 3"], open_tp1: [TR_TP, "1.5 2.5"], open_add_stop: [TR_ADD, "5 3"],
-};
-const TONE = { tp: TR_TP, stop: TR_STOP, add_stop: TR_ADD, exit: "#ffffff" };
+const TR_STOP = "#ff4d4d", TR_ENT = "#9ad0ff";
+const LINE_STYLE = { stop: [TR_STOP, "5 3"], open_entry: [TR_ENT, ""], open_stop: [TR_STOP, "5 3"] };
+const TONE = { stop: TR_STOP, exit: "#ffffff" };
 const MARKS = "①②③④⑤";
 const SR_BEYOND = "10% 內無，取範圍外最強";
 function mark(rank) { return rank >= 1 && rank <= MARKS.length ? MARKS[rank - 1] : String(rank || "?"); }
@@ -149,7 +146,7 @@ function KChart({ d, maSet }) {
   for (const b of bars) { if (b.h != null) vals.push(b.h); if (b.l != null) vals.push(b.l); }
   if (!vals.length) return <div className="ta-nochart">沒有 K 線資料</div>;
   let lo = Math.min(...vals), hi = Math.max(...vals);
-  // 撐壓、進出場的線離 K 棒太遠（例如空單 2R 停利算到負價）就不撐大座標：線裁掉、右側標籤貼邊加 ↑／↓
+  // 撐壓、進出場的線離 K 棒太遠就不撐大座標：線裁掉、右側標籤貼邊加 ↑／↓
   const reach = (hi - lo) * 0.2;
   for (const y of [...srl.map(([x]) => x.price), ...tlines.map((ln) => ln.y)]) {
     if (y != null && y >= lo - reach && y <= hi + reach) { lo = Math.min(lo, y); hi = Math.max(hi, y); }
@@ -261,7 +258,7 @@ function KChart({ d, maSet }) {
     lab.push({ y, t: (side === "sup" ? "撐 " : "壓 ") + fnum(x.price) + (srcAbbr(x.sources) ? " " + srcAbbr(x.sources) : "") + (x.testing ? " 測" : ""),
       col: "#ffffff", nt: x.pick_scope === "beyond" ? SR_BEYOND : "" });
   });
-  // 進出場的線：停損紅虛線、停利 2R 黃點線、加碼停損橘虛線；持倉中的線 i1=null → 延伸到右緣
+  // 進出場的線：停損紅虛線（抱著期間不動）；持倉中的線 i1=null → 延伸到右緣
   tlines.forEach((ln, k) => {
     if (ln.y == null) return;
     const [col, dash] = LINE_STYLE[ln.kind] || ["#ffffff", ""];
@@ -276,18 +273,12 @@ function KChart({ d, maSet }) {
   if (p) {
     const ly = (kind) => { const ln = tlines.find((x) => x.kind === kind); return ln && ln.y != null ? ln.y : null; };
     const tag = p.side === 1 ? "多" : "空";
-    const items = [
-      ["open_entry", tag + "單進場 ", TR_ENT, ""],
-      ["open_stop", "停損 ", TR_STOP, ""],
-      ["open_tp1", "停利一半 ", TR_TP, p.tp1_done ? " ✓已出" : ""],
-      ["open_add_stop", "加碼停損 ", TR_ADD, ""],
-    ];
-    for (const [kind, w, col, sfx] of items) {
+    for (const [kind, w, col] of [["open_entry", tag + "單進場 ", TR_ENT], ["open_stop", "停損 ", TR_STOP]]) {
       const v = ly(kind);
-      if (v != null) lab.push({ y: Y(v), t: w + fnum(v) + sfx, col, nt: "" });
+      if (v != null) lab.push({ y: Y(v), t: w + fnum(v), col, nt: "" });
     }
   }
-  // 記號：▲多進（紅，K 低點下）／▼空進（綠，K 高點上）、◆加碼、✕出場（字＝原因，同一筆第幾段錯開）
+  // 記號：▲多進（紅，K 低點下）／▼空進（綠，K 高點上）、✕出場（字＝原因）
   marks.forEach((m, k) => {
     if (m.i == null || m.i < 0 || m.i >= n) return;
     const b = bars[m.i], x = X(m.i);
@@ -301,14 +292,10 @@ function KChart({ d, maSet }) {
         els.push(<path key={"me" + k} className="mk-entry" d={`M${x.toFixed(1)} ${y.toFixed(1)} l-4 -7 h8 z`} fill={K_DN} />);
         els.push(<text key={"met" + k} className="te" x={x} y={y - 10} textAnchor="middle" style={{ fill: K_DN }}>{m.label || "空進"}</text>);
       }
-    } else if (m.kind === "add") {
-      const col = m.side === 1 ? K_UP : K_DN, y = Y(m.px);
-      els.push(<path key={"ma" + k} className="mk-add" d={`M${x.toFixed(1)} ${(y - 5).toFixed(1)} l5 5 l-5 5 l-5 -5 z`} fill={col} stroke="#0b0f15" strokeWidth="1" />);
-      els.push(<text key={"mat" + k} className="te" x={x} y={m.side === 1 ? Y(b.l) + 14 : Y(b.h) - 6} textAnchor="middle" style={{ fill: col }}>{m.label || "加碼"}</text>);
     } else if (m.kind === "exit") {
-      const col = TONE[m.tone] || "#ffffff", y = Y(m.px), sd = m.side === 1 ? 1 : -1;
+      const col = TONE[m.tone] || "#ffffff", y = Y(m.px);
       els.push(<path key={"mx" + k} className="mk-exit" d={`M${(x - 3.5).toFixed(1)} ${(y - 3.5).toFixed(1)}l7 7m0 -7l-7 7`} stroke={col} strokeWidth="1.8" />);
-      els.push(<text key={"mxt" + k} className="tx" x={x + 5} y={y + (sd === 1 ? 12 : -6) + 11 * (m.stack || 0) * sd} style={{ fill: col }}>{m.label || m.why}</text>);
+      els.push(<text key={"mxt" + k} className="tx" x={x + 5} y={y + (m.side === 1 ? 12 : -6)} style={{ fill: col }}>{m.label || m.why}</text>);
     }
   });
   // 右側標籤避讓（由上到下排、不重疊、不超出價格區）；圖外的價位貼邊、加 ↑／↓
@@ -350,11 +337,8 @@ const SW = {
   gap: <><i className="bx" style={{ background: K_UP }} /><i className="bx" style={{ background: K_DN }} /></>,
   ema10: <i className="sw" style={{ color: EMA_COL }} />,
   entry: <><b style={{ color: K_UP }}>▲</b><b style={{ color: K_DN }}>▼</b></>,
-  add: <><b style={{ color: K_UP }}>◆</b><b style={{ color: K_DN }}>◆</b></>,
   stop: <i className="sw dash" style={{ color: TR_STOP }} />,
-  add_stop: <i className="sw dash" style={{ color: TR_ADD }} />,
-  tp1: <i className="sw dot" style={{ color: TR_TP }} />,
-  exit: <><b style={{ color: TR_TP }}>✕</b><b style={{ color: TR_STOP }}>✕</b><b style={{ color: TR_ADD }}>✕</b><b>✕</b></>,
+  exit: <><b style={{ color: TR_STOP }}>✕</b><b>✕</b></>,
   open: <i className="sw" style={{ color: TR_ENT }} />,
   unfinished: <i className="bx unf" />,
 };
@@ -529,71 +513,95 @@ function Trade({ d }) {
   const lastFinal = [...bars].reverse().find((b) => b.final !== false);
   const close = lastFinal ? lastFinal.c : null;
   const side = (s) => <b className={s === 1 ? "up" : "dn"}>{s === 1 ? "多" : "空"}</b>;
-  const addTxt = (a) => (a ? a.t + " 加 0.5＠" + fnum(a.px) + "，加碼停損 " + fnum(a.stop) + (a.qty > 0 ? "" : "（已碰停損出場）") : "—");
   const recent = [];
   for (let k = tt.length - 1; k >= Math.max(0, tt.length - 10); k--) recent.push({ k, ...tt[k] });
-  const legsTxt = (t) => {
-    const ev = (t.legs || []).map((l) => [l.t, md(l.t) + " " + fnum(l.px) + " " + (l.label || l.why)]);
-    if (t.add) ev.push([t.add.t, md(t.add.t) + " " + fnum(t.add.px) + " 加碼0.5（停損 " + fnum(t.add.stop) + "）"]);
-    return ev.sort((a, b) => String(a[0]).localeCompare(String(b[0]))).map((x) => x[1]).join("／");
-  };
   const cols = [
     { label: "#", num: true, render: (t) => t.k + 1, sort: (t) => t.k },
     { label: "方向", render: (t) => side(t.side), sort: (t) => t.side },
     { label: "進場", render: (t) => t.entry_t, sort: (t) => t.entry_t },
     { label: "進場價", num: true, render: (t) => fnum(t.entry), sort: (t) => nz(t.entry) },
-    { label: "停損", num: true, render: (t) => fnum(t.stop0), sort: (t) => nz(t.stop0) },
-    { label: "停利一半", num: true, render: (t) => (t.tp1_na ? <span className="mut">{t.tp1_note}</span> : fnum(t.tp1)), sort: (t) => nz(t.tp1) },
-    { label: "出場（時間 價 原因）", cls: "wrap small", render: legsTxt, sort: (t) => t.exit_t },
+    { label: "停損", num: true, render: (t) => fnum(t.stop), sort: (t) => nz(t.stop) },
+    { label: "出場（價 原因）", cls: "wrap small", render: (t) => fnum(t.exit_px) + " " + (t.label || t.why), sort: (t) => t.why },
     { label: "出場", render: (t) => t.exit_t, sort: (t) => t.exit_t },
     { label: "損益", num: true, render: (t) => <span className={ud(t.pct)}>{fpct(t.pct)}</span>, sort: (t) => nz(t.pct) },
   ];
   return (
     <div className="ta-block" data-blk="trade">
-      <div className="ta-cap">④ 進出場 <span className="mut">EMA5／10／20 排列剛成立＋量比 ≥1.2 進場；近 3 根低（高）停損、2R 先出一半；停利後回測 EMA10 沒收破、下一根帶量收回 EMA5 外側加碼 0.5（最多一次）</span></div>
+      <div className="ta-cap">④ 進出場 <span className="mut">EMA5／10／20 排列剛成立＋量比 ≥1.2 進場；停損＝進場時近 3 根低（高），抱著期間不動；收破 EMA10 或爆量反向 K 整筆出</span></div>
       <BadBanner d={d} />
       <div className="ta-hs">
         <table className="ta-tbl ta-dt">
-          <thead><tr><th>目前持倉</th><th>進場</th><th className="r">進場價</th><th className="r">停損</th><th className="r">停利一半（2R）</th><th>已出一半</th><th>加碼</th><th className="r">停損距今收</th></tr></thead>
+          <thead><tr><th>目前持倉</th><th>進場</th><th className="r">進場價</th><th className="r">停損</th><th className="r">停損距今收</th></tr></thead>
           <tbody>
             {p ? (
               <tr>
                 <td>{side(p.side)}</td><td>{p.entry_t}</td><td className="r">{fnum(p.entry)}</td>
-                <td className="r">{p.qty > 0 ? fnum(p.stop) : "—（原單已出）"}</td><td className="r" data-tp1-na={p.tp1_na ? "1" : undefined}>{p.tp1_na ? <span className="mut">{p.tp1_note}</span> : fnum(p.tp1)}</td>
-                <td>{p.tp1_done ? "是（停損已移到進場價）" : "否"}</td><td className="wrap">{addTxt(p.add)}</td>
-                <td className="r">{close && p.qty > 0 ? fpct((p.stop / close - 1) * 100) : "—"}</td>
+                <td className="r">{fnum(p.stop)}</td><td className="r">{close ? fpct((p.stop / close - 1) * 100) : "—"}</td>
               </tr>
-            ) : <tr><td colSpan={8} className="mut">目前無持倉</td></tr>}
+            ) : <tr><td colSpan={5} className="mut">目前無持倉</td></tr>}
           </tbody>
         </table>
       </div>
       <div className="ta-hs">
         <table className="ta-tbl ta-dt">
-          <thead><tr><th>回測期間</th><th className="r">筆數</th><th className="r">勝率</th><th className="r">合計</th><th className="r">平均賺</th><th className="r">平均賠</th><th className="r">最大連續虧損</th><th className="r">有加碼</th></tr></thead>
+          <thead><tr><th>回測期間</th><th className="r">筆數</th><th className="r">勝率</th><th className="r">合計</th><th className="r">平均賺</th><th className="r">平均賠</th><th className="r">最大連續虧損</th></tr></thead>
           <tbody><tr>
             <td>{st.start || "—"}～{st.end || "—"}（{st.bars || "—"} 根{TF_ZH[d.tf]}）</td>
             <td className="r">{st.n || 0}（多 {st.n_long || 0}／空 {st.n_short || 0}）</td>
             <td className="r">{st.n ? fpct(st.win_rate, false) + "（" + st.wins + "/" + st.n + "）" : "—"}</td>
             <td className={"r " + ud(st.sum_pct)}>{fpct(st.sum_pct)}</td>
             <td className="r up">{fpct(st.avg_win_pct)}</td><td className="r dn">{fpct(st.avg_loss_pct)}</td>
-            <td className="r">{st.max_consec_loss || 0} 筆</td><td className="r">{st.adds || 0} 筆</td>
+            <td className="r">{st.max_consec_loss || 0} 筆</td>
           </tr></tbody>
         </table>
       </div>
       <div className="ta-note">{trd.note || "樣本內統計，不代表未來；未計手續費與滑價"}</div>
-      <div className="ta-cap ta-sub">最近 10 筆 <span className="mut">新到舊；#＝全期第幾筆；損益＝各段（整筆 1、一半 0.5、加碼 0.5，各用自己的進場價）合計 ÷ 原進場價</span></div>
+      <div className="ta-cap ta-sub">最近 10 筆 <span className="mut">新到舊；#＝全期第幾筆；損益＝（出場價 − 進場價）÷ 進場價（空單反過來）</span></div>
       {recent.length ? <div className="ta-win10"><SortTable className="ta-dt" cols={cols} rows={recent} rowKey={(t) => "t" + t.k} /></div>
         : <div className="ta-empty">期間內沒有成交</div>}
     </div>
   );
 }
 
+// 圖下 ①～④ 四個分頁：[key, 分頁名, 區塊, 怎麼看]
+const BLOCKS = [
+  ["vol", "① 前五大量", TopVolume, "近 120 根裡成交量最大的 5 根。量倍數＝這根量 ÷ 這根「之前」20 根的平均量。那根的最高、最低就是關卡：現價高過最高＝在上方、低過最低＝在下方，其餘＝區間內。"],
+  ["gap", "② 跳空缺口", Gaps, "近 120 根的全部跳空，不設門檻。向上＝這根最低高過前一根最高；向下＝這根最高低過前一根最低。之後有 K 碰進缺口＝部分回補，碰到另一邊＝已補。類型看缺口前的趨勢與位置：突＝突破、破＝跌破、逃＝逃逸、竭＝竭盡、彈＝空頭裡的反彈、回＝多頭裡的回檔、一＝一般、島＝島狀反轉。"],
+  ["ma", "③ 多空排列", MaAlign, "三組均線可切換：短 SMA5／10／20、中 SMA8／13／34、長 SMA20／60／120。多頭排列＝收盤 > 第一條 > 第二條 > 第三條，而且三條都往上；空頭排列完全相反；其他叫糾結，並寫出哪個條件不成立。"],
+  ["trade", "④ 進出場", Trade, "EMA＝指數均線，全部等收盤才算。EMA5／10／20 剛排好（前 3 根還沒全排好）、量比前 10 根均量 ≥1.2、收在 EMA5 同側＝收盤進場。停損＝進場時近 3 根最低（空單最高），抱著的期間都不動，盤中碰到就整筆出。沒碰停損就一直抱，收盤破 EMA10（空單站上）整筆出；或爆量反向 K（量比 ≥2、反向 K、收破 EMA5）整筆出。同一根同時碰停損和其他出場，算停損。"],
+];
+const BLK_KEY = "yoda_ta_blk";
+
+function BlockTabs({ d, maSet }) {
+  const [cur, setCur] = useState(() => { const v = lsGet(BLK_KEY); return BLOCKS.some(([k]) => k === v) ? v : BLOCKS[0][0]; });
+  const pick = (k) => { setCur(k); lsSet(BLK_KEY, k); };
+  const onKey = (e) => {   // ←／→／Home／End 換分頁（WAI-ARIA tabs）
+    const i = BLOCKS.findIndex(([k]) => k === cur), n = BLOCKS.length;
+    const j = { ArrowRight: (i + 1) % n, ArrowLeft: (i - 1 + n) % n, Home: 0, End: n - 1 }[e.key];
+    if (j === undefined) return;
+    e.preventDefault();
+    pick(BLOCKS[j][0]);
+    document.getElementById("ta-blk-tab-" + BLOCKS[j][0])?.focus();
+  };
+  const [, label, Blk, rule] = BLOCKS.find(([k]) => k === cur);
+  return (
+    <div className="ta-blks">
+      <div className="ta-seg ta-blktabs" role="tablist" aria-label="圖下資料" onKeyDown={onKey}>
+        {BLOCKS.map(([k, nm]) => (
+          <button key={k} id={"ta-blk-tab-" + k} type="button" role="tab" aria-selected={cur === k} aria-controls="ta-blk-panel"
+            tabIndex={cur === k ? 0 : -1} className={"ta-tab" + (cur === k ? " on" : "")} onClick={() => pick(k)}>{nm}</button>
+        ))}
+      </div>
+      <div id="ta-blk-panel" role="tabpanel" aria-labelledby={"ta-blk-tab-" + cur} tabIndex={0}>
+        <Blk d={d} maSet={maSet} />
+        <div className="ta-block ta-rules"><dl><div className="ta-rule"><dt>怎麼看</dt><dd>{rule}</dd></div></dl></div>
+      </div>
+    </div>
+  );
+}
+
 const RULES = [
-  ["① 前五大量", "近 120 根裡成交量最大的 5 根。量倍數＝這根量 ÷ 這根「之前」20 根的平均量。那根的最高、最低就是關卡：現價高過最高＝在上方、低過最低＝在下方，其餘＝區間內。"],
-  ["② 跳空缺口", "近 120 根的全部跳空，不設門檻。向上＝這根最低高過前一根最高；向下＝這根最高低過前一根最低。之後有 K 碰進缺口＝部分回補，碰到另一邊＝已補。類型看缺口前的趨勢與位置：突＝突破、破＝跌破、逃＝逃逸、竭＝竭盡、彈＝空頭裡的反彈、回＝多頭裡的回檔、一＝一般、島＝島狀反轉。"],
-  ["③ 多空排列", "三組均線可切換：短 SMA5／10／20、中 SMA8／13／34、長 SMA20／60／120。多頭排列＝收盤 > 第一條 > 第二條 > 第三條，而且三條都往上；空頭排列完全相反；其他叫糾結，並寫出哪個條件不成立。"],
   ["支撐／壓力", "候選價位：前五大量 K 的高與低、未補缺口的邊緣、反覆打到又回來的價位（觸及 ≥3 根）。差距在容差內的併成一條；強度＝大量 K 量倍數（上限 5）＋每個缺口 2＋觸及根數。今收下方＝支撐（白實線）、上方＝壓力（白虛線），各只留一條。"],
-  ["④ 進出場", "EMA＝指數均線，全部等收盤才算。EMA5／10／20 剛排好（前 3 根還沒全排好）、量比前 10 根均量 ≥1.2、收在 EMA5 同側＝收盤進場。停損＝近 3 根最低（空單最高），盤中碰到就出；漲到 2 倍風險（2R）先出一半、停損移到進場價；同一根同時碰停損與 2R 算停損。剩下的收盤破 EMA10（空單站上）出，或爆量反向 K（量比 ≥2、反向 K、收破 EMA5）全出。加碼：停利一半之後，某根碰到 EMA10 但沒收破、下一根帶量收回 EMA5 外側，收盤加 0.5（一筆最多一次）；加碼停損＝近 3 根最低（空單最高），碰到只出加碼那份。"],
   ["盤中未定", "最後一根還在交易中（收盤那根要收盤後 15 分鐘才定案）：只畫在圖上，訊號、排列、回測都只用定案的 K。"],
   ["距離 %", "(價位 ÷ 今收 − 1) × 100：正數在現價上方、負數在下方。"],
 ];
@@ -819,11 +827,8 @@ export default function TaPage() {
                 <KChart d={d} maSet={maSet} />
                 <Legend d={d} maSet={maSet} />
                 {(d.notes || []).length ? <div className="ta-notes">資料註記：{d.notes.join("；")}</div> : null}
-                <TopVolume d={d} />
-                <Gaps d={d} />
-                <MaAlign d={d} maSet={maSet} />
+                <BlockTabs d={d} maSet={maSet} />
                 <SrLevels d={d} />
-                <Trade d={d} />
                 <div className="ta-block ta-rules">
                   <div className="ta-cap">怎麼看 <span className="mut">規則寫死、每一根都可以手算</span></div>
                   <dl>{RULES.map(([k, v]) => <div key={k} className="ta-rule"><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
