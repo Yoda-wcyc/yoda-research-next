@@ -28,6 +28,7 @@ vendor.json 記 sha256，兩邊各有檢查，副本不能偷偷漂移：
       產生）＋查詢時補抓，期交所連不上照回回補檔＋註記（見下面 TAIFEX 那段、契約 §2.3）。^SOX 照收（費半期旁註明 ^SOX 是指數版）。
 """
 import os, re, io, csv, sys, json, time, hmac, hashlib, shutil, urllib.request, urllib.parse, urllib.error
+from concurrent.futures import ThreadPoolExecutor, wait
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
@@ -401,13 +402,19 @@ def build(df, tf, market, now_local, data_t=None):
 #     ①平盤爆量那根：整根 h＝l、量 ≥ 近 200 根中位數 20 倍＝新合約接上時塞進來的一根（股指 2024-06-21／09-20／12-20、2025-06-20 16:00，
 #       CL 2024-09-20、2025-06-20 16:00）→ 窗口內有這根就是它。
 #     ②資料斷層後第一根：LTD＋1（股指 E＋1、GC FND）那天的第一根，前面跟上一個交易日之間斷了 8～24 小時
-#       （CL 2024-08～2025-07：Yahoo 一路跟舊合約到 LTD 14:30 結算，之後沒資料，隔天 03:00 才接新合約）。
+#       （CL 2024-08～2025-07：Yahoo 一路跟舊合約到 LTD 14:30 結算，之後沒資料，隔天 03:00 才接新合約）；
+#       斷層前一根早於 16:00（舊合約最後交易日當天就停了，不是正常收盤）時，連著週末／假日最長 4 天也算
+#       （NQ 2025-06：06-20 09:30 到期結算後沒資料，Juneteenth＋週末斷 57 小時，06-22 18:00 才接新合約）。
+#       正常週末斷層前一根是 16:00 → 不算，不會把一般的週日開盤當成換月。
+#     CL 的①（平盤爆量）是新合約的結算紀錄、不是成交：舊合約 14:30 結算就停，CL1! 第一根真正成交的新合約 K 是下一個時段的第一根
+#       → 兩根都標換月（2025-06-22 18:00 週日開盤剛好碰上伊朗空襲跳空，換合約是事實，依規則不算缺口；2026-11-10 主對話定）。
 #   參考標的抓不到：1H／4H 只認上面兩種形狀（日K／週K 本來就只用日曆）。
 ROLL_MIN = 0.0015
 ROLL_MAD_K = 3
 ROLL_STRONG = 0.0025
 ROLL_FLAT_X = 20
 ROLL_HOLE_H = (8, 24)
+ROLL_HOLE_LONG = 96                       # 斷層前一根早於 16:00 時，最長 4 天（連週末／假日）
 
 
 def roll_windows(kind, days):
@@ -515,16 +522,20 @@ def _splices(kind, src, days, R):
     flat = ((src['h'] == src['l']) & (src['v'] >= ROLL_FLAT_X * med)).to_numpy()
     kd = days.searchsorted(tdi)
     dh = np.r_[0.0, np.diff(src.index.asi8) / 3.6e12]
-    hole = (dh >= ROLL_HOLE_H[0]) & (dh < ROLL_HOLE_H[1]) & (np.r_[0, np.diff(kd)] == 1)
+    pt = np.r_[24 * 60, np.asarray(_tod(src.index))[:-1]]          # 斷層前一根的時刻（分）
+    hole = (dh >= ROLL_HOLE_H[0]) & ((dh < ROLL_HOLE_H[1]) | ((dh <= ROLL_HOLE_LONG) & (pt < 16 * 60))) & (np.r_[0, np.diff(kd)] == 1)
     isgap = (src['l'] > src['h'].shift()) | (src['h'] < src['l'].shift())
     byday = {d: (prev, step) for d, prev, step, _ in roll_days(kind, F, R, days=days)}
     out = []
     for win, cand, fb, E in roll_windows(kind, days):
-        T = src.index[tdi.isin(win) & flat]
+        T = src.index[tdi.isin(win) & flat][:1]
+        if len(T) and kind == 'cl':
+            k = src.index.get_loc(T[0]) + 1
+            T = T.append(src.index[k:k + 1][dh[k:k + 1] >= ROLL_HOLE_H[0]])   # CL：結算紀錄＋下一個時段第一根
         if not len(T):
-            T = src.index[(tdi == fb) & hole]
+            T = src.index[(tdi == fb) & hole][:1]
         if len(T):
-            out.append((T[0], float(ret[T[0]]) if np.isfinite(ret[T[0]]) else None))
+            out += [(x, float(ret[x]) if np.isfinite(ret[x]) else None) for x in T]
             continue
         d = next((x for x in win if x in byday), None)
         if d is None:
@@ -572,7 +583,9 @@ def find_rolls(kind, tf, src, bars, R):
         i = int(hit[0])
         if out and out[-1]['i'] == i:
             continue
-        out.append({'i': i, 't': A._d(bars.index[i]), 'dir': None if step is None else 'up' if step >= 0 else 'down',
+        with A.full_times(tf in ('1H', '4H')):
+            t = A._d(bars.index[i])
+        out.append({'i': i, 't': t, 'dir': None if step is None else 'up' if step >= 0 else 'down',
                     'step_pct': None if step is None else round(float(np.exp(step) - 1) * 100, 2), 'label': ROLL_LABEL})
     return out
 
@@ -587,14 +600,16 @@ def find_rolls(kind, tf, src, bars, R):
 #       費半期最後結算日（最後交易日的次一營業日）那天舊合約只剩結算前夜盤、日盤不交易 → 那天就換（taifex_daily 的例外），
 #       價格不還原；換月那根＝月份跟前一根不同的那根（只靠合約月份，不用猜），跟 Yahoo 期貨同一條路（analyze_bars 的 rolls）。
 # 資料：Next repo ta-engine/data/fut_TX.json、fut_SXF.json（Skill\taifex_backfill.py 產生、commit 進 repo），查詢時再抓「回補檔最後一天～今天」
-#       （一次 28 天、最多 3 次、每次 timeout 6 秒）；抓不到照回回補檔＋註記「期交所最新資料暫時讀不到，資料到 YYYY-MM-DD」，沒有回補檔才 502。
+#       （一次 28 天、最多 3 段同時抓、總共最多等 3 秒）；抓不到（或期交所慢、3 秒內沒全回）照回回補檔＋註記「期交所最新資料暫時讀不到，資料到 YYYY-MM-DD」，
+#       沒有回補檔才 502。
 TWF_URL = 'https://www.taifex.com.tw/cht/3/futDataDown'
 TWF_SCHEMA = 'taifex-cont-1'
 TWF_DIR = os.path.join(HERE, 'data')
 TWF_DAY, TWF_NIGHT = '一般', '盤後'
 TWF_WIN = 28                             # 期交所一次最多查一個月
 TWF_MAX_REQ = 3
-TWF_TIMEOUT = 6
+TWF_BUDGET = 3.0                         # 補抓總時限（秒）：幾段同時抓，時間到還沒全回就用回補檔＋註記（台指期日K 查詢要 5 秒內回）
+TWF_TIMEOUT = TWF_BUDGET
 TWF_RETRY = 300                          # 期交所連不上時，5 分鐘後再試（不用等 15 分鐘快取）
 TWF_TFS = ['D', 'W']
 TWF_DAILY_ONLY = '期交所只有日資料：台指期、費半期只提供日K、週K'
@@ -722,20 +737,24 @@ def taifex_series(root, now, post=taifex_post):
     base = taifex_load(root)
     today = _local(now, 'Asia/Taipei').normalize()
     s0 = base.index[-1] if base is not None else today - pd.Timedelta(days=TWF_WIN * TWF_MAX_REQ - 1)
-    rows, s, why = [], s0, None
-    try:
-        for _ in range(TWF_MAX_REQ):
-            if s > today:
+    wins, s = [], s0
+    while len(wins) < TWF_MAX_REQ and s <= today:
+        e_ = min(today, s + pd.Timedelta(days=TWF_WIN - 1))
+        wins.append((s, e_))
+        s = e_ + pd.Timedelta(days=1)
+    rows, why = [], (TWF_OLD if s <= today else None)
+    if wins:                                  # 幾段同時抓、總共最多等 TWF_BUDGET 秒（期交所慢的時候不拖垮查詢）
+        ex = ThreadPoolExecutor(len(wins))
+        futs = [ex.submit(post, root, a, b) for a, b in wins]
+        done = wait(futs, timeout=TWF_BUDGET)[0]
+        ex.shutdown(wait=False, cancel_futures=True)
+        for f in futs:                        # 只接從頭連續抓到的那幾段（中間缺一段就不能往後接）
+            if f not in done or f.exception() is not None:
+                why = TWF_STALE
                 break
-            e_ = min(today, s + pd.Timedelta(days=TWF_WIN - 1))
-            rows += taifex_rows(post(root, s, e_), root)
-            s = e_ + pd.Timedelta(days=1)
-        if s <= today:
-            why = TWF_OLD
-    except EngineError:
-        if base is None and not rows:
-            raise
-        why = TWF_STALE
+            rows += taifex_rows(f.result(), root)
+    if why == TWF_STALE and base is None and not rows:
+        raise EngineError(502, 'upstream', TWF_DOWN)
     live = taifex_daily(rows)
     if base is None:
         df = live
@@ -805,6 +824,12 @@ def gaps_full(dc, skip=()):
 
 
 def analyze_bars(df, market, final=None, rolls=None, fut_note=None):
+    """盤中週期（index 有不是 00:00 的 K）整段時間都帶時分：期貨 1H 每天 00:00 那根不會只剩日期（股票盤中沒有 00:00 的 K，輸出不變）。"""
+    with A.full_times(bool((df.index != df.index.normalize()).any())):
+        return _analyze_bars(df, market, final, rolls, fut_note)
+
+
+def _analyze_bars(df, market, final=None, rolls=None, fut_note=None):
     """純函式。df：o/h/l/c/v（index＝K 棒時間，舊到新）；final：每根是否定案（None＝全部定案；未定只能在尾巴）；
     rolls：期貨換月那幾根（find_rolls 的輸出，i＝df 位置）→ 那根不算缺口，上圖標「換月」。
     訊號、均線排列只用定案 K；圖＝最後 120 根定案 K ＋ 尾巴的盤中未定 K；history＝全部 K（瀏覽器回測只用前 bars_completed 根）。
@@ -1313,6 +1338,33 @@ def selftest():
     rc0 = [x['t'] for x in find_rolls('cl', '1H', cl1, cl1, None)]
     ok(re1 == ['2026-03-20 16:00'] and re4 == ['2026-03-20 14:00'] and rc1 == ['2026-06-23 03:00'] and rc0 == rc1,
        '1H 換月認形狀：平盤爆量那根（資料開頭的第一次換月也抓得到）、LTD 後資料斷層的第一根（參考標的抓不到也一樣）：%s %s %s' % (re1, re4, rc1))
+    # 股指 2025-06（NQ）：到期日 06-20 09:00 之後沒資料、Juneteenth＋週末斷 57 小時，06-22 18:00 才接新合約（+1%）；
+    # 06-19 18:00 是 Juneteenth 提早休市後重新開盤的真行情（+0.9%、量暴增）→ 換月標 06-22 18:00。
+    # 同一份資料 2025-09：週二 09-16 15:00 就換（+1%），週五 16:00→週日 18:00 是正常週末斷層 → 不能把 09-21 18:00 當換月。
+    tj, nq = h1_of('2025-05-01', '2025-10-31')
+    nq = nq[~((nq.index > pd.Timestamp('2025-06-19 12:00')) & (nq.index < pd.Timestamp('2025-06-19 18:00')))
+            & ~((nq.index > pd.Timestamp('2025-06-20 09:00')) & (nq.index < pd.Timestamp('2025-06-22 18:00')))].copy()
+    nq.loc[nq.index >= pd.Timestamp('2025-06-19 18:00'), ['o', 'h', 'l', 'c']] *= 1.009
+    nq.loc[pd.Timestamp('2025-06-19 18:00'), 'v'] = 30000.0
+    nq.loc[nq.index >= pd.Timestamp('2025-06-22 18:00'), ['o', 'h', 'l', 'c']] *= 1.01
+    nq.loc[nq.index >= pd.Timestamp('2025-09-16 15:00'), ['o', 'h', 'l', 'c']] *= 1.01
+    rj = pd.Series(100.0, index=tj)
+    rn = [x['t'] for x in find_rolls('eq', '1H', nq, nq, rj)]
+    # CL 2025-06：LTD（週五 06-20）16:00 平盤爆量＝新合約結算紀錄，下一個時段第一根（週日 18:00）也標（2026-11-10 主對話定）
+    tl, cl6 = h1_of('2025-06-01', '2025-07-15')
+    sp6 = pd.Timestamp('2025-06-20 16:00')
+    cl6 = cl6[~((cl6.index > pd.Timestamp('2025-06-20 14:00')) & (cl6.index < sp6))].copy()
+    cl6.loc[cl6.index >= sp6, ['o', 'h', 'l', 'c']] *= 0.985
+    cl6.loc[sp6, ['o', 'h', 'l', 'c', 'v']] = [98.5, 98.5, 98.5, 98.5, 600000.0]
+    cl6.loc[cl6.index >= pd.Timestamp('2025-06-22 18:00'), ['o', 'h', 'l', 'c']] *= 1.05
+    rl6 = [x['t'] for x in find_rolls('cl', '1H', cl6, cl6, pd.Series(100.0, index=tl))]
+    a6 = analyze_bars(cl6, 'fut', rolls=find_rolls('cl', '1H', cl6, cl6, None))
+    ok(rn == ['2025-06-22 18:00', '2025-09-16 15:00'] and rl6 == ['2025-06-20 16:00', '2025-06-22 18:00']
+       and not ({'2025-06-20 16:00', '2025-06-22 18:00'} & {a6['history']['t'][x[0]] for x in a6['chart']['overlays']['gaps']['rows']}),
+       '1H 換月：到期後資料斷層連週末／假日（≤4 天）也算、正常週末開盤不算；CL 結算紀錄＋下一個時段第一根都標、都不算缺口：%s %s' % (rn, rl6))
+    t00 = a6['history']['t']
+    ok(all(len(x) == 16 for x in t00) and '2025-06-24 00:00' in t00 and analyze_bars(_trend_df(), 'tw')['history']['t'][0] == '2024-01-01',
+       '期貨 1H 每天 00:00 那根也帶時分（日K 照舊只有日期）：%s' % [x for x in t00 if x.endswith('00:00')][:2])
     # 期貨盤中定案看資料時間：Yahoo 期貨晚約 10 分鐘，03:04 抓到的資料只到 02:54 → 02:00 那根還沒定案
     wk2 = pd.DataFrame({'o': 1.0, 'h': 2.0, 'l': .5, 'c': 1.5, 'v': 10.0},
                        index=pd.to_datetime(['2026-11-10 01:00', '2026-11-10 02:00', '2026-11-10 11:00', '2026-11-10 12:00']))
@@ -1505,6 +1557,18 @@ def selftest():
             ok(rs_['ok'] and rs_['history']['t'][-1] == '2026-10-16' and rs_['symbol']['stale'] == msg and msg in rs_['notes']
                and rs_['symbol']['data_through'] == '2026-10-16' and [x['t'] for x in rs_['chart']['overlays']['rolls']] == mchg[:-1],
                '期交所連不上：照回回補檔，註記「%s」' % msg)
+            _CACHE.clear()
+
+            def post_slow(cid, s, e):
+                time.sleep(TWF_BUDGET + 2)                 # 不記 calls_t：背景執行緒晚到，不能干擾後面幾項的次數
+                return twf_csv([d for d in tdays if s <= d <= e], cid)
+            t0_ = time.time()
+            rsl = run('TXF1!', 'D', n1430, post=post_slow)
+            dt_ = time.time() - t0_
+            ok(dt_ < TWF_BUDGET + 1 and rsl['symbol']['stale'] == msg and rsl['history']['t'][-1] == '2026-10-16',
+               '期交所慢（%.0f 秒才回）：%.1f 秒就用回補檔＋註記，不等它' % (TWF_BUDGET + 2, dt_))
+            _CACHE.clear()
+            run('TXF1!', 'D', n1430, post=post_down)
             ok(_CACHE[('taifex', 'TX')][0] == n1430 and run('TXF1!', 'D', n1430 + TWF_RETRY - 1, post=post_ok)['cached']
                and not run('TXF1!', 'D', n1430 + TWF_RETRY + 1, post=post_ok)['cached'], '連不上的結果只快取 5 分鐘，之後重抓')
             put_backfill(td_, tdf[tdf.index <= T_('2026-07-31')])

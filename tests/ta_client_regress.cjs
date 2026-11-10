@@ -287,6 +287,15 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     assert.strictEqual(LV.symKey("NQ1!"), "NQ=F"); assert.strictEqual(LV.symKey("/nq"), "NQ=F"); assert.strictEqual(LV.symKey("NQ=F"), "NQ=F");
     assert.strictEqual(LV.symKey("2330.TW"), "2330"); assert.strictEqual(LV.symKey("BRK.B"), "BRK-B"); assert.strictEqual(LV.symKey("^SOX"), "^SOX");
   });
+  await t("ta-live：引擎 ALIAS 裡每個中文別名都收得進來（直接讀 ta-engine/ta_engine.py，引擎加別名這裡自動跟上）", async () => {
+    const src = fs.readFileSync(path.join(ROOT, "ta-engine", "ta_engine.py"), "utf8");
+    const m = src.match(/^ALIAS = \{([\s\S]*?)\}\n/m);
+    assert.ok(m, "找不到 ALIAS");
+    const keys = [...m[1].matchAll(/'([^']+)':/g)].map((x) => x[1]);
+    assert.ok(keys.length >= 20 && keys.includes("台指期") && keys.includes("小那斯達克"), "ALIAS 解析：" + keys.length);
+    const bad = keys.filter((k) => !LV.cleanSym(k));
+    assert.deepStrictEqual(bad, [], "被擋掉的別名");
+  });
 
   // ---------- 5. 台指期／費半期（期交所） ----------
   const TWF = { market: "fut", exchange: "TAIFEX", type: "FUTURE", code: "TXF1!", yahoo: "TXF1!", contract: "202611", tfs: ["D", "W"], session: "含夜盤（夜盤算到隔天）" };

@@ -256,7 +256,7 @@ invalidation 一句話日檢條件（多頭：收盤跌破最後一個 HL；空�
 confidence  0～100 規則分（見 SCORE_TABLE）；breakdown 逐項 hit／pts／why；notes：「分數不是勝率」
 chart       最近 120 根：bars=[{date,o,h,l,c,v}]、sma20=[…]、sma60=[…]（與 bars 對齊，缺值 None）
 """
-import os, re, io, sys, json, math, time, pickle, datetime as dt, contextlib
+import os, re, io, sys, json, math, time, pickle, datetime as dt, contextlib, contextvars
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -333,9 +333,22 @@ def _pct(a, b):
     return round((a / b - 1) * 100, 2)
 
 
+_FULL_T = contextvars.ContextVar('ta_full_t', default=False)
+
+
 def _d(ts):
     t = pd.Timestamp(ts)      # 11-08 網站版：盤中 K（1H／4H）要帶時分才不撞日期；日 K（00:00）輸出不變
-    return t.strftime('%Y-%m-%d %H:%M' if (t.hour or t.minute) else '%Y-%m-%d')
+    return t.strftime('%Y-%m-%d %H:%M' if (t.hour or t.minute or _FULL_T.get()) else '%Y-%m-%d')
+
+
+@contextlib.contextmanager
+def full_times(on):
+    """11-10 期貨 1H 有 00:00 那根：盤中週期整段都帶時分（on＝True），不然 00:00 那根只剩日期。股票盤中沒有 00:00 的 K，輸出不變。"""
+    tok = _FULL_T.set(bool(on))
+    try:
+        yield
+    finally:
+        _FULL_T.reset(tok)
 
 
 def _ymd(x):
