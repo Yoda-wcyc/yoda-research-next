@@ -355,15 +355,25 @@ def bars_w(d1, market):
 BUILD = {'1H': bars_1h, 'D': bars_d, 'W': bars_w}
 
 
-def build(df, tf, market, now_local):
-    """回 (bars, final)；final[i]＝該根已收完：結束時間 ≤ 現在；結束在收盤的那根（含日K、週K）要再等 GRACE。"""
+def build(df, tf, market, now_local, data_t=None):
+    """回 (bars, final)；final[i]＝該根已收完：結束時間 ≤ 現在；結束在收盤的那根（含日K、週K）要再等 GRACE。
+    now_local 要傳「資料抓下來的時間」（快取的資料不會有抓之後的成交）。
+    期貨盤中的 K（不是收在 17:00 那根）：Yahoo 期貨資料晚約 10 分鐘 → 要資料時間 data_t（meta.regularMarketTime）已過結束時間才定案；
+    沒給 data_t 就等 GRACE；data_t 一直沒過（提早收盤日停在休市前最後一筆）就等滿 1 小時。"""
     if tf == '4H':
         h1, _ = bars_1h(df, market)
         b, end = bars_4h(h1, market)
     else:
         b, end = BUILD[tf](df, market)
     at_close = _tod(end) == SESS[market][1]
-    return b, np.asarray(end + pd.to_timedelta(np.where(at_close, GRACE, 0), unit='s') <= now_local, dtype=bool)
+    fin = end + pd.to_timedelta(np.where(at_close, GRACE, 0), unit='s') <= now_local
+    if market == 'fut':
+        if data_t is None:
+            mid = end + pd.Timedelta(seconds=GRACE) <= now_local
+        else:
+            mid = (end <= data_t) | (end + pd.Timedelta(hours=1) <= now_local)
+        fin = np.where(at_close, fin, mid)
+    return b, np.asarray(fin, dtype=bool)
 
 
 # ═════════════════════════ 期貨換月（價格不還原，只標出換月那根） ═════════════════════════
@@ -373,12 +383,22 @@ def build(df, tf, market, now_local):
 #     GC＝FND（交割月 G/J/M/Q/Z 前一個月最後營業日）或 FND＋1：{FND−1, FND} 裡量跳升最大那天的隔天；量看不出來（跳升 < 1.3 倍）才改挑開盤跳空大的那天。
 #     （舊做法在窗口裡挑價差／跳空最大那天，波動大的時期會被雜訊騙走：CL 三成標在 LTD、股指 2016／2018／2020 差好幾天。）
 #   1H／4H：Yahoo 比日K 早幾天、在 K 中間換 → 從「期貨 ÷ 參考標的」價差（basis）的跳動找那一天：
-#     股指窗口 [E−8 天, E+3 天]；GC 窗口 FND−5～+2 營業日；CL 窗口 LTD−5～+2 營業日；窗口內 |Δln(F/R)| 最大那天、要大於 max(25bp, 5×近一年 MAD)。
+#     股指窗口 [E−8 天, E+3 天]；GC 窗口 FND−5～+2 營業日；CL 窗口 LTD−5～+2 營業日；窗口內 |Δln(F/R)| 最大那天、要大於 max(15bp, 3×近一年 MAD)
+#     （窗口裡一定有一次換月，門檻只是擋純雜訊；CL 2025-11、2026-02 價差只有 −0.21%／−0.25%）。
+#     價差跳動 < 25bp（弱）時只在「不是缺口」的 K 裡挑：價差這麼小，換月本身不會做出缺口，挑錯也不能把真的缺口藏掉。
 #     F 用 15:00 那根 1H 的收盤（收在 16:00＝參考標的收盤）。換月那根＝當天「|報酬| × √(量跳升倍數÷同時段平常倍數)」最大、方向和 Δbasis 一樣的那根：
 #     舊合約快到期時量很小、新合約一接上量就暴增，所以拼接那根的量跳升特別大（GC 2026-07-29 03:00 是平常的 4.8 倍；同一天 14:00 的 FOMC 行情 K 只有 3.2 倍）。
-#   參考標的抓不到：1H／4H 不標（日K／週K 本來就只用日曆）。
-ROLL_MIN = 0.0025
-ROLL_MAD_K = 5
+#   拼接有固定形狀時先認形狀、不看價差（2026-11-10 對 Yahoo 1H 逐根核對）：
+#     ①平盤爆量那根：整根 h＝l、量 ≥ 近 200 根中位數 20 倍＝新合約接上時塞進來的一根（股指 2024-06-21／09-20／12-20、2025-06-20 16:00，
+#       CL 2024-09-20、2025-06-20 16:00）→ 窗口內有這根就是它。
+#     ②資料斷層後第一根：LTD＋1（股指 E＋1、GC FND）那天的第一根，前面跟上一個交易日之間斷了 8～24 小時
+#       （CL 2024-08～2025-07：Yahoo 一路跟舊合約到 LTD 14:30 結算，之後沒資料，隔天 03:00 才接新合約）。
+#   參考標的抓不到：1H／4H 只認上面兩種形狀（日K／週K 本來就只用日曆）。
+ROLL_MIN = 0.0015
+ROLL_MAD_K = 3
+ROLL_STRONG = 0.0025
+ROLL_FLAT_X = 20
+ROLL_HOLE_H = (8, 24)
 
 
 def roll_windows(kind, days):
@@ -387,7 +407,9 @@ def roll_windows(kind, days):
     out = []
     if not len(days):
         return out
-    days = days.append(pd.bdate_range(days[-1] + pd.Timedelta(days=1), periods=45))
+    # 前後用平日補：還沒到的到期日也算得出窗口；資料第一天之前的窗口（CL 第一個 LTD 在資料開頭）也要算，窗口裡沒資料的日子偵測時自然跳過
+    days = pd.bdate_range(end=days[0] - pd.Timedelta(days=1), periods=10).append(days).append(
+        pd.bdate_range(days[-1] + pd.Timedelta(days=1), periods=45))
     D = lambda k: days[k] if 0 <= k < len(days) else None
     last_le = lambda x: int(days.searchsorted(x, 'right')) - 1
     for y in range(days[0].year, days[-1].year + 1):
@@ -431,7 +453,7 @@ def roll_days(kind, F, R, gap_o=None, fill=False, days=None, v=None):
     out = []
     days = F.index if days is None else days
     wins = roll_windows(kind, days)
-    seen = lambda d: d is not None and d <= days[-1]            # 還沒到的日子不標
+    seen = lambda d: d is not None and days[0] <= d <= days[-1]   # 還沒到（或資料開始前）的日子不標
     db = None
     if R is not None:
         j = pd.concat([F.rename('f'), R.rename('r')], axis=1, join='inner').dropna()
@@ -470,44 +492,72 @@ def roll_days(kind, F, R, gap_o=None, fill=False, days=None, v=None):
     return out
 
 
+def _splices(kind, src, days, R):
+    """1H 換月拼接那根：回 [(T＝那根 1H 的時間, 跳動 log 或 None)]。先認形狀（平盤爆量、資料斷層，見上面），再看價差跳動。"""
+    s15 = src['c'][(src.index.hour == 15) & (src.index.minute == 0)]
+    F = pd.Series(s15.to_numpy(), index=s15.index.normalize())
+    F = F[~F.index.duplicated(keep='last')]
+    tdi = _tday(src.index)
+    ret = np.log(src['c'] / src['c'].shift())
+    lr = np.log(src['v'].where(src['v'] > 0)).ffill().diff()       # 量跳升倍數（log），扣掉同時段近 20 天的中位數
+    base = lr.groupby(src.index.hour).transform(lambda x: x.rolling(20, min_periods=5).median().shift())
+    vz = np.exp(lr - base).fillna(1.0).clip(lower=1.0)
+    med = src['v'].rolling(200, min_periods=20).median().shift()
+    flat = ((src['h'] == src['l']) & (src['v'] >= ROLL_FLAT_X * med)).to_numpy()
+    kd = days.searchsorted(tdi)
+    dh = np.r_[0.0, np.diff(src.index.asi8) / 3.6e12]
+    hole = (dh >= ROLL_HOLE_H[0]) & (dh < ROLL_HOLE_H[1]) & (np.r_[0, np.diff(kd)] == 1)
+    isgap = (src['l'] > src['h'].shift()) | (src['h'] < src['l'].shift())
+    byday = {d: (prev, step) for d, prev, step, _ in roll_days(kind, F, R, days=days)}
+    out = []
+    for win, cand, fb, E in roll_windows(kind, days):
+        T = src.index[tdi.isin(win) & flat]
+        if not len(T):
+            T = src.index[(tdi == fb) & hole]
+        if len(T):
+            out.append((T[0], float(ret[T[0]]) if np.isfinite(ret[T[0]]) else None))
+            continue
+        d = next((x for x in win if x in byday), None)
+        if d is None:
+            continue
+        prev, step = byday[d]
+        if prev is None:                                          # 價差第一個比對日（1H 歷史開頭）：往前一個交易日起算，不能只看當天
+            k = int(days.searchsorted(d))
+            prev = days[k - 1] if k else None
+        lo = prev + pd.Timedelta(hours=15) if prev is not None else src.index[0] - pd.Timedelta(hours=1)
+        seg = ret[(ret.index > lo) & (ret.index <= d + pd.Timedelta(hours=15))].dropna()
+        if abs(step) < ROLL_STRONG:
+            seg = seg[~isgap.reindex(seg.index).to_numpy()]
+        same = seg[np.sign(seg) == np.sign(step)]
+        seg = same if len(same) else seg
+        if seg.empty:
+            continue
+        T = (seg.abs() * np.sqrt(vz.reindex(seg.index))).idxmax()
+        e16 = E + pd.Timedelta(hours=16) if E is not None else None   # 2025-06 以前股指 1H 在到期日 16:00 那根換（那天 15:00 常沒有 K）
+        if e16 is not None and e16 in seg.index:
+            T = e16
+        out.append((T, step))
+    return out
+
+
 def find_rolls(kind, tf, src, bars, R):
     """src：1H（tf＝1H／4H，已過 bars_1h）或日K（D／W，已修量）；bars：要輸出的 K；R：參考標的日K 收盤。
-    回 [{i, t, dir, step_pct, label}]（i＝bars 的位置；dir／step_pct＝換月那天的價差跳動，只靠日曆時是 None）。"""
-    intra = tf in ('1H', '4H')
-    if intra:
-        s15 = src['c'][(src.index.hour == 15) & (src.index.minute == 0)]
-        F = pd.Series(s15.to_numpy(), index=s15.index.normalize())
-        gap_o = None
-        ret = np.log(src['c'] / src['c'].shift())
-        lr = np.log(src['v'].where(src['v'] > 0)).ffill().diff()       # 量跳升倍數（log），扣掉同時段近 20 天的中位數
-        base = lr.groupby(src.index.hour).transform(lambda x: x.rolling(20, min_periods=5).median().shift())
-        vz = np.exp(lr - base).fillna(1.0).clip(lower=1.0)
+    回 [{i, t, dir, step_pct, label}]（i＝bars 的位置；dir／step_pct＝換月那根的跳動，只靠日曆時是 None）。"""
+    out = []
+    if tf in ('1H', '4H'):
+        days = pd.DatetimeIndex(_tday(src.index).unique()).sort_values()
+        hits = []
+        for T, step in _splices(kind, src, days, R):
+            key = T if tf == '1H' else _fut_4h_key(pd.DatetimeIndex([T]))[0]
+            hits.append((np.flatnonzero(bars.index == key), step))
     else:
         F = src['c']
+        F = F[~F.index.duplicated(keep='last')]
         gap_o = None if kind == 'eq' else np.log(src['o'] / src['c'].shift())
-    F = F[~F.index.duplicated(keep='last')]
-    mon = bars.index - pd.to_timedelta(bars.index.weekday, unit='D')
-    out = []
-    days = pd.DatetimeIndex(_tday(src.index).unique()).sort_values() if intra else None
-    for d, prev, step, E in roll_days(kind, F, R, gap_o, fill=not intra, days=days, v=None if intra else src['v']):
-        if intra:
-            lo = (prev if prev is not None else d - pd.Timedelta(days=1)) + pd.Timedelta(hours=15)
-            seg = ret[(ret.index > lo) & (ret.index <= d + pd.Timedelta(hours=15))].dropna()
-            if step is not None:
-                same = seg[np.sign(seg) == np.sign(step)]
-                seg = same if len(same) else seg
-            if seg.empty:
-                continue
-            T = (seg.abs() * np.sqrt(vz.reindex(seg.index))).idxmax()
-            e16 = E + pd.Timedelta(hours=16) if E is not None else None   # 2025-06 以前股指 1H 在到期日 16:00 那根換（那天 15:00 常沒有 K）
-            if e16 is not None and e16 in seg.index:
-                T = e16
-            key = T if tf == '1H' else _fut_4h_key(pd.DatetimeIndex([T]))[0]
-            hit = np.flatnonzero(bars.index == key)
-        elif tf == 'D':
-            hit = np.flatnonzero(bars.index == d)
-        else:
-            hit = np.flatnonzero(mon == d - pd.Timedelta(days=d.weekday()))
+        mon = bars.index - pd.to_timedelta(bars.index.weekday, unit='D')
+        hits = [(np.flatnonzero(bars.index == d) if tf == 'D' else np.flatnonzero(mon == d - pd.Timedelta(days=d.weekday())), step)
+                for d, _, step, _ in roll_days(kind, F, R, gap_o, fill=True, v=src['v'])]
+    for hit, step in hits:
         if not len(hit):
             continue
         i = int(hit[0])
@@ -652,7 +702,8 @@ def run(raw, tf, now=None, http=None):
         raise EngineError(422, 'not_supported', '只支援個股與 ETF（%s 是 %s）' % (code, m.get('instrumentType')))
     tz = m.get('exchangeTimezoneName') or ('Asia/Taipei' if market == 'tw' else 'America/New_York')
     src = frame(res, TFS[tf])
-    bars, final = build(src, tf, market, _local(now, tz))
+    rmt = m.get('regularMarketTime') if market == 'fut' else None
+    bars, final = build(src, tf, market, _local(min(now, fetched), tz), _local(rmt, tz) if rmt else None)
     rolls = None
     if market == 'fut':
         R = None
@@ -1010,6 +1061,41 @@ def selftest():
     h1['o'] = h1['o'].where(h1.index != sp_t, 100.0)
     ri = [x['t'] for x in find_rolls('gc', '1H', h1, h1, pd.Series(100.0, index=tds))]
     ok(ri == ['2026-07-29 03:00'], 'GC 1H 換月那根＝報酬×量跳升最大的拼接 K，不是同一天報酬稍大的消息 K：%s' % ri)
+
+    def h1_of(start, end):
+        tds_ = pd.bdate_range(start, end)
+        ix = pd.DatetimeIndex([td + pd.Timedelta(hours=h_ - (24 if h_ >= 18 else 0)) for td in tds_ for h_ in hrs])
+        return tds_, pd.DataFrame({'o': 100.0, 'h': 100.1, 'l': 99.9, 'c': 100.0, 'v': 1000.0}, index=ix.sort_values())
+    # 股指：資料第一天就是到期日，拼接是到期日 16:00 那根平盤爆量 K（ES 2024-06-21）→ 標那根，不被「第一個比對日」縮掉
+    tq, eq1 = h1_of('2026-03-19', '2026-05-29')
+    sp_e = pd.Timestamp('2026-03-20 16:00')
+    eq1.loc[eq1.index >= sp_e, ['o', 'h', 'l', 'c']] *= 1.013
+    eq1.loc[sp_e, ['h', 'l', 'v']] = [eq1.at[sp_e, 'o'], eq1.at[sp_e, 'o'], 200000.0]
+    eq1.loc[sp_e, 'c'] = eq1.at[sp_e, 'o']
+    re1 = [x['t'] for x in find_rolls('eq', '1H', eq1, eq1, pd.Series(100.0, index=tq))]
+    re4 = [x['t'] for x in find_rolls('eq', '4H', eq1, bars_4h(eq1, 'fut')[0], pd.Series(100.0, index=tq))]
+    # CL：LTD（2026-06-22）14:00 以後沒資料、隔天 03:00 才接新合約（−1.5%）；LTD 當天 03:00 有一根量暴增的假動作 → 標 06-23 03:00
+    tc, cl1 = h1_of('2026-06-01', '2026-07-10')
+    sp_c, fake = pd.Timestamp('2026-06-23 03:00'), pd.Timestamp('2026-06-22 03:00')
+    cl1 = cl1[(cl1.index <= pd.Timestamp('2026-06-22 14:00')) | (cl1.index >= sp_c)].copy()
+    cl1.loc[cl1.index >= sp_c, ['o', 'h', 'l', 'c']] *= 0.985
+    cl1.loc[fake, ['c', 'l', 'v']] = [99.0, 98.9, 30000.0]
+    rc1 = [x['t'] for x in find_rolls('cl', '1H', cl1, cl1, pd.Series(100.0, index=tc))]
+    rc0 = [x['t'] for x in find_rolls('cl', '1H', cl1, cl1, None)]
+    ok(re1 == ['2026-03-20 16:00'] and re4 == ['2026-03-20 14:00'] and rc1 == ['2026-06-23 03:00'] and rc0 == rc1,
+       '1H 換月認形狀：平盤爆量那根（資料開頭的第一次換月也抓得到）、LTD 後資料斷層的第一根（參考標的抓不到也一樣）：%s %s %s' % (re1, re4, rc1))
+    # 期貨盤中定案看資料時間：Yahoo 期貨晚約 10 分鐘，03:04 抓到的資料只到 02:54 → 02:00 那根還沒定案
+    wk2 = pd.DataFrame({'o': 1.0, 'h': 2.0, 'l': .5, 'c': 1.5, 'v': 10.0},
+                       index=pd.to_datetime(['2026-11-10 01:00', '2026-11-10 02:00', '2026-11-10 11:00', '2026-11-10 12:00']))
+    T_ = pd.Timestamp
+    g1 = build(wk2.iloc[:2], '1H', 'fut', T_('2026-11-10 03:04:43'), T_('2026-11-10 02:54:36'))[1]
+    g2 = build(wk2.iloc[:2], '1H', 'fut', T_('2026-11-10 03:13'), T_('2026-11-10 03:03'))[1]
+    g3 = build(wk2.iloc[:2], '1H', 'fut', T_('2026-11-10 03:10'))[1]
+    g4_ = build(wk2.iloc[:2], '4H', 'fut', T_('2026-11-10 06:20'), T_('2026-11-10 05:59:59'))[1]
+    g5 = build(wk2, '1H', 'fut', T_('2026-11-10 14:05'), T_('2026-11-10 12:59:58'))[1]   # 提早收盤 13:00：資料停在休市前
+    ok(list(g1) == [True, False] and list(g2) == [True, True] and list(g3) == [True, False] and list(g4_) == [True, False]
+       and list(g5) == [True, True, True, True],
+       '期貨盤中定案：資料時間過了結束才算（沒給資料時間就等 15 分鐘；資料一直沒過就等滿 1 小時）')
 
     def mock_f(url):
         sym = urllib.parse.unquote(url.split('/chart/')[1].split('?')[0])
