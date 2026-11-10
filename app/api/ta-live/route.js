@@ -10,7 +10,8 @@ export const maxDuration = 60;
 //     {action:'status'}            → {ok, owner, quota, wm}           （頁面一進來先問：開通了沒、今天剩幾檔）
 //     {symbol:'2330', tf:'D'}      → {ok, owner, quota, wm, data:<引擎回應>}
 //   失敗 → {ok:false, reason, error, quota?}
-//     reason：need-login 401｜not-enabled 403｜bad-request 400｜quota-exceeded 429｜symbol-not-found 404/422｜coming-soon 422（台指期／費半期整合中）｜upstream 502｜error 500
+//     reason：need-login 401｜not-enabled 403｜bad-request 400｜quota-exceeded 429｜symbol-not-found 404/422｜coming-soon 422｜
+//             daily-only 422（台指期／費半期只有日K／週K，選 1H／4H 時；頁面自動改查日K）｜upstream 502｜error 500
 function R(data, status) {
   return Response.json(data, { status: status || 200, headers: { 'Cache-Control': 'private, no-store' } });
 }
@@ -56,8 +57,9 @@ export async function POST(req) {
     }
     const msg = (eb && eb.error && eb.error.message) || '';
     if (status === 400 || status === 404 || status === 422) {   // 查無／不支援（指數、加密貨幣、資料太少）：不扣額度
-      const soon = eb && eb.error && eb.error.code === 'coming_soon';
-      return R({ ok: false, reason: soon ? 'coming-soon' : 'symbol-not-found', error: msg || '查無此代號', quota: quota(used.length) }, status === 422 ? 422 : 404);
+      const code = eb && eb.error && eb.error.code;
+      const reason = code === 'coming_soon' ? 'coming-soon' : code === 'daily_only' ? 'daily-only' : 'symbol-not-found';
+      return R({ ok: false, reason, error: msg || '查無此代號', quota: quota(used.length) }, status === 422 ? 422 : 404);
     }
     return R({ ok: false, reason: 'upstream', error: status === 401 ? '計算引擎設定有誤（金鑰不符）' : msg || '行情來源暫時沒有回應，請稍後再試', quota: quota(used.length) }, 502);
   } catch (e) {

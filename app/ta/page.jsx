@@ -7,7 +7,9 @@ import { normParams, backtest, chartMarks, exitLine, ruleText, maName, smaSeq, P
 //   會員登入（/api/member-login，票存 localStorage）→ /api/ta-live 每次都重驗：站長（OWNER_PUB_IDS）或 ta_access 有開通
 //   左 1/4：輸入代號（台股上市櫃、美股、ETF、美國期貨連續月 ES1!／NQ1!…、指數只收 ^SOX）＋最近查過＋今日額度（會員每天 30 檔、站長不限）
 //   期貨（11-10）：換月那根圖上標「換月」（引擎 chart.overlays.rolls）；沒有成交量的標的（^SOX）量的條件停用、量柱與 ③ 前五大量改寫「此標的沒有成交量」。
-//   新欄位（has_volume、rolls、symbol.contract）一律可缺：舊引擎回應照舊畫。
+//   台指期／費半期（11-10，期交所日資料）：只有日K／週K（symbol.tfs → 1H／4H 停用、寫「期交所只有日資料」；選著 1H 查會自動改日K）、
+//           標題列「含夜盤（夜盤算到隔天）」、期交所讀不到時的黃色註記、費半期旁「^SOX 是指數版」可一鍵改看。
+//   新欄位（has_volume、rolls、symbol.contract／tfs／session／stale／see_also）一律可缺：舊引擎回應照舊畫。
 //   右 3/4：週期分頁 1H／4H／日K／週K ＋ 均線組 短（5/10/20）中（8/13/34）長（20/60/120）＋ K 線圖（撐壓、前五大量、缺口、島狀反轉、
 //           進出場、停損、出場 ✕；均線紅黃藍＝短到長；圖下「時間區間導覽列」拖曳看整段歷史）
 //           ＋ 緊貼圖下三個大分頁 ①進出場 ②跳空缺口 ③前五大量（11-09；原本的均線排列分頁已永久刪除，守門見 Skill\tests\ta_engine_check.py）＋ 圖例（預設收合）＋ 支撐壓力
@@ -55,12 +57,41 @@ function noVolume(d) {
   const v = g(d, "history", "v");
   return Array.isArray(v) && v.length > 0 && !hasVolume(v, d.bars_completed != null ? d.bars_completed : v.length);
 }
-// 標題列的市場標籤：台股／美股（·交易所·ETF）、美國期貨・CME、指數
+// 標題列的市場標籤：台股／美股（·交易所·ETF）、美國期貨・CME、台灣期貨・TAIFEX、指數
 function mktBadge(s) {
   if (!s || typeof s !== "object") return "";
-  if (s.market === "fut") return "美國期貨・" + (s.exchange || "CME");
+  if (s.market === "fut") return (s.exchange === "TAIFEX" ? "台灣期貨・" : "美國期貨・") + (s.exchange || "CME");
   if (s.type === "INDEX") return "指數";
   return (s.market === "tw" ? "台股" : "美股") + (s.exchange ? "·" + s.exchange : "") + (s.type === "ETF" ? "·ETF" : "");
+}
+// 週期分頁：引擎有給 symbol.tfs（台指期／費半期＝["D","W"]）時其他週期停用並註明；舊回應沒有 tfs＝全部可用
+const TWF_ONLY_TXT = "期交所只有日資料";
+function TfTabs({ tf, tfs, onPick }) {
+  const ok = Array.isArray(tfs) && tfs.length ? tfs : null;
+  return (
+    <div className="ta-seg" role="tablist" aria-label="週期">
+      {TFS.map(([k, nm]) => {
+        const off = !!ok && !ok.includes(k);
+        return (
+          <button key={k} type="button" role="tab" aria-selected={tf === k} className={"ta-tab" + (tf === k ? " on" : "")} disabled={off}
+            title={off ? TWF_ONLY_TXT : undefined} onClick={() => onPick(k)}>{nm}</button>
+        );
+      })}
+      {ok && TFS.some(([k]) => !ok.includes(k)) ? <span className="ta-seglab ta-tfnote">{TWF_ONLY_TXT}</span> : null}
+    </div>
+  );
+}
+// 標題列下的期交所說明（台指期／費半期才有，欄位都可缺）：盤別、期交所暫時讀不到、同標的的指數版（費半期 → ^SOX）
+function FutInfo({ s, onPick }) {
+  if (!s || typeof s !== "object" || s.exchange !== "TAIFEX") return null;
+  const see = s.see_also && typeof s.see_also === "object" && typeof s.see_also.code === "string" ? s.see_also : null;
+  if (!see && !(typeof s.stale === "string" && s.stale)) return null;
+  return (
+    <div className="ta-finfo">
+      {typeof s.stale === "string" && s.stale ? <span className="ta-chip warn">{s.stale}</span> : null}
+      {see ? <span className="ta-fsee">{typeof see.text === "string" ? see.text : see.code}<button type="button" className="ta-link" onClick={() => onPick(see.code)}>改看 {see.code}</button></span> : null}
+    </div>
+  );
 }
 function ud(x) { const v = Number(x); return x === null || x === undefined || !Number.isFinite(v) || v === 0 ? "" : v > 0 ? "up" : "dn"; }
 function g(o, ...path) { let x = o; for (const p of path) { if (!x || typeof x !== "object") return undefined; x = x[p]; } return x; }
@@ -1244,6 +1275,7 @@ export default function TaPage() {
     if (j.quota) setQuota(j.quota);
     if (!j.ok) {
       if (gate(j)) return;
+      if (j.reason === "daily-only" && t !== "D") { load(s, "D"); return; }   // 台指期／費半期只有日K、週K：選著 1H／4H 查就自動改日K
       setErr({ reason: j.reason, error: j.error || "讀取失敗" }); setData(null); return;
     }
     cache.current.set(ck, j.data);
@@ -1322,7 +1354,7 @@ export default function TaPage() {
       <header className="ta-head">
         <div className="ta-hrow">
           <span className="ta-badge">會員專屬</span>
-          <h1 className="ta-h1">技術分析<span className="sep">｜</span><span className="ta-sub2">台股上市櫃・美股・ETF・美國期貨・費半，1H／4H／日K／週K</span></h1>
+          <h1 className="ta-h1">技術分析<span className="sep">｜</span><span className="ta-sub2">台股上市櫃・美股・ETF・美國期貨・台指期・費半，1H／4H／日K／週K</span></h1>
         </div>
       </header>
 
@@ -1332,11 +1364,11 @@ export default function TaPage() {
           <form className="ta-ltools" onSubmit={submit}>
             <label className="ta-lab" htmlFor="ta-in">輸入代號</label>
             <div className="ta-inrow">
-              <input id="ta-in" type="search" className="ta-q" placeholder="2330、00878、NVDA、NQ1!、^SOX" value={q}
+              <input id="ta-in" type="search" className="ta-q" placeholder="2330、00878、NVDA、NQ1!、台指期" value={q}
                 onChange={(e) => setQ(e.target.value)} autoComplete="off" spellCheck={false} enterKeyHint="search" />
               <button type="submit" className="ta-btn ta-go" disabled={busy || !q.trim()}>查</button>
             </div>
-            <div className="ta-hint">台股打數字代號（先找上市、再找上櫃）、美股打英文代號；美國期貨打 ES1!、NQ1!、YM1!、RTY1!、GC1!、CL1!（也可打 小那、小道、黃金期、原油期）；指數只收 ^SOX（費半）</div>
+            <div className="ta-hint">台股打數字代號（先找上市、再找上櫃）、美股打英文代號；美國期貨打 ES1!、NQ1!、YM1!、RTY1!、GC1!、CL1!（也可打 小那、小道、黃金期、原油期）；台指期打 TXF1!（或 台指期）、費半期打 SXF1!（或 費半期），只有日K／週K；指數只收 ^SOX（費半）</div>
           </form>
           <div className="ta-quota" data-left={quota && !quota.unlimited ? quota.left : ""}>
             {owner || (quota && quota.unlimited) ? <>站長：不限檔數</> : quota ? (
@@ -1369,12 +1401,7 @@ export default function TaPage() {
         {/* ── 右 3/4：週期＋均線組＋圖＋表 ── */}
         <div className="ta-right">
           <div className="ta-tabs">
-            <div className="ta-seg" role="tablist" aria-label="週期">
-              {TFS.map(([k, nm]) => (
-                <button key={k} type="button" role="tab" aria-selected={tf === k} className={"ta-tab" + (tf === k ? " on" : "")}
-                  onClick={() => (sym ? load(sym, k) : setTf(k))}>{nm}</button>
-              ))}
-            </div>
+            <TfTabs tf={tf} tfs={symInfo.tfs} onPick={(k) => (sym ? load(sym, k) : setTf(k))} />
             <div className="ta-seg" role="group" aria-label="均線組">
               <span className="ta-seglab">均線</span>
               {MA_SETS.map(([k, nm]) => (
@@ -1407,8 +1434,10 @@ export default function TaPage() {
                   <span className="ta-chip asof">{TF_ZH[d.tf]}・最後定案 {d.asof || "—"}</span>
                   {unfB ? <span className="ta-chip warn">{d.unfinished_label || "盤中未定"} {fnum(unfB.c)}</span> : null}
                   <span className="ta-chip" data-mkt={symInfo.market || ""}>{mktBadge(symInfo)}</span>
-                  {symInfo.market === "fut" && typeof symInfo.contract === "string" && symInfo.contract ? <span className="ta-chip" title="Yahoo 連續月目前接的合約">連續月・{symInfo.contract}</span> : null}
+                  {symInfo.market === "fut" && typeof symInfo.contract === "string" && symInfo.contract ? <span className="ta-chip" title="連續月目前接的合約">連續月・{symInfo.contract}</span> : null}
+                  {typeof symInfo.session === "string" && symInfo.session ? <span className="ta-chip" data-k="session">{symInfo.session}</span> : null}
                 </div>
+                <FutInfo s={symInfo} onPick={(c) => load(c, "D")} />
                 {g(d, "signals", "badges") ? (
                   <div className="ta-bds full">
                     <span className="ta-bd"><i>量</i>{d.signals.badges.vol || "—"}</span>
@@ -1427,7 +1456,7 @@ export default function TaPage() {
               </Boundary>
             ) : null}
             <div className="ta-foot">
-              資料來源 Yahoo Finance（開高低收依除息事件還原）；以上數字全由寫死的規則計算，只描述過去的價量位置與這套規則的歷史表現，不是買賣建議。
+              資料來源 {g(d, "symbol", "exchange") === "TAIFEX" ? "臺灣期貨交易所（近月連續，價格不還原）" : "Yahoo Finance（開高低收依除息事件還原）"}；以上數字全由寫死的規則計算，只描述過去的價量位置與這套規則的歷史表現，不是買賣建議。
               本頁為會員專屬，請勿轉傳。
             </div>
           </div>

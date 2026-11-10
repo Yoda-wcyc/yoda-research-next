@@ -8,6 +8,8 @@
 //  3. 訊號篩選（11-10）：全部／只看多方／只看空方只篩顯示（記號、線、清單、統計），統計＝子集重算；localStorage 壞值回「全部」。
 //  4. 期貨／費半（11-10）：市場標籤、換月標籤（rolls 缺、壞值都不崩）、沒有成交量（has_volume=false 或量全 null）→ 量柱、③ 前五大量、
 //     規則面板寫「此標的沒有成交量」、量的條件不套用（不改面板存的參數）；lib/ta-live.js 代號格式（期貨、^SOX、中文別名）與額度鍵。
+//  5. 台指期／費半期（11-10，期交所）：市場標籤「台灣期貨・TAIFEX」、symbol.tfs → 1H／4H 停用＋「期交所只有日資料」、
+//     期交所讀不到的註記、費半期「^SOX 是指數版」；欄位缺／壞值不崩；代號 TXF1!／TX／台指期／SXF1!／費半期 收得進來。
 const fs = require("fs"), path = require("path"), vm = require("vm"), assert = require("assert");
 const ROOT = path.join(__dirname, "..");
 let fails = 0;
@@ -117,7 +119,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   const { transformSync } = require(path.join(ROOT, "node_modules", "next", "dist", "build", "swc"));
   const opts = { jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "classic" } }, target: "es2020" }, module: { type: "commonjs" } };
   const src = 'const React = require("react");\n' + fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8")
-    .replace('"../../lib/ta-trade"', JSON.stringify(path.join(ROOT, "lib", "ta-trade.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries };\n";
+    .replace('"../../lib/ta-trade"', JSON.stringify(path.join(ROOT, "lib", "ta-trade.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo };\n";
   const Mod = require("module");
   const libSrc = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-trade.js"), "utf8"), opts).code;
   const lib = new Mod(path.join(ROOT, "lib", "ta-trade.js")); lib.paths = Mod._nodeModulePaths(ROOT); lib._compile(libSrc, lib.id);
@@ -284,6 +286,40 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     for (const x of ["^^X", "A B", "<x>", "ES=F;DROP", "1234567890123", "小那斯達克期貨超長名字"]) assert.strictEqual(LV.cleanSym(x), "", x);
     assert.strictEqual(LV.symKey("NQ1!"), "NQ=F"); assert.strictEqual(LV.symKey("/nq"), "NQ=F"); assert.strictEqual(LV.symKey("NQ=F"), "NQ=F");
     assert.strictEqual(LV.symKey("2330.TW"), "2330"); assert.strictEqual(LV.symKey("BRK.B"), "BRK-B"); assert.strictEqual(LV.symKey("^SOX"), "^SOX");
+  });
+
+  // ---------- 5. 台指期／費半期（期交所） ----------
+  const TWF = { market: "fut", exchange: "TAIFEX", type: "FUTURE", code: "TXF1!", yahoo: "TXF1!", contract: "202611", tfs: ["D", "W"], session: "含夜盤（夜盤算到隔天）" };
+  const html0 = (el) => renderToString(el).replace(/<!-- -->/g, "");
+  await t("台指期：市場標籤台灣期貨・TAIFEX；美國期貨照舊", async () => {
+    assert.strictEqual(P.mktBadge(TWF), "台灣期貨・TAIFEX");
+    assert.strictEqual(P.mktBadge({ market: "fut", exchange: "CME" }), "美國期貨・CME");
+  });
+  await t("台指期：symbol.tfs=[D,W] → 1H／4H 停用＋「期交所只有日資料」；沒有 tfs（舊回應、美股）或壞值全部可用", async () => {
+    const on = html0(React.createElement(P.TfTabs, { tf: "D", tfs: TWF.tfs, onPick: () => {} }));
+    assert.strictEqual((on.match(/disabled=""/g) || []).length, 2, on);
+    assert.ok(/title="期交所只有日資料"[^>]*>1H</.test(on) && on.includes("ta-tfnote") && /aria-selected="true"[^>]*>日K</.test(on), on);
+    for (const x of [undefined, null, "D", [], { a: 1 }]) {
+      const h = html0(React.createElement(P.TfTabs, { tf: "1H", tfs: x, onPick: () => {} }));
+      assert.ok(!h.includes("disabled") && !h.includes("期交所只有日資料") && h.includes(">週K<"), String(x));
+    }
+  });
+  await t("台指期：期交所讀不到 → 黃色註記；費半期 → ^SOX 是指數版＋改看鈕；美股、欄位壞值不顯示也不崩", async () => {
+    const st = html0(React.createElement(P.FutInfo, { s: { ...TWF, stale: "期交所最新資料暫時讀不到，資料到 2026-11-07" }, onPick: () => {} }));
+    assert.ok(st.includes("ta-chip warn") && st.includes("資料到 2026-11-07"), st);
+    const sx = html0(React.createElement(P.FutInfo, { s: { ...TWF, code: "SXF1!", see_also: { code: "^SOX", text: "^SOX 是指數版（費城半導體指數，Yahoo 資料）" } }, onPick: () => {} }));
+    assert.ok(sx.includes("^SOX 是指數版") && sx.includes("改看 ^SOX"), sx);
+    for (const s of [TWF, { market: "fut", exchange: "CME", stale: "x" }, null, "x", { ...TWF, see_also: "x", stale: 5 }, { ...TWF, see_also: { code: 3 } }]) {
+      assert.strictEqual(html0(React.createElement(P.FutInfo, { s, onPick: () => {} })), "", JSON.stringify(s));
+    }
+  });
+  await t("台指期：換月標籤、量（口）照畫", async () => {
+    const h = chartHtml(mkD({ symbol: TWF, rolls: [{ i: 40, t: "2026-02-13", dir: null, step_pct: null, label: "換月" }] }));
+    assert.ok(h.includes('data-roll="2026-02-13"') && h.includes("量（口）"), "台指期圖");
+  });
+  await t("ta-live：台指期／費半期代號收得進來、額度鍵 TXF1!＝TXF=F", async () => {
+    for (const x of ["TXF1!", "txf1!", "TX", "台指期", "台指", "SXF1!", "SXF", "費半期"]) assert.ok(LV.cleanSym(x), x);
+    assert.strictEqual(LV.symKey("TXF1!"), "TXF=F"); assert.strictEqual(LV.symKey("SXF1!"), "SXF=F");
   });
 
   console.log(fails ? "FAILED " + fails : "all passed");

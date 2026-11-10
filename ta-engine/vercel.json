@@ -3,6 +3,7 @@
   "functions": {
     "api/engine.py": {
       "maxDuration": 60,
+      "includeFiles": "data/**",
       "excludeFiles": "{dev_server.py,vendor.json,**/__pycache__/**}"
     }
   }

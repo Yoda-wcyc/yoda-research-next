@@ -323,3 +323,9 @@ svg.ta-k .unf{fill:#ffcf70;font-size:11px;font-weight:700;paint-order:stroke;str
 svg.ta-k .roll-t{fill:#9aa4b2;font-size:10px;paint-order:stroke;stroke:#0b0f15;stroke-width:3px;stroke-linejoin:round}
 .ta-rp label.off{opacity:.45}
 .ta-rp .hint.warn{color:var(--yellow)}
+/* 台指期／費半期（11-10）：只有日K／週K → 1H／4H 停用；期交所說明列（讀不到的黃色註記、費半期 → ^SOX 指數版） */
+.ta-tab:disabled{opacity:.35;cursor:not-allowed}
+.ta-tab:disabled:hover{color:var(--dim)}
+.ta-tfnote{margin-left:6px;font-size:calc(12px*var(--scale))}
+.ta-finfo{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:-4px 0 8px;font-size:calc(12.5px*var(--scale));color:var(--dim)}
+.ta-fsee .ta-link{margin-left:8px}

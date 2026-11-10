@@ -1,4 +1,8 @@
-# ta-engine 回應契約（schema `ta-engine-3`，2026-11-09；11-10 加期貨／費半，只加欄位）
+# ta-engine 回應契約（schema `ta-engine-3`，2026-11-09；11-10 加期貨／費半、台指期／費半期，只加欄位）
+
+> 11-10 晚（schema 不變、**只加欄位**）：台指期 `TXF1!`、費半期 `SXF1!` 改走**期交所官方日資料**（§2.3），只有日K／週K。
+> 新欄位（只有這兩檔有，舊頁面不看）：`symbol.source`／`tfs`／`data_through`／`session`／`stale`／`see_also`。原本回 422 `coming_soon` 的代號改成正常回應；
+> 選 1H／4H 回 422 `daily_only`。`signals.top_volume.unit` 期貨改 `口`（原本 `shares`）。
 
 > 11-10（schema 不變、**只加欄位**，舊頁面拿到新回應、新頁面拿到舊回應都要能跑）：收美國期貨連續月（ES、NQ、YM、RTY、GC、CL）與 ^SOX。
 > 新欄位：頂層 `has_volume`、`symbol.has_volume`／`contract`／`continuous`、`chart.overlays.rolls`（換月）、`chart.legend` 的 `roll`／（沒量時）少 `top_volume`。
@@ -32,7 +36,7 @@ python "G:\Yoda x Claude\Skill\ta_engine.py" --check-vendor "G:\Yoda x Claude\_d
 | 項目 | 值 |
 |---|---|
 | Header | `X-TA-Engine-Key: <hex>`，`hex = HMAC-SHA256(key=TA_ENGINE_KEY, msg="ta-engine")` 小寫 hex 64 字 |
-| symbol | 台股數字代號（`2330`、`00878`、`6488`，可帶 `.TW`／`.TWO`）；美股英文代號（`NVDA`、`SPY`、`BRK.B`）。大小寫、前後空白不拘。<br>美國期貨（白名單，§2.1）：`ES=F`／`ES1!`／`/ES`，`NQ`、`YM`、`RTY`、`GC` 也收純代號；純 `ES`、`CL` 照查股票（Eversource、Colgate），期貨要打 `ES1!`／`CL1!`。中文別名：小那、那指期→NQ；小道、道瓊期→YM；小標普、標普期→ES；小羅素→RTY；黃金期→GC；原油期、輕原油→CL。<br>指數只收 `^SOX`（也收 `SOX`、費半、費城半導體）。`TXF1!`、`SXF1!`、台指期、小台、費半期 → 422 `coming_soon`（下一階段接 TAIFEX） |
+| symbol | 台股數字代號（`2330`、`00878`、`6488`，可帶 `.TW`／`.TWO`）；美股英文代號（`NVDA`、`SPY`、`BRK.B`）。大小寫、前後空白不拘。<br>美國期貨（白名單，§2.1）：`ES=F`／`ES1!`／`/ES`，`NQ`、`YM`、`RTY`、`GC` 也收純代號；純 `ES`、`CL` 照查股票（Eversource、Colgate），期貨要打 `ES1!`／`CL1!`。中文別名：小那、那指期→NQ；小道、道瓊期→YM；小標普、標普期→ES；小羅素→RTY；黃金期→GC；原油期、輕原油→CL。<br>台指期（§2.3）：`TXF1!`、`TX`、`TXF`、`/TXF`、台指期、台指；費半期：`SXF1!`、`SXF`、費半期（`TX` 不再查 Yahoo 的 Ternium；「小台」不收，小型台指是另一檔商品）。<br>指數只收 `^SOX`（也收 `SOX`、費半、費城半導體）。 |
 | tf | `1H`、`4H`、`D`（日K）、`W`（週K）；預設 `D` |
 | 回應 | `application/json; charset=utf-8`，`Cache-Control: private, no-store` |
 
@@ -61,9 +65,10 @@ const r = await fetch(`${ENGINE}/api/engine?symbol=${encodeURIComponent(sym)}&tf
 | 400 | `bad_tf` | tf 不是 1H／4H／D／W |
 | 404 | `not_found` | Yahoo 查無（台股 `.TW`、`.TWO` 都試過） |
 | 422 | `not_supported` | 查得到但不是個股／ETF（`instrumentType` 不是 `EQUITY`／`ETF`；期貨白名單要是 `FUTURE`、`^SOX` 要是 `INDEX`） |
-| 422 | `coming_soon` | 台指期／費半期（`TXF1!`、`SXF1!`…）：`message`＝「台指期／費半期資料整合中」；Next 回 `reason: "coming-soon"`、不扣額度 |
+| 422 | `daily_only` | 台指期／費半期選 1H／4H：`message`＝「期交所只有日資料：台指期、費半期只提供日K、週K」；Next 回 `reason: "daily-only"`、不扣額度，頁面自動改查日K |
+| 422 | `coming_soon` | （11-10 晚起不再發生：原本台指期／費半期回這個；Next 仍認得 `reason: "coming-soon"`） |
 | 422 | `too_few_bars` | 定案 K 少於 30 根（新上市） |
-| 502 | `upstream` | Yahoo query1、query2 都沒回 |
+| 502 | `upstream` | Yahoo query1、query2 都沒回；台指期／費半期：期交所連不上**而且**沒有回補檔（有回補檔就照回 200＋註記，§2.3） |
 | 500 | `internal` | 引擎例外（message 只給例外型別） |
 
 **額度要在 Next 端算**：同一檔換 tf／均線組不算新的一檔；`not_found`／`bad_symbol` 要不要扣額度由 Next 決定（建議不扣）。
@@ -152,6 +157,40 @@ CL 2025-02、2025-11、2026-02 這三個月都要有換月。CL 2025-06-22 18:00
 | `legend` | 有換月時多一項 `{key:"roll", label:"換月", desc}` |
 
 畫法：換月那根畫灰色（`#8b95a3`）細虛直線、價格區底部小字「換月」（中性色，不是紅綠）；回測照常（換月那根也可能進出場）。
+
+### 2.3 台指期／費半期（期交所 TAIFEX，11-10 晚）
+
+| 代號 | 期交所商品 | `symbol.name` | 歷史 |
+|---|---|---|---|
+| `TXF1!` | TX | 台指期近月連續 | 2016-01-04 起（夜盤 2017-05-16 起才有） |
+| `SXF1!` | SXF | 費城半導體期貨近月連續 | 2023-12-18 上市起 |
+
+- 來源：`POST https://www.taifex.com.tw/cht/3/futDataDown`（`down_type=1`、`commodity_id`、起迄 `yyyy/mm/dd`，一次最多一個月；免金鑰；cp950 CSV；出錯一律 HTTP 200＋HTML，內容以 `<` 開頭＝失敗）。
+- **盤別**：期交所把盤後（夜盤，D−1 15:00～D 05:00）標在 D（週五夜盤標下週一）→ 直接併進 D 那根：開＝夜盤開、高低＝兩段極值、收＝日盤收（13:45）、量＝兩段相加（口）。
+  某段沒成交就只用另一段；只成交一筆時期交所常只給開、收（高低 `-`）→ 用開收補高低；兩段都沒成交那天沒有 K。頁面標題列寫「含夜盤（夜盤算到隔天）」（`symbol.session`）。
+- **近月連續**：每天用當天掛牌的最小 6 位數月份（週契約 `202611W2`、價差 `202611/202612` 剔除）。到期合約隔天就不在清單 → **換月＝到期合約最後交易日的隔天**
+  （期交所日盤結算價寫 0 那天＝最後交易日；TX 十年 130 次、SXF 11 次，含農曆年延後的 2023-01-31、2026-02-24）。例外：最後交易日整天沒成交（SXF 2026-03-23，只有這一次）→ 那天直接用下一個月。
+  價格**不還原**；換月那根＝合約月份跟前一根不同的那根，`chart.overlays.rolls` 標「換月」（`dir`／`step_pct`＝`null`），跟 §2.2 同一條路：不算缺口、不進撐壓、不配成島。週K＝含那天的那一週。
+- **定案**：日K 要日盤收盤 13:45＋15 分鐘**而且**那天已有日盤（清晨只有夜盤的那根＝盤中未定）；週K 到週五 13:45＋15 分鐘，而且最後一天有日盤。「現在」同樣用抓資料的時間。
+- **資料**：`ta-engine/data/fut_TX.json`、`fut_SXF.json`（`Skill/taifex_backfill.py` 產生、commit 進本 repo；`vercel.json` 的 `includeFiles: "data/**"` 打包進函式）
+  `{schema:"taifex-cont-1", sym, source, through, t[], o[], h[], l[], c[], v[], m[]}`（`m`＝合約月份；結尾只有夜盤的那幾根不寫）。
+  查詢時再從回補檔最後一天起補抓到今天（一次 28 天、最多 3 次、每次 timeout 6 秒），那天重抓蓋掉回補。回補檔**至少每月重跑一次**（超過 84 天補不完 → 註記「回補檔太舊…」）。
+  回補檔**刻意不進 vendor.json 的 sha256**（資料每次重跑都會變、Skill 沒有正本）；`--check-vendor` 改驗兩個檔存在、格式對（`twf_problems`）。
+- **期交所連不上**：有回補檔照回 200，`notes` 與 `symbol.stale` 寫「期交所最新資料暫時讀不到，資料到 YYYY-MM-DD」（頁面黃色標籤；5 分鐘後再試）；沒有回補檔才 502 `upstream`「期交所暫時連不上，請稍後再試」。
+- 快取：行程記憶體 15 分鐘（日K、週K 共用同一份）；額度鍵＝`symbol.yahoo`（＝`TXF1!`／`SXF1!`，Next `symKey` 轉成 `TXF=F`／`SXF=F`）。
+- `^SOX` 照收（Yoda 定：兩種都留）；費半期回應帶 `symbol.see_also = {code:"^SOX", text:"^SOX 是指數版（費城半導體指數，Yahoo 資料）"}`，頁面一行註明＋「改看 ^SOX」。
+- 費半期成交量小（日盤成交量中位數約 48 口）、日盤收在台北 13:45（美股休市時），`notes` 會寫。
+
+| 欄位（只有台指期／費半期有） | 說明 |
+|---|---|
+| `symbol.source` | `"TAIFEX"` |
+| `symbol.exchange` | `"TAIFEX"`（頁面市場標籤「台灣期貨・TAIFEX」；舊頁面會顯示「美國期貨・TAIFEX」，不會壞） |
+| `symbol.tfs` | `["D","W"]`：頁面把 1H／4H 分頁停用、寫「期交所只有日資料」；沒有這欄＝四個週期都有 |
+| `symbol.contract` | 目前近月，例 `"202611"` |
+| `symbol.data_through` | 資料最後一天 `YYYY-MM-DD` |
+| `symbol.session` | `"含夜盤（夜盤算到隔天）"` |
+| `symbol.stale` | 只有期交所讀不到或回補檔太舊時才有：註記字串 |
+| `symbol.see_also` | 只有費半期：`{code:"^SOX", text}` |
 
 ## 3. 成功回應（頂層）
 
@@ -306,5 +345,6 @@ Vercel Services 可以同專案共存，但要改 Framework Preset 並把整個 
 | `ta-engine/ta_engine.py`、`analyze_symbol.py` | Skill 副本（vendor.json 鎖 sha256）；`ta_trade.py` 11-09 起不再同步（引擎不用） |
 | `ta-engine/requirements.txt` | `numpy==2.3.2`、`pandas==2.3.1`（同本機） |
 | `ta-engine/.python-version` | `3.13` |
-| `ta-engine/vercel.json` | `maxDuration 60`、排除 dev_server／vendor.json |
+| `ta-engine/vercel.json` | `maxDuration 60`、`includeFiles: data/**`（期交所回補檔）、排除 dev_server／vendor.json |
+| `ta-engine/data/fut_TX.json`、`fut_SXF.json` | 期交所回補檔（§2.3；`Skill/taifex_backfill.py` 產生，不進 sha256） |
 | `ta-engine/dev_server.py` | 本機伺服器 |

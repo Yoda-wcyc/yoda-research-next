@@ -923,7 +923,7 @@ def _sig_top_volume(idx, O, H, L, Cc, v, k0, market):
                  'text': {'在上方': '在最大量K上方', '在下方': '在最大量K下方', '區間內': '在最大量K區間內'}[t['relation']]}
     else:
         badge = {'relation': None, 'date': None, 'days_ago': None, 'text': '無量資料'}
-    return {'unit': '股' if market == 'tw' else 'shares', 'items': items, 'badge': badge}
+    return {'unit': {'tw': '股', 'fut': '口'}.get(market, 'shares'), 'items': items, 'badge': badge}
 
 
 def _sig_gaps(idx, H, L, Cc, v, k0, skip=()):
