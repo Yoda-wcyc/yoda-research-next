@@ -9,14 +9,15 @@ self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => {
+  const done = caches.keys().then(ks => {
     const old = ks.filter(k => k !== CACHE);
-    return Promise.all(old.map(k => caches.delete(k)))
-      .then(() => self.clients.claim())
-      // 從舊版升上來：開著的分頁可能正跑著舊快取的程式，重新載入一次換成新版（全新安裝不重載）
-      .then(() => old.length && self.clients.matchAll({ type: 'window' })
-        .then(cs => Promise.all(cs.map(c => c.navigate(c.url).catch(() => {})))));
-  }));
+    return Promise.all(old.map(k => caches.delete(k))).then(() => self.clients.claim()).then(() => old.length > 0);
+  });
+  e.waitUntil(done);
+  // 從舊版升上來：開著的分頁可能正跑著舊快取的程式，重新載入一次換成新版（全新安裝不重載）。
+  // navigate 不能放進 waitUntil：導覽請求要等 SW 進入 activated 才處理，兩邊互等會卡 5 分鐘（2026-11-10 實測）。
+  done.then(up => up && self.clients.matchAll({ type: 'window' })
+    .then(cs => cs.forEach(c => c.navigate(c.url).catch(() => {}))));
 });
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);

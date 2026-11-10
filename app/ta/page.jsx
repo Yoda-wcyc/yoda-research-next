@@ -66,6 +66,16 @@ class Boundary extends Component {
     return <div className="ta-err" role="alert"><span>這一塊顯示失敗：{String((e && e.message) || e).slice(0, 200)}（重新整理頁面，或換一檔再試）</span></div>;
   }
 }
+// 標題列用的數字；在所有 Boundary 外面算，所以資料格式怪也不能丟例外（bars 不是陣列、symbol 不是物件）
+function headInfo(d) {
+  const bars = (Array.isArray(g(d, "chart", "bars")) ? d.chart.bars : []).filter((b) => b && typeof b === "object");
+  const fin = bars.filter((b) => b.final !== false);
+  const lastB = fin[fin.length - 1], prevB = fin[fin.length - 2];
+  const chg = lastB && prevB && prevB.c ? (lastB.c / prevB.c - 1) * 100 : null;
+  const unfB = bars.length && bars[bars.length - 1].final === false ? bars[bars.length - 1] : null;
+  const symInfo = d && d.symbol && typeof d.symbol === "object" ? d.symbol : {};
+  return { lastB, chg, unfB, symInfo };
+}
 function readHash() {
   try {
     const q = new URLSearchParams((location.hash || "").replace(/^#/, ""));
@@ -1116,7 +1126,11 @@ export default function TaPage() {
   useEffect(() => {
     if (rulesReady) lsSet(RULES_KEY, JSON.stringify({ cur: applied, saved, active }));
   }, [rulesReady, applied, saved, active]);
-  const dv = useMemo(() => withTrade(data && data.tf === tf ? data : null, applied), [data, tf, applied]);
+  const dv = useMemo(() => {
+    const x = data && data.tf === tf ? data : null;
+    try { return withTrade(x, applied); } catch (e) { console.error("[ta] 進出場計算失敗", e); return x; }   // 在 Boundary 外面，丟例外會整頁崩
+  }, [data, tf, applied]);
+  const bkey = useMemo(() => [dv, maSet], [dv, maSet]);   // Boundary 重試鍵：資料、交易參數、均線組任一換了就重試
   const actB = BUILTINS.find((x) => BI + x.name === active);
   const actS = actB || saved.find((x) => x.name === active);
   const rstatus = actS ? (actB ? "內建・" : "") + actS.name + (sameP(actS.p, applied) ? "" : "（未存的修改）") : sameP(applied, DEF_P) ? "預設（站方現行規則）" : "自訂（未存）";
@@ -1235,12 +1249,7 @@ export default function TaPage() {
   }
 
   const d = dv;
-  const bars = g(d, "chart", "bars") || [];
-  const fin = bars.filter((b) => b.final !== false);
-  const lastB = fin[fin.length - 1], prevB = fin[fin.length - 2];
-  const chg = lastB && prevB && prevB.c ? (lastB.c / prevB.c - 1) * 100 : null;
-  const unfB = bars.length && bars[bars.length - 1].final === false ? bars[bars.length - 1] : null;
-  const symInfo = (d && d.symbol) || {};
+  const { lastB, chg, unfB, symInfo } = headInfo(d);
 
   return (
     <main className="ta-root ta-app">
@@ -1318,7 +1327,7 @@ export default function TaPage() {
             ) : null}
             {!d && !err ? <div className="ta-ph">{busy ? "計算中…（第一次查一檔約需幾秒）" : "從左邊輸入代號開始。"}</div> : null}
             {d ? (
-              <Boundary reset={d}>
+              <Boundary reset={bkey}>
               <div className="ta-one" data-sym={symInfo.yahoo}>
                 <div className="ta-ch">
                   <h2><span className="mono">{symInfo.code || sym}</span>{symInfo.name || ""}</h2>
@@ -1337,10 +1346,10 @@ export default function TaPage() {
                   </div>
                 ) : null}
                 <BadBanner d={d} />
-                <Boundary reset={d}><ChartArea key={(symInfo.yahoo || sym) + "|" + d.tf} d={d} maSet={maSet} /></Boundary>
-                <Boundary reset={d}><Legend d={d} maSet={maSet} /></Boundary>
+                <Boundary reset={bkey}><ChartArea key={(symInfo.yahoo || sym) + "|" + d.tf} d={d} maSet={maSet} /></Boundary>
+                <Boundary reset={bkey}><Legend d={d} maSet={maSet} /></Boundary>
                 {(d.notes || []).length ? <div className="ta-notes">資料註記：{d.notes.join("；")}</div> : null}
-                <Boundary reset={d}><SrLevels d={d} /></Boundary>
+                <Boundary reset={bkey}><SrLevels d={d} /></Boundary>
               </div>
               </Boundary>
             ) : null}
