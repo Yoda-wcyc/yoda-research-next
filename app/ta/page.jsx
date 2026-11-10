@@ -1,11 +1,13 @@
 "use client";
 import { Component, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { normParams, backtest, chartMarks, exitLine, ruleText, maName, smaSeq, PRESETS, explainEntry, explainExit, fpx, fpc, statsOf } from "../../lib/ta-trade";
+import { normParams, backtest, chartMarks, exitLine, ruleText, maName, smaSeq, PRESETS, explainEntry, explainExit, fpx, fpc, statsOf, hasVolume, effParams } from "../../lib/ta-trade";
 
 // 會員技術分析（獨立網站版·2026-11-08 Yoda 定）
 //
 //   會員登入（/api/member-login，票存 localStorage）→ /api/ta-live 每次都重驗：站長（OWNER_PUB_IDS）或 ta_access 有開通
-//   左 1/4：輸入代號（台股上市櫃、美股、ETF；不收指數）＋最近查過＋今日額度（會員每天 30 檔、站長不限）
+//   左 1/4：輸入代號（台股上市櫃、美股、ETF、美國期貨連續月 ES1!／NQ1!…、指數只收 ^SOX）＋最近查過＋今日額度（會員每天 30 檔、站長不限）
+//   期貨（11-10）：換月那根圖上標「換月」（引擎 chart.overlays.rolls）；沒有成交量的標的（^SOX）量的條件停用、量柱與 ③ 前五大量改寫「此標的沒有成交量」。
+//   新欄位（has_volume、rolls、symbol.contract）一律可缺：舊引擎回應照舊畫。
 //   右 3/4：週期分頁 1H／4H／日K／週K ＋ 均線組 短（5/10/20）中（8/13/34）長（20/60/120）＋ K 線圖（撐壓、前五大量、缺口、島狀反轉、
 //           進出場、停損、出場 ✕；均線紅黃藍＝短到長；圖下「時間區間導覽列」拖曳看整段歷史）
 //           ＋ 緊貼圖下三個大分頁 ①進出場 ②跳空缺口 ③前五大量（11-09；原本的均線排列分頁已永久刪除，守門見 Skill\tests\ta_engine_check.py）＋ 圖例（預設收合）＋ 支撐壓力
@@ -41,7 +43,24 @@ function fvol(v, market) {
   const x = Number(v);
   if (v === null || v === undefined || !Number.isFinite(x)) return "—";
   if (market === "tw") return Math.round(x / 1000).toLocaleString("en-US");   // 股 → 張
+  if (market === "fut") return Math.round(x).toLocaleString("en-US");        // 口
   return (x / 1e6).toFixed(1) + "M";
+}
+const volUnit = (market) => (market === "tw" ? "量（張）" : market === "fut" ? "量（口）" : "量（股）");
+// 沒有成交量（^SOX 指數）：引擎 has_volume=false，或舊回應沒這欄但定案 K 的量全是 null／0
+const NOVOL_TXT = "此標的沒有成交量";
+function noVolume(d) {
+  if (!d || typeof d !== "object") return false;
+  if (d.has_volume === false) return true;
+  const v = g(d, "history", "v");
+  return Array.isArray(v) && v.length > 0 && !hasVolume(v, d.bars_completed != null ? d.bars_completed : v.length);
+}
+// 標題列的市場標籤：台股／美股（·交易所·ETF）、美國期貨・CME、指數
+function mktBadge(s) {
+  if (!s || typeof s !== "object") return "";
+  if (s.market === "fut") return "美國期貨・" + (s.exchange || "CME");
+  if (s.type === "INDEX") return "指數";
+  return (s.market === "tw" ? "台股" : "美股") + (s.exchange ? "·" + s.exchange : "") + (s.type === "ETF" ? "·ETF" : "");
 }
 function ud(x) { const v = Number(x); return x === null || x === undefined || !Number.isFinite(v) || v === 0 ? "" : v > 0 ? "up" : "dn"; }
 function g(o, ...path) { let x = o; for (const p of path) { if (!x || typeof x !== "object") return undefined; x = x[p]; } return x; }
@@ -199,7 +218,7 @@ function topVolume(full, a, b, nf, eng) {
 }
 
 // K 線圖畫整段歷史的 [a, b) 這一段；Y 軸依區間內高低。K 棒與量柱併成幾條 path（1H 五千根拖曳才不卡）
-function KChart({ d, full, smas, a, b, onTip, gaps, islands, top }) {
+function KChart({ d, full, smas, a, b, onTip, gaps, islands, top, rolls }) {
   const ch = d.chart || {};
   const bars = full.bars.slice(a, b), n = bars.length;
   if (n < 2) return <div className="ta-nochart">沒有 K 線資料</div>;
@@ -247,7 +266,9 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top }) {
   const every = Math.max(1, Math.ceil((n * 100) / pw));
   for (let i = 0; i < n - every; i += every) els.push(<text key={"d" + i} className="ax" x={X(i)} y={H - 7} textAnchor="middle">{tl(i)}</text>);
   els.push(<text key="dl" className="ax" x={xr} y={H - 7} textAnchor="end">{longD ? String(bars[n - 1].t).slice(0, 10) : md(bars[n - 1].t)}</text>);
-  els.push(<text key="vl" className="ax" x={L - 6} y={T + PH + GP + 10} textAnchor="end">{market === "tw" ? "量（張）" : "量"}</text>);
+  const noVol = noVolume(d);
+  if (noVol) els.push(<text key="nov" className="ax" data-novol="" x={L + pw / 2} y={T + PH + GP + VH / 2 + 4} textAnchor="middle">{NOVOL_TXT}</text>);
+  else els.push(<text key="vl" className="ax" x={L - 6} y={T + PH + GP + 10} textAnchor="end">{market === "tw" ? "量（張）" : market === "fut" ? "量（口）" : "量"}</text>);
   // 圖上文字／記號佔的位置（缺口代號、島狀反轉的字、前五大量編號、圖左上線名、進出場記號先放，進出場標籤再找不撞的位置）；tw＝字寬估計（中文 12、英數 6.8）
   const placed = [];
   const tw = (s) => [...s].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? 12 : 6.8), 0);
@@ -297,6 +318,19 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top }) {
     for (let k = 0; k < 4 && busy(ly); k++) ly = Math.min(T + PH - 3, Math.max(T + 11, ly + (top ? -14 : 14)));   // 島挨太近：字往外疊開
     placed.push([lx - 36, ly - 12, lx + 36, ly + 4]);
     els.push(<text key={"ist" + k} className="isl-t" x={lx} y={ly} textAnchor="middle">{top ? "頂部島狀反轉" : "底部島狀反轉"}</text>);
+  });
+  // 期貨換月（引擎 chart.overlays.rolls，i＝history 絕對位置）：灰色細虛直線＋底部小字「換月」；字太擠（相鄰 < 30px）只畫線
+  let lastRx = -1e9;
+  (rolls || []).forEach((r, k) => {
+    if (!r || !Number.isFinite(Number(r.i)) || r.i < a || r.i >= b) return;
+    const x = X(r.i - a);
+    els.push(<line key={"rl" + k} className="roll" x1={x} x2={x} y1={T} y2={T + PH} stroke="#8b95a3" strokeWidth="1" strokeDasharray="2 3" data-roll={r.t} />);
+    if (x - lastRx >= 30) {
+      const lab = r.label || "換月";
+      els.push(<text key={"rlt" + k} className="roll-t" x={x + 3} y={T + PH - 4}>{lab}{r.step_pct != null ? <title>{"換到下一個合約，價差 " + fpct(r.step_pct)}</title> : null}</text>);
+      placed.push([x + 3, T + PH - 15, x + 3 + tw(lab), T + PH]);
+      lastRx = x;
+    }
   });
   // K 棒（收 ≥ 開＝紅）＋量柱：一般的併成 path；前五大量（金框＋金色量柱＋①～⑤）與盤中未定那根單獨畫
   const topI = {};
@@ -592,6 +626,7 @@ function ChartArea({ d, maSet }) {
   const nf = d.bars_completed != null ? Math.min(d.bars_completed, N) : N;
   const gapsAll = useMemo(() => decodeGaps(g(ch, "overlays", "gaps"), full.bars), [ch.overlays, full]);   // eslint-disable-line react-hooks/exhaustive-deps
   const islAll = g(ch, "overlays", "islands") || [];
+  const rollsAll = Array.isArray(g(ch, "overlays", "rolls")) ? ch.overlays.rolls : [];   // 舊回應沒有 rolls
   const top = useMemo(() => topVolume(full, a, b, nf, g(d, "signals", "top_volume", "items")), [full, a, b, nf, d.signals]);   // eslint-disable-line react-hooks/exhaustive-deps
   const view = useMemo(() => ({
     a, b, from: full.bars[a] ? full.bars[a].t : "", to: full.bars[b - 1] ? full.bars[b - 1].t : "", top,
@@ -638,7 +673,7 @@ function ChartArea({ d, maSet }) {
   const info = tip && trd.ctx && trd.p ? (tip.kind === "entry" ? explainEntry(trd, trd.p, tip.t) : explainExit(trd, trd.p, tip.t)) : null;
   return (
     <>
-      <KChart d={d} full={full} smas={smas} a={a} b={b} onTip={onTip} gaps={gapsAll} islands={islAll} top={top} />
+      <KChart d={d} full={full} smas={smas} a={a} b={b} onTip={onTip} gaps={gapsAll} islands={islAll} top={top} rolls={rollsAll} />
       {N > NAV_MIN ? <RangeNav bars={full.bars} a={a} b={b} onChange={setRng} /> : null}
       <BlockTabs d={d} view={view} />
       {info ? (
@@ -666,6 +701,7 @@ const SW = {
   link: <><i className="sw dash" style={{ color: K_UP }} /><i className="sw dash" style={{ color: K_DN }} /></>,
   island: <i className="bx isl" />,
   unfinished: <i className="bx unf" />,
+  roll: <i className="sw dash" style={{ color: "#8b95a3" }} />,
 };
 function Legend({ d, maSet }) {
   const set = g(d, "chart", "ma_sets", maSet) || [];
@@ -704,12 +740,20 @@ function islandText(x) {
 const rangeTxt = (v) => (v.from === v.to ? v.from : v.from + " ～ " + v.to) + "（" + (v.b - v.a) + " 根）";
 function TopVolume({ d, view }) {
   const market = g(d, "symbol", "market");
+  if (noVolume(d)) {
+    return (
+      <div className="ta-block" data-blk="vol">
+        <div className="ta-cap">③ 前五大量</div>
+        <div className="ta-empty" data-novol="">{NOVOL_TXT}（Yahoo 不給指數的量），沒有前五大量可列</div>
+      </div>
+    );
+  }
   const rows = view.top;
   const cols = [
     { label: "#", render: (x) => mark(x.rank), sort: (x) => x.rank },
     { label: "時間", render: (x) => x.date, sort: (x) => x.date },
     { label: "幾根前", num: true, render: (x) => x.days_ago, sort: (x) => nz(x.days_ago) },
-    { label: market === "tw" ? "量（張）" : "量（股）", num: true, render: (x) => fvol(x.volume, market), sort: (x) => nz(x.volume) },
+    { label: volUnit(market), num: true, render: (x) => fvol(x.volume, market), sort: (x) => nz(x.volume) },
     { label: "量倍數", num: true, title: "這根量 ÷ 之前 20 根均量", render: (x) => (x.vol_ratio == null ? "—" : f1(x.vol_ratio) + "x"), sort: (x) => nz(x.vol_ratio) },
     { label: "漲跌", num: true, render: (x) => <span className={ud(x.chg_pct)}>{fpct(x.chg_pct)}</span>, sort: (x) => nz(x.chg_pct) },
     ...optCols(rows, [{ f: "candle", label: "K 棒" }, { f: "close_pos", label: "收在", title: "收盤落在這根區間的哪一段", sort: (x) => nz(x.close_pos_ratio) }]),
@@ -926,9 +970,10 @@ function cleanRules(o) {
 function readRules() { try { return cleanRules(JSON.parse(lsGet(RULES_KEY) || "null")); } catch (e) { return cleanRules(null); } }
 
 // 引擎回應＋參數 → 給圖與 ① 進出場用的 trade（記號、線、統計、橫幅、白話規則、圖例）
-function withTrade(d, p) {
+function withTrade(d, p0) {
   if (!d || !g(d, "history", "c")) return d;
   const nf = d.bars_completed;
+  const p = effParams(p0, !noVolume(d));   // 沒有成交量：量的條件不套用（規則文字、浮動說明也用這份；面板上存的參數不改）
   const r = backtest(d.history, nf, p);
   const rt = ruleText(p);
   const exLab = p.exit_ma ? maName(p, p.exit_k) + "（出場線）" : null;
@@ -966,30 +1011,32 @@ function sideTrade(d, side) {
 }
 
 // 模組層元件：寫在 RulePanel 裡面的話每次重繪都是新元件，輸入框會掉焦點
-function RuleOpt({ children, hint, k, errors }) {
+function RuleOpt({ children, hint, k, errors, warn }) {
   const ks = k ? [].concat(k).filter((x) => errors[x]) : [];
   return (
     <div className="ta-opt">
       <div className="row">{children}</div>
+      {warn ? <div className="hint warn" data-novol="">{warn}</div> : null}
       {hint ? <div className="hint">{hint}</div> : null}
       {ks.map((x) => <div key={x} className="ta-ferr" role="alert">{errors[x]}（這格沒套用）</div>)}
     </div>
   );
 }
 
-function RulePanel({ draft, set, errors, status, saved, active, nm, setNm, rn, setRn, msg, onSave, onApply, onDel, onRen, onReset }) {
+function RulePanel({ draft, set, errors, status, saved, active, nm, setNm, rn, setRn, msg, onSave, onApply, onDel, onRen, onReset, noVol }) {
   const v = (x) => (x === undefined || x === null ? "" : String(x));
   const put = (k, x) => set({ ...draft, [k]: x });
   const M = draft.ma === "sma" ? "SMA" : "EMA";
   const man = (j) => M + v(draft.ma_n[j]);
-  const N = (k, label, w) => (
+  const N = (k, label, w, dis) => (
     <input type="text" inputMode="decimal" className={"ta-n" + (errors[k] ? " bad" : "")} style={w ? { width: w } : undefined}
-      value={v(draft[k])} onChange={(e) => put(k, e.target.value)} aria-label={label} aria-invalid={!!errors[k]} data-k={k} />
+      value={v(draft[k])} onChange={(e) => put(k, e.target.value)} aria-label={label} aria-invalid={!!errors[k]} data-k={k} disabled={!!dis} />
   );
+  const NV = noVol ? NOVOL_TXT + "：量的條件不套用" : "";   // 這檔不套用，但勾選照存（換回有量的標的就恢復）
   const Rad = (k, x, text) => (
     <label key={String(x)}><input type="radio" name={"tr-" + k} checked={draft[k] === x} onChange={() => put(k, x)} />{text}</label>
   );
-  const Chk = (k, text) => <label><input type="checkbox" checked={!!draft[k]} onChange={(e) => put(k, e.target.checked)} data-k={k} />{text}</label>;
+  const Chk = (k, text, dis) => <label className={dis ? "off" : undefined}><input type="checkbox" checked={!!draft[k]} onChange={(e) => put(k, e.target.checked)} data-k={k} disabled={!!dis} />{text}</label>;
   return (
     <section className="ta-rp" aria-label="交易規則">
       <h3>交易規則 <span className="ta-rpst" data-status>{status}</span></h3>
@@ -1048,8 +1095,8 @@ function RulePanel({ draft, set, errors, status, saved, active, nm, setNm, rn, s
           ))}
         </RuleOpt>
         <RuleOpt errors={errors} k="fresh_n" hint="本根排好、前 N 根還沒全排好，才算「剛成立」">排列剛成立：回看 {N("fresh_n", "排列剛成立回看根數")} 根</RuleOpt>
-        <RuleOpt errors={errors} k={["vol_in", "vol_n"]} hint="量比＝本根量 ÷ 前 N 根平均量；不勾＝不看量">
-          {Chk("vol_on", "量比 ≥")}{N("vol_in", "進場量比門檻")}，比前 {N("vol_n", "量比比較根數")} 根
+        <RuleOpt errors={errors} k={["vol_in", "vol_n"]} hint="量比＝本根量 ÷ 前 N 根平均量；不勾＝不看量" warn={NV}>
+          {Chk("vol_on", "量比 ≥", noVol)}{N("vol_in", "進場量比門檻", null, noVol)}，比前 {N("vol_n", "量比比較根數", null, noVol)} 根
         </RuleOpt>
         <RuleOpt errors={errors} hint={"多單收盤要在 " + man(0) + " 上方、空單在下方"}>{Chk("side_ma", "收在第一條均線同側（" + man(0) + "）")}</RuleOpt>
       </fieldset>
@@ -1075,7 +1122,7 @@ function RulePanel({ draft, set, errors, status, saved, active, nm, setNm, rn, s
           </select> 條線
         </RuleOpt>
         <RuleOpt errors={errors} k="exit_delay" hint="0＝進場後下一根就開始看；3＝先放 3 根不看，第 4 根起才看">進場後 {N("exit_delay", "出場線延遲根數")} 根才開始看這條</RuleOpt>
-        <RuleOpt errors={errors} k="vol_out" hint={"量比達門檻＋收反向 K（多單收黑）＋收破 " + man(0) + " → 收盤整筆出"}>{Chk("vol_exit", "爆量反向 K，量比 ≥")}{N("vol_out", "爆量反向K量比門檻")}</RuleOpt>
+        <RuleOpt errors={errors} k="vol_out" hint={"量比達門檻＋收反向 K（多單收黑）＋收破 " + man(0) + " → 收盤整筆出"} warn={NV}>{Chk("vol_exit", "爆量反向 K，量比 ≥", noVol)}{N("vol_out", "爆量反向K量比門檻", null, noVol)}</RuleOpt>
         <RuleOpt errors={errors} k="max_hold" hint="抱滿 N 根還沒出，就在第 N 根收盤整筆出">{Chk("max_hold_on", "最多持有")}{N("max_hold", "最多持有根數")} 根</RuleOpt>
       </fieldset>
 
@@ -1275,7 +1322,7 @@ export default function TaPage() {
       <header className="ta-head">
         <div className="ta-hrow">
           <span className="ta-badge">會員專屬</span>
-          <h1 className="ta-h1">技術分析<span className="sep">｜</span><span className="ta-sub2">台股上市櫃・美股・ETF，1H／4H／日K／週K</span></h1>
+          <h1 className="ta-h1">技術分析<span className="sep">｜</span><span className="ta-sub2">台股上市櫃・美股・ETF・美國期貨・費半，1H／4H／日K／週K</span></h1>
         </div>
       </header>
 
@@ -1285,11 +1332,11 @@ export default function TaPage() {
           <form className="ta-ltools" onSubmit={submit}>
             <label className="ta-lab" htmlFor="ta-in">輸入代號</label>
             <div className="ta-inrow">
-              <input id="ta-in" type="search" className="ta-q" placeholder="2330、00878、6488、NVDA、SPY" value={q}
+              <input id="ta-in" type="search" className="ta-q" placeholder="2330、00878、NVDA、NQ1!、^SOX" value={q}
                 onChange={(e) => setQ(e.target.value)} autoComplete="off" spellCheck={false} enterKeyHint="search" />
               <button type="submit" className="ta-btn ta-go" disabled={busy || !q.trim()}>查</button>
             </div>
-            <div className="ta-hint">台股打數字代號（先找上市、再找上櫃）、美股打英文代號；不收指數</div>
+            <div className="ta-hint">台股打數字代號（先找上市、再找上櫃）、美股打英文代號；美國期貨打 ES1!、NQ1!、YM1!、RTY1!、GC1!、CL1!（也可打 小那、小道、黃金期、原油期）；指數只收 ^SOX（費半）</div>
           </form>
           <div className="ta-quota" data-left={quota && !quota.unlimited ? quota.left : ""}>
             {owner || (quota && quota.unlimited) ? <>站長：不限檔數</> : quota ? (
@@ -1300,7 +1347,8 @@ export default function TaPage() {
         </aside>
 
         <RulePanel draft={draft} set={setDraft} errors={norm.errors} status={rstatus} saved={saved} active={active}
-          nm={nm} setNm={setNm} rn={rn} setRn={setRn} msg={pmsg} onSave={saveS} onApply={applyS} onDel={delS} onRen={renS} onReset={resetS} />
+          nm={nm} setNm={setNm} rn={rn} setRn={setRn} msg={pmsg} onSave={saveS} onApply={applyS} onDel={delS} onRen={renS} onReset={resetS}
+          noVol={noVolume(dv)} />
 
         <div className="ta-left ta-recent">
           <div className="ta-rhead">最近查過</div>
@@ -1358,7 +1406,8 @@ export default function TaPage() {
                   <span className="ta-px mono">{fnum(lastB && lastB.c)} <span className={ud(chg)}>{fpct(chg)}</span></span>
                   <span className="ta-chip asof">{TF_ZH[d.tf]}・最後定案 {d.asof || "—"}</span>
                   {unfB ? <span className="ta-chip warn">{d.unfinished_label || "盤中未定"} {fnum(unfB.c)}</span> : null}
-                  <span className="ta-chip">{symInfo.market === "tw" ? "台股" : "美股"}{symInfo.exchange ? "·" + symInfo.exchange : ""}{symInfo.type === "ETF" ? "·ETF" : ""}</span>
+                  <span className="ta-chip" data-mkt={symInfo.market || ""}>{mktBadge(symInfo)}</span>
+                  {symInfo.market === "fut" && typeof symInfo.contract === "string" && symInfo.contract ? <span className="ta-chip" title="Yahoo 連續月目前接的合約">連續月・{symInfo.contract}</span> : null}
                 </div>
                 {g(d, "signals", "badges") ? (
                   <div className="ta-bds full">

@@ -926,12 +926,13 @@ def _sig_top_volume(idx, O, H, L, Cc, v, k0, market):
     return {'unit': '股' if market == 'tw' else 'shares', 'items': items, 'badge': badge}
 
 
-def _sig_gaps(idx, H, L, Cc, v, k0):
+def _sig_gaps(idx, H, L, Cc, v, k0, skip=()):
+    """skip：不算缺口的 K（絕對位置；網站版期貨換月那根，價格沒還原、跳空是換合約不是行情）。"""
     N = len(Cc)
     C = Cc[-1]
     raw = []
     for i in range(max(1, k0), N):
-        if np.isnan(H[i - 1]) or np.isnan(L[i - 1]):
+        if np.isnan(H[i - 1]) or np.isnan(L[i - 1]) or i in skip:
             continue
         if L[i] > H[i - 1]:
             dr, bot, top = 'up', H[i - 1], L[i]
@@ -1517,8 +1518,8 @@ def _classify(sig_gaps, sig_tv, ctx, idx, O, H, L, Cc, v, k0):
         t.update(trend=trend, position=pos, position_zh=POS_ZH['up'].get(pos) if pos else None, read=rd, basis=basis)
 
 
-def compute_signals(df, market):
-    """回 (signals, chart)。價格比較用顯示精度（見檔頭通用口徑）。"""
+def compute_signals(df, market, skip_gaps=()):
+    """回 (signals, chart)。價格比較用顯示精度（見檔頭通用口徑）。skip_gaps：不算缺口的 K（見 _sig_gaps）。"""
     idx = df.index
     o_raw, h_raw, l_raw, c_raw, v = (df[k].values.astype('float64') for k in ('o', 'h', 'l', 'c', 'v'))
     N = len(c_raw)
@@ -1534,7 +1535,7 @@ def compute_signals(df, market):
         return out
     O, H, L, Cc = rnd(o_raw), rnd(h_raw), rnd(l_raw), rnd(c_raw)
     tv = _sig_top_volume(idx, O, H, L, Cc, v, k0, market)
-    gp = _sig_gaps(idx, H, L, Cc, v, k0)
+    gp = _sig_gaps(idx, H, L, Cc, v, k0, skip_gaps)
     ma = _sig_ma_align(c_raw, idx)
     sr = _sig_sr(idx, H, L, Cc, h_raw, l_raw, c_raw, k0, tv, gp)
     _classify(gp, tv, _gap_ctx(H, L, Cc, c_raw, h_raw, l_raw, tx), idx, O, H, L, Cc, v, k0)

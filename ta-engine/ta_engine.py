@@ -19,6 +19,10 @@ vendor.json 記 sha256，兩邊各有檢查，副本不能偷偷漂移：
       tests/ta_trade_parity.py 驗）。引擎不再回 trade，免得兩份打架。
 授權  handle() 第一步就驗 X-TA-Engine-Key＝HMAC-SHA256(TA_ENGINE_KEY, "ta-engine") 小寫 hex（引擎專用密鑰，跟會員登入用的密鑰分開）；
       不對或引擎沒設 TA_ENGINE_KEY 就 401，不碰 Yahoo。原始密鑰不上線路，只傳衍生值。
+期貨  11-10：美國期貨連續月 ES／NQ／YM／RTY／GC／CL（ES1!、ES=F、/ES、小那…，special()）＋ 指數只收 ^SOX。期貨盤別＝CME 交易日
+      （前一天 18:00～當天 17:00 美東；1H 23 根、4H 從 18:00 起切、日K 用 Yahoo 交易日＋結算價）。換月：用「期貨 ÷ 參考標的」價差跳動找
+      （find_rolls），價格不還原，換月那根不算缺口、回應 chart.overlays.rolls 標「換月」。整段沒有量（^SOX）→ has_volume=false。
+      只加欄位，舊頁面拿到新回應不會壞（docs/ta-engine-contract.md §2.1／§2.2）。
 """
 import os, re, sys, json, time, hmac, hashlib, shutil, urllib.request, urllib.parse, urllib.error
 
@@ -41,10 +45,27 @@ GRACE = 15 * 60                          # 收盤後再等 15 分鐘才算定案
 TTL_INTRA = 15 * 60
 TTL_MISS = 3600
 CACHE_MAX = 64
-SESS = {'tw': (9 * 60, 13 * 60 + 30), 'us': (9 * 60 + 30, 16 * 60)}   # 開盤／收盤（交易所當地分鐘）
+SESS = {'tw': (9 * 60, 13 * 60 + 30), 'us': (9 * 60 + 30, 16 * 60),
+        'fut': (18 * 60, 17 * 60)}   # 開盤／收盤（交易所當地分鐘）；期貨＝前一天 18:00 開、當天 17:00 收（美東，CME 交易日）
+FUT_SHIFT = pd.Timedelta(hours=6)        # 期貨交易日＝(時間＋6 小時) 的日期：18:00 開盤那根算隔天
 HOSTS = ('query1.finance.yahoo.com', 'query2.finance.yahoo.com')
 UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'
-OK_TYPES = ('EQUITY', 'ETF')
+OK_TYPES = ('EQUITY', 'ETF')             # 一般代號只收個股／ETF；期貨、費半走下面的白名單
+# 期貨（Yahoo 連續月 =F）：根 → (Yahoo, 換月偵測的參考標的, 換月規則, 中文名, 交易所)
+FUT = {'ES': ('ES=F', '^GSPC', 'eq', 'E-mini 標普 500 期貨', 'CME'),
+       'NQ': ('NQ=F', '^NDX', 'eq', 'E-mini 那斯達克 100 期貨', 'CME'),
+       'YM': ('YM=F', '^DJI', 'eq', 'E-mini 道瓊期貨', 'CBOT'),
+       'RTY': ('RTY=F', '^RUT', 'eq', 'E-mini 羅素 2000 期貨', 'CME'),
+       'GC': ('GC=F', 'GLD', 'gc', '黃金期貨', 'COMEX'),
+       'CL': ('CL=F', 'USO', 'cl', '輕原油期貨', 'NYMEX')}
+FUT_BARE = ('NQ', 'YM', 'RTY', 'GC')     # 不帶 =F／1!／斜線也當期貨（Yahoo 沒有同名股票）；純 ES＝Eversource、純 CL＝Colgate，照查股票
+FUT_SOON = ('TXF', 'SXF')                # 台指期、費半期（TAIFEX）下一階段才接
+SOX = {'yahoo': '^SOX', 'code': '^SOX', 'market': 'us', 'type': 'INDEX', 'name': '費城半導體指數', 'exchange': 'Nasdaq'}
+ALIAS = {'小那': 'NQ1!', '小那斯達克': 'NQ1!', '那指期': 'NQ1!', '那斯達克期': 'NQ1!', '小道': 'YM1!', '小道瓊': 'YM1!', '道瓊期': 'YM1!',
+         '小標普': 'ES1!', '標普期': 'ES1!', '小羅素': 'RTY1!', '羅素期': 'RTY1!', '黃金期': 'GC1!', '原油期': 'CL1!', '輕原油': 'CL1!',
+         'SOX': '^SOX', '費半': '^SOX', '費城半導體': '^SOX', '台指期': 'TXF1!', '小台': 'TXF1!', '費半期': 'SXF1!'}
+FUT_IN = re.compile(r'^(/)?([A-Z]{2,3})(=F|1!)?$')
+ROLL_LABEL = '換月'
 TW_IN = re.compile(r'^(\d{4,6}[A-Z]?)(\.TWO?)?$')
 US_IN = re.compile(r'^[A-Z][A-Z0-9]{0,5}([.\-][A-Z]{1,2})?$')
 REN = {'o': 'Open', 'h': 'High', 'l': 'Low', 'c': 'Close', 'v': 'Volume'}
@@ -62,6 +83,8 @@ LEGEND = [
     {'key': 'gap', 'label': '缺口', 'desc': '方框＝還沒補的缺口區間（部分回補只畫剩下那段）；補滿的畫到回補那根'},
     {'key': 'unfinished', 'label': UNFINISHED, 'desc': '最後一根還在交易中，只上圖，不進訊號與回測'},
 ]
+LEGEND_ROLL = {'key': 'roll', 'label': ROLL_LABEL,
+               'desc': '灰色細虛線：期貨連續月換到下一個合約的那根（價格沒有還原）；那根的跳空不算缺口、不進撐壓、不算島狀反轉'}
 
 
 class EngineError(Exception):
@@ -124,9 +147,12 @@ def _fresh(entry, interval, now):
     if now - t < TTL_INTRA:
         return True
     if interval == '1d':
-        end = (((res.get('meta') or {}).get('currentTradingPeriod') or {}).get('regular') or {}).get('end')
-        # shortcut: 收盤後抓的日K沿用到收盤後 17 小時（台股、美股隔天開盤前），之後退回 15 分鐘；週末會多抓幾次，要省再接交易日曆
-        return bool(end) and t >= end + GRACE and now < end + 17 * 3600
+        m = res.get('meta') or {}
+        end = ((m.get('currentTradingPeriod') or {}).get('regular') or {}).get('end')
+        # shortcut: 收盤後抓的日K沿用到收盤後 17 小時（台股、美股隔天開盤前；期貨 17:00 收、18:00 就開，只沿用到收盤後 1 小時），
+        # 之後退回 15 分鐘；週末會多抓幾次，要省再接交易日曆
+        hold = 3600 if m.get('instrumentType') == 'FUTURE' else 17 * 3600
+        return bool(end) and t >= end + GRACE and now < end + hold
     return False
 
 
@@ -151,8 +177,29 @@ def candidates(raw):
         code, suf = m.group(1), m.group(2)
         return ([code + suf] if suf else [code + '.TW', code + '.TWO']), 'tw', code
     if s.startswith('^') or not US_IN.match(s):
-        raise EngineError(400, 'bad_symbol', '代號格式不對：台股填數字代號（如 2330、00878），美股填英文代號（如 NVDA）；不支援指數')
+        raise EngineError(400, 'bad_symbol', '代號格式不對：台股填數字代號（如 2330、00878），美股填英文代號（如 NVDA），'
+                                             '期貨填 ES1!、NQ1!、YM1!、RTY1!、GC1!、CL1!；指數只收 ^SOX（費半）')
     return [s.replace('.', '-')], 'us', s
+
+
+def special(raw):
+    """期貨與費半（白名單）→ dict(yahoo, code, market, type, name, exchange[, root, ref, kind])；一般代號回 None（走 candidates）。
+    收 ES=F／ES1!／/ES、純 NQ／YM／RTY／GC、中文別名（ALIAS）；台指期／費半期（TXF、SXF）先回「整合中」。"""
+    s = (raw or '').strip().upper().replace(' ', '')
+    s = ALIAS.get(s, s)
+    if s == '^SOX':
+        return dict(SOX)
+    m = FUT_IN.match(s)
+    if not m:
+        return None
+    root, marked = m.group(2), bool(m.group(1) or m.group(3))
+    if root in FUT_SOON and (marked or s == root):
+        raise EngineError(422, 'coming_soon', '台指期／費半期資料整合中')
+    if root not in FUT or not (marked or root in FUT_BARE):
+        return None
+    y, ref, kind, name, ex = FUT[root]
+    return {'yahoo': y, 'code': root + '1!', 'market': 'fut', 'type': 'FUTURE', 'name': name, 'exchange': ex,
+            'root': root, 'ref': ref, 'kind': kind}
 
 
 def _local(epoch, tz):
@@ -205,9 +252,51 @@ def _tod(idx):
     return idx.hour * 60 + idx.minute
 
 
+def _tday(idx):
+    """期貨交易日（00:00）：前一天 18:00 起到當天 17:00。"""
+    return (idx + FUT_SHIFT).normalize()
+
+
+def _merge(df, key):
+    g = df.groupby(key)
+    return pd.DataFrame({'o': g['o'].first(), 'h': g['h'].max(), 'l': g['l'].min(), 'c': g['c'].last(), 'v': g['v'].sum(min_count=1)})
+
+
+def _fut_1h(df):
+    """期貨 1H（18:00～隔天 16:00 共 23 根整點 K）：丟 17:00 那根雜訊 K（休市時段）、丟沒對齊整點又沒價動的即時跳動點；
+    提早收盤日對齊 :30 的 K 併進所在的整點；有價動卻量 0（18:00 開盤那根常見）＝缺量 → NaN。結束＝下一個整點，最晚交易日 17:00。"""
+    t = _tod(df.index)
+    moved = (df['h'] > df['l']) | (df['o'] != df['c'])
+    on_hour = (df.index.minute == 0) & (df.index.second == 0)
+    df = df[((t < 17 * 60) | (t >= 18 * 60)) & (on_hour | moved)].copy()
+    df.loc[(df['v'] == 0) & ((df['h'] > df['l']) | (df['o'] != df['c'])), 'v'] = np.nan
+    if not ((df.index.minute == 0) & (df.index.second == 0)).all():
+        df = _merge(df, df.index.floor('h'))
+    end = np.minimum(df.index + pd.Timedelta(hours=1), _tday(df.index) + pd.Timedelta(hours=17))
+    return df, pd.DatetimeIndex(end)
+
+
+def _fut_4h_key(idx):
+    """期貨 4H 從 18:00 起切：18、22、02、06、10、14（14:00～17:00 那段只有 3 小時，同 TradingView）。"""
+    return (idx + FUT_SHIFT).floor('4h') - FUT_SHIFT
+
+
+def _fut_dvol(d1):
+    """期貨日K 的量：0＝沒給、跟前一根一模一樣＝Yahoo 抄前一天（最近一個收完的交易日常見，事後才補正）→ 都當缺量 NaN。"""
+    v = d1['v']
+    bad = (v == 0) | (v == v.shift())
+    if not bad.any():
+        return d1
+    d1 = d1.copy()
+    d1.loc[bad, 'v'] = np.nan
+    return d1
+
+
 def bars_1h(df, market):
     """只留開盤起整點對齊的 1H（丟掉收盤那刻的假 K）；有價動卻量 0＝缺量 → NaN。回 (df, end)。
-    盤中沒對齊整點、但有價動的 K（美股提早收盤日 13:00 那根）不丟，併進它所在那根 1H。"""
+    盤中沒對齊整點、但有價動的 K（美股提早收盤日 13:00 那根）不丟，併進它所在那根 1H。期貨見 _fut_1h。"""
+    if market == 'fut':
+        return _fut_1h(df)
     o_m, c_m = SESS[market]
     t = _tod(df.index)
     moved = (df['h'] > df['l']) | (df['o'] != df['c'])
@@ -226,7 +315,11 @@ def bars_1h(df, market):
 
 
 def bars_4h(h1, market):
-    """1H → 4H：每個交易日從開盤起每 4 根 1H 一根（依時間切，缺根不會錯位）；標在該段開始時間。"""
+    """1H → 4H：每個交易日從開盤起每 4 根 1H 一根（依時間切，缺根不會錯位）；標在該段開始時間。期貨見 _fut_4h_key。"""
+    if market == 'fut':
+        out = _merge(h1, _fut_4h_key(h1.index))
+        end = np.minimum(out.index + pd.Timedelta(hours=4), _tday(out.index) + pd.Timedelta(hours=17))
+        return out, pd.DatetimeIndex(end)
     o_m, c_m = SESS[market]
     day = h1.index.normalize()
     k = (_tod(h1.index) - o_m) // 240
@@ -239,11 +332,16 @@ def bars_4h(h1, market):
 
 
 def bars_d(d1, market):
+    """日K：結束＝當天收盤。期貨用 Yahoo 的交易日（K 標在交易日 00:00＝前一天 18:00～當天 17:00，收盤＝結算價），結束＝當天 17:00。"""
+    if market == 'fut':
+        d1 = _fut_dvol(d1)
     return d1, d1.index + pd.Timedelta(minutes=SESS[market][1])
 
 
 def bars_w(d1, market):
     """日K → 週K（週一～週五）；標在該週最後一個交易日；結束＝該週五收盤（週五休市也一樣，晚半天定案而已）。"""
+    if market == 'fut':
+        d1 = _fut_dvol(d1)
     mon = d1.index - pd.to_timedelta(d1.index.weekday, unit='D')
     g = d1.groupby(mon)
     out = pd.DataFrame({'o': g['o'].first(), 'h': g['h'].max(), 'l': g['l'].min(), 'c': g['c'].last(),
@@ -266,6 +364,144 @@ def build(df, tf, market, now_local):
         b, end = BUILD[tf](df, market)
     at_close = _tod(end) == SESS[market][1]
     return b, np.asarray(end + pd.to_timedelta(np.where(at_close, GRACE, 0), unit='s') <= now_local, dtype=bool)
+
+
+# ═════════════════════════ 期貨換月（價格不還原，只標出換月那根） ═════════════════════════
+# Yahoo 連續月（=F）到期前直接接下一個合約、沒有還原，也拿不到過期合約 → 從「期貨 ÷ 參考標的」價差（basis）的跳動找換月：
+#   股指：季月第三個週五 E（遇假日往前），窗口 [E−8 天, E+3 天]；GC：交割月 G/J/M/Q/Z 前一個月最後營業日＝FND，窗口 FND−5～+2 營業日；
+#   CL：25 日（不是營業日就用它前面最後一個營業日）往前 3 個營業日＝LTD，窗口 LTD−5～+2 營業日。
+#   窗口內 |Δln(F/R)| 最大那天、要大於 max(25bp, 5×近一年 MAD) 才算。日K 用收盤（結算價）；1H／4H 用 15:00 那根 1H 的收盤（收在 16:00＝參考標的收盤）。
+#   例外：GC、CL 的日K 結算時間跟 ETF 收盤不同、價差雜訊太大，改在 {FND, FND+1}／{LTD, LTD+1} 兩天裡挑開盤跳空 |ln(開/前收)| 大的那根。
+#   參考標的抓不到：只用日曆（股指 E 後第一個交易日、GC＝FND、CL＝LTD+1）。1H 的換月是在 K 中間拼接，換月那根＝當天報酬與 Δbasis 同向且最大的那根。
+ROLL_MIN = 0.0025
+ROLL_MAD_K = 5
+
+
+def roll_windows(kind, days):
+    """回 [(窗口內交易日, 兩天候選(GC／CL 日K 用), 只用日曆時的換月日, 股指到期日 E)]；days＝交易日（已排序）。
+    資料最後一天之後用平日補（還沒到的到期日也算得出窗口；窗口裡沒資料的日子偵測時自然跳過）。"""
+    out = []
+    if not len(days):
+        return out
+    days = days.append(pd.bdate_range(days[-1] + pd.Timedelta(days=1), periods=45))
+    D = lambda k: days[k] if 0 <= k < len(days) else None
+    last_le = lambda x: int(days.searchsorted(x, 'right')) - 1
+    for y in range(days[0].year, days[-1].year + 1):
+        for mth in range(1, 13):
+            if kind == 'eq':
+                if mth % 3:
+                    continue
+                d1 = pd.Timestamp(y, mth, 1)
+                f3 = d1 + pd.Timedelta(days=(4 - d1.weekday()) % 7 + 14)        # 第三個週五
+                k = last_le(f3)
+                E = D(k)
+                if E is None or E.month != mth:
+                    continue
+                hi = max(E + pd.Timedelta(days=3), D(k + 1))                  # 週四到期（週五休市）也要含下週一
+                out.append((days[(days >= E - pd.Timedelta(days=8)) & (days <= hi)], None, D(k + 1), E))
+            else:
+                if kind == 'gc':
+                    if mth not in (1, 3, 5, 7, 11):                             # 交割月 G J M Q Z 的前一個月（跳過 V）
+                        continue
+                    k = last_le(pd.Timestamp(y, mth, 1) + pd.offsets.MonthEnd(0))
+                    if D(k) is None or D(k).month != mth:
+                        continue
+                    fb = D(k)
+                else:
+                    k0 = last_le(pd.Timestamp(y, mth, 25))
+                    if D(k0) is None or D(k0).month != mth:
+                        continue
+                    k = k0 - 3
+                    fb = D(k + 1)
+                if k - 5 < 0 or k + 2 >= len(days):
+                    continue
+                out.append((days[k - 5:k + 3], days[k:k + 2], fb, None))
+    return out
+
+
+def roll_days(kind, F, R, gap_o=None, fill=False, days=None):
+    """F：期貨每個交易日的比較價（index＝日期）；R：參考標的日K 收盤（None＝抓不到）；gap_o：ln(開/前收)（只有 GC／CL 日K 給）；
+    fill：窗口裡偵測不到（換月價差太小，例如 2017～2021 低利率時股指只差幾個 bp）時改用日曆的換月日（日K／週K 用；每季、每月一定會換）。
+    days：交易日（不給＝F 的日期；1H 要給全部交易日，到期日那天常沒有 15:00 那根）。
+    回 [(換月日＝第一根新合約那天, 前一個比對日或 None, Δbasis 或 None＝只靠日曆, 股指到期日 E 或 None)]。"""
+    out = []
+    days = F.index if days is None else days
+    wins = roll_windows(kind, days)
+    seen = lambda d: d is not None and d <= days[-1]            # 還沒到的日子不標
+    db = None
+    if R is not None:
+        j = pd.concat([F.rename('f'), R.rename('r')], axis=1, join='inner').dropna()
+        # 股指日K：到期日那天 Yahoo 的收盤是到期合約的最後結算價（早盤特別開盤價），不是收盤 → 那天不比，Δbasis 直接跨過去
+        j = j[(j['f'] > 0) & (j['r'] > 0) & ~(fill and j.index.isin([w[3] for w in wins if w[3] is not None]))]
+        if len(j) > 30:
+            db = np.log(j['f'] / j['r']).diff().dropna()
+    if db is not None:
+        tail = db.iloc[-260:]
+        thr = max(ROLL_MIN, ROLL_MAD_K * float((tail - tail.median()).abs().median()))
+    for win, cand, fb, E in wins:
+        if gap_o is not None and cand is not None:
+            g = gap_o.reindex(cand).abs()
+            if g.notna().all():
+                d = g.idxmax()
+                out.append((d, None, float(gap_o[d]), E))
+            continue
+        if db is None:
+            if seen(fb):
+                out.append((fb, None, None, E))
+            continue
+        x = db.reindex(win).dropna()
+        d = x.abs().idxmax() if len(x) else None
+        if d is not None and abs(x[d]) > thr:
+            k = db.index.get_loc(d)
+            out.append((d, db.index[k - 1] if k else None, float(x[d]), E))
+        elif fill and seen(fb):
+            out.append((fb, None, None, E))
+    return out
+
+
+def find_rolls(kind, tf, src, bars, R):
+    """src：1H（tf＝1H／4H，已過 bars_1h）或日K（D／W，已修量）；bars：要輸出的 K；R：參考標的日K 收盤。
+    回 [{i, t, dir, step_pct, label}]（i＝bars 的位置；dir／step_pct＝換月那天的價差跳動，只靠日曆時是 None）。"""
+    intra = tf in ('1H', '4H')
+    if intra:
+        s15 = src['c'][(src.index.hour == 15) & (src.index.minute == 0)]
+        F = pd.Series(s15.to_numpy(), index=s15.index.normalize())
+        gap_o = None
+        ret = np.log(src['c'] / src['c'].shift())
+    else:
+        F = src['c']
+        gap_o = None if kind == 'eq' else np.log(src['o'] / src['c'].shift())
+    F = F[~F.index.duplicated(keep='last')]
+    mon = bars.index - pd.to_timedelta(bars.index.weekday, unit='D')
+    out = []
+    days = pd.DatetimeIndex(_tday(src.index).unique()).sort_values() if intra else None
+    for d, prev, step, E in roll_days(kind, F, R, gap_o, fill=not intra, days=days):
+        if intra:
+            lo = (prev if prev is not None else d - pd.Timedelta(days=1)) + pd.Timedelta(hours=15)
+            seg = ret[(ret.index > lo) & (ret.index <= d + pd.Timedelta(hours=15))].dropna()
+            if step is not None:
+                same = seg[np.sign(seg) == np.sign(step)]
+                seg = same if len(same) else seg
+            if seg.empty:
+                continue
+            T = seg.abs().idxmax()
+            e16 = E + pd.Timedelta(hours=16) if E is not None else None   # 2025-06 以前股指 1H 在到期日 16:00 那根換（那天 15:00 常沒有 K）
+            if e16 is not None and e16 in seg.index:
+                T = e16
+            key = T if tf == '1H' else _fut_4h_key(pd.DatetimeIndex([T]))[0]
+            hit = np.flatnonzero(bars.index == key)
+        elif tf == 'D':
+            hit = np.flatnonzero(bars.index == d)
+        else:
+            hit = np.flatnonzero(mon == d - pd.Timedelta(days=d.weekday()))
+        if not len(hit):
+            continue
+        i = int(hit[0])
+        if out and out[-1]['i'] == i:
+            continue
+        out.append({'i': i, 't': A._d(bars.index[i]), 'dir': None if step is None else 'up' if step >= 0 else 'down',
+                    'step_pct': None if step is None else round(float(np.exp(step) - 1) * 100, 2), 'label': ROLL_LABEL})
+    return out
 
 
 # ═════════════════════════ 純函式：K → 訊號＋進出場＋圖 ═════════════════════════
@@ -295,31 +531,39 @@ def ma_sets(c, idx):
     return out
 
 
-def gaps_full(dc):
+def gaps_full(dc, skip=()):
     """整段定案 K 的缺口（含分類、回補到最後一根）與島狀反轉；口徑＝analyze_symbol.compute_signals 把視窗放到整段（k0=0、tx=0）。
     分類只看缺口那根以前的 K（趨勢／位置／第幾個／當時壓力），回補與距現價看到最後一根，所以最近 120 根那段＝signals.gaps
-    （tests/ta_engine_check.py --regress 驗）。唯一可能的差：島的 A 缺口在 120 根視窗左邊、B 在視窗內 → 整段版會標成島、視窗版不會。"""
+    （tests/ta_engine_check.py --regress 驗）。唯一可能的差：島的 A 缺口在 120 根視窗左邊、B 在視窗內 → 整段版會標成島、視窗版不會。
+    skip＝期貨換月那幾根（不算缺口，所以也不分類、不配成島；signals 同一份 skip）。"""
     idx = dc.index
     o_raw, h_raw, l_raw, c_raw, v = (dc[k].to_numpy('float64') for k in ('o', 'h', 'l', 'c', 'v'))
     rnd = lambda a: np.array([np.nan if A._p(x) is None else A._p(x) for x in a], 'float64')
     O, H, L, Cc = rnd(o_raw), rnd(h_raw), rnd(l_raw), rnd(c_raw)
-    gp = A._sig_gaps(idx, H, L, Cc, v, 0)
+    gp = A._sig_gaps(idx, H, L, Cc, v, 0, skip)
     A._classify(gp, {'items': []}, A._gap_ctx(H, L, Cc, c_raw, h_raw, l_raw, 0), idx, O, H, L, Cc, v, 0)
     return gp
 
 
-def analyze_bars(df, market, final=None):
-    """純函式。df：o/h/l/c/v（index＝K 棒時間，舊到新）；final：每根是否定案（None＝全部定案；未定只能在尾巴）。
-    訊號、均線排列只用定案 K；圖＝最後 120 根定案 K ＋ 尾巴的盤中未定 K；history＝全部 K（瀏覽器回測只用前 bars_completed 根）。"""
+def analyze_bars(df, market, final=None, rolls=None):
+    """純函式。df：o/h/l/c/v（index＝K 棒時間，舊到新）；final：每根是否定案（None＝全部定案；未定只能在尾巴）；
+    rolls：期貨換月那幾根（find_rolls 的輸出，i＝df 位置）→ 那根不算缺口，上圖標「換月」。
+    訊號、均線排列只用定案 K；圖＝最後 120 根定案 K ＋ 尾巴的盤中未定 K；history＝全部 K（瀏覽器回測只用前 bars_completed 根）。
+    整段定案 K 的量全是 0／缺＝沒有成交量（指數）：量全部當缺（history.v 全 null）、has_volume=false。"""
     df = df[['o', 'h', 'l', 'c', 'v']].astype('float64')
     fin = np.ones(len(df), bool) if final is None else np.asarray(final, bool)
     nf = int(fin.sum())
     if not fin[:nf].all():
         raise ValueError('未定的 K 只能在尾巴')
-    dc = df.iloc[:nf]
     if nf < MIN_BARS:
         raise EngineError(422, 'too_few_bars', '只有 %d 根定案 K，至少要 %d 根' % (nf, MIN_BARS))
-    sig, _chart = A.compute_signals(dc, market)
+    has_vol = bool((df['v'].to_numpy()[:nf] > 0).any())
+    if not has_vol:
+        df = df.assign(v=np.nan)
+    rolls = list(rolls or [])
+    skip = {r['i'] for r in rolls}
+    dc = df.iloc[:nf]
+    sig, _chart = A.compute_signals(dc, market, skip)
     sig['ma_align'] = ma_sets(dc['c'].to_numpy('float64'), dc.index)
     sig['badges']['ma'] = sig['ma_align']['badge']['text']
     k0 = max(0, nf - CHART_N)
@@ -331,7 +575,7 @@ def analyze_bars(df, market, final=None):
              'final': bool(f)} for t, r, f in zip(w.index, w.itertuples(), wf)]
     # 缺口／島狀反轉：整段歷史（i、fill_i、i0、i1＝history 的絕對位置）；1H 缺口幾百個，用欄位表（cols＋rows）省 payload
     hi = {A._d(t): i for i, t in enumerate(df.index)}
-    gf = gaps_full(dc)
+    gf = gaps_full(dc, skip)
     # 文字欄（方向、回補、類型、趨勢、位置）存成 enums[欄] 的序號：日K 十年五百多個缺口，省三成 payload
     en = {c: sorted({g.get(c) for g in gf['items']} - {None}) for c in GAP_ENUMS}
     code = {c: {x: k for k, x in enumerate(v)} for c, v in en.items()}
@@ -355,12 +599,19 @@ def analyze_bars(df, market, final=None):
             'v': [int(x) if x == x else None for x in df['v'].to_numpy()]}
     notes = []
     nv = int(np.isnan(dc['v'].to_numpy()[k0:]).sum())
-    if nv:
-        notes.append('近 %d 根裡有 %d 根 Yahoo 沒給量（台股盤中第一根常見），量比與前五大量會跳過這些 K' % (nf - k0, nv))
+    if not has_vol:
+        notes.append('這檔 Yahoo 不給成交量（指數沒有量）：量比、前五大量、量的進出場條件都停用')
+    elif nv:
+        why = {'tw': '（台股盤中第一根常見）', 'fut': '（期貨每天 18:00 開盤那根、日K 最近一天常見）'}.get(market, '')
+        notes.append('近 %d 根裡有 %d 根 Yahoo 沒給量%s，量比與前五大量會跳過這些 K' % (nf - k0, nv, why))
+    if market == 'fut':
+        notes.append('期貨連續月是 Yahoo 直接接下一個合約、價格沒有還原：換月那根（圖上標「%s」）的跳空不算缺口、不進撐壓、不算島狀反轉'
+                     % ROLL_LABEL)
+    legend = [x for x in LEGEND if has_vol or x['key'] != 'top_volume'] + ([LEGEND_ROLL] if rolls else [])
     out = {'asof': A._d(dc.index[-1]), 'bars_total': int(len(df)), 'bars_completed': nf,
-           'unfinished': bool(not wf[-1]), 'unfinished_label': UNFINISHED if not wf[-1] else None,
+           'unfinished': bool(not wf[-1]), 'unfinished_label': UNFINISHED if not wf[-1] else None, 'has_volume': has_vol,
            'chart': {'n': len(bars), 'bars': bars, 'sma': sma, 'ma_sets': {k: list(ns) for k, ns in MA_SETS},
-                     'overlays': {'sr': srl, 'gaps': gaps, 'islands': isl}, 'legend': LEGEND},
+                     'overlays': {'sr': srl, 'gaps': gaps, 'islands': isl, 'rolls': rolls}, 'legend': legend},
            'signals': sig, 'history': hist, 'notes': notes}
     return _clean(out)
 
@@ -372,24 +623,40 @@ def run(raw, tf, now=None, http=None):
     tf = (tf or 'D').upper()
     if tf not in TFS:
         raise EngineError(400, 'bad_tf', '週期只能是 1H、4H、D、W')
-    cands, market, code = candidates(raw)
+    http = http or _http_get
+    sp = special(raw)
+    cands, market, code = ([sp['yahoo']], sp['market'], sp['code']) if sp else candidates(raw)
     res = None
     for ysym in cands:
-        res, cached, fetched = cached_chart(ysym, TFS[tf], now, http or _http_get)
+        res, cached, fetched = cached_chart(ysym, TFS[tf], now, http)
         if res is not None:
             break
     if res is None:
         raise EngineError(404, 'not_found', '查不到這個代號：%s' % code)
     m = res.get('meta') or {}
-    if m.get('instrumentType') not in OK_TYPES:
+    if m.get('instrumentType') not in ((sp['type'],) if sp else OK_TYPES):
         raise EngineError(422, 'not_supported', '只支援個股與 ETF（%s 是 %s）' % (code, m.get('instrumentType')))
     tz = m.get('exchangeTimezoneName') or ('Asia/Taipei' if market == 'tw' else 'America/New_York')
-    bars, final = build(frame(res, TFS[tf]), tf, market, _local(now, tz))
-    out = analyze_bars(bars, market, final)
-    out = dict({'ok': True, 'schema': SCHEMA, 'tf': tf,
-                'symbol': {'input': raw, 'code': code, 'yahoo': ysym, 'market': market, 'type': m.get('instrumentType'),
-                           'name': m.get('longName') or m.get('shortName'), 'exchange': m.get('fullExchangeName'),
-                           'currency': m.get('currency'), 'timezone': tz},
+    src = frame(res, TFS[tf])
+    bars, final = build(src, tf, market, _local(now, tz))
+    rolls = None
+    if market == 'fut':
+        R = None
+        try:
+            rr = cached_chart(sp['ref'], '1d', now, http)[0]
+            R = frame(rr, '1d')['c'] if rr else None
+        except EngineError:
+            pass                                   # 參考標的抓不到 → 只用日曆
+        rolls = find_rolls(sp['kind'], tf, bars if tf == '1H' else bars_1h(src, 'fut')[0] if tf == '4H' else src, bars, R)
+    out = analyze_bars(bars, market, final, rolls)
+    sym = {'input': raw, 'code': code, 'yahoo': ysym, 'market': market, 'type': m.get('instrumentType'),
+           'name': m.get('longName') or m.get('shortName'), 'exchange': m.get('fullExchangeName'),
+           'currency': m.get('currency'), 'timezone': tz, 'has_volume': out['has_volume']}
+    if sp:                                         # 期貨／費半：中文名＋交易所；期貨另給目前合約（Yahoo shortName，例 E-Mini S&P 500 Dec 26）
+        sym.update(name=sp['name'], exchange=sp['exchange'])
+        if market == 'fut':
+            sym.update(contract=m.get('shortName'), continuous=True)
+    out = dict({'ok': True, 'schema': SCHEMA, 'tf': tf, 'symbol': sym,
                 'generated_at': int(now), 'fetched_at': int(fetched), 'cached': bool(cached)}, **out)
     return out
 
@@ -625,6 +892,114 @@ def selftest():
         ok(False, 'bad tf')
     except EngineError as e:
         ok(e.code == 'bad_tf', '週期只收 1H／4H／D／W')
+
+    # ── 期貨／費半（11-10）──
+    sp = lambda x: (special(x) or {}).get('yahoo')
+    ok([sp(x) for x in ('ES1!', 'es=f', '/ES', 'NQ', 'nq1!', '小那', '小道瓊', 'RTY', 'GC', '黃金期', 'CL1!', '輕原油', '^SOX', 'sox', '費半')]
+       == ['ES=F', 'ES=F', 'ES=F', 'NQ=F', 'NQ=F', 'NQ=F', 'YM=F', 'RTY=F', 'GC=F', 'GC=F', 'CL=F', 'CL=F', '^SOX', '^SOX', '^SOX']
+       and special('ES') is None and special('CL') is None and special('MES=F') is None and special('2330') is None
+       and special('NVDA') is None and special('NQ1!')['code'] == 'NQ1!' and special('NQ1!')['market'] == 'fut',
+       '期貨代號：X=F／X1!／/X、純 NQ YM RTY GC、中文別名；純 ES／CL 照查股票（Eversource／Colgate）；^SOX／費半')
+    for x in ('TXF1!', 'SXF1!', '台指期', '費半期', '/TXF'):
+        try:
+            special(x)
+            ok(False, x)
+        except EngineError as e:
+            ok(e.code == 'coming_soon' and e.msg == '台指期／費半期資料整合中', '%s → 台指期／費半期資料整合中' % x)
+    # 期貨 1H：17:00 雜訊 K 丟、18:00 量 0 有價動＝缺量、提早收盤 :30 併進整點、即時跳動點丟；16:00 那根結束在 17:00
+    fr = [('2026-11-05 15:00', [10, 11, 9, 10.5, 50]), ('2026-11-05 16:00', [10.5, 11, 10, 10.8, 40]),
+          ('2026-11-05 17:00', [10.8, 10.8, 10.8, 10.8, 1]), ('2026-11-05 18:00', [11, 12, 10.9, 11.5, 0]),
+          ('2026-11-05 19:00', [11.5, 12, 11, 11.8, 30]), ('2026-11-05 19:30', [11.8, 12.5, 11.7, 12.2, 5]),
+          ('2026-11-05 20:36:03', [12.2, 12.2, 12.2, 12.2, 0])]
+    fdf = pd.DataFrame([r for _, r in fr], index=pd.DatetimeIndex([pd.Timestamp(t) for t, _ in fr]), columns=['o', 'h', 'l', 'c', 'v'], dtype='float64')
+    f1, fe = bars_1h(fdf, 'fut')
+    ok(list(f1.index.strftime('%H:%M')) == ['15:00', '16:00', '18:00', '19:00'] and np.isnan(f1['v'].iloc[2])
+       and f1['c'].iloc[3] == 12.2 and f1['h'].iloc[3] == 12.5 and f1['v'].iloc[3] == 35
+       and fe[1] == pd.Timestamp('2026-11-05 17:00') and fe[2] == pd.Timestamp('2026-11-05 19:00'),
+       '期貨 1H：丟 17:00 雜訊 K 與即時跳動點、18:00 量 0 有價動 → NaN、19:30 併進 19:00；16:00 那根結束在 17:00')
+    hrs = pd.date_range('2026-11-08 18:00', '2026-11-09 16:00', freq='h')
+    hh = pd.DataFrame({'o': 1.0, 'h': 2.0, 'l': .5, 'c': 1.5, 'v': 10.0}, index=hrs)
+    g4, e4f = bars_4h(hh, 'fut')
+    ok(list(g4.index.strftime('%m-%d %H:%M')) == ['11-08 18:00', '11-08 22:00', '11-09 02:00', '11-09 06:00', '11-09 10:00', '11-09 14:00']
+       and list(g4['v']) == [40, 40, 40, 40, 40, 30] and e4f[-1] == pd.Timestamp('2026-11-09 17:00') and e4f[0] == pd.Timestamp('2026-11-08 22:00'),
+       '期貨 4H：從 18:00 起 18／22／02／06／10／14，14:00 那段到 17:00（3 根）')
+    # 定案：週日 18:00 開盤；週五 16:00 那根 17:15 才定案；週末全部定案
+    wk1 = pd.DataFrame({'o': 1.0, 'h': 2.0, 'l': .5, 'c': 1.5, 'v': 10.0},
+                       index=pd.to_datetime(['2026-11-06 15:00', '2026-11-06 16:00', '2026-11-08 18:00']))
+    fa = build(wk1, '1H', 'fut', pd.Timestamp('2026-11-06 17:10'))[1]
+    fb = build(wk1, '1H', 'fut', pd.Timestamp('2026-11-07 12:00'))[1]
+    fc = build(wk1, '1H', 'fut', pd.Timestamp('2026-11-08 18:30'))[1]
+    dd2 = pd.DataFrame({'o': 1.0, 'h': 2.0, 'l': .5, 'c': 1.5, 'v': [10.0, 20.0, 20.0, 0.0]},
+                       index=pd.to_datetime(['2026-11-04', '2026-11-05', '2026-11-06', '2026-11-09']))
+    fd1 = build(dd2, 'D', 'fut', pd.Timestamp('2026-11-06 17:20'))
+    fd2 = build(dd2, 'D', 'fut', pd.Timestamp('2026-11-08 19:00'))[1]
+    fw = build(dd2, 'W', 'fut', pd.Timestamp('2026-11-06 17:20'))[1]
+    ok(list(fa) == [True, False, False] and list(fb) == [True, True, False] and list(fc) == [True, True, False]
+       and list(fd1[1]) == [True, True, True, False] and list(fd2) == [True, True, True, False] and list(fw) == [True, False]
+       and np.isnan(fd1[0]['v'].iloc[2]) and np.isnan(fd1[0]['v'].iloc[3]) and fd1[0]['v'].iloc[1] == 20,
+       '期貨定案：週五 16:00 那根 17:15 才定案、週末全定案、週日 18:00 起週一那根盤中；日K 17:15 定案；量抄前一天／量 0 → NaN')
+    # 換月：股指每季第三個週五後的週一價差跳 +80bp（其他天 ±2bp 雜訊）→ 偵測到週一；沒有參考標的 → 退回日曆
+    rng = np.random.RandomState(7)
+    dts = pd.bdate_range('2025-01-02', '2026-11-06')
+    Rr = pd.Series(5000 * np.exp(np.cumsum(rng.normal(0, .01, len(dts)))), index=dts)
+    E3 = [d for d in dts if d.month % 3 == 0 and d.weekday() == 4 and 15 <= d.day <= 21]
+    bas = np.cumsum([.008 if (d - pd.Timedelta(days=3)) in E3 else 0 for d in dts]) + rng.normal(0, .0002, len(dts))
+    Ff = Rr * np.exp(bas)
+    got = [str(d.date()) for d, *_ in roll_days('eq', Ff, Rr, fill=True)]
+    want = [str((d + pd.Timedelta(days=3)).date()) for d in E3]
+    ok(got == want and [str(d.date()) for d, *_ in roll_days('eq', Ff, None, fill=True)] == want,
+       '換月偵測（股指日K）：每季第三個週五後的週一；參考標的抓不到 → 日曆（同一天）：%s' % got[-2:])
+    gdf = pd.DataFrame({'o': Ff.to_numpy(), 'h': Ff.to_numpy() * 1.01, 'l': Ff.to_numpy() * .99, 'c': Ff.to_numpy(), 'v': 1000.0}, index=dts)
+    jump = [d + pd.Timedelta(days=3) for d in E3]
+    for k, d in enumerate(dts):                            # 換月那根做成往上跳空
+        if d in jump:
+            gdf.iloc[k:, :4] *= 1.05
+    rl = find_rolls('eq', 'D', gdf, gdf, Rr)
+    ag = analyze_bars(gdf, 'fut', rolls=rl)
+    G = ag['chart']['overlays']['gaps']
+    gi = {r_[G['cols'].index('i')] for r_ in G['rows']}
+    ok(len(rl) >= 6 and not (gi & {x['i'] for x in rl}) and all(x['label'] == ROLL_LABEL for x in ag['chart']['overlays']['rolls'])
+       and all(x['date'] not in {y['t'] for y in rl} for x in ag['signals']['gaps']['items'])
+       and any(x['key'] == 'roll' for x in ag['chart']['legend']) and any('換月' in n for n in ag['notes']),
+       '換月那根的跳空不算缺口（整段、近 120 根都沒有）、上圖標「換月」、圖例與註記有說明')
+    # GC 日K：FND／FND+1 兩天挑開盤跳空大的那根；CL：LTD／LTD+1
+    gd2 = pd.DataFrame({'o': 100.0, 'h': 101.0, 'l': 99.0, 'c': 100.0, 'v': 1.0}, index=dts)
+    for dstr in ('2025-07-31', '2025-12-01', '2026-02-02'):  # FND 7/31（Q）、11/28 → 隔一天 12/01（Z）、1/30 → 2/02（G）
+        k = dts.get_loc(pd.Timestamp(dstr))
+        gd2.iloc[k:, :4] *= 1.02
+    gr = [x['t'] for x in find_rolls('gc', 'D', gd2, gd2, None)]
+    ok({'2025-07-31', '2025-12-01', '2026-02-02'} <= set(gr), 'GC 日K：FND 當天或隔一天、挑開盤跳空大的：%s' % gr[-5:])
+
+    def mock_f(url):
+        sym = urllib.parse.unquote(url.split('/chart/')[1].split('?')[0])
+        if sym == '^SOX':
+            c = _fake_chart(sym, 'INDEX', 'America/New_York')
+            c['indicators']['quote'][0]['volume'] = [0] * len(c['timestamp'])
+            return 200, {'chart': {'result': [c]}}
+        if sym.endswith('=F'):
+            c = _fake_chart(sym, 'FUTURE', 'America/New_York')
+            c['meta']['shortName'] = 'Nasdaq 100 Dec 26'
+            return 200, {'chart': {'result': [c]}}
+        if sym == '^NDX':
+            return 502, None
+        return mock(url)
+    _CACHE.clear()
+    rs = run('費半', 'D', now, mock_f)
+    rq = run('NQ1!', 'D', now, mock_f)
+    ok(rs['symbol']['yahoo'] == '^SOX' and rs['symbol']['type'] == 'INDEX' and rs['has_volume'] is False
+       and rs['symbol']['has_volume'] is False and set(rs['history']['v']) == {None} and '指數沒有量' in rs['notes'][0]
+       and not any(x['key'] == 'top_volume' for x in rs['chart']['legend']) and rs['chart']['overlays']['rolls'] == [],
+       '^SOX：指數白名單放行、量全 0 → has_volume=false、history.v 全 null、圖例沒有前五大量')
+    ok(rq['symbol']['market'] == 'fut' and rq['symbol']['yahoo'] == 'NQ=F' and rq['symbol']['name'] == 'E-mini 那斯達克 100 期貨'
+       and rq['symbol']['exchange'] == 'CME' and rq['symbol']['contract'] == 'Nasdaq 100 Dec 26' and rq['has_volume'] is True
+       and isinstance(rq['chart']['overlays']['rolls'], list),
+       'NQ1!：期貨白名單、中文名＋CME＋目前合約；參考標的 ^NDX 抓不到也照算（只用日曆）')
+    for sym, code in (('ES', 'not_found'), ('IDXX', 'not_supported'), ('TXF1!', 'coming_soon')):
+        try:
+            run(sym, 'D', now, lambda u: (404, None) if '/ES?' in u else mock_f(u))
+            ok(False, sym)
+        except EngineError as e:
+            ok(e.code == code, '%s → %s（純 ES 走股票查法；其他指數照擋）' % (sym, code))
 
     # 授權
     calls.clear()

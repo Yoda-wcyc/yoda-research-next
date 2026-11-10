@@ -6,6 +6,8 @@
 //  2. app/ta/page.jsx：最近查過的 s／n 是物件時要收成字串（否則 React #31 整頁崩潰）；Boundary 出錯只顯示那一塊的錯誤摘要；
 //     chart.bars 不是陣列也不崩（標題列在 Boundary 外面算）。
 //  3. 訊號篩選（11-10）：全部／只看多方／只看空方只篩顯示（記號、線、清單、統計），統計＝子集重算；localStorage 壞值回「全部」。
+//  4. 期貨／費半（11-10）：市場標籤、換月標籤（rolls 缺、壞值都不崩）、沒有成交量（has_volume=false 或量全 null）→ 量柱、③ 前五大量、
+//     規則面板寫「此標的沒有成交量」、量的條件不套用（不改面板存的參數）；lib/ta-live.js 代號格式（期貨、^SOX、中文別名）與額度鍵。
 const fs = require("fs"), path = require("path"), vm = require("vm"), assert = require("assert");
 const ROOT = path.join(__dirname, "..");
 let fails = 0;
@@ -115,7 +117,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   const { transformSync } = require(path.join(ROOT, "node_modules", "next", "dist", "build", "swc"));
   const opts = { jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "classic" } }, target: "es2020" }, module: { type: "commonjs" } };
   const src = 'const React = require("react");\n' + fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8")
-    .replace('"../../lib/ta-trade"', JSON.stringify(path.join(ROOT, "lib", "ta-trade.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade };\n";
+    .replace('"../../lib/ta-trade"', JSON.stringify(path.join(ROOT, "lib", "ta-trade.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries };\n";
   const Mod = require("module");
   const libSrc = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-trade.js"), "utf8"), opts).code;
   const lib = new Mod(path.join(ROOT, "lib", "ta-trade.js")); lib.paths = Mod._nodeModulePaths(ROOT); lib._compile(libSrc, lib.id);
@@ -204,6 +206,84 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     globalThis.localStorage = { getItem: () => { throw new Error("blocked"); } };
     assert.strictEqual(P.readSide(), "all");
     assert.strictEqual(P.sideTrade(D, "bogus"), D);
+  });
+
+  // ---------- 4. 期貨／費半 ----------
+  const mkD = (o = {}) => {
+    const n = 60, t = [], O = [], H = [], Lo = [], C = [], V = [];
+    for (let i = 0; i < n; i++) {
+      const c = 100 + 10 * Math.sin(i / 5) + (i >= 40 ? 6 : 0);   // 第 40 根往上跳（當作換月）
+      t.push("2026-0" + (1 + Math.floor(i / 28)) + "-" + String(1 + (i % 28)).padStart(2, "0")); O.push(c - 0.5); H.push(c + 1); Lo.push(c - 1); C.push(c);
+      V.push(o.noVol ? null : 1000 + (i % 3) * 800);
+    }
+    const bars = t.slice(-40).map((x, k) => ({ t: x, o: O[20 + k], h: H[20 + k], l: Lo[20 + k], c: C[20 + k], v: V[20 + k], final: true }));
+    const d = { tf: "D", bars_completed: n, history: { n, t, o: O, h: H, l: Lo, c: C, v: V },
+      symbol: o.symbol || { market: "fut", exchange: "CME", type: "FUTURE", code: "NQ1!", yahoo: "NQ=F", contract: "Nasdaq 100 Dec 26" },
+      chart: { bars, ma_sets: { short: [5, 10, 20] }, overlays: { sr: [], gaps: { cols: [], rows: [] }, islands: [] }, legend: [] }, signals: {} };
+    if ("rolls" in o) d.chart.overlays.rolls = o.rolls;
+    if ("hv" in o) d.has_volume = o.hv;
+    return d;
+  };
+  const chartHtml = (d) => { const full = P.fullSeries(d); return renderToString(React.createElement(P.KChart, { d, full, smas: [], a: 0, b: full.bars.length, gaps: [], islands: [], top: [], rolls: g4(d) })); };
+  const g4 = (d) => (Array.isArray(d.chart.overlays.rolls) ? d.chart.overlays.rolls : []);
+  await t("市場標籤：美國期貨・CME／指數／台股／美股·NASDAQ·ETF；怪值不崩", async () => {
+    assert.strictEqual(P.mktBadge({ market: "fut", exchange: "CME" }), "美國期貨・CME");
+    assert.strictEqual(P.mktBadge({ market: "fut", exchange: "NYMEX" }), "美國期貨・NYMEX");
+    assert.strictEqual(P.mktBadge({ market: "us", type: "INDEX", exchange: "Nasdaq" }), "指數");
+    assert.strictEqual(P.mktBadge({ market: "tw", exchange: "Taipei Exchange" }), "台股·Taipei Exchange");
+    assert.strictEqual(P.mktBadge({ market: "us", exchange: "NasdaqGS", type: "ETF" }), "美股·NasdaqGS·ETF");
+    assert.strictEqual(P.mktBadge(null), ""); assert.strictEqual(P.mktBadge("x"), "");
+  });
+  await t("換月：rolls 在區間內 → 灰色虛線＋「換月」；沒有 rolls（舊回應）或壞值 → 照畫不崩", async () => {
+    const html = chartHtml(mkD({ rolls: [{ i: 40, t: "2026-02-13", dir: "up", step_pct: 0.9, label: "換月" }] }));
+    assert.ok(html.includes("換月") && html.includes('data-roll="2026-02-13"'), "沒畫換月");
+    for (const r of [undefined, null, "x", [null, { i: "a" }, { i: 999 }, { i: -3 }]]) {
+      const h = chartHtml(mkD(r === undefined ? {} : { rolls: r }));
+      assert.ok(h.includes("<svg") && !h.includes("data-roll"), String(r));
+    }
+  });
+  await t("沒有成交量：has_volume=false 或（舊回應）量全 null → 量區寫「此標的沒有成交量」；有量照舊", async () => {
+    assert.strictEqual(P.noVolume(mkD({ hv: false })), true);
+    assert.strictEqual(P.noVolume(mkD({ noVol: true })), true);
+    assert.strictEqual(P.noVolume(mkD({})), false);
+    assert.strictEqual(P.noVolume(mkD({ hv: true })), false);
+    assert.strictEqual(P.noVolume({ chart: {} }), false); assert.strictEqual(P.noVolume(null), false);
+    const h1 = chartHtml(mkD({ noVol: true, symbol: { market: "us", type: "INDEX" } }));
+    assert.ok(h1.includes("此標的沒有成交量") && !h1.includes(">量<"), "量區沒換字");
+    const h2 = chartHtml(mkD({}));
+    assert.ok(!h2.includes("此標的沒有成交量") && h2.includes("量（口）"), "期貨量單位");
+  });
+  await t("沒有成交量：③ 前五大量顯示「此標的沒有成交量」；規則面板兩處提示、量的格子停用", async () => {
+    const d = mkD({ noVol: true, hv: false });
+    const tv = renderToString(React.createElement(P.TopVolume, { d, view: { a: 0, b: 60, from: "a", to: "b", top: [] } }));
+    assert.ok(tv.includes("此標的沒有成交量"), tv);
+    const draft = lib3.normParams({}).p, props = { draft, set: () => {}, errors: {}, status: "", saved: [], active: null, nm: "", setNm: () => {}, rn: null, setRn: () => {}, msg: "" };
+    const on = renderToString(React.createElement(P.RulePanel, { ...props, noVol: true }));
+    assert.strictEqual((on.match(/此標的沒有成交量：量的條件不套用/g) || []).length, 2, "提示要在量比進場、爆量出場兩處");
+    assert.ok(/data-k="vol_on" disabled=""/.test(on) && /data-k="vol_exit" disabled=""/.test(on), "勾選框要停用");
+    const off = renderToString(React.createElement(P.RulePanel, { ...props, noVol: false }));
+    assert.ok(!off.includes("此標的沒有成交量") && !/disabled=""/.test(off));
+  });
+  await t("沒有成交量：回測與規則文字不套用量的條件，面板參數不改；有交易", async () => {
+    const p = lib3.normParams({}).p;
+    const w = P.withTrade(mkD({ noVol: true }), p);
+    assert.strictEqual(w.trade.p.vol_on, false); assert.strictEqual(w.trade.p.vol_exit, false); assert.strictEqual(p.vol_on, true);
+    assert.ok(w.rules.entry.includes("不看量") && !w.rules.exit.includes("爆量"), w.rules.entry);
+    const raw = lib3.backtest(w.history, w.bars_completed, p), off = lib3.backtest(w.history, w.bars_completed, { ...p, vol_on: false, vol_exit: false });
+    assert.deepStrictEqual(raw.trades.map((x) => [x.entry_i, x.exit_i, x.why]), off.trades.map((x) => [x.entry_i, x.exit_i, x.why]));
+    assert.strictEqual(lib3.hasVolume([null, 0, NaN]), false); assert.strictEqual(lib3.hasVolume([null, 5]), true); assert.strictEqual(lib3.hasVolume([null, 5], 1), false);
+    const w2 = P.withTrade(mkD({}), p);
+    assert.strictEqual(w2.trade.p.vol_on, true);
+  });
+  // lib/ta-live.js（swc 轉 CJS；jwt 同法載入）
+  const ldMod = (rel) => { const f = path.join(ROOT, "lib", rel), mm = new Mod(f); mm.filename = f; mm.paths = Mod._nodeModulePaths(ROOT); mm._compile(transformSync(fs.readFileSync(f, "utf8"), opts).code, f); require.cache[f] = mm; mm.loaded = true; return mm.exports; };
+  ldMod("jwt.js");
+  const LV = ldMod("ta-live.js");
+  await t("ta-live：代號格式收期貨／^SOX／中文別名，擋怪字；額度鍵 NQ1!／/NQ＝NQ=F", async () => {
+    for (const x of ["2330", "brk.b", "ES=F", "nq1!", "/NQ", "^sox", "小那", "費半", "TXF1!", "2330.TWO"]) assert.ok(LV.cleanSym(x), x);
+    for (const x of ["^^X", "A B", "<x>", "ES=F;DROP", "1234567890123", "小那斯達克期貨超長名字"]) assert.strictEqual(LV.cleanSym(x), "", x);
+    assert.strictEqual(LV.symKey("NQ1!"), "NQ=F"); assert.strictEqual(LV.symKey("/nq"), "NQ=F"); assert.strictEqual(LV.symKey("NQ=F"), "NQ=F");
+    assert.strictEqual(LV.symKey("2330.TW"), "2330"); assert.strictEqual(LV.symKey("BRK.B"), "BRK-B"); assert.strictEqual(LV.symKey("^SOX"), "^SOX");
   });
 
   console.log(fails ? "FAILED " + fails : "all passed");

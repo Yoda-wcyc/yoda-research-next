@@ -319,3 +319,7 @@ svg.ta-k .unf{fill:#ffcf70;font-size:11px;font-weight:700;paint-order:stroke;str
   .ta-navh{width:44px} .ta-navh.l{left:-22px} .ta-navh.r{right:-22px}
   .ta-navh::after{left:18px;width:8px;top:16px;bottom:16px}
 }
+/* 期貨換月（11-10）：灰色細虛直線＋底部小字；沒有成交量時面板上量的選項變淡（disabled） */
+svg.ta-k .roll-t{fill:#9aa4b2;font-size:10px;paint-order:stroke;stroke:#0b0f15;stroke-width:3px;stroke-linejoin:round}
+.ta-rp label.off{opacity:.45}
+.ta-rp .hint.warn{color:var(--yellow)}
