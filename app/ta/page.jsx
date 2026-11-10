@@ -528,9 +528,13 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top, rolls }) {
     placed.push([x - 7, my - 12, x + 7, my + 3]);
     rkEls.push(<text key={"m" + i} className="mk" x={x} y={my} textAnchor="middle" data-rank={rk}>{mark(rk)}</text>);
     if (v > 0) {
-      let vy = VY(v) - 3;
-      for (let k = 0; k < 5 && busyAt([x - 7, vy - 12, x + 7, vy + 3]); k++) vy -= 13;
-      placed.push([x - 7, vy - 12, x + 7, vy + 3]);
+      // 量區編號只在量區內找位置（量柱頂上方→往上錯開到量區頂→往下壓進量柱），不會跑進價格區或換月那一列；都撞就選重疊最少的
+      const VT = T + PH + GP + 14, vy0 = Math.max(VT, VY(v) - 3), vbx = (y) => [x - 7, y - 12, x + 7, y + 3];
+      const vc = [vy0];
+      for (let y = vy0 - 13; y >= VT; y -= 13) vc.push(y);
+      for (let y = vy0 + 13; y <= VB - 1; y += 13) vc.push(y);
+      const vy = vc.find((y) => !busyAt(vbx(y))) ?? vc.reduce((u, y) => (hitArea(vbx(y)) < hitArea(vbx(u)) ? y : u), vy0);
+      placed.push(vbx(vy));
       rkEls.push(<text key={"mv" + i} className="mk mkv" x={x} y={vy} textAnchor="middle">{mark(rk)}</text>);
     }
   }
