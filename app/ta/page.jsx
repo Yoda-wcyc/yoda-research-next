@@ -303,6 +303,21 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top, rolls }) {
   // 圖上文字／記號佔的位置（缺口代號、島狀反轉的字、前五大量編號、圖左上線名、進出場記號先放，進出場標籤再找不撞的位置）；tw＝字寬估計（中文 12、英數 6.8）
   const placed = [];
   const tw = (s) => [...s].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? 12 : 6.8), 0);
+  // 重疊面積（四邊各多留 1px，字的描邊才不會貼在一起）
+  const hitArea = (bx) => placed.reduce((z, r) => z + Math.max(0, Math.min(bx[2], r[2] + 1) - Math.max(bx[0], r[0] - 1)) * Math.max(0, Math.min(bx[3], r[3] + 1) - Math.max(bx[1], r[1] - 1)), 0);
+  const busyAt = (bx) => placed.some((p) => bx[0] < p[2] && bx[2] > p[0] && bx[1] < p[3] && bx[3] > p[1]);
+  // 圖左上線名（三條均線、出場線、停損）：先佔位，後面的島狀反轉、盤中未定、進出場標籤才會避開；字最後才畫（蓋在 K 棒上面）
+  const ckey = [...smas.map(([m], k) => ["SMA" + m, MA_COL[k], ""]),
+    ...(ch.exit_line ? [["出場線 " + (trd.p ? maName(trd.p, trd.p.exit_k) : ""), EMA_COL, ""]] : []), ...(marks.length || trd.open ? [["停損", TR_STOP, "4 3"]] : [])];
+  const kels = [];
+  let kx = L + 6;
+  ckey.forEach(([s, col, dash], k) => {
+    if (!s) return;
+    kels.push(<line key={"ky" + k} x1={kx} x2={kx + 14} y1={T + 9} y2={T + 9} stroke={col} strokeWidth="2" strokeDasharray={dash || undefined} />);
+    kels.push(<text key={"kyt" + k} className="ckey" x={kx + 18} y={T + 13} style={{ fill: col }}>{s}</text>);
+    placed.push([kx, T + 1, kx + 18 + tw(s), T + 15]);
+    kx += 26 + tw(s);
+  });
   // 缺口框（整段歷史，只畫跟區間有交集的）：未補／部分回補＝剩下的區間畫到右緣（部分回補的原缺口淡淡畫到回補那根）；已補＝缺口那根畫到回補那根。
   // 缺口旁的類型字：區間超過 250 根就不寫（同進出場 ✕ 的規則，十年日K 五百多個缺口字會糊成一片），框照畫
   (gaps || []).forEach((x, k) => {
@@ -334,6 +349,7 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top, rolls }) {
         y={(Y(x.top) + Y(x.bottom)) / 2 + 4} textAnchor="end">{String(ts)}{x.type ? <title>{x.type}</title> : null}</text>);
     }
   });
+  const islWant = [];
   // 島狀反轉：金色虛線框＋直接標字（頂部島標在框上方、底部島標在框下方；沒有 kind 時看島開頭那個缺口：向上＝頂部）
   (islands || []).forEach((x, k) => {
     if (x.high == null || x.low == null || x.i0 == null || x.i1 == null || x.i1 < a || x.i0 >= b) return;   // 跟區間沒交集
@@ -343,12 +359,7 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top, rolls }) {
     const yt = Y(x.high) - 3, yb = Y(x.low) + 3, x1 = X(i1) + step / 2;
     els.push(<rect key={"is" + k} className="isl" x={x0} y={yt} width={Math.max(2, x1 - x0)} height={Math.max(2, yb - yt)}
       fill="none" stroke={GOLD} strokeWidth="1.2" strokeDasharray="3 3" clipPath={clip} data-kind={top ? "top" : "bottom"} />);
-    const lx = Math.min(xr - 40, Math.max(L + 40, (x0 + x1) / 2));
-    let ly = top ? Math.max(T + 11, yt - 5) : Math.min(T + PH - 3, yb + 14);
-    const busy = (y) => placed.some((p) => lx - 36 < p[2] && lx + 36 > p[0] && y - 12 < p[3] && y + 4 > p[1]);
-    for (let k = 0; k < 4 && busy(ly); k++) ly = Math.min(T + PH - 3, Math.max(T + 11, ly + (top ? -14 : 14)));   // 島挨太近：字往外疊開
-    placed.push([lx - 36, ly - 12, lx + 36, ly + 4]);
-    els.push(<text key={"ist" + k} className="isl-t" x={lx} y={ly} textAnchor="middle">{top ? "頂部島狀反轉" : "底部島狀反轉"}</text>);
+    islWant.push([x0, x1, yt, yb, top, k]);   // 字等進出場記號放好再找位置（不會被 ▲▼✕ 蓋住）
   });
   // 期貨換月（引擎 chart.overlays.rolls，i＝history 絕對位置）：灰色細虛直線＋底部小字「換月」；字太擠（相鄰 < 30px）只畫線
   let lastRx = -1e9;
@@ -367,7 +378,7 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top, rolls }) {
   const topI = {};
   for (const t of top || []) topI[t.i - a] = t.rank;
   const pth = { wu: "", wd: "", bu: "", bd: "", vu: "", vd: "" };
-  const one = [];
+  const one = [], unfAt = [], rkAt = [];
   const f1d = (x) => x.toFixed(1);
   const addBar = (x, w, op, h, l, c, v) => {
     const s = c >= op ? "u" : "d", y1 = Y(Math.max(op, c)), bh = Math.max(1, Y(Math.min(op, c)) - y1);
@@ -411,13 +422,8 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top, rolls }) {
       one.push(<rect key={"v" + i} className={"vb" + (rk ? " top" : "")} x={x - bw / 2} y={VY(v)} width={bw} height={Math.max(0.5, VB - VY(v))}
         fill={rk ? GOLD : col} fillOpacity={rk ? 1 : 0.3} />);
     }
-    if (rk) {
-      placed.push([x - 7, Y(h) - 17, x + 7, Y(h) - 2]);
-      one.push(<text key={"m" + i} className="mk" x={x} y={Y(h) - 5} textAnchor="middle" data-rank={rk}>{mark(rk)}</text>);
-      if (v > 0) one.push(<text key={"mv" + i} className="mk mkv" x={x} y={VY(v) - 3} textAnchor="middle">{mark(rk)}</text>);
-    }
-    if (unf) { const uy = Y(h) - (rk ? 20 : 6); placed.push([x - tw(d.unfinished_label || "盤中未定"), uy - 11, x, uy + 3]); }
-    if (unf) one.push(<text key={"uf" + i} className="unf" x={x} y={Y(h) - (rk ? 20 : 6)} textAnchor="end">{d.unfinished_label || "盤中未定"}</text>);
+    if (rk) rkAt.push([i, x, h, v, rk]);   // 編號等進出場記號放好再找位置
+    if (unf) unfAt.push([i, x]);
   });
   els.push(<path key="wu" d={pth.wu} stroke={K_UP} strokeWidth="1" fill="none" />, <path key="wd" d={pth.wd} stroke={K_DN} strokeWidth="1" fill="none" />);
   els.push(<path key="bu" className="bd" d={pth.bu} fill={K_UP} />, <path key="bd" className="bd" d={pth.bd} fill={K_DN} />);
@@ -514,20 +520,63 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top, rolls }) {
         [x + 9, yb + dy, "start"], [x - 9, yb + dy, "end"], [x + 9, yb + 2 * dy, "start"], [x - 9, yb + 2 * dy, "end"], [x + 9, yb + 3 * dy, "start"]]]);
     }
   });
-  // 圖上直接寫線的名字（不用點開圖例）：三條均線、出場線、停損
-  const ckey = [...smas.map(([m], k) => ["SMA" + m, MA_COL[k], ""]),
-    ...(ch.exit_line ? [["出場線 " + (trd.p ? maName(trd.p, trd.p.exit_k) : ""), EMA_COL, ""]] : []), ...(marks.length || op ? [["停損", TR_STOP, "4 3"]] : [])];
-  let kx = L + 6;
-  ckey.forEach(([s, col, dash], k) => {
-    if (!s) return;
-    els.push(<line key={"ky" + k} x1={kx} x2={kx + 14} y1={T + 9} y2={T + 9} stroke={col} strokeWidth="2" strokeDasharray={dash || undefined} />);
-    els.push(<text key={"kyt" + k} className="ckey" x={kx + 18} y={T + 13} style={{ fill: col }}>{s}</text>);
-    placed.push([kx, T + 1, kx + 18 + tw(s), T + 15]);
-    kx += 26 + tw(s);
-  });
+  // 前五大量編號：相鄰幾根都上榜、或碰到 ▲▼✕ 時往上錯開，不疊在一起（量區的編號同樣錯開）
+  const rkEls = [];
+  for (const [i, x, h, v, rk] of rkAt) {
+    let my = Y(h) - 5;
+    for (let k = 0; k < 5 && busyAt([x - 7, my - 12, x + 7, my + 3]); k++) my -= 14;
+    placed.push([x - 7, my - 12, x + 7, my + 3]);
+    rkEls.push(<text key={"m" + i} className="mk" x={x} y={my} textAnchor="middle" data-rank={rk}>{mark(rk)}</text>);
+    if (v > 0) {
+      let vy = VY(v) - 3;
+      for (let k = 0; k < 5 && busyAt([x - 7, vy - 12, x + 7, vy + 3]); k++) vy -= 13;
+      placed.push([x - 7, vy - 12, x + 7, vy + 3]);
+      rkEls.push(<text key={"mv" + i} className="mk mkv" x={x} y={vy} textAnchor="middle">{mark(rk)}</text>);
+    }
+  }
+  // 島狀反轉的字：進出場記號放好之後才放，畫在 K 棒和記號上面
+  const islEls = [];
+  for (const [x0, x1, yt, yb, top, k] of islWant) {
+    // 島挨太近或碰到左上線名：字先往外疊開，外面沒位置（貼到圖頂／圖底）就改放框的另一側、再左右挪；都撞就選重疊最少的
+    const cl = (y) => Math.min(T + PH - 3, Math.max(T + 11, y));
+    const out = top ? [yt - 5, yt - 19, yt - 33, yt - 47] : [yb + 14, yb + 28, yb + 42, yb + 56], inn = top ? [yb + 14, yb + 28, yb + 42] : [yt - 5, yt - 19, yt - 33];
+    const cx = Math.min(xr - 40, Math.max(L + 40, (x0 + x1) / 2));
+    let best = null;
+    for (const dx of [0, 76, -76]) {
+      const lx0 = Math.min(xr - 40, Math.max(L + 40, cx + dx));
+      for (const y of [...out, ...inn].map(cl)) {
+        const bx = [lx0 - 36, y - 12, lx0 + 36, y + 4], o = hitArea(bx);
+        if (!best || o < best[2]) best = [lx0, y, o, bx];
+        if (!o) break;
+      }
+      if (!best[2]) break;
+    }
+    const [lx, ly] = best;
+    placed.push(best[3]);
+    islEls.push(<text key={"ist" + k} className="isl-t" x={lx} y={ly} textAnchor="middle">{top ? "頂部島狀反轉" : "底部島狀反轉"}</text>);
+  }
+  // 盤中未定（進出場記號放好之後才找位置，不會蓋到 ▲▼✕）：字往左寫會蓋到前幾根 K 和均線 → 放在字底下那幾根的最高點（含均線）上方，沒位置就放最低點下方；墊一塊底色、最後才畫
+  const unfEls = [];
+  for (const [i, x] of unfAt) {
+    const s = d.unfinished_label || "盤中未定", w = tw(s) + 4;
+    let hiP = -Infinity, loP = Infinity;
+    for (let j = Math.max(0, Math.floor(i - (w + step) / step)); j <= i; j++) {
+      const bj = bars[j];
+      for (const v of [bj.h, bj.l, bj.c, ch.exit_line ? ch.exit_line[a + j] : null, ...smas.map(([, arr]) => (arr ? arr[a + j] : null))]) {
+        if (v != null && Number.isFinite(v)) { hiP = Math.max(hiP, v); loP = Math.min(loP, v); }
+      }
+    }
+    if (!Number.isFinite(hiP)) continue;
+    const cl = (y) => Math.min(T + PH - 3, Math.max(T + 12, y));
+    const cands = [Y(hiP) - 6, Y(hiP) - 20, Y(hiP) - 34, Y(loP) + 16, Y(loP) + 30].map(cl);
+    const box = (y) => [x - w + 2, y - 12, x + 2, y + 3];
+    const uy = cands.reduce((u, y) => (hitArea(box(y)) < hitArea(box(u)) ? y : u), cands[0]);   // 第一個不撞的；都撞就選重疊最少的
+    placed.push(box(uy));
+    unfEls.push(<rect key={"ufb" + i} className="unf-bg" x={x - w + 2} y={uy - 12} width={w} height={15} rx="2" fill="#0b0f15" fillOpacity=".85" />,
+      <text key={"uf" + i} className="unf" x={x} y={uy} textAnchor="end">{s}</text>);
+  }
+  els.push(...kels);   // 圖上直接寫線的名字（不用點開圖例；位置上面已佔好）
   if (trd.sideLabel && !marks.length) els.push(<text key="sidenone" className="ckey" data-side-empty="" x={xr - 6} y={T + 13} textAnchor="end" style={{ fill: "#ffffff" }}>{"區間內沒有" + trd.sideNone + "訊號"}</text>);
-  // 重疊面積（四邊各多留 1px，字的描邊才不會貼在一起）
-  const hitArea = (bx) => placed.reduce((z, r) => z + Math.max(0, Math.min(bx[2], r[2] + 1) - Math.max(bx[0], r[0] - 1)) * Math.max(0, Math.min(bx[3], r[3] + 1) - Math.max(bx[1], r[1] - 1)), 0);
   if (showLab) want.forEach(([s, col, cls, cands]) => {
     const w = tw(s);
     let best = null;
@@ -540,7 +589,7 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top, rolls }) {
     placed.push(best[3]);
     tlab.push(<text key={"tlb" + tlab.length} className={cls} x={best[0]} y={best[1]} textAnchor="start" style={{ fill: col }} data-ov={best[2] ? Math.round(best[2]) : undefined}>{s}</text>);
   });
-  els.push(...tlab);  // 右側標籤避讓（由上到下排、不重疊、不超出價格區）；圖外的價位貼邊、加 ↑／↓
+  els.push(...rkEls, ...islEls, ...unfEls, ...tlab);  // 右側標籤避讓（由上到下排、不重疊、不超出價格區）；圖外的價位貼邊、加 ↑／↓
   for (const z of lab) {
     if (z.y < T) { z.y = T; z.t = "↑" + z.t; }
     else if (z.y > T + PH) { z.y = T + PH; z.t = "↓" + z.t; }

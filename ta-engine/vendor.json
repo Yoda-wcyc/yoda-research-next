@@ -2,6 +2,6 @@
   "note": "這些檔是 Skill\\ 的副本，不要在這裡改；改 Skill\\ 再 python ta_engine.py --sync",
   "files": {
     "analyze_symbol.py": "a96444068cfca87c7978c4ecb9f2a6bbef16e49112423fe9abe76ad61019e789",
-    "ta_engine.py": "f8393af8d09fe86b6ef0b0bf233c10169009d95ff428c6ce560b1fb1ff830c13"
+    "ta_engine.py": "fdc20134b676fd6dda719cc8115cf8dc09b221bdfbfc4424a0802157f49772ae"
   }
 }

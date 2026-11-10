@@ -406,8 +406,8 @@ def build(df, tf, market, now_local, data_t=None):
 #       斷層前一根早於 16:00（舊合約最後交易日當天就停了，不是正常收盤）時，連著週末／假日最長 4 天也算
 #       （NQ 2025-06：06-20 09:30 到期結算後沒資料，Juneteenth＋週末斷 57 小時，06-22 18:00 才接新合約）。
 #       正常週末斷層前一根是 16:00 → 不算，不會把一般的週日開盤當成換月。
-#     CL 的①（平盤爆量）是新合約的結算紀錄、不是成交：舊合約 14:30 結算就停，CL1! 第一根真正成交的新合約 K 是下一個時段的第一根
-#       → 兩根都標換月（2025-06-22 18:00 週日開盤剛好碰上伊朗空襲跳空，換合約是事實，依規則不算缺口；2026-11-10 主對話定）。
+#     CL 的①（平盤爆量）就是 CL1! 換到新合約那根（微型合約對照組同一根換）→ 只標這一根；下一個時段第一根兩邊都已是新合約，
+#       它的跳空是真行情、照算缺口（2025-06-22 18:00 週日開盤伊朗空襲 +5%、2024-09-22 18:00 都不標換月；2026-11-10 主對話更正：「換月要標、換月跳空不算」只管真正換的那根）。
 #   參考標的抓不到：1H／4H 只認上面兩種形狀（日K／週K 本來就只用日曆）。
 ROLL_MIN = 0.0015
 ROLL_MAD_K = 3
@@ -529,9 +529,6 @@ def _splices(kind, src, days, R):
     out = []
     for win, cand, fb, E in roll_windows(kind, days):
         T = src.index[tdi.isin(win) & flat][:1]
-        if len(T) and kind == 'cl':
-            k = src.index.get_loc(T[0]) + 1
-            T = T.append(src.index[k:k + 1][dh[k:k + 1] >= ROLL_HOLE_H[0]])   # CL：結算紀錄＋下一個時段第一根
         if not len(T):
             T = src.index[(tdi == fb) & hole][:1]
         if len(T):
@@ -1350,7 +1347,7 @@ def selftest():
     nq.loc[nq.index >= pd.Timestamp('2025-09-16 15:00'), ['o', 'h', 'l', 'c']] *= 1.01
     rj = pd.Series(100.0, index=tj)
     rn = [x['t'] for x in find_rolls('eq', '1H', nq, nq, rj)]
-    # CL 2025-06：LTD（週五 06-20）16:00 平盤爆量＝新合約結算紀錄，下一個時段第一根（週日 18:00）也標（2026-11-10 主對話定）
+    # CL 2025-06：LTD（週五 06-20）16:00 平盤爆量＝真正換合約那根 → 只標它；週日 06-22 18:00 的 +5% 是真跳空（兩邊都是新合約）→ 不標換月、照算缺口（2026-11-10 主對話更正）
     tl, cl6 = h1_of('2025-06-01', '2025-07-15')
     sp6 = pd.Timestamp('2025-06-20 16:00')
     cl6 = cl6[~((cl6.index > pd.Timestamp('2025-06-20 14:00')) & (cl6.index < sp6))].copy()
@@ -1359,9 +1356,10 @@ def selftest():
     cl6.loc[cl6.index >= pd.Timestamp('2025-06-22 18:00'), ['o', 'h', 'l', 'c']] *= 1.05
     rl6 = [x['t'] for x in find_rolls('cl', '1H', cl6, cl6, pd.Series(100.0, index=tl))]
     a6 = analyze_bars(cl6, 'fut', rolls=find_rolls('cl', '1H', cl6, cl6, None))
-    ok(rn == ['2025-06-22 18:00', '2025-09-16 15:00'] and rl6 == ['2025-06-20 16:00', '2025-06-22 18:00']
-       and not ({'2025-06-20 16:00', '2025-06-22 18:00'} & {a6['history']['t'][x[0]] for x in a6['chart']['overlays']['gaps']['rows']}),
-       '1H 換月：到期後資料斷層連週末／假日（≤4 天）也算、正常週末開盤不算；CL 結算紀錄＋下一個時段第一根都標、都不算缺口：%s %s' % (rn, rl6))
+    g6 = {a6['history']['t'][x[0]] for x in a6['chart']['overlays']['gaps']['rows']}
+    ok(rn == ['2025-06-22 18:00', '2025-09-16 15:00'] and rl6 == ['2025-06-20 16:00']
+       and '2025-06-20 16:00' not in g6 and '2025-06-22 18:00' in g6,
+       '1H 換月：到期後資料斷層連週末／假日（≤4 天）也算、正常週末開盤不算；CL 只標結算紀錄那根（不算缺口），下一個時段的真跳空照算缺口：%s %s' % (rn, rl6))
     t00 = a6['history']['t']
     ok(all(len(x) == 16 for x in t00) and '2025-06-24 00:00' in t00 and analyze_bars(_trend_df(), 'tw')['history']['t'][0] == '2024-01-01',
        '期貨 1H 每天 00:00 那根也帶時分（日K 照舊只有日期）：%s' % [x for x in t00 if x.endswith('00:00')][:2])
