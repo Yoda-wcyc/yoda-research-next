@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Component, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { normParams, backtest, chartMarks, exitLine, ruleText, maName, smaSeq, PRESETS, explainEntry, explainExit, fpx, fpc } from "../../lib/ta-trade";
 
 // 會員技術分析（獨立網站版·2026-11-08 Yoda 定）
@@ -51,7 +51,21 @@ const txt = (v) => (has(v) ? (typeof v === "object" ? JSON.stringify(v) : String
 const md = (t) => String(t || "").slice(5);   // 2026-11-06 → 11-06；2026-11-06 13:00 → 11-06 13:00
 function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 function lsSet(k, v) { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
-function readRecent() { try { const a = JSON.parse(lsGet(RECENT_KEY) || "[]"); return Array.isArray(a) ? a.filter((x) => x && x.s) : []; } catch (e) { return []; } }
+// 最近查過：s／n 一律收成字串（物件直接放進 JSX 會讓整頁崩潰＝React #31）
+function cleanRecent(a) { return Array.isArray(a) ? a.filter((x) => x && typeof x.s === "string" && x.s).map((x) => ({ s: x.s, n: typeof x.n === "string" ? x.n : "" })) : []; }
+function readRecent() { try { return cleanRecent(JSON.parse(lsGet(RECENT_KEY) || "[]")); } catch (e) { return []; } }
+// 圖表區的保險：某一塊 render 丟例外時只把那一塊換成錯誤摘要，登入框、左欄、其他區塊照常；reset 一換（新資料／新參數）就重試
+class Boundary extends Component {
+  constructor(props) { super(props); this.state = { err: null, reset: props.reset }; }
+  static getDerivedStateFromError(err) { return { err }; }
+  static getDerivedStateFromProps(p, s) { return p.reset !== s.reset ? { err: null, reset: p.reset } : null; }
+  componentDidCatch(err) { console.error("[ta] 區塊顯示失敗", err); }
+  render() {
+    const e = this.state.err;
+    if (!e) return this.props.children;
+    return <div className="ta-err" role="alert"><span>這一塊顯示失敗：{String((e && e.message) || e).slice(0, 200)}（重新整理頁面，或換一檔再試）</span></div>;
+  }
+}
 function readHash() {
   try {
     const q = new URLSearchParams((location.hash || "").replace(/^#/, ""));
@@ -1156,7 +1170,7 @@ export default function TaPage() {
     cache.current.set(ck, j.data);
     setData(j.data);
     const code = g(j.data, "symbol", "code") || s;
-    const nx = [{ s: code, n: g(j.data, "symbol", "name") || "" }, ...readRecent().filter((x) => x.s !== code && x.s !== s)].slice(0, RECENT_MAX);
+    const nx = cleanRecent([{ s: String(code), n: g(j.data, "symbol", "name") }, ...readRecent().filter((x) => x.s !== code && x.s !== s)]).slice(0, RECENT_MAX);
     lsSet(RECENT_KEY, JSON.stringify(nx)); setRecent(nx);
   }, [gate]);
 
@@ -1304,6 +1318,7 @@ export default function TaPage() {
             ) : null}
             {!d && !err ? <div className="ta-ph">{busy ? "計算中…（第一次查一檔約需幾秒）" : "從左邊輸入代號開始。"}</div> : null}
             {d ? (
+              <Boundary reset={d}>
               <div className="ta-one" data-sym={symInfo.yahoo}>
                 <div className="ta-ch">
                   <h2><span className="mono">{symInfo.code || sym}</span>{symInfo.name || ""}</h2>
@@ -1322,11 +1337,12 @@ export default function TaPage() {
                   </div>
                 ) : null}
                 <BadBanner d={d} />
-                <ChartArea key={(symInfo.yahoo || sym) + "|" + d.tf} d={d} maSet={maSet} />
-                <Legend d={d} maSet={maSet} />
+                <Boundary reset={d}><ChartArea key={(symInfo.yahoo || sym) + "|" + d.tf} d={d} maSet={maSet} /></Boundary>
+                <Boundary reset={d}><Legend d={d} maSet={maSet} /></Boundary>
                 {(d.notes || []).length ? <div className="ta-notes">資料註記：{d.notes.join("；")}</div> : null}
-                <SrLevels d={d} />
+                <Boundary reset={d}><SrLevels d={d} /></Boundary>
               </div>
+              </Boundary>
             ) : null}
             <div className="ta-foot">
               資料來源 Yahoo Finance（開高低收依除息事件還原）；以上數字全由寫死的規則計算，只描述過去的價量位置與這套規則的歷史表現，不是買賣建議。
