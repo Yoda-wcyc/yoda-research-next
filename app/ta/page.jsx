@@ -1,6 +1,6 @@
 "use client";
 import { Component, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { normParams, backtest, chartMarks, exitLine, ruleText, maName, smaSeq, PRESETS, explainEntry, explainExit, fpx, fpc } from "../../lib/ta-trade";
+import { normParams, backtest, chartMarks, exitLine, ruleText, maName, smaSeq, PRESETS, explainEntry, explainExit, fpx, fpc, statsOf } from "../../lib/ta-trade";
 
 // 會員技術分析（獨立網站版·2026-11-08 Yoda 定）
 //
@@ -460,6 +460,7 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top }) {
     placed.push([kx, T + 1, kx + 18 + tw(s), T + 15]);
     kx += 26 + tw(s);
   });
+  if (trd.sideLabel && !marks.length) els.push(<text key="sidenone" className="ckey" data-side-empty="" x={xr - 6} y={T + 13} textAnchor="end" style={{ fill: "#ffffff" }}>{"區間內沒有" + trd.sideNone + "訊號"}</text>);
   // 重疊面積（四邊各多留 1px，字的描邊才不會貼在一起）
   const hitArea = (bx) => placed.reduce((z, r) => z + Math.max(0, Math.min(bx[2], r[2] + 1) - Math.max(bx[0], r[0] - 1)) * Math.max(0, Math.min(bx[3], r[3] + 1) - Math.max(bx[1], r[1] - 1)), 0);
   if (showLab) want.forEach(([s, col, cls, cands]) => {
@@ -809,7 +810,7 @@ function Trade({ d }) {
   const recent = [];
   for (let k = tt.length - 1; k >= Math.max(0, tt.length - 10); k--) recent.push({ k, ...tt[k] });
   const cols = [
-    { label: "#", num: true, render: (t) => t.k + 1, sort: (t) => t.k },
+    { label: "#", num: true, render: (t) => t.no || t.k + 1, sort: (t) => t.k },
     { label: "方向", render: (t) => side(t.side), sort: (t) => t.side },
     { label: "進場", render: (t) => t.entry_t, sort: (t) => t.entry_t },
     { label: "進場價", num: true, render: (t) => fnum(t.entry), sort: (t) => nz(t.entry) },
@@ -851,7 +852,7 @@ function Trade({ d }) {
           <thead><tr><th>回測期間</th><th className="r">筆數</th><th className="r">勝率</th><th className="r">總報酬</th><th className="r" title="各筆報酬累加（不複利）從高點回落最多幾個百分點">最大回撤</th><th className="r">平均賺</th><th className="r">平均賠</th><th className="r" title="平均賺 ÷ 平均賠（絕對值）">賺賠比</th><th className="r">最大連續虧損</th></tr></thead>
           <tbody><tr>
             <td>{st.start || "—"}～{st.end || "—"}（{st.bars || "—"} 根{TF_ZH[d.tf]}）</td>
-            <td className="r" data-stat="n">{st.n || 0}（多 {st.n_long || 0}／空 {st.n_short || 0}）</td>
+            <td className="r" data-stat="n">{trd.sideLabel ? trd.sideLabel + "：" + (st.n || 0) + " 筆" : <>{st.n || 0}（多 {st.n_long || 0}／空 {st.n_short || 0}）</>}</td>
             <td className="r">{st.n ? fpct(st.win_rate, false) + "（" + st.wins + "/" + st.n + "）" : "—"}</td>
             <td className={"r " + ud(st.sum_pct)} data-stat="sum">{fpct(st.sum_pct)}</td>
             <td className="r" data-stat="mdd">{st.n ? (st.mdd_pct > 0 ? "−" : "") + fnum(st.mdd_pct) + "%" : "—"}</td>
@@ -864,7 +865,7 @@ function Trade({ d }) {
       <div className="ta-note">{trd.note || "樣本內統計，不代表未來；未計手續費與滑價"}</div>
       <div className="ta-cap ta-sub">最近 10 筆 <span className="mut">新到舊；#＝全期第幾筆；損益＝（出場價 − 進場價）÷ 進場價（空單反過來）</span></div>
       {recent.length ? <div className="ta-win10"><SortTable className="ta-dt" cols={cols} rows={recent} rowKey={(t) => "t" + t.k} /></div>
-        : <div className="ta-empty">期間內沒有成交</div>}
+        : <div className="ta-empty" data-side-empty={trd.sideLabel ? "" : undefined}>{trd.sideLabel ? "區間內沒有" + trd.sideNone + "訊號" : "期間內沒有成交"}</div>}
     </div>
   );
 }
@@ -948,6 +949,20 @@ function withTrade(d, p) {
     trade: { ...r, ...chartMarks(r, 0), p, note: "樣本內統計，不代表未來；" + rt.cost },
     rules: rt, trade_legend: legend,
   };
+}
+
+// 訊號顯示篩選（Yoda 11-10）：只篩圖上記號／線／標籤／浮動說明和 ① 進出場的清單與統計，回測本身不變（方向設定在面板）
+const SIDES = [["all", "全部", 0], ["long", "只看多方", 1], ["short", "只看空方", -1]];
+const SIDE_KEY = "yoda_ta_side";
+function readSide() { const v = lsGet(SIDE_KEY); return SIDES.some(([k]) => k === v) ? v : "all"; }
+function sideTrade(d, side) {
+  const S = SIDES.find(([k]) => k === side), trd = d && d.trade;
+  if (!S || !S[2] || !trd) return d;
+  const s = S[2], st = trd.stats || {};
+  const trades = (trd.trades || []).map((t, k) => ({ ...t, no: k + 1 })).filter((t) => t.side === s);   // no＝全期第幾筆
+  const open = trd.open && trd.open.side === s ? trd.open : null;
+  const r = { trades, open };
+  return { ...d, trade: { ...trd, ...r, ...chartMarks(r, 0), stats: statsOf(trades, st.start, st.end, st.bars), sideLabel: S[1], sideNone: S[1].replace("只看", "") } };
 }
 
 // 模組層元件：寫在 RulePanel 裡面的話每次重繪都是新元件，輸入框會掉焦點
@@ -1130,7 +1145,10 @@ export default function TaPage() {
     const x = data && data.tf === tf ? data : null;
     try { return withTrade(x, applied); } catch (e) { console.error("[ta] 進出場計算失敗", e); return x; }   // 在 Boundary 外面，丟例外會整頁崩
   }, [data, tf, applied]);
-  const bkey = useMemo(() => [dv, maSet], [dv, maSet]);   // Boundary 重試鍵：資料、交易參數、均線組任一換了就重試
+  const [side, setSide] = useState(readSide);
+  const pickSide = (k) => { setSide(k); lsSet(SIDE_KEY, k); };
+  const dvs = useMemo(() => sideTrade(dv, side), [dv, side]);
+  const bkey = useMemo(() => [dvs, maSet], [dvs, maSet]);   // Boundary 重試鍵：資料、交易參數、均線組、訊號篩選任一換了就重試
   const actB = BUILTINS.find((x) => BI + x.name === active);
   const actS = actB || saved.find((x) => x.name === active);
   const rstatus = actS ? (actB ? "內建・" : "") + actS.name + (sameP(actS.p, applied) ? "" : "（未存的修改）") : sameP(applied, DEF_P) ? "預設（站方現行規則）" : "自訂（未存）";
@@ -1248,7 +1266,7 @@ export default function TaPage() {
     );
   }
 
-  const d = dv;
+  const d = dvs;
   const { lastB, chg, unfB, symInfo } = headInfo(d);
 
   return (
@@ -1314,6 +1332,12 @@ export default function TaPage() {
               {MA_SETS.map(([k, nm]) => (
                 <button key={k} type="button" aria-pressed={maSet === k} className={"ta-tab" + (maSet === k ? " on" : "")} onClick={() => setMaSet(k)}
                   title={MA_NM[k]}>{nm}</button>
+              ))}
+            </div>
+            <div className="ta-seg" role="group" aria-label="訊號篩選">
+              <span className="ta-seglab">訊號</span>
+              {SIDES.map(([k, nm]) => (
+                <button key={k} type="button" aria-pressed={side === k} className={"ta-tab" + (side === k ? " on" : "")} onClick={() => pickSide(k)} data-side={k}>{nm}</button>
               ))}
             </div>
             {busy ? <span className="ta-kbd">計算中…</span> : null}

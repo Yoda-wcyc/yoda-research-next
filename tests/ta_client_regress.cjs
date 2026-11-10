@@ -5,6 +5,7 @@
 //  1b. components/PwaRegister.jsx：controllerchange 重載一次（原本沒 controller 不重載；30 秒內不重複）。
 //  2. app/ta/page.jsx：最近查過的 s／n 是物件時要收成字串（否則 React #31 整頁崩潰）；Boundary 出錯只顯示那一塊的錯誤摘要；
 //     chart.bars 不是陣列也不崩（標題列在 Boundary 外面算）。
+//  3. 訊號篩選（11-10）：全部／只看多方／只看空方只篩顯示（記號、線、清單、統計），統計＝子集重算；localStorage 壞值回「全部」。
 const fs = require("fs"), path = require("path"), vm = require("vm"), assert = require("assert");
 const ROOT = path.join(__dirname, "..");
 let fails = 0;
@@ -114,7 +115,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   const { transformSync } = require(path.join(ROOT, "node_modules", "next", "dist", "build", "swc"));
   const opts = { jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "classic" } }, target: "es2020" }, module: { type: "commonjs" } };
   const src = 'const React = require("react");\n' + fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8")
-    .replace('"../../lib/ta-trade"', JSON.stringify(path.join(ROOT, "lib", "ta-trade.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo };\n";
+    .replace('"../../lib/ta-trade"', JSON.stringify(path.join(ROOT, "lib", "ta-trade.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade };\n";
   const Mod = require("module");
   const libSrc = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-trade.js"), "utf8"), opts).code;
   const lib = new Mod(path.join(ROOT, "lib", "ta-trade.js")); lib.paths = Mod._nodeModulePaths(ROOT); lib._compile(libSrc, lib.id);
@@ -159,6 +160,50 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     assert.strictEqual(P.headInfo(null).lastB, undefined);
     const h = P.headInfo({ chart: { bars: [{ c: 100 }, { c: 110 }, { c: 120, final: false }] }, symbol: { code: "2330" } });
     assert.strictEqual(h.lastB.c, 110); assert.ok(Math.abs(h.chg - 10) < 1e-9); assert.strictEqual(h.unfB.c, 120); assert.strictEqual(h.symInfo.code, "2330");
+  });
+
+  // ---------- 3. 訊號篩選 ----------
+  const lib3 = require(lib.id);
+  const mk = (side, entry_i, exit_i, pct) => ({ side, entry_i, exit_i, entry: 100, exit_px: 100 + pct * side, stop: 90, entry_t: "e" + entry_i, exit_t: "x" + exit_i, pts: pct, pct, why: "停損", label: "停損" });
+  const TT = [mk(1, 30, 35, 5), mk(-1, 40, 44, -2), mk(1, 50, 55, -3), mk(-1, 60, 62, 4), mk(-1, 70, 71, 1)];
+  const OPEN = { side: 1, entry_i: 80, entry: 120, stop: 110, entry_t: "e80" };
+  const base = { trades: TT, open: OPEN, stats: lib3.statsOf(TT, "s", "e", 100), banner: { bad: false }, ctx: {}, p: {} };
+  const D = { tf: "D", trade: { ...base, ...lib3.chartMarks(base, 0) } };
+  await t("訊號篩選：全部＝原樣；只看多方／空方的筆數、記號、持倉、統計子集", async () => {
+    assert.strictEqual(P.sideTrade(D, "all"), D);
+    const L = P.sideTrade(D, "long").trade, S = P.sideTrade(D, "short").trade;
+    assert.strictEqual(L.trades.length, 2); assert.strictEqual(S.trades.length, 3);
+    assert.ok(L.trades.every((x) => x.side === 1) && S.trades.every((x) => x.side === -1));
+    assert.deepStrictEqual(S.trades.map((x) => x.no), [2, 4, 5]);   // # 仍是全期第幾筆
+    assert.strictEqual(L.stats.n, 2); assert.strictEqual(L.stats.n_short, 0); assert.strictEqual(L.stats.wins, 1); assert.strictEqual(L.stats.sum_pct, 2);
+    assert.strictEqual(S.stats.n, 3); assert.strictEqual(S.stats.n_long, 0); assert.strictEqual(S.stats.sum_pct, 3); assert.strictEqual(S.stats.start, "s"); assert.strictEqual(S.stats.bars, 100);
+    assert.strictEqual(L.open, OPEN); assert.strictEqual(S.open, null);
+    assert.strictEqual(L.markers.filter((m) => m.kind === "entry").length, 3);   // 2 筆＋持倉
+    assert.strictEqual(S.markers.length, 6); assert.ok(!S.lines.some((x) => String(x.kind).startsWith("open_")));
+    assert.strictEqual(L.sideLabel, "只看多方"); assert.strictEqual(S.sideNone, "空方");
+    assert.strictEqual(D.trade.trades.length, 5);   // 原資料沒被改
+    const html = renderToString(React.createElement(P.Trade, { d: P.sideTrade(D, "short") }));
+    assert.ok(html.includes("只看空方：3 筆") && !html.includes("多 0"), html);
+    assert.ok(renderToString(React.createElement(P.Trade, { d: D })).replace(/<!-- -->/g, "").includes("5（多 2／空 3）"));
+  });
+  await t("訊號篩選：沒有該方向 → 0 筆，① 顯示『區間內沒有空方訊號』", async () => {
+    const only = TT.filter((x) => x.side === 1), b2 = { ...base, trades: only, stats: lib3.statsOf(only, "s", "e", 100) };
+    const S = P.sideTrade({ tf: "D", trade: { ...b2, ...lib3.chartMarks(b2, 0) } }, "short");
+    assert.strictEqual(S.trade.trades.length, 0); assert.strictEqual(S.trade.stats.n, 0); assert.strictEqual(S.trade.markers.length, 0);
+    const html = renderToString(React.createElement(P.Trade, { d: S }));
+    assert.ok(html.includes("區間內沒有空方訊號") && html.includes("只看空方：0 筆"), html);
+    assert.strictEqual(P.sideTrade(null, "long"), null);
+  });
+  await t("訊號篩選：localStorage 壞值／不能用 → 全部", async () => {
+    const st = {};
+    globalThis.localStorage = { getItem: (k) => (k in st ? st[k] : null), setItem: (k, v) => { st[k] = String(v); }, removeItem: (k) => { delete st[k]; } };
+    for (const [v, want] of [["long", "long"], ["short", "short"], ["all", "all"], ["LONG", "all"], ["", "all"], ['"long"', "all"], ["null", "all"]]) {
+      st.yoda_ta_side = v; assert.strictEqual(P.readSide(), want, v);
+    }
+    delete st.yoda_ta_side; assert.strictEqual(P.readSide(), "all");
+    globalThis.localStorage = { getItem: () => { throw new Error("blocked"); } };
+    assert.strictEqual(P.readSide(), "all");
+    assert.strictEqual(P.sideTrade(D, "bogus"), D);
   });
 
   console.log(fails ? "FAILED " + fails : "all passed");
