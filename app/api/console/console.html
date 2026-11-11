@@ -881,8 +881,8 @@ async function setTaAccess(id, cb){
   var want=!!cb.checked;
   var who=m?((m.name||id)+'（'+id+'）'):id;
   var ok=await uiConfirm(want
-    ?('給 '+who+' 技術分析權限？\n對方下次開美股／台股分析報告就會看到勾選欄與「技術分析」按鈕。')
-    :('撤銷 '+who+' 的技術分析權限？\n撤銷後對方開著的 /ta 頁下一次查詢就會失效，報告裡也不再出現勾選欄。'));
+    ?('給 '+who+' 技術分析權限？\n對方登入後就能開 /ta 技術分析頁查個股（每天 30 檔）。')
+    :('撤銷 '+who+' 的技術分析權限？\n撤銷後對方開著的 /ta 頁下一次查詢就會失效。'));
   if(!ok){ cb.checked=!want; return; }
   taBusy[id]=true; cb.disabled=true;
   try{
