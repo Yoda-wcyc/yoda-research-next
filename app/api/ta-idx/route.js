@@ -37,7 +37,7 @@ export async function POST(req) {
     if (!owner && !(await st.allowed(sub))) return R({ ok: false, reason: 'not-enabled', error: '技術分析未開通' }, 403);
 
     const local = process.env.NODE_ENV !== 'production' && process.env.TA_IDX_LOCAL_FILE;
-    const hit = local ? newestUs([{ reportId: local.split(/[\\/]/).pop() }]) || { reportId: 'local', date: '本機檔' } : newestUs((await readIndex()).entries);
+    const hit = local ? newestUs([{ reportId: local.split(/[\\/]/).pop().replace(/\.html$/i, '') }]) || { reportId: 'local', date: '本機檔' } : newestUs((await readIndex()).entries);
     if (!hit) return R({ ok: false, reason: 'not-found', error: '還沒有已發佈的美股報告' }, 404);
 
     const key = blobPath(hit.reportId);

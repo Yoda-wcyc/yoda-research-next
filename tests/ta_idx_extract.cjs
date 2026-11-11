@@ -38,7 +38,7 @@ t("找不到章節回 null、不丟例外", () => {
   assert.strictEqual(extractIdxPos('<div id="sec-idxpos" class="section-header"></div>'), null);   // 後面沒有下一章
 });
 t("newestUs：只挑美股、日期最新（含付費_前綴）", () => {
-  const r = newestUs([{ reportId: "台股分析_20261112" }, { reportId: "美股分析_20261110" }, { reportId: "付費_美股分析_20261111" }, { reportId: "免費_美股分析_20261112" }]);
+  const r = newestUs([{ reportId: "台股分析_20261112" }, { reportId: "美股分析_20261110" }, { reportId: "付費_美股分析_20261111" }, { reportId: "免費_美股分析_20261112" }, { reportId: "美股分析_20261111_預覽" }, { reportId: "美股分析_20261112_v2" }]);
   assert.deepStrictEqual(r, { reportId: "付費_美股分析_20261111", date: "2026-11-11" });
   assert.strictEqual(newestUs([]), null);
 });
