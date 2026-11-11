@@ -79,6 +79,9 @@
 .ta-kbd{margin-left:auto;color:var(--dim);font-size:calc(12px*var(--scale))}
 .ta-pane{flex:1;min-height:0;overflow:auto;padding:14px 20px 18px;overscroll-behavior:contain}
 .ta-pane[hidden]{display:none}
+/* 指數位階分頁（2026-11-11）：開著時週期／均線／訊號不顯示選中（點任一個就回 K 線）；iframe 高度由頁面程式跟內容走 */
+.ta-tabs[data-view="idx"] .ta-seg:not(.ta-vseg) .ta-tab.on{color:var(--dim);background:none;border-color:transparent;font-weight:400}
+.ta-idxf{display:block;width:100%;height:600px;border:0}
 .ta-pane-all{padding:0}
 .ta-allcap{font-weight:700;font-size:calc(14.5px*var(--scale));padding:10px 14px 8px}
 .ta-pane-all .ta-hint{padding:0 14px 14px}

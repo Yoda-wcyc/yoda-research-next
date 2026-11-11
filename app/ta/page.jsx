@@ -1221,6 +1221,36 @@ function RulePanel({ draft, set, errors, status, saved, active, nm, setNm, rn, s
   );
 }
 
+// ───────── 指數位階分頁（2026-11-11）：最新美股報告「02 指數位階」整章原樣（/api/ta-idx）─────────
+// 章內腳本靠 document.currentScript／inline onclick，只能跑在自己的文件裡 → iframe srcdoc（同源：父頁直接量高度、換深淺）
+const VIEW_KEY = "yoda_ta_view";
+function readView() { return lsGet(VIEW_KEY) === "idx" ? "idx" : "chart"; }
+const isLight = () => document.documentElement.getAttribute("data-theme") === "light";
+function IdxView({ x }) {
+  const ifr = useRef(null);
+  const doc = useMemo(() => x.html.replace("<body>", isLight() ? '<body class="light">' : "<body>"), [x]);
+  useEffect(() => {   // 站內深淺切換：報告用 body.light，直接改 iframe 裡的 class，不重載（TAB 選到哪不跑掉）
+    const mo = new MutationObserver(() => { const b = g(ifr.current, "contentDocument", "body"); if (b) b.classList.toggle("light", isLight()); });
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => mo.disconnect();
+  }, []);
+  const onLoad = () => {   // 高度跟內容走（切 TAB 會變高變矮），iframe 自己不出捲軸
+    const f = ifr.current, w = f && f.contentWindow;
+    if (!w || !w.document.body) return;
+    const b = w.document.body;
+    b.classList.toggle("light", isLight());
+    const fit = () => { f.style.height = Math.ceil(b.scrollHeight) + "px"; };
+    new w.ResizeObserver(fit).observe(b);
+    fit();
+  };
+  return (
+    <div className="ta-idx">
+      <div className="ta-notes">內容同美股報告 {x.date} 第 02 章</div>
+      <iframe ref={ifr} className="ta-idxf" title="指數位階" srcDoc={doc} onLoad={onLoad} />
+    </div>
+  );
+}
+
 // ───────── 主頁 ─────────
 async function post(url, body, token) {
   const headers = { "Content-Type": "application/json" };
@@ -1277,7 +1307,10 @@ export default function TaPage() {
     try { return withTrade(x, applied); } catch (e) { console.error("[ta] 進出場計算失敗", e); return x; }   // 在 Boundary 外面，丟例外會整頁崩
   }, [data, tf, applied]);
   const [side, setSide] = useState(readSide);
-  const pickSide = (k) => { setSide(k); lsSet(SIDE_KEY, k); };
+  const [view, setView] = useState(readView);   // chart＝K 線｜idx＝指數位階
+  const pickView = (v) => { setView(v); lsSet(VIEW_KEY, v); };
+  const [idx, setIdx] = useState(null);         // {date, html}｜{error}；整個分頁期間只抓一次（失敗的下次打開再抓）
+  const pickSide = (k) => { setSide(k); lsSet(SIDE_KEY, k); pickView("chart"); };
   const dvs = useMemo(() => sideTrade(dv, side), [dv, side]);
   const bkey = useMemo(() => [dvs, maSet], [dvs, maSet]);   // Boundary 重試鍵：資料、交易參數、均線組、訊號篩選任一換了就重試
   const actB = BUILTINS.find((x) => BI + x.name === active);
@@ -1356,6 +1389,17 @@ export default function TaPage() {
     start();
   }, [start]);
 
+  useEffect(() => {   // 指數位階：第一次打開才抓（idx 故意不放進相依：拿到了就不再抓）
+    if (phase !== "app" || view !== "idx" || (idx && !idx.error)) return;
+    let live = true;
+    setIdx(null);
+    post("/api/ta-idx", {}, tok.current).then((j) => {
+      if (!live || gate(j)) return;
+      setIdx(j.ok ? { date: j.date, html: j.html } : { error: j.error || "讀取失敗" });
+    });
+    return () => { live = false; };
+  }, [phase, view, gate]);
+
   const login = async (e) => {
     e.preventDefault();
     if (loginBusy) return;
@@ -1368,7 +1412,7 @@ export default function TaPage() {
     } else setMsg((j && j.error) || "登入失敗，請確認 email 與密碼");
   };
   const logout = () => { lsSet(TOK_KEY, null); tok.current = ""; cache.current.clear(); setData(null); setSym(""); setMsg(""); setPhase("login"); };
-  const submit = (e) => { e.preventDefault(); const s = q.trim(); if (s) { load(s, tf); setQ(""); } };
+  const submit = (e) => { e.preventDefault(); const s = q.trim(); if (s) { pickView("chart"); load(s, tf); setQ(""); } };
 
   // ───── 閘門畫面 ─────
   if (phase === "init") return <main className="ta-root"><div className="ta-gate"><p>讀取中…</p></div></main>;
@@ -1439,7 +1483,7 @@ export default function TaPage() {
           <div className="ta-rhead">最近查過</div>
           <div className="ta-list" role="list">
             {recent.map((r) => (
-              <div key={r.s} role="listitem" className={"ta-li" + (r.s === (symInfo.code || sym) ? " on" : "")} onClick={() => load(r.s, tf)}>
+              <div key={r.s} role="listitem" className={"ta-li" + (r.s === (symInfo.code || sym) ? " on" : "")} onClick={() => { pickView("chart"); load(r.s, tf); }}>
                 <div className="l1"><b className="mono">{r.s}</b><span className="nm" title={r.n}>{r.n}</span></div>
               </div>
             ))}
@@ -1453,12 +1497,12 @@ export default function TaPage() {
 
         {/* ── 右 3/4：週期＋均線組＋圖＋表 ── */}
         <div className="ta-right">
-          <div className="ta-tabs">
-            <TfTabs tf={tf} tfs={symInfo.tfs} onPick={(k) => (sym ? load(sym, k) : setTf(k))} />
+          <div className="ta-tabs" data-view={view}>
+            <TfTabs tf={tf} tfs={symInfo.tfs} onPick={(k) => { pickView("chart"); if (sym) load(sym, k); else setTf(k); }} />
             <div className="ta-seg" role="group" aria-label="均線組">
               <span className="ta-seglab">均線</span>
               {MA_SETS.map(([k, nm]) => (
-                <button key={k} type="button" aria-pressed={maSet === k} className={"ta-tab" + (maSet === k ? " on" : "")} onClick={() => setMaSet(k)}
+                <button key={k} type="button" aria-pressed={maSet === k} className={"ta-tab" + (maSet === k ? " on" : "")} onClick={() => { setMaSet(k); pickView("chart"); }}
                   title={MA_NM[k]}>{nm}</button>
               ))}
             </div>
@@ -1468,9 +1512,20 @@ export default function TaPage() {
                 <button key={k} type="button" aria-pressed={side === k} className={"ta-tab" + (side === k ? " on" : "")} onClick={() => pickSide(k)} data-side={k}>{nm}</button>
               ))}
             </div>
+            <div className="ta-seg ta-vseg">
+              <button type="button" aria-pressed={view === "idx"} className={"ta-tab" + (view === "idx" ? " on" : "")}
+                onClick={() => pickView(view === "idx" ? "chart" : "idx")}>指數位階</button>
+            </div>
             {busy ? <span className="ta-kbd">計算中…</span> : null}
           </div>
-          <div className="ta-pane">
+          {view === "idx" ? (
+            <div className="ta-pane">
+              <Boundary reset={idx}>
+                {!idx ? <div className="ta-ph">讀取中…</div> : idx.error ? <div className="ta-err"><span>{idx.error}</span></div> : <IdxView x={idx} />}
+              </Boundary>
+            </div>
+          ) : null}
+          <div className="ta-pane" hidden={view === "idx"}>
             {err ? (
               <div className={"ta-err r-" + err.reason}>
                 <span>{err.reason === "quota-exceeded" ? "額度用完：" : err.reason === "symbol-not-found" ? "查無資料：" : err.reason === "upstream" ? "行情暫時抓不到：" : ""}{err.error}</span>
