@@ -6,7 +6,7 @@ import { presetStart } from "../../lib/ta-rs";
 // 會員技術分析（獨立網站版·2026-11-08 Yoda 定）
 //
 //   會員登入（/api/member-login，票存 localStorage）→ /api/ta-live 每次都重驗：站長（OWNER_PUB_IDS）或 ta_access 有開通
-//   左 1/4：輸入代號（台股上市櫃、美股、ETF、美國期貨連續月 ES1!／NQ1!…、指數只收 ^SOX）＋最近查過＋今日額度（會員每天 30 檔、站長不限）
+//   左 1/4：輸入代號（點輸入框下拉最近查過，11-13）＋今日額度（會員每天 30 檔、站長不限）；輸入框下的代號說明 11-13 永久刪（守門見 tests/ta_client_regress.cjs）
 //   期貨（11-10）：換月那根圖上標「換月」（引擎 chart.overlays.rolls）；沒有成交量的標的（^SOX）量的條件停用、量柱與 ③ 前五大量改寫「此標的沒有成交量」。
 //   台指期／費半期（11-10，期交所日資料）：只有日K／週K（symbol.tfs → 1H／4H 停用、寫「期交所只有日資料」；選著 1H 查會自動改日K）、
 //           標題列「含夜盤（夜盤算到隔天）」、期交所讀不到時的黃色註記、費半期旁「^SOX 是指數版」可一鍵改看。
@@ -67,6 +67,20 @@ function mktBadge(s) {
 }
 // 週期分頁：引擎有給 symbol.tfs（台指期／費半期＝["D","W"]）時其他週期停用並註明；舊回應沒有 tfs＝全部可用
 const TWF_ONLY_TXT = "期交所只有日資料";
+// 輸入框下拉的最近查過（11-13，取代左欄底部清單）：整塊 onMouseDown 擋掉，輸入框才不會先 blur 把清單收掉
+function RecentDrop({ items, hi, cur, onPick, onClear }) {
+  return (
+    <div id="ta-dd" className="ta-dd" role="listbox" aria-label="最近查過" onMouseDown={(e) => e.preventDefault()}>
+      {items.map((r, i) => (
+        <div key={r.s} role="option" aria-selected={i === hi} className={"ta-li" + (r.s === cur ? " on" : "") + (i === hi ? " hi" : "")} onClick={() => onPick(r.s)}>
+          <div className="l1"><b className="mono">{r.s}</b><span className="nm" title={r.n}>{r.n}</span></div>
+        </div>
+      ))}
+      <div className="ta-ddfoot"><button type="button" className="ta-link" onClick={onClear}>清除紀錄</button></div>
+    </div>
+  );
+}
+
 function TfTabs({ tf, tfs, onPick }) {
   const ok = Array.isArray(tfs) && tfs.length ? tfs : null;
   return (
@@ -1356,6 +1370,7 @@ export default function TaPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);         // {reason, error}
   const [recent, setRecent] = useState([]);
+  const [dd, setDd] = useState(null);           // 最近查過下拉：null＝收起；-1＝打開沒反白；0…＝↑↓反白第幾筆
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [loginBusy, setLoginBusy] = useState(false);
@@ -1506,7 +1521,15 @@ export default function TaPage() {
     } else setMsg((j && j.error) || "登入失敗，請確認 email 與密碼");
   };
   const logout = () => { lsSet(TOK_KEY, null); tok.current = ""; cache.current.clear(); setData(null); setSym(""); setMsg(""); setPhase("login"); };
-  const submit = (e) => { e.preventDefault(); const s = q.trim(); if (s) { pickView("chart"); load(s, tf); setQ(""); } };
+  const submit = (e) => { e.preventDefault(); const s = q.trim(); if (s) { setDd(null); pickView("chart"); load(s, tf); setQ(""); } };
+  const pickRecent = (s) => { setDd(null); pickView("chart"); load(s, tf); };
+  const ddKey = (e) => {   // 只有輸入框空著（下拉打開）時 ↑↓Enter 才管清單；打了字 Enter 照舊查打的代號
+    if (e.key === "Escape") { setDd(null); return; }
+    if (q || !recent.length || !["ArrowDown", "ArrowUp", "Enter"].includes(e.key)) return;
+    const n = recent.length, x = dd === null ? -1 : dd;
+    if (e.key === "Enter") { if (x >= 0) { e.preventDefault(); pickRecent(recent[x].s); } return; }
+    e.preventDefault(); setDd(e.key === "ArrowDown" ? (x + 1) % n : x <= 0 ? n - 1 : x - 1);
+  };
 
   // ───── 閘門畫面 ─────
   if (phase === "init") return <main className="ta-root"><div className="ta-gate"><p>讀取中…</p></div></main>;
@@ -1550,18 +1573,22 @@ export default function TaPage() {
       </header>
 
       <div className="ta-split">
-        {/* ── 左 1/4：輸入＋最近查過＋額度 ── */}
+        {/* ── 左 1/4：輸入（點一下下拉最近查過）＋額度 ── */}
         <aside className="ta-left" aria-label="查詢">
           <form className="ta-ltools" onSubmit={submit}>
             <label className="ta-lab" htmlFor="ta-in">輸入代號</label>
             <div className="ta-inrow">
               <input id="ta-in" type="search" className="ta-q" placeholder="2330、00878、NVDA、NQ1!、台指期" value={q}
-                onChange={(e) => setQ(e.target.value)} autoComplete="off" spellCheck={false} enterKeyHint="search" />
+                onChange={(e) => setQ(e.target.value)} autoComplete="off" spellCheck={false} enterKeyHint="search"
+                role="combobox" aria-expanded={dd !== null && !q && recent.length > 0} aria-controls="ta-dd"
+                onFocus={() => setDd(-1)} onClick={() => setDd((x) => (x === null ? -1 : x))} onBlur={() => setDd(null)} onKeyDown={ddKey} />
               <button type="submit" className="ta-btn ta-go" disabled={busy || !q.trim()}>查</button>
+              {dd !== null && !q && recent.length ? <RecentDrop items={recent} hi={dd} cur={symInfo.code || sym} onPick={pickRecent}
+                onClear={() => { lsSet(RECENT_KEY, null); setRecent([]); setDd(null); }} /> : null}
             </div>
-            <div className="ta-hint">台股打數字代號（先找上市、再找上櫃）、美股打英文代號；美國期貨打 ES1!、NQ1!、YM1!、RTY1!、GC1!、CL1!（也可打 小那、小道、黃金期、原油期）；台指期打 TXF1!（或 台指期）、費半期打 SXF1!（或 費半期），只有日K／週K；指數只收 ^SOX（費半）</div>
           </form>
           <div className="ta-quota" data-left={quota && !quota.unlimited ? quota.left : ""}>
+            <button type="button" className="ta-link ta-out" onClick={logout}>登出</button>
             {owner || (quota && quota.unlimited) ? <>站長：不限檔數</> : quota ? (
               <>今日已查 <b>{quota.used}</b>／{quota.max} 檔，剩 <b className={quota.left ? "" : "warn"}>{quota.left}</b> 檔
                 <div className="mut">同一檔換週期、均線組不另計；台灣時間 0 點重算</div></>
@@ -1572,22 +1599,6 @@ export default function TaPage() {
         <RulePanel draft={draft} set={setDraft} errors={norm.errors} status={rstatus} saved={saved} active={active}
           nm={nm} setNm={setNm} rn={rn} setRn={setRn} msg={pmsg} onSave={saveS} onApply={applyS} onDel={delS} onRen={renS} onReset={resetS}
           noVol={noVolume(dv)} />
-
-        <div className="ta-left ta-recent">
-          <div className="ta-rhead">最近查過</div>
-          <div className="ta-list" role="list">
-            {recent.map((r) => (
-              <div key={r.s} role="listitem" className={"ta-li" + (r.s === (symInfo.code || sym) ? " on" : "")} onClick={() => { pickView("chart"); load(r.s, tf); }}>
-                <div className="l1"><b className="mono">{r.s}</b><span className="nm" title={r.n}>{r.n}</span></div>
-              </div>
-            ))}
-            {!recent.length ? <div className="ta-lempty">還沒有查過的代號</div> : null}
-          </div>
-          <div className="ta-lfoot">
-            {recent.length ? <button type="button" className="ta-link" onClick={() => { lsSet(RECENT_KEY, null); setRecent([]); }}>清除紀錄</button> : null}
-            <button type="button" className="ta-link" onClick={logout}>登出</button>
-          </div>
-        </div>
 
         {/* ── 右 3/4：週期＋均線組＋圖＋表 ── */}
         <div className="ta-right">

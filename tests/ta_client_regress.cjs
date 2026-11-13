@@ -120,7 +120,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   const opts = { jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "classic" } }, target: "es2020" }, module: { type: "commonjs" } };
   const src = 'const React = require("react");\n' + fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8")
     .replace('"../../lib/ta-trade"', JSON.stringify(path.join(ROOT, "lib", "ta-trade.js").replace(/\\/g, "/")))
-    .replace('"../../lib/ta-rs"', JSON.stringify(path.join(ROOT, "lib", "ta-rs.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo };\n";
+    .replace('"../../lib/ta-rs"', JSON.stringify(path.join(ROOT, "lib", "ta-rs.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop };\n";
   const Mod = require("module");
   const libSrc = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-trade.js"), "utf8"), opts).code;
   const lib = new Mod(path.join(ROOT, "lib", "ta-trade.js")); lib.paths = Mod._nodeModulePaths(ROOT); lib._compile(libSrc, lib.id);
@@ -147,6 +147,21 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
       const r = P.readRecent();
       assert.ok(Array.isArray(r) && r.every((x) => typeof x.s === "string" && typeof x.n === "string"), v);
     }
+  });
+  await t("最近查過：改成輸入框下拉（11-13），點一筆就查；顯示代號＋名稱、反白、目前這檔", async () => {
+    const picked = [];
+    const el = P.RecentDrop({ items: [{ s: "2330", n: "台積電" }, { s: "NVDA", n: "" }], hi: 1, cur: "2330", onPick: (s) => picked.push(s), onClear: () => {} });
+    const html = renderToString(el);
+    assert.ok(html.includes("台積電") && html.includes('role="listbox"') && html.includes("清除紀錄"), html);
+    assert.ok(/class="ta-li on"[^>]*>.*2330/.test(html) && /aria-selected="true" class="ta-li hi"[^>]*>.*NVDA/.test(html), html);
+    el.props.children[0][1].props.onClick(); assert.deepStrictEqual(picked, ["NVDA"]);
+    let stopped = 0; el.props.onMouseDown({ preventDefault: () => stopped++ }); assert.strictEqual(stopped, 1, "mousedown 沒擋 → 輸入框 blur 先把清單收掉");
+  });
+  // ⛔ 2026-11-13 Yoda 永久刪除，不准重建：輸入框下的代號說明（台股打數字代號…指數只收 ^SOX）＋左欄底部「最近查過」清單
+  await t("⛔ 輸入框代號說明、左欄底部最近查過清單已永久刪除", async () => {
+    const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
+    for (const w of ["台股打數字代號", "指數只收", "美股打英文代號"]) assert.ok(!raw.includes(w), "page.jsx 又出現「" + w + "」");
+    assert.ok(!/ta-rhead|ta-recent|>最近查過</.test(raw), "page.jsx 又出現底部最近查過區塊");
   });
   await t("Boundary：子元件丟例外 → 顯示『這一塊顯示失敗』與錯誤摘要", async () => {
     const st = P.Boundary.getDerivedStateFromError(new TypeError("(x.gaps || []).forEach is not a function"));

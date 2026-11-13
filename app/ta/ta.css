@@ -42,7 +42,6 @@
 .ta-dir{flex:none;font:inherit;font-size:calc(12.5px*var(--scale));color:var(--text);background:var(--surface2);border:1px solid var(--border);
   border-radius:8px;padding:4px 9px;cursor:pointer;white-space:nowrap}
 .ta-dir:hover{border-color:var(--accent)}
-.ta-list{flex:1;min-height:0;overflow-y:auto;position:relative;overscroll-behavior:contain}
 .ta-li{padding:6px 10px 7px 9px;border-bottom:1px solid var(--divider);border-left:3px solid transparent;cursor:pointer;user-select:none}
 .ta-li:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}
 .ta-li.on{background:color-mix(in srgb,var(--accent) 20%,transparent);border-left-color:var(--accent)}
@@ -52,10 +51,6 @@
 .ta-li .px,.ta-li .pc{flex:none;font-size:calc(13px*var(--scale))}
 .ta-li .pc{min-width:4.2em;text-align:right}
 .ta-li .ta-bds{margin-top:3px}
-.ta-lempty{padding:18px 12px;color:var(--dim);font-size:calc(13.5px*var(--scale))}
-.ta-lfoot{flex:none;padding:8px 12px;border-top:1px solid var(--border);color:var(--dim);font-size:calc(12.5px*var(--scale));
-  max-height:8em;overflow:auto;line-height:1.55}
-.ta-lfoot b{color:var(--text);font-weight:600}
 
 /* 四個小徽章：量・缺・排・撐壓（多頭紅、空頭綠、中性灰） */
 .ta-bds{display:flex;flex-wrap:wrap;gap:3px 4px}
@@ -202,12 +197,17 @@ svg.ta-k .gl.up{fill:#ff8f96} svg.ta-k .gl.dn{fill:#6fd6a0} svg.ta-k .gl.filled{
 .ta-inrow .ta-q{flex:1;min-width:0}
 .ta-go{font-weight:700;padding:5px 16px}
 .ta-go:disabled,.ta-btn:disabled{opacity:.5;cursor:default}
-.ta-ltools .ta-hint{margin:0}
 .ta-quota{flex:none;padding:9px 12px;border-bottom:1px solid var(--border);font-size:calc(13.5px*var(--scale))}
 .ta-quota b{font-weight:700}
 .ta-quota .mut{font-size:calc(12px*var(--scale));margin-top:2px}
-.ta-rhead{flex:none;padding:7px 12px 3px;font-size:calc(12.5px*var(--scale));color:var(--dim)}
-.ta-lfoot{display:flex;gap:14px}
+/* 最近查過下拉（11-13）：蓋在規則面板上，所以查詢卡不裁切、疊在上層 */
+.ta-split>.ta-left{overflow:visible;position:relative;z-index:5}
+.ta-inrow{position:relative}
+.ta-dd{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:20;max-height:50vh;overflow-y:auto;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.ta-li.hi{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.ta-ddfoot{padding:5px 10px 6px;text-align:right}
+.ta-out{float:right;margin-left:10px}
 .ta-link{font:inherit;font-size:calc(12.5px*var(--scale));color:var(--dim);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline}
 .ta-link:hover{color:var(--text)}
 .ta-tabs{gap:10px;flex-wrap:wrap}   /* 14→10（11-13）：多了「區間強弱」鈕，1200 寬中字級仍排一列 */
@@ -266,12 +266,11 @@ svg.ta-k .unf{fill:#ffcf70;font-size:11px;font-weight:700;paint-order:stroke;str
 .ta-legend .bx.unf{background:rgba(224,82,94,.35);border:1px dashed #e0525e;opacity:1}
 .ta-legend .bx.isl{background:none;border:1.4px dashed #ffc94a;opacity:1}
 
-/* 交易規則面板（11-09）：左欄＝查詢卡／規則面板（自己捲動）／最近查過，右欄跨三列 */
-.ta-split{grid-template-rows:auto minmax(0,1fr) auto;row-gap:10px}
+/* 交易規則面板（11-09）：左欄＝查詢卡／規則面板（自己捲動），右欄跨兩列（底部最近查過 11-13 移進輸入框下拉） */
+.ta-split{grid-template-rows:auto minmax(0,1fr);row-gap:10px}
 .ta-split>.ta-left{grid-column:1;grid-row:1}
 .ta-split>.ta-rp{grid-column:1;grid-row:2}
-.ta-split>.ta-recent{grid-column:1;grid-row:3;max-height:22vh}
-.ta-split>.ta-right{grid-column:2;grid-row:1 / span 3}
+.ta-split>.ta-right{grid-column:2;grid-row:1 / span 2}
 .ta-rp{min-height:0;overflow-y:auto;overscroll-behavior:contain;background:var(--surface);border:1px solid var(--border);border-radius:12px;
   padding:8px 10px 12px;font-size:calc(13px*var(--scale));line-height:1.5}
 .ta-rp h3{font-size:calc(14.5px*var(--scale));font-weight:700;margin:0 0 2px;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px}
@@ -314,9 +313,8 @@ svg.ta-k .unf{fill:#ffcf70;font-size:11px;font-weight:700;paint-order:stroke;str
   .ta-root,.ta-root.ta-app{min-width:0;height:auto;overflow:visible;padding:12px 12px 40px}
   .ta-head{padding-right:0}
   .ta-split{grid-template-columns:minmax(0,1fr);grid-template-rows:none}
-  .ta-split>.ta-left,.ta-split>.ta-rp,.ta-split>.ta-recent,.ta-split>.ta-right{grid-column:auto;grid-row:auto}
-  .ta-split>.ta-left{order:0} .ta-split>.ta-recent{order:1;max-height:none} .ta-split>.ta-right{order:2} .ta-split>.ta-rp{order:3;overflow:visible}
-  .ta-list{max-height:30vh}
+  .ta-split>.ta-left,.ta-split>.ta-rp,.ta-split>.ta-right{grid-column:auto;grid-row:auto}
+  .ta-split>.ta-left{order:0} .ta-split>.ta-right{order:2} .ta-split>.ta-rp{order:3;overflow:visible}
   .ta-legend dl,.ta-cur dl{grid-template-columns:minmax(0,1fr)}
   .ta-blktab{min-height:64px}
   .ta-nav{height:84px}   /* 版面 1200 縮到手機寬，導覽列與把手放大才好用手指拖 */
