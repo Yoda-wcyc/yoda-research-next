@@ -1,6 +1,7 @@
 "use client";
 import { Component, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { normParams, backtest, chartMarks, exitLine, ruleText, maName, smaSeq, PRESETS, explainEntry, explainExit, fpx, fpc, statsOf, hasVolume, effParams } from "../../lib/ta-trade";
+import { presetStart } from "../../lib/ta-rs";
 
 // 會員技術分析（獨立網站版·2026-11-08 Yoda 定）
 //
@@ -134,7 +135,7 @@ function readHash() {
 }
 
 // ───────── 可排序表格（每一欄都能排序）─────────
-function SortTable({ cols, rows, rowKey, className, rowClass }) {
+function SortTable({ cols, rows, rowKey, className, rowClass, onRow }) {
   const [sk, setSk] = useState(null);
   const [dir, setDir] = useState(1);
   const sorted = useMemo(() => {
@@ -172,7 +173,7 @@ function SortTable({ cols, rows, rowKey, className, rowClass }) {
       </thead>
       <tbody>
         {sorted.map((r, ri) => (
-          <tr key={rowKey ? rowKey(r) : ri} className={rowClass ? rowClass(r) : ""}>
+          <tr key={rowKey ? rowKey(r) : ri} className={rowClass ? rowClass(r) : ""} onClick={onRow ? () => onRow(r) : undefined}>
             {cols.map((c, i) => (
               <td key={i} className={(c.num ? "r " : "") + (c.cls || "")}>{c.render(r)}</td>
             ))}
@@ -1224,7 +1225,7 @@ function RulePanel({ draft, set, errors, status, saved, active, nm, setNm, rn, s
 // ───────── 指數位階分頁（2026-11-11）：最新美股報告「02 指數位階」整章原樣（/api/ta-idx）─────────
 // 章內腳本靠 document.currentScript／inline onclick，只能跑在自己的文件裡 → iframe srcdoc（同源：父頁直接量高度、換深淺）
 const VIEW_KEY = "yoda_ta_view";
-function readView() { return lsGet(VIEW_KEY) === "idx" ? "idx" : "chart"; }
+function readView() { const v = lsGet(VIEW_KEY); return v === "idx" || v === "rs" ? v : "chart"; }
 const isLight = () => document.documentElement.getAttribute("data-theme") === "light";
 function IdxView({ x }) {
   const ifr = useRef(null);
@@ -1247,6 +1248,86 @@ function IdxView({ x }) {
     <div className="ta-idx">
       <div className="ta-notes">內容同美股報告 {x.date} 第 02 章</div>
       <iframe ref={ifr} className="ta-idxf" title="指數位階" srcDoc={doc} onLoad={onLoad} />
+    </div>
+  );
+}
+
+// ───────── 區間強弱分頁（2026-11-13 本機 demo）：任選起迄日，台股族群／個股相對大盤（/api/ta-rs，lib/ta-rs.js 現算）─────────
+const pc1 = (x) => (x === null || x === undefined || !Number.isFinite(Number(x)) ? "—" : (x > 0 ? "+" : "") + Number(x).toFixed(1) + "%");
+const yi = (m) => (Number.isFinite(Number(m)) ? (m / 100).toFixed(2) : "—");   // 百萬 → 億
+const mdd = (s) => String(s || "").slice(5).replace("-", "/");
+const RS_PRE = [["1w", "近 1 週"], ["1m", "近 1 月"], ["3m", "近 3 月"], ["ytd", "今年以來"]];
+const RS_NOTE = "相對大盤＝區間報酬 − 加權報酬指數同期報酬；股價已還原除權息與減資；族群＝台股報告 v6 分類，成分股等權平均。";
+function rsCols(onCode, rank) {
+  const c = [
+    { label: "代號", render: (x) => <button type="button" className="ta-link mono" title="看 K 線" onClick={(e) => { e.stopPropagation(); onCode(x.code); }}>{x.code}</button>, sort: (x) => x.code },
+    { label: "名稱", render: (x) => x.name || "—", sort: (x) => x.name },
+    { label: "市場", render: (x) => x.mkt || "—", sort: (x) => x.mkt },
+    { label: "區間報酬", num: 1, render: (x) => <span className={ud(x.ret)}>{pc1(x.ret)}</span>, sort: (x) => x.ret },
+    { label: "相對大盤", num: 1, render: (x) => <span className={ud(x.rel)}>{pc1(x.rel)}</span>, sort: (x) => x.rel },
+    { label: "日均成交值（億）", num: 1, render: (x) => yi(x.avgAmt), sort: (x) => x.avgAmt },
+  ];
+  if (!rank) return c;
+  return [{ label: "名次", num: 1, render: (x) => x.rk, sort: (x) => x.rk }, ...c.slice(0, 3),
+    { label: "族群", cls: "wrap", render: (x) => (x.groups || []).join("、") || "—", sort: (x) => (x.groups || []).join("、") }, ...c.slice(3)];
+}
+function RsView({ rs, run, onCode }) {
+  const d = rs.data, rg = (d && d.range) || rs.range || {};
+  const [f, setF] = useState(() => ({ start: d ? d.start : "", end: d ? d.end : "", wan: "5000", n: "20" }));
+  const [open, setOpen] = useState(null);   // 展開成分股的族群
+  const num = (v) => (v === "" ? undefined : Number(v));   // 打錯的數字送 NaN（JSON 變 null）→ 伺服器回錯誤訊息
+  const go = (o) => { const g = { ...f, ...o }; setF(g); run({ start: g.start, end: g.end, minAmt: g.wan === "" ? undefined : num(g.wan) * 1e4, n: num(g.n) }); };
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const gcols = useMemo(() => [
+    { label: "族群", render: (x) => <>{open === x.name ? "▾ " : "▸ "}{x.name}</>, sort: (x) => x.name },
+    { label: "相對大盤", num: 1, render: (x) => <span className={ud(x.rel)}>{pc1(x.rel)}</span>, sort: (x) => x.rel },
+    { label: "區間報酬", num: 1, render: (x) => <span className={ud(x.ret)}>{pc1(x.ret)}</span>, sort: (x) => x.ret },
+    { label: "檔數", num: 1, render: (x) => x.n + "／" + x.total, sort: (x) => x.n },
+  ], [open]);
+  const scols = useMemo(() => rsCols(onCode, true), [onCode]);
+  const mcols = useMemo(() => rsCols(onCode, false), [onCode]);
+  const og = d && d.groups.find((x) => x.name === open);
+  const rk = (a) => a.map((x, i) => ({ ...x, rk: i + 1 }));
+  return (
+    <div className="ta-rs">
+      <form className="ta-rs-form" onSubmit={(e) => { e.preventDefault(); go({}); }}>
+        <label>起日 <input type="date" className="ta-q" min={rg.min} max={rg.max} value={f.start} onChange={set("start")} required /></label>
+        <label>迄日 <input type="date" className="ta-q" min={rg.min} max={rg.max} value={f.end} onChange={set("end")} required /></label>
+        <span className="ta-rs-pre">{RS_PRE.map(([k, nm]) => (
+          <button key={k} type="button" className="ta-btn" disabled={!rg.max || rs.busy} onClick={() => go({ start: presetStart(rg.max, k), end: rg.max })}>{nm}</button>))}</span>
+        <label>日均成交值 ≥ <input type="number" className="ta-q ta-rs-num" min="0" step="1000" value={f.wan} onChange={set("wan")} /> 萬</label>
+        <label>前後各 <input type="number" className="ta-q ta-rs-num" min="5" max="100" step="1" value={f.n} onChange={set("n")} /> 名</label>
+        <button type="submit" className="ta-btn ta-go" disabled={rs.busy}>{rs.busy ? "計算中…" : "計算"}</button>
+      </form>
+      {rs.error ? <div className="ta-err" role="alert"><span>{rs.error}</span>{!d ? <button type="button" className="ta-btn" onClick={() => run({})}>重試</button> : null}</div> : null}
+      {d ? (
+        <>
+          <div className="ta-rs-sum">
+            <b>{d.start}（基準 {mdd(d.base)} 收盤）→ {d.end}</b>，共 {d.days} 個交易日
+            <span className="sep">｜</span>加權報酬指數 <b className={ud(d.bench.tr)}>{pc1(d.bench.tr)}</b>
+            <span className="sep">｜</span>加權指數（價格，參考）<span className={ud(d.bench.px)}>{pc1(d.bench.px)}</span>
+            <span className="sep">｜</span>符合成交值門檻 {d.universe.eligible}／{d.universe.total} 檔
+          </div>
+          <div className="ta-cap">族群強弱 <span className="mut">{d.groups.length} 個族群，依相對大盤由強到弱；點一列看成分股</span></div>
+          <div className="ta-hs"><SortTable className="ta-dt ta-rs-g" cols={gcols} rows={d.groups} rowKey={(x) => x.name}
+            rowClass={(x) => (x.name === open ? "sel" : "")} onRow={(x) => setOpen(open === x.name ? null : x.name)} /></div>
+          {og ? (
+            <div className="ta-rs-mem">
+              <div className="ta-cap">{og.name} 成分股 <span className="mut">{og.n}／{og.total} 檔有基準日與迄日價格；族群不套成交值門檻</span></div>
+              <div className="ta-hs"><SortTable className="ta-dt" cols={mcols} rows={og.members} rowKey={(x) => x.code} /></div>
+            </div>
+          ) : null}
+          <div className="ta-rs-two">
+            {[["最強", d.strong], ["最弱", d.weak]].map(([t, a]) => (
+              <div key={t}>
+                <div className="ta-cap">相對大盤{t} {a.length} 檔 <span className="mut">上市＋上櫃普通股，日均成交值 ≥ 門檻</span></div>
+                <div className="ta-hs"><SortTable className="ta-dt" cols={scols} rows={rk(a)} rowKey={(x) => x.code} /></div>
+              </div>
+            ))}
+          </div>
+          <div className="ta-notes ta-rs-foot">{RS_NOTE}資料到 {d.through}。</div>
+        </>
+      ) : !rs.error ? <div className="ta-ph">讀取中…</div> : null}
     </div>
   );
 }
@@ -1310,6 +1391,8 @@ export default function TaPage() {
   const [view, setView] = useState(readView);   // chart＝K 線｜idx＝指數位階
   const pickView = (v) => { setView(v); lsSet(VIEW_KEY, v); };
   const [idx, setIdx] = useState(null);         // {date, html}｜{error}；整個分頁期間只抓一次（失敗的下次打開再抓）
+  const [rs, setRs] = useState(null);           // 區間強弱 {data（最後一次成功的結果）, error, busy, range}
+  const rsSeq = useRef(0);
   const pickSide = (k) => { setSide(k); lsSet(SIDE_KEY, k); pickView("chart"); };
   const dvs = useMemo(() => sideTrade(dv, side), [dv, side]);
   const bkey = useMemo(() => [dvs, maSet], [dvs, maSet]);   // Boundary 重試鍵：資料、交易參數、均線組、訊號篩選任一換了就重試
@@ -1399,6 +1482,16 @@ export default function TaPage() {
     });
     return () => { live = false; };
   }, [phase, view, gate]);
+
+  const runRs = useCallback(async (body) => {   // 區間強弱：每按一次「計算」打一次；只收最後一次的回應
+    const my = ++rsSeq.current;
+    setRs((o) => ({ ...(o || {}), busy: true, error: "" }));
+    const j = await post("/api/ta-rs", body, tok.current);
+    if (my !== rsSeq.current || gate(j)) return;
+    setRs((o) => (j.ok ? { data: j, busy: false, error: "" } : { ...(o || {}), busy: false, error: j.error || "讀取失敗", range: j.range }));
+  }, [gate]);
+  useEffect(() => { if (phase === "app" && view === "rs" && !rs) runRs({}); }, [phase, view, rs, runRs]);   // 第一次打開＝近 1 月
+  const rsCode = useCallback((c) => { pickView("chart"); load(c, "D"); }, [load]);
 
   const login = async (e) => {
     e.preventDefault();
@@ -1515,6 +1608,8 @@ export default function TaPage() {
             <div className="ta-seg ta-vseg">
               <button type="button" aria-pressed={view === "idx"} className={"ta-tab" + (view === "idx" ? " on" : "")}
                 onClick={() => pickView(view === "idx" ? "chart" : "idx")}>指數位階</button>
+              <button type="button" aria-pressed={view === "rs"} className={"ta-tab" + (view === "rs" ? " on" : "")}
+                onClick={() => pickView(view === "rs" ? "chart" : "rs")}>區間強弱</button>
             </div>
             {busy ? <span className="ta-kbd">計算中…</span> : null}
           </div>
@@ -1525,7 +1620,12 @@ export default function TaPage() {
               </Boundary>
             </div>
           ) : null}
-          <div className="ta-pane" hidden={view === "idx"}>
+          {view === "rs" ? (
+            <div className="ta-pane">
+              <Boundary reset={rs}>{rs ? <RsView key={rs.data ? "ok" : "init"} rs={rs} run={runRs} onCode={rsCode} /> : <div className="ta-ph">讀取中…</div>}</Boundary>
+            </div>
+          ) : null}
+          <div className="ta-pane" hidden={view !== "chart"}>
             {err ? (
               <div className={"ta-err r-" + err.reason}>
                 <span>{err.reason === "quota-exceeded" ? "額度用完：" : err.reason === "symbol-not-found" ? "查無資料：" : err.reason === "upstream" ? "行情暫時抓不到：" : ""}{err.error}</span>

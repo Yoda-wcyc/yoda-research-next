@@ -79,9 +79,10 @@
 .ta-kbd{margin-left:auto;color:var(--dim);font-size:calc(12px*var(--scale))}
 .ta-pane{flex:1;min-height:0;overflow:auto;padding:14px 20px 18px;overscroll-behavior:contain}
 .ta-pane[hidden]{display:none}
-/* 指數位階分頁（2026-11-11）：開著時週期／均線／訊號不顯示選中（點任一個就回 K 線）；iframe 高度由頁面程式跟內容走 */
-.ta-tabs[data-view="idx"] .ta-seg:not(.ta-vseg) .ta-tab.on{color:var(--dim);background:none;border-color:transparent;font-weight:400}
+/* 指數位階／區間強弱分頁（2026-11-11／11-13）：開著時週期／均線／訊號不顯示選中（點任一個就回 K 線）；iframe 高度由頁面程式跟內容走 */
+.ta-tabs:not([data-view="chart"]) .ta-seg:not(.ta-vseg) .ta-tab.on{color:var(--dim);background:none;border-color:transparent;font-weight:400}
 .ta-idxf{display:block;width:100%;height:600px;border:0}
+.ta-vseg .ta-tab{padding:3px 6px}   /* 兩個分頁鈕（指數位階、區間強弱）收窄，1200 寬時跟週期／均線／訊號同一列 */
 .ta-pane-all{padding:0}
 .ta-allcap{font-weight:700;font-size:calc(14.5px*var(--scale));padding:10px 14px 8px}
 .ta-pane-all .ta-hint{padding:0 14px 14px}
@@ -209,7 +210,7 @@ svg.ta-k .gl.up{fill:#ff8f96} svg.ta-k .gl.dn{fill:#6fd6a0} svg.ta-k .gl.filled{
 .ta-lfoot{display:flex;gap:14px}
 .ta-link{font:inherit;font-size:calc(12.5px*var(--scale));color:var(--dim);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline}
 .ta-link:hover{color:var(--text)}
-.ta-tabs{gap:14px;flex-wrap:wrap}
+.ta-tabs{gap:10px;flex-wrap:wrap}   /* 14→10（11-13）：多了「區間強弱」鈕，1200 寬中字級仍排一列 */
 .ta-seg{display:flex;align-items:center;gap:2px}
 .ta-seglab{color:var(--dim);font-size:calc(13px*var(--scale));margin-right:4px}
 /* 圖下三個大分頁（11-09）：等寬大按鈕，緊貼圖＋導覽列下方，選中整格亮起 */
@@ -332,3 +333,17 @@ svg.ta-k .roll-t{fill:#9aa4b2;font-size:10px;paint-order:stroke;stroke:#0b0f15;s
 .ta-tfnote{margin-left:6px;font-size:calc(12px*var(--scale))}
 .ta-finfo{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:-4px 0 8px;font-size:calc(12.5px*var(--scale));color:var(--dim)}
 .ta-fsee .ta-link{margin-left:8px}
+/* 區間強弱分頁（2026-11-13 本機 demo）：表單一列、摘要、族群表（點列展開成分）、最強／最弱兩表上下排（8 欄並排太擠） */
+.ta-rs-form{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-bottom:10px;font-size:calc(13.5px*var(--scale))}
+.ta-rs-form label{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.ta-rs-form .ta-q{width:auto;padding:3px 8px}
+.ta-rs-form .ta-rs-num{width:7em}
+.ta-rs-pre{display:inline-flex;gap:4px}
+.ta-rs-sum{margin:0 0 12px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:calc(13.5px*var(--scale))}
+.ta-rs-sum .sep{color:var(--dim);margin:0 6px}
+.ta-rs-g tbody tr{cursor:pointer}
+.ta-rs-g tbody tr:hover td{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.ta-rs-g tbody tr.sel td{background:color-mix(in srgb,var(--accent) 20%,transparent)}
+.ta-rs-mem{margin:10px 0 0 18px;padding-left:10px;border-left:2px solid var(--accent)}
+.ta-rs-two>div{margin-top:16px}
+.ta-rs-foot{margin-top:12px}
