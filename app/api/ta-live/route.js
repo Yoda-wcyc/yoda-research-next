@@ -18,7 +18,7 @@ function R(data, status) {
 
 export async function POST(req) {
   let body = {};
-  try { body = await req.json(); } catch (e) {}
+  try { body = (await req.json()) || {}; } catch (e) {}
   const NL = () => R({ ok: false, reason: 'need-login', error: '請先登入會員' }, 401);
   let p = authOf(req), expired = false;
   // 過期 7 天內的 aud:'ta' 票只能拿來 status 換新票（下面現查開通＋付費，不過就 need-login）；查代號等其他動作照樣拒

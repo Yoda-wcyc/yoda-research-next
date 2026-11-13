@@ -138,6 +138,13 @@ const req = (tok) => ({ headers: { get: (k) => (k.toLowerCase() === "authorizati
     assert.strictEqual(r.status, 403);
     process.env.TA_MOCK_ACCESS = "MTEST1:1";
   });
+  await t("body 是 null 不丟例外（沒票 401）；頁面查代號／指數位階／區間強弱都走 call（need-login 先換票重試）", async () => {
+    const r = await RT.POST(new Request("http://t/api/ta-live", { method: "POST", body: "null" }));
+    assert.strictEqual(r.status, 401);
+    const pg = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
+    assert.ok(!/post\("\/api\/ta-(idx|rs)"|post\("\/api\/ta-live", \{ symbol/.test(pg));
+    assert.ok(/call\("\/api\/ta-live", \{ symbol/.test(pg) && /call\("\/api\/ta-idx"/.test(pg) && /call\("\/api\/ta-rs"/.test(pg));
+  });
   console.log(fails ? "\n" + fails + " FAIL" : "\nall ok");
   process.exit(fails ? 1 : 0);
 })();

@@ -1468,6 +1468,17 @@ export default function TaPage() {
     return false;
   }, []);
 
+  // 查代號／指數位階／區間強弱：回 need-login 先換票重試一次（票可能剛過期、還在 7 天寬限內，或別的分頁已換了新票），換不到才交給閘門
+  const call = useCallback(async (url, body) => {
+    const j = await post(url, body, tok.current);
+    if (j.reason !== "need-login") return j;
+    tok.current = lsGet(TOK_KEY) || tok.current;
+    const s = await post("/api/ta-live", { action: "status" }, tok.current);
+    if (!s.ok) return s;   // need-login／not-enabled 走閘門；連線或伺服器錯誤只顯示錯誤、不清票
+    if (typeof s.token === "string" && s.token) { tok.current = s.token; lsSet(TOK_KEY, s.token); if (s.wm) setWm(s.wm); }
+    return post(url, body, tok.current);
+  }, []);
+
   const load = useCallback(async (s, t) => {
     s = String(s || "").trim().toUpperCase();
     if (!s) return;
@@ -1477,7 +1488,7 @@ export default function TaPage() {
     if (cache.current.has(ck)) { setData(cache.current.get(ck)); return; }
     const my = ++seq.current;
     setBusy(true);
-    const j = await post("/api/ta-live", { symbol: s, tf: t }, tok.current);
+    const j = await call("/api/ta-live", { symbol: s, tf: t });
     if (my !== seq.current) return;
     setBusy(false);
     if (j.quota) setQuota(j.quota);
@@ -1491,7 +1502,7 @@ export default function TaPage() {
     const code = g(j.data, "symbol", "code") || s;
     const nx = cleanRecent([{ s: String(code), n: g(j.data, "symbol", "name") }, ...readRecent().filter((x) => x.s !== code && x.s !== s)]).slice(0, RECENT_MAX);
     lsSet(RECENT_KEY, JSON.stringify(nx)); setRecent(nx);
-  }, [gate]);
+  }, [gate, call]);
 
   const start = useCallback(async () => {
     const j = await post("/api/ta-live", { action: "status" }, tok.current);
@@ -1529,22 +1540,22 @@ export default function TaPage() {
     if (phase !== "app" || view !== "idx" || (idx && !idx.error)) return;
     let live = true;
     setIdx(null);
-    post("/api/ta-idx", {}, tok.current).then((j) => {
+    call("/api/ta-idx", {}).then((j) => {
       if (!live || gate(j)) return;
       setIdx(j.ok ? { date: j.date, html: j.html } : { error: j.error || "讀取失敗" });
     });
     return () => { live = false; };
-  }, [phase, view, gate]);
+  }, [phase, view, gate, call]);
 
   const runRs = useCallback(async (mk, body) => {   // 區間強弱：每按一次「計算」打一次；每個市場只收自己最後一次的回應
     const my = (rsSeq.current[mk] = (rsSeq.current[mk] || 0) + 1);
     const up = (fn) => setRs((a) => ({ ...a, [mk]: fn(a[mk]) }));
     up((o) => ({ ...(o || {}), busy: true, error: "" }));
-    const j = await post("/api/ta-rs", { ...body, market: mk }, tok.current);
+    const j = await call("/api/ta-rs", { ...body, market: mk });
     if (my !== rsSeq.current[mk]) return;
     if (gate(j)) { setRs({}); return; }   // 登入過期：清掉 busy，重新登入後 !rs[市場] 會自動重算
     up((o) => (j.ok ? { data: j, busy: false, error: "" } : { ...(o || {}), busy: false, error: j.error || "讀取失敗", range: j.range }));
-  }, [gate]);
+  }, [gate, call]);
   useEffect(() => { if (phase === "app" && view === "rs" && !rs[rsMkt]) runRs(rsMkt, {}); }, [phase, view, rs, rsMkt, runRs]);   // 每個市場第一次打開＝近 1 月
   const rsCode = useCallback((c) => { pickView("chart"); load(c, "D"); }, [load]);
 
