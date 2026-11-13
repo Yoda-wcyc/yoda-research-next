@@ -33,7 +33,7 @@ export async function POST(req) {
     let b = {};
     try { b = (await req.json()) || {}; } catch (e) { b = {}; }
     if (typeof b !== 'object' || Array.isArray(b)) b = {};
-    for (const k of ['start', 'end']) if (b[k] !== undefined && b[k] !== '' && !(typeof b[k] === 'string' && DATE_RE.test(b[k]))) return R({ ok: false, reason: 'bad-input', error: '日期格式要 YYYY-MM-DD' }, 400);
+    for (const k of ['start', 'end']) if (b[k] !== undefined && b[k] !== '' && !(typeof b[k] === 'string' && DATE_RE.test(b[k]) && new Date(Date.parse(b[k]) || 0).toISOString().slice(0, 10) === b[k])) return R({ ok: false, reason: 'bad-input', error: '日期格式要 YYYY-MM-DD' }, 400);
     const minAmt = b.minAmt === undefined ? 5e7 : b.minAmt;   // 只收數字（null、字串都擋）
     if (typeof minAmt !== 'number' || !Number.isFinite(minAmt) || minAmt < 0 || minAmt > 1e11) return R({ ok: false, reason: 'bad-input', error: '成交值門檻要在 0 ～ 1,000 億元之間' }, 400);
     const n = b.n === undefined ? 20 : b.n;

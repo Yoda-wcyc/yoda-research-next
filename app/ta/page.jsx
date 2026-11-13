@@ -1487,7 +1487,8 @@ export default function TaPage() {
     const my = ++rsSeq.current;
     setRs((o) => ({ ...(o || {}), busy: true, error: "" }));
     const j = await post("/api/ta-rs", body, tok.current);
-    if (my !== rsSeq.current || gate(j)) return;
+    if (my !== rsSeq.current) return;
+    if (gate(j)) { setRs(null); return; }   // 登入過期：清掉 busy，重新登入後 !rs 會自動重算
     setRs((o) => (j.ok ? { data: j, busy: false, error: "" } : { ...(o || {}), busy: false, error: j.error || "讀取失敗", range: j.range }));
   }, [gate]);
   useEffect(() => { if (phase === "app" && view === "rs" && !rs) runRs({}); }, [phase, view, rs, runRs]);   // 第一次打開＝近 1 月
