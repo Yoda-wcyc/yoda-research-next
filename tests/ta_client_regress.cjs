@@ -120,7 +120,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   const opts = { jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "classic" } }, target: "es2020" }, module: { type: "commonjs" } };
   const src = 'const React = require("react");\n' + fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8")
     .replace('"../../lib/ta-trade"', JSON.stringify(path.join(ROOT, "lib", "ta-trade.js").replace(/\\/g, "/")))
-    .replace('"../../lib/ta-rs"', JSON.stringify(path.join(ROOT, "lib", "ta-rs.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop };\n";
+    .replace('"../../lib/ta-rs"', JSON.stringify(path.join(ROOT, "lib", "ta-rs.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, pastHalf };\n";
   const Mod = require("module");
   const libSrc = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-trade.js"), "utf8"), opts).code;
   const lib = new Mod(path.join(ROOT, "lib", "ta-trade.js")); lib.paths = Mod._nodeModulePaths(ROOT); lib._compile(libSrc, lib.id);
@@ -378,6 +378,28 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   await t("ta-live：台指期／費半期代號收得進來、額度鍵 TXF1!＝TXF=F", async () => {
     for (const x of ["TXF1!", "txf1!", "TX", "台指期", "台指", "SXF1!", "SXF", "費半期"]) assert.ok(LV.cleanSym(x), x);
     assert.strictEqual(LV.symKey("TXF1!"), "TXF=F"); assert.strictEqual(LV.symKey("SXF1!"), "SXF=F");
+  });
+
+  // ---------- 6. 區間強弱台股／美股（11-13）、續票判斷 ----------
+  await t("區間強弱：美股字（SPY 含息、百萬美元、交易所、13 族群註腳），台股字不變", async () => {
+    const row = { code: "NVDA", name: "NVIDIA", mkt: "NASDAQ", ret: 5.2, rel: 3.1, avgAmt: 32000.4, groups: ["半導體"] };
+    const d = { start: "2026-11-02", end: "2026-11-12", base: "2026-10-31", days: 9, bench: { tr: 2.1, px: 2.0 }, range: { min: "2023-11-14", max: "2026-11-12" },
+      groups: [{ name: "半導體", rel: 3.1, ret: 5.2, n: 1, total: 1, members: [row] }], strong: [row], weak: [row], universe: { eligible: 1, total: 1 }, through: "2026-11-12" };
+    const h = (mk) => renderToString(React.createElement(P.RsView, { mk, rs: { data: d }, run: () => {}, onCode: () => {} }));
+    const us = h("us"), tw = h("tw");
+    for (const x of ["SPY 含息", "SPY 不含息（參考）", "百萬美元", "交易所", "32,000", "標普 500 成分股", "SPY 含息同期報酬", "美股報告熱力圖 13 族群", "個族群，依相對大盤"]) assert.ok(us.includes(x), "美股少了 " + x);
+    for (const x of ["加權報酬指數", "加權指數", "日均成交值（億）", "上市＋上櫃"]) assert.ok(!us.includes(x), "美股不該有 " + x);
+    for (const x of ["加權報酬指數", "加權指數（價格，參考）", "日均成交值（億）", "市場", "v6 分類", 'value="5000"']) assert.ok(tw.includes(x), "台股少了 " + x);
+    assert.ok(us.includes('value="0"') && !tw.includes("SPY"));
+  });
+  await t("pastHalf：TA 票過半才續；普通票、壞票、沒期限 → 要問 status", async () => {
+    const tk = (p) => "h." + Buffer.from(JSON.stringify(p)).toString("base64url") + ".s", n = Date.now() / 1000;
+    assert.strictEqual(P.pastHalf(tk({ aud: "ta", iat: n - 86400, exp: n + 29 * 86400 })), false);
+    assert.strictEqual(P.pastHalf(tk({ aud: "ta", iat: n - 16 * 86400, exp: n + 14 * 86400 })), true);
+    assert.strictEqual(P.pastHalf(tk({ aud: "ta", iat: n - 40 * 86400, exp: n - 86400 })), true);   // 已過期
+    assert.strictEqual(P.pastHalf(tk({ iat: n, exp: n + 3600 })), true);   // 普通票：換長效票
+    assert.strictEqual(P.pastHalf(tk({ aud: "ta" })), true);
+    assert.strictEqual(P.pastHalf("garbage"), true); assert.strictEqual(P.pastHalf(""), false);
   });
 
   console.log(fails ? "FAILED " + fails : "all passed");

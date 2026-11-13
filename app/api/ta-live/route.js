@@ -1,4 +1,4 @@
-import { authOf, owners, store, todayTaipei, cleanSym, symKey, callEngine, renewTa, TFS, DAILY_MAX } from '../../../lib/ta-live';
+import { authOf, TA_GRACE_SEC, owners, store, todayTaipei, cleanSym, symKey, callEngine, renewTa, TFS, DAILY_MAX } from '../../../lib/ta-live';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,18 +17,21 @@ function R(data, status) {
 }
 
 export async function POST(req) {
-  const p = authOf(req);
-  if (!p) return R({ ok: false, reason: 'need-login', error: '請先登入會員' }, 401);
-  const sub = String(p.sub);
-  const wm = p.wm || sub;
-
   let body = {};
   try { body = await req.json(); } catch (e) {}
+  const NL = () => R({ ok: false, reason: 'need-login', error: '請先登入會員' }, 401);
+  let p = authOf(req), expired = false;
+  // 過期 7 天內的 aud:'ta' 票只能拿來 status 換新票（下面現查開通＋付費，不過就 need-login）；查代號等其他動作照樣拒
+  if (!p && body.action === 'status') { p = authOf(req, TA_GRACE_SEC); expired = !!p; }
+  if (!p) return NL();
+  const sub = String(p.sub);
+  const wm = p.wm || sub;
 
   try {
     const st = await store();
     const owner = owners().includes(sub) || (await st.isOwner(sub));
     if (!owner && !(await st.allowed(sub))) {
+      if (expired) return NL();
       return R({ ok: false, reason: 'not-enabled', error: '技術分析未開通' }, 403);
     }
     const day = todayTaipei();
@@ -36,8 +39,10 @@ export async function POST(req) {
     const quota = (n) => (owner ? { unlimited: true } : { used: n, max: DAILY_MAX, left: Math.max(0, DAILY_MAX - n) });
 
     if (body.action === 'status') {   // 已確認開通才續長效票（token 空＝沒換，頁面沿用舊票）
-      const token = await renewTa(p);
-      return R({ ok: true, owner, quota: quota(used.length), wm, ...(token ? { token } : {}) });
+      const token = await renewTa(p, expired);
+      if (expired && !token) return NL();   // 過期票續不了（沒付費／查不到／DB 出錯）＝重新登入
+      const nwm = token ? JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8')).wm : wm;   // 換了票＝浮水印跟新票（現查會員重算）
+      return R({ ok: true, owner, quota: quota(used.length), wm: nwm, ...(token ? { token } : {}) });
     }
 
     const sym = cleanSym(body.symbol);

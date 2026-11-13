@@ -115,6 +115,13 @@ const has = (v) => v !== null && v !== undefined && v !== "";
 const txt = (v) => (has(v) ? (typeof v === "object" ? JSON.stringify(v) : String(v)) : "—");
 const md = (t) => String(t || "").slice(5);   // 2026-11-06 → 11-06；2026-11-06 13:00 → 11-06 13:00
 function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+// 票過了一半壽命（或不是 aud:'ta' 長效票、或讀不出期限）→ 該問 status 續票；只看期限、不驗簽（驗簽在伺服器）
+function pastHalf(t) {
+  try {
+    const p = JSON.parse(atob(String(t).split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return p.aud !== "ta" || !(p.iat && p.exp) || Date.now() / 1000 - p.iat >= (p.exp - p.iat) / 2;
+  } catch (e) { return !!t; }
+}
 function lsSet(k, v) { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
 // 最近查過：s／n 一律收成字串（物件直接放進 JSX 會讓整頁崩潰＝React #31）
 function cleanRecent(a) { return Array.isArray(a) ? a.filter((x) => x && typeof x.s === "string" && x.s).map((x) => ({ s: x.s, n: typeof x.n === "string" ? x.n : "" })) : []; }
@@ -1271,31 +1278,41 @@ function IdxView({ x }) {
   );
 }
 
-// ───────── 區間強弱分頁（2026-11-13 本機 demo）：任選起迄日，台股族群／個股相對大盤（/api/ta-rs，lib/ta-rs.js 現算）─────────
+// ───────── 區間強弱分頁（2026-11-13 本機 demo）：任選起迄日，台股／美股族群、個股相對大盤（/api/ta-rs，lib/ta-rs.js 現算）─────────
 const pc1 = (x) => (x === null || x === undefined || !Number.isFinite(Number(x)) ? "—" : (x > 0 ? "+" : "") + Number(x).toFixed(1) + "%");
 const yi = (m) => (Number.isFinite(Number(m)) ? (m / 100).toFixed(2) : "—");   // 百萬 → 億
 const mdd = (s) => String(s || "").slice(5).replace("-", "/");
 const RS_PRE = [["1w", "近 1 週"], ["1m", "近 1 月"], ["3m", "近 3 月"], ["ytd", "今年以來"]];
-const RS_NOTE = "相對大盤＝區間報酬 − 加權報酬指數同期報酬；股價已還原除權息與減資；族群＝台股報告現行 v6 分類回頭套用，生技、資訊服務這類近期才成群的族群，在過去區間的強弱帶有事後歸類的成分；成分股等權平均。";
-function rsCols(onCode, rank) {
+const RS_MKT_KEY = "yoda_ta_rs_mkt";
+const RS_MKTS = [["tw", "台股"], ["us", "美股"]];
+function readRsMkt() { return lsGet(RS_MKT_KEY) === "us" ? "us" : "tw"; }
+// 每個市場的字：門檻單位（輸入值 × mul ＝ API 要的元／美元）、大盤、註腳
+const RS_M = {
+  tw: { wan: "5000", unit: "萬", mul: 1e4, step: "1000", bench: ["加權報酬指數", "加權指數（價格，參考）"], uni: "上市＋上櫃普通股", mktCol: "市場", amtCol: "日均成交值（億）", amt: (m) => yi(m),
+    note: "相對大盤＝區間報酬 − 加權報酬指數同期報酬；股價已還原除權息與減資；族群＝台股報告現行 v6 分類回頭套用，生技、資訊服務這類近期才成群的族群，在過去區間的強弱帶有事後歸類的成分；成分股等權平均。" },
+  us: { wan: "0", unit: "百萬美元", mul: 1e6, step: "10", bench: ["SPY 含息", "SPY 不含息（參考）"], uni: "標普 500 成分股", mktCol: "交易所", amtCol: "日均成交值（百萬美元）", amt: (m) => (Number.isFinite(Number(m)) ? Math.round(m).toLocaleString("en-US") : "—"),
+    note: "相對大盤＝區間報酬 − SPY 含息同期報酬；股價已還原拆股與股利；族群＝美股報告熱力圖 13 族群，成分股等權平均；成分只含現在的標普 500，期間內被剔除的公司不在其中。" },
+};
+function rsCols(onCode, rank, M = RS_M.tw) {
   const c = [
     { label: "代號", render: (x) => <button type="button" className="ta-link mono" title="看 K 線" onClick={(e) => { e.stopPropagation(); onCode(x.code); }}>{x.code}</button>, sort: (x) => x.code },
     { label: "名稱", render: (x) => x.name || "—", sort: (x) => x.name },
-    { label: "市場", render: (x) => x.mkt || "—", sort: (x) => x.mkt },
+    { label: M.mktCol, render: (x) => x.mkt || "—", sort: (x) => x.mkt },
     { label: "區間報酬", num: 1, render: (x) => <span className={ud(x.ret)}>{pc1(x.ret)}</span>, sort: (x) => x.ret },
     { label: "相對大盤", num: 1, render: (x) => <span className={ud(x.rel)}>{pc1(x.rel)}</span>, sort: (x) => x.rel },
-    { label: "日均成交值（億）", num: 1, render: (x) => yi(x.avgAmt), sort: (x) => x.avgAmt },
+    { label: M.amtCol, num: 1, render: (x) => M.amt(x.avgAmt), sort: (x) => x.avgAmt },
   ];
   if (!rank) return c;
   return [{ label: "名次", num: 1, render: (x) => x.rk, sort: (x) => x.rk }, ...c.slice(0, 3),
     { label: "族群", cls: "wrap", render: (x) => (x.groups || []).join("、") || "—", sort: (x) => (x.groups || []).join("、") }, ...c.slice(3)];
 }
-function RsView({ rs, run, onCode }) {
+function RsView({ rs, run, onCode, mk = "tw" }) {
+  const M = RS_M[mk] || RS_M.tw;
   const d = rs.data, rg = (d && d.range) || rs.range || {};
-  const [f, setF] = useState(() => ({ start: d ? d.start : "", end: d ? d.end : "", wan: "5000", n: "20" }));
+  const [f, setF] = useState(() => ({ start: d ? d.start : "", end: d ? d.end : "", wan: M.wan, n: "20" }));
   const [open, setOpen] = useState(null);   // 展開成分股的族群
   const num = (v) => (v === "" ? undefined : Number(v));   // 打錯的數字送 NaN（JSON 變 null）→ 伺服器回錯誤訊息
-  const go = (o) => { const g = { ...f, ...o }; setF(g); run({ start: g.start, end: g.end, minAmt: g.wan === "" ? undefined : num(g.wan) * 1e4, n: num(g.n) }); };
+  const go = (o) => { const g = { ...f, ...o }; setF(g); run({ start: g.start, end: g.end, minAmt: g.wan === "" ? undefined : num(g.wan) * M.mul, n: num(g.n) }); };
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const gcols = useMemo(() => [
     { label: "族群", render: (x) => <>{open === x.name ? "▾ " : "▸ "}{x.name}</>, sort: (x) => x.name },
@@ -1303,8 +1320,8 @@ function RsView({ rs, run, onCode }) {
     { label: "區間報酬", num: 1, render: (x) => <span className={ud(x.ret)}>{pc1(x.ret)}</span>, sort: (x) => x.ret },
     { label: "檔數", num: 1, render: (x) => x.n + "／" + x.total, sort: (x) => x.n },
   ], [open]);
-  const scols = useMemo(() => rsCols(onCode, true), [onCode]);
-  const mcols = useMemo(() => rsCols(onCode, false), [onCode]);
+  const scols = useMemo(() => rsCols(onCode, true, M), [onCode, M]);
+  const mcols = useMemo(() => rsCols(onCode, false, M), [onCode, M]);
   const og = d && d.groups.find((x) => x.name === open);
   const rk = (a) => a.map((x, i) => ({ ...x, rk: i + 1 }));
   return (
@@ -1314,7 +1331,7 @@ function RsView({ rs, run, onCode }) {
         <label>迄日 <input type="date" className="ta-q" min={rg.min} max={rg.max} value={f.end} onChange={set("end")} required /></label>
         <span className="ta-rs-pre">{RS_PRE.map(([k, nm]) => (
           <button key={k} type="button" className="ta-btn" disabled={!rg.max || rs.busy} onClick={() => go({ start: presetStart(rg.max, k), end: rg.max })}>{nm}</button>))}</span>
-        <label>日均成交值 ≥ <input type="number" className="ta-q ta-rs-num" min="0" step="1000" value={f.wan} onChange={set("wan")} /> 萬</label>
+        <label>日均成交值 ≥ <input type="number" className="ta-q ta-rs-num" min="0" step={M.step} value={f.wan} onChange={set("wan")} /> {M.unit}</label>
         <label>前後各 <input type="number" className="ta-q ta-rs-num" min="5" max="100" step="1" value={f.n} onChange={set("n")} /> 名</label>
         <button type="submit" className="ta-btn ta-go" disabled={rs.busy}>{rs.busy ? "計算中…" : "計算"}</button>
       </form>
@@ -1323,8 +1340,8 @@ function RsView({ rs, run, onCode }) {
         <>
           <div className="ta-rs-sum">
             <b>{d.start}（基準 {mdd(d.base)} 收盤）→ {d.end}</b>，共 {d.days} 個交易日
-            <span className="sep">｜</span>加權報酬指數 <b className={ud(d.bench.tr)}>{pc1(d.bench.tr)}</b>
-            <span className="sep">｜</span>加權指數（價格，參考）<span className={ud(d.bench.px)}>{pc1(d.bench.px)}</span>
+            <span className="sep">｜</span>{M.bench[0]} <b className={ud(d.bench.tr)}>{pc1(d.bench.tr)}</b>
+            <span className="sep">｜</span>{M.bench[1]} <span className={ud(d.bench.px)}>{pc1(d.bench.px)}</span>
             <span className="sep">｜</span>符合成交值門檻 {d.universe.eligible}／{d.universe.total} 檔
           </div>
           <div className="ta-cap">族群強弱 <span className="mut">{d.groups.length} 個族群，依相對大盤由強到弱；點一列看成分股</span></div>
@@ -1339,12 +1356,12 @@ function RsView({ rs, run, onCode }) {
           <div className="ta-rs-two">
             {[["最強", d.strong], ["最弱", d.weak]].map(([t, a]) => (
               <div key={t}>
-                <div className="ta-cap">相對大盤{t} {a.length} 檔 <span className="mut">上市＋上櫃普通股，日均成交值 ≥ 門檻</span></div>
+                <div className="ta-cap">相對大盤{t} {a.length} 檔 <span className="mut">{M.uni}，日均成交值 ≥ 門檻</span></div>
                 <div className="ta-hs"><SortTable className="ta-dt" cols={scols} rows={rk(a)} rowKey={(x) => x.code} /></div>
               </div>
             ))}
           </div>
-          <div className="ta-notes ta-rs-foot">{RS_NOTE}資料到 {d.through}。</div>
+          <div className="ta-notes ta-rs-foot">{M.note}資料到 {d.through}。</div>
         </>
       ) : !rs.error ? <div className="ta-ph">讀取中…</div> : null}
     </div>
@@ -1411,8 +1428,10 @@ export default function TaPage() {
   const [view, setView] = useState(readView);   // chart＝K 線｜idx＝指數位階
   const pickView = (v) => { setView(v); lsSet(VIEW_KEY, v); };
   const [idx, setIdx] = useState(null);         // {date, html}｜{error}；整個分頁期間只抓一次（失敗的下次打開再抓）
-  const [rs, setRs] = useState(null);           // 區間強弱 {data（最後一次成功的結果）, error, busy, range}
-  const rsSeq = useRef(0);
+  const [rs, setRs] = useState({});             // 區間強弱：市場 → {data（最後一次成功的結果）, error, busy, range}
+  const [rsMkt, setRsMkt] = useState(readRsMkt); // tw｜us，記在 localStorage
+  const pickRsMkt = (k) => { setRsMkt(k); lsSet(RS_MKT_KEY, k); };
+  const rsSeq = useRef({});
   const pickSide = (k) => { setSide(k); lsSet(SIDE_KEY, k); pickView("chart"); };
   const dvs = useMemo(() => sideTrade(dv, side), [dv, side]);
   const bkey = useMemo(() => [dvs, maSet], [dvs, maSet]);   // Boundary 重試鍵：資料、交易參數、均線組、訊號篩選任一換了就重試
@@ -1444,7 +1463,7 @@ export default function TaPage() {
 
   // 共用的閘門處理：票失效 → 登入；沒開通 → 未開通畫面
   const gate = useCallback((j) => {
-    if (j.reason === "need-login") { lsSet(TOK_KEY, null); tok.current = ""; setMsg("登入已過期，請重新登入。"); setPhase("login"); return true; }
+    if (j.reason === "need-login") { if (lsGet(TOK_KEY) === tok.current) lsSet(TOK_KEY, null); tok.current = ""; setMsg("登入已過期，請重新登入。"); setPhase("login"); return true; }
     if (j.reason === "not-enabled") { setPhase("denied"); return true; }
     return false;
   }, []);
@@ -1490,8 +1509,21 @@ export default function TaPage() {
     setRecent(readRecent());
     tok.current = lsGet(TOK_KEY) || "";
     if (!tok.current) { setPhase("login"); return; }
-    start();
+    start();   // 票過期也先問伺服器（過期 7 天內 status 會現查付費＋開通、換新票），不在這裡自己判過期
   }, [start]);
+
+  useEffect(() => {   // 分頁開很久：切回來時票過半壽命就問一次 status 續票（失敗不打斷畫面，只有 need-login／not-enabled 走閘門）
+    if (phase !== "app") return;
+    const f = () => {
+      if (document.visibilityState !== "visible" || !tok.current || !pastHalf(tok.current)) return;
+      post("/api/ta-live", { action: "status" }, tok.current).then((j) => {
+        if (j.ok && typeof j.token === "string" && j.token) { tok.current = j.token; lsSet(TOK_KEY, j.token); if (j.wm) setWm(j.wm); }
+        else if (!j.ok) gate(j);
+      });
+    };
+    document.addEventListener("visibilitychange", f);
+    return () => document.removeEventListener("visibilitychange", f);
+  }, [phase, gate]);
 
   useEffect(() => {   // 指數位階：第一次打開才抓（idx 故意不放進相依：拿到了就不再抓）
     if (phase !== "app" || view !== "idx" || (idx && !idx.error)) return;
@@ -1504,15 +1536,16 @@ export default function TaPage() {
     return () => { live = false; };
   }, [phase, view, gate]);
 
-  const runRs = useCallback(async (body) => {   // 區間強弱：每按一次「計算」打一次；只收最後一次的回應
-    const my = ++rsSeq.current;
-    setRs((o) => ({ ...(o || {}), busy: true, error: "" }));
-    const j = await post("/api/ta-rs", body, tok.current);
-    if (my !== rsSeq.current) return;
-    if (gate(j)) { setRs(null); return; }   // 登入過期：清掉 busy，重新登入後 !rs 會自動重算
-    setRs((o) => (j.ok ? { data: j, busy: false, error: "" } : { ...(o || {}), busy: false, error: j.error || "讀取失敗", range: j.range }));
+  const runRs = useCallback(async (mk, body) => {   // 區間強弱：每按一次「計算」打一次；每個市場只收自己最後一次的回應
+    const my = (rsSeq.current[mk] = (rsSeq.current[mk] || 0) + 1);
+    const up = (fn) => setRs((a) => ({ ...a, [mk]: fn(a[mk]) }));
+    up((o) => ({ ...(o || {}), busy: true, error: "" }));
+    const j = await post("/api/ta-rs", { ...body, market: mk }, tok.current);
+    if (my !== rsSeq.current[mk]) return;
+    if (gate(j)) { setRs({}); return; }   // 登入過期：清掉 busy，重新登入後 !rs[市場] 會自動重算
+    up((o) => (j.ok ? { data: j, busy: false, error: "" } : { ...(o || {}), busy: false, error: j.error || "讀取失敗", range: j.range }));
   }, [gate]);
-  useEffect(() => { if (phase === "app" && view === "rs" && !rs) runRs({}); }, [phase, view, rs, runRs]);   // 第一次打開＝近 1 月
+  useEffect(() => { if (phase === "app" && view === "rs" && !rs[rsMkt]) runRs(rsMkt, {}); }, [phase, view, rs, rsMkt, runRs]);   // 每個市場第一次打開＝近 1 月
   const rsCode = useCallback((c) => { pickView("chart"); load(c, "D"); }, [load]);
 
   const login = async (e) => {
@@ -1641,7 +1674,14 @@ export default function TaPage() {
           ) : null}
           {view === "rs" ? (
             <div className="ta-pane">
-              <Boundary reset={rs}>{rs ? <RsView key={rs.data ? "ok" : "init"} rs={rs} run={runRs} onCode={rsCode} /> : <div className="ta-ph">讀取中…</div>}</Boundary>
+              <div className="ta-seg ta-rs-mkt" role="group" aria-label="市場">
+                {RS_MKTS.map(([k, nm]) => <button key={k} type="button" aria-pressed={rsMkt === k} className={"ta-tab" + (rsMkt === k ? " on" : "")} onClick={() => pickRsMkt(k)}>{nm}</button>)}
+              </div>
+              {RS_MKTS.map(([k]) => (   // 兩個市場都留著（只藏起來）＝各自的輸入與結果切回來還在
+                <div key={k} hidden={rsMkt !== k}>
+                  <Boundary reset={rs[k]}>{rs[k] ? <RsView key={rs[k].data ? "ok" : "init"} mk={k} rs={rs[k]} run={(b) => runRs(k, b)} onCode={rsCode} /> : <div className="ta-ph">讀取中…</div>}</Boundary>
+                </div>
+              ))}
             </div>
           ) : null}
           <div className="ta-pane" hidden={view !== "chart"}>
