@@ -159,8 +159,23 @@ step("路由：段跟 latest 對不上 → 503 updating", async () => {
   const r = await ask(route(files, []), { market: "us" });
   assert.strictEqual(r.status, 503); assert.strictEqual(r.j.reason, "updating");
 });
+step("路由：latest 換到壞版（sha256 不對／schema 不符）而記憶體有舊的好面板 → 回舊面板（帶舊的資料日），不 503", async () => {
+  const files = blobOf("us_rs_panel", U, "20260109"), rt = route(files, []), Q = { market: "us", start: "2026-01-06", end: "2026-01-07" };
+  assert.strictEqual((await ask(rt, Q)).j.through, "2026-01-09");
+  const now = Date.now;
+  const U2 = Object.assign({}, U, { through: "20260110" });
+  for (const bad of [(f) => { const k = Object.keys(f).find((p) => p.endsWith("part1.bin")); f[k] = Buffer.from(f[k]); f[k][0] ^= 1; },
+                     (f) => Object.assign(f, blobOf("us_rs_panel", Object.assign({}, U2, { schema: "tw-rs-1" }), "20260110"))]) {
+    const nf = blobOf("us_rs_panel", U2, "20260110"); bad(nf); Object.assign(files, nf);
+    try {
+      Date.now = () => now() + 11 * 60 * 1000;
+      const r = await ask(rt, Q);
+      assert.strictEqual(r.status, 200, JSON.stringify(r.j)); assert.strictEqual(r.j.through, "2026-01-09");
+    } finally { Date.now = now; }
+  }
+});
 
-const US_REAL = "G:\\Yoda x Claude\\Skill\\data\\us_rs\\us_rs_panel.json.gz";
+const US_REAL ="G:\\Yoda x Claude\\Skill\\data\\us_rs\\us_rs_panel.json.gz";
 if (!fs.existsSync(US_REAL)) console.log("skip 美股真面板不在：", US_REAL);
 else t("美股真面板：2026-11-02→11-12 SPY +0.1853%、APP rel ≈ +72.10pp", () => {
   const R = load("us-real", () => zlib.gunzipSync(fs.readFileSync(US_REAL)).toString("utf8"), "us");

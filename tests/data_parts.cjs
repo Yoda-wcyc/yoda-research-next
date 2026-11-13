@@ -65,15 +65,18 @@ function esm(file, over) {
   return mm.exports;
 }
 const zlib = require("zlib");
-const store = {};
+const store = {}, broken = new Set();   // broken：讀這些路徑時 Blob 丟錯（暫時性）
 process.env.ADMIN_KEY = "k-" + crypto.randomBytes(8).toString("hex");
 const rt = esm(path.join(ROOT, "app", "api", "admin-put-data", "route.js"), { "../../../lib/data-blob": {
   put: async (p, b) => { store[p] = Buffer.from(b); return { pathname: p }; },
-  get: async (p) => (store[p] ? { stream: store[p] } : null),
+  get: async (p) => { if (broken.has(p)) throw new Error("Blob 503"); return store[p] ? { stream: store[p] } : null; },
 } });
 const send = (o, raw) => rt.POST(new Request("http://x/api/admin-put-data", { method: "POST", headers: { "x-yoda-encoding": "gzip" }, body: raw || zlib.gzipSync(JSON.stringify(Object.assign({ key: process.env.ADMIN_KEY }, o))) }))
   .then(async (r) => ({ status: r.status, j: await r.json() }));
-function version(name, through, buf) {
+const SCHEMA_OF = m.exports.SCHEMA_OF;
+// buf 包成 gzip 面板 {schema, pad}（schema 預設照資料名；傳 null＝buf 原樣當 gz，不是合法面板）
+function version(name, through, buf, schema = SCHEMA_OF[name]) {
+  if (schema !== null) buf = zlib.gzipSync(JSON.stringify({ schema, pad: buf.toString("base64") }));
   const h = sha256(buf), cut = Math.ceil(buf.length / 2), ps = [buf.subarray(0, cut), buf.subarray(cut)];
   return ps.map((p, i) => ({ name, ver: through + "-" + h.slice(0, 12), part: i, parts: 2, through, bytes: buf.length, sha256: h, data: p.toString("base64") }));
 }
@@ -102,6 +105,30 @@ at.push(["路由：資料日倒退 → 409（force:true 才放行）；同一天
   assert.strictEqual((await send(Object.assign({}, v[1], { force: true }))).status, 200); assert.strictEqual(lat().through, "20261110");
   for (const b of version("us_rs_panel", "20261110", crypto.randomBytes(3000))) assert.strictEqual((await send(b)).status, 200);
   assert.ok(!store["data/tw_rs_panel/latest.json"]);                       // 各資料名各自一份 latest
+}]);
+at.push(["路由：資料名 ↔ schema 對不上、不是 gzip 面板 → 409，latest 不動", async () => {
+  const before = store[LP].toString();
+  for (const v of [version("us_rs_panel", "20261120", crypto.randomBytes(3000), "tw-rs-1"), version("us_rs_panel", "20261120", crypto.randomBytes(3000), null)]) {
+    await send(v[0]);
+    const r = await send(v[1]);
+    assert.strictEqual(r.status, 409, JSON.stringify(r.j)); assert.ok(r.j.error.includes("schema"), r.j.error);
+  }
+  assert.strictEqual(store[LP].toString(), before);
+  const tw = version("tw_rs_panel", "20261120", crypto.randomBytes(3000), "us-rs-1");
+  await send(tw[0]); assert.strictEqual((await send(tw[1])).status, 409);
+  assert.ok(!store["data/tw_rs_panel/latest.json"]);
+}]);
+at.push(["路由：讀回段時 Blob 出錯 → 503（可重試）；真的缺段 → 409", async () => {
+  const before = store[LP].toString(), v = version("us_rs_panel", "20261121", crypto.randomBytes(3000));
+  await send(v[0]);
+  broken.add(partPath("us_rs_panel", v[0].ver, 0));
+  const r = await send(v[1]);
+  broken.clear();
+  assert.strictEqual(r.status, 503, JSON.stringify(r.j)); assert.strictEqual(store[LP].toString(), before);
+  assert.strictEqual((await send(v[1])).status, 200); assert.strictEqual(lat().through, "20261121");   // 重試最後一段就過
+  const w = version("us_rs_panel", "20261122", crypto.randomBytes(3000));
+  const miss = await send(w[1]);                                            // part0 沒傳
+  assert.strictEqual(miss.status, 409); assert.ok(miss.j.error.includes("沒到齊"), miss.j.error);
 }]);
 at.push(["路由：gzip 炸彈（解開 > 8MB）→ 400；金鑰錯 → 403", async () => {
   const r = await send(null, zlib.gzipSync(JSON.stringify({ key: process.env.ADMIN_KEY, pad: "a".repeat(9e6) })));   // 合法 JSON，沒護欄會解開

@@ -25,7 +25,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // 資料來源（2026-11-13 Yoda 定）：私有 Blob，本機每天 python tw_rs_export.py／us_rs_export.py --upload 分段上傳（見 lib/data-parts.js）。
 //   讀 data/<name>/latest.json（最多每 10 分鐘回源看一次）→ 版本變了才下載各段、接起來驗 sha256、解 gzip。
-//   回 panel；null＝還沒有 latest.json；'updating'＝段跟 latest 對不上（不快取，下一個請求重看 latest）
+//   回 panel；null＝還沒有 latest.json；'updating'＝段跟 latest 對不上（不快取，下一個請求重看 latest；記憶體有舊的好面板就回舊的、帶它自己的資料日）
 //   latest.json 讀失敗（Blob 錯、JSON 壞）而記憶體已有好面板 → 先用舊的，不回 500
 //   同一版同時多個請求只下載／解一次（INFLIGHT）。本機另可用 TA_RS_LOCAL_FILE／TA_RS_US_LOCAL_FILE 直接指到 .json.gz（正式站不看）
 const LATEST_MS = 10 * 60 * 1000;
@@ -58,8 +58,10 @@ async function panel(mk) {
         return r ? Buffer.from(await new Response(r.stream).arrayBuffer()) : Buffer.alloc(0);
       }));
       const gz = assemble(bufs, m.sha256);
-      if (!gz) { LATEST[mk] = { t: 0, meta: null }; return 'updating'; }
-      return (LAST[mk] = load(m.ver, () => gunzipSync(gz).toString('utf8'), mk));
+      let p = null;
+      try { p = gz && load(m.ver, () => gunzipSync(gz).toString('utf8'), mk); } catch (e) { p = null; }   // 解不開／schema 不符＝同壞版
+      if (!p) { LATEST[mk] = { t: 0, meta: null }; return LAST[mk] || 'updating'; }   // 壞版：有舊的好面板就先用（through 是舊的）
+      return (LAST[mk] = p);
     })().finally(() => INFLIGHT.delete(k)));
   }
   return INFLIGHT.get(k);
