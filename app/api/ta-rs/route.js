@@ -4,46 +4,65 @@ import { get } from '../../../lib/data-blob';
 import { latestPath, partPath, assemble } from '../../../lib/data-parts';
 import { gunzipSync } from 'zlib';
 
-const NAME = 'tw_rs_panel';
+// 市場 → Blob 資料名、本機 dev 檔的環境變數、預設成交值門檻（台股 5,000 萬元；美股 0＝S&P 500 成分本來就夠大）
+const MKT = {
+  tw: { name: 'tw_rs_panel', env: 'TA_RS_LOCAL_FILE', minAmt: 5e7, unit: '億元' },
+  us: { name: 'us_rs_panel', env: 'TA_RS_US_LOCAL_FILE', minAmt: 0, unit: '億美元' },
+};
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// /ta「區間強弱」分頁（2026-11-13 本機 demo）：任選起迄日 → 台股族群／個股相對大盤強弱（lib/ta-rs.js 現算）。
-//   POST  Authorization: Bearer <會員登入票>  body {start?, end?（YYYY-MM-DD）, minAmt?（元，0..1e11，預設 5e7）, n?（5..100，預設 20）}
-//   → {ok, ...compute 結果, range:{min,max}}；沒給日期＝近 1 月。失敗 → {ok:false, reason, error}；閘門同 /api/ta-idx
+// /ta「區間強弱」分頁（2026-11-13 本機 demo）：任選起迄日 → 族群／個股相對大盤強弱（lib/ta-rs.js 現算）。
+//   POST  Authorization: Bearer <會員登入票>  body {market?（'tw'｜'us'，預設 tw）, start?, end?（YYYY-MM-DD）,
+//         minAmt?（該市場貨幣，0..1e11，預設 tw 5e7／us 0）, n?（5..100，預設 20）}
+//   → {ok, market, currency, ...compute 結果（含 groups_ver）, range:{min,max}}；沒給日期＝近 1 月。失敗 → {ok:false, reason, error}；閘門同 /api/ta-idx
 function R(data, status) {
   return Response.json(data, { status: status || 200, headers: { 'Cache-Control': 'private, no-store' } });
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-// 資料來源（2026-11-13 Yoda 定）：私有 Blob，本機每天 python tw_rs_export.py --upload 分段上傳（見 lib/data-parts.js）。
-//   讀 data/tw_rs_panel/latest.json（最多每 10 分鐘回源看一次）→ 版本變了才下載各段、接起來驗 sha256、解 gzip。
+// 資料來源（2026-11-13 Yoda 定）：私有 Blob，本機每天 python tw_rs_export.py／us_rs_export.py --upload 分段上傳（見 lib/data-parts.js）。
+//   讀 data/<name>/latest.json（最多每 10 分鐘回源看一次）→ 版本變了才下載各段、接起來驗 sha256、解 gzip。
 //   回 panel；null＝還沒有 latest.json；'updating'＝段跟 latest 對不上（不快取，下一個請求重看 latest）
-//   本機另可用 TA_RS_LOCAL_FILE 直接指到 tw_rs_panel.json.gz（正式站不看）
+//   latest.json 讀失敗（Blob 錯、JSON 壞）而記憶體已有好面板 → 先用舊的，不回 500
+//   同一版同時多個請求只下載／解一次（INFLIGHT）。本機另可用 TA_RS_LOCAL_FILE／TA_RS_US_LOCAL_FILE 直接指到 .json.gz（正式站不看）
 const LATEST_MS = 10 * 60 * 1000;
-let LATEST = { t: 0, meta: null };
-async function panel() {
-  const f = process.env.NODE_ENV !== 'production' && process.env.TA_RS_LOCAL_FILE;
+const LATEST = {}, LAST = {}, INFLIGHT = new Map();   // 市場 → {t, meta}；市場 → 最近一次載好的面板；name|ver → 下載中的 promise
+async function panel(mk) {
+  const { name, env } = MKT[mk];
+  const f = process.env.NODE_ENV !== 'production' && process.env[env];
   if (f) {
     const fs = await import('fs');
-    return load(f + '|' + fs.statSync(f).mtimeMs, () => gunzipSync(fs.readFileSync(f)).toString('utf8'));
+    return load(f + '|' + fs.statSync(f).mtimeMs, () => gunzipSync(fs.readFileSync(f)).toString('utf8'), mk);
   }
-  if (!LATEST.t || Date.now() - LATEST.t > LATEST_MS) {
-    const r = await get(latestPath(NAME), { access: 'private', useCache: false });
-    LATEST = { t: r ? Date.now() : 0, meta: r ? JSON.parse(await new Response(r.stream).text()) : null };   // 沒有 latest 不快取：第一次上傳後馬上看得到
+  const L = LATEST[mk];
+  if (!L || !L.t || Date.now() - L.t > LATEST_MS) {
+    try {
+      const r = await get(latestPath(name), { access: 'private', useCache: false });
+      LATEST[mk] = { t: r ? Date.now() : 0, meta: r ? JSON.parse(await new Response(r.stream).text()) : null };   // 沒有 latest 不快取：第一次上傳後馬上看得到
+    } catch (e) {
+      if (LAST[mk]) return LAST[mk];
+      throw e;
+    }
   }
-  const m = LATEST.meta;
+  const m = LATEST[mk].meta;
   if (!m) return null;
-  if (loaded(m.ver)) return load(m.ver, () => '');
-  const bufs = await Promise.all(Array.from({ length: m.parts }, async (_, i) => {
-    const r = await get(partPath(NAME, m.ver, i), { access: 'private' });   // 段路徑帶版本、不覆寫＝可以吃 CDN 快取
-    return r ? Buffer.from(await new Response(r.stream).arrayBuffer()) : Buffer.alloc(0);
-  }));
-  const gz = assemble(bufs, m.sha256);
-  if (!gz) { LATEST = { t: 0, meta: null }; return 'updating'; }
-  return load(m.ver, () => gunzipSync(gz).toString('utf8'));
+  if (loaded(m.ver, mk)) return load(m.ver, () => '', mk);
+  const k = name + '|' + m.ver;
+  if (!INFLIGHT.has(k)) {
+    INFLIGHT.set(k, (async () => {
+      const bufs = await Promise.all(Array.from({ length: m.parts }, async (_, i) => {
+        const r = await get(partPath(name, m.ver, i), { access: 'private' });   // 段路徑帶版本、不覆寫＝可以吃 CDN 快取
+        return r ? Buffer.from(await new Response(r.stream).arrayBuffer()) : Buffer.alloc(0);
+      }));
+      const gz = assemble(bufs, m.sha256);
+      if (!gz) { LATEST[mk] = { t: 0, meta: null }; return 'updating'; }
+      return (LAST[mk] = load(m.ver, () => gunzipSync(gz).toString('utf8'), mk));
+    })().finally(() => INFLIGHT.delete(k)));
+  }
+  return INFLIGHT.get(k);
 }
 
 export async function POST(req) {
@@ -58,13 +77,15 @@ export async function POST(req) {
     let b = {};
     try { b = (await req.json()) || {}; } catch (e) { b = {}; }
     if (typeof b !== 'object' || Array.isArray(b)) b = {};
+    const mk = b.market === undefined ? 'tw' : b.market;
+    if (!Object.prototype.hasOwnProperty.call(MKT, mk)) return R({ ok: false, reason: 'bad-input', error: '市場要是 tw 或 us' }, 400);
     for (const k of ['start', 'end']) if (b[k] !== undefined && b[k] !== '' && !(typeof b[k] === 'string' && DATE_RE.test(b[k]) && new Date(Date.parse(b[k]) || 0).toISOString().slice(0, 10) === b[k])) return R({ ok: false, reason: 'bad-input', error: '日期格式要 YYYY-MM-DD' }, 400);
-    const minAmt = b.minAmt === undefined ? 5e7 : b.minAmt;   // 只收數字（null、字串都擋）
-    if (typeof minAmt !== 'number' || !Number.isFinite(minAmt) || minAmt < 0 || minAmt > 1e11) return R({ ok: false, reason: 'bad-input', error: '成交值門檻要在 0 ～ 1,000 億元之間' }, 400);
+    const minAmt = b.minAmt === undefined ? MKT[mk].minAmt : b.minAmt;   // 只收數字（null、字串都擋）
+    if (typeof minAmt !== 'number' || !Number.isFinite(minAmt) || minAmt < 0 || minAmt > 1e11) return R({ ok: false, reason: 'bad-input', error: '成交值門檻要在 0 ～ 1,000 ' + MKT[mk].unit + '之間' }, 400);
     const n = b.n === undefined ? 20 : b.n;
     if (!Number.isInteger(n) || n < 5 || n > 100) return R({ ok: false, reason: 'bad-input', error: '名次要是 5 ～ 100 的整數' }, 400);
 
-    const pn = await panel();
+    const pn = await panel(mk);
     if (!pn) return R({ ok: false, reason: 'no-source', error: '資料來源尚未設定' }, 503);
     if (pn === 'updating') return R({ ok: false, reason: 'updating', error: '資料更新中' }, 503);
     const rg = range(pn);
@@ -72,7 +93,7 @@ export async function POST(req) {
     const start = b.start || presetStart(end, '1m');
     const out = compute(pn, { start, end, minAmt, n });
     if (out.error) return R({ ok: false, reason: 'bad-range', error: out.error, range: rg }, 400);
-    return R({ ok: true, ...out });
+    return R({ ok: true, market: mk, currency: pn.currency || 'TWD', ...out });
   } catch (e) {
     return R({ ok: false, reason: 'error', error: '伺服器錯誤：' + String((e && e.message) || e).slice(0, 200) }, 500);
   }

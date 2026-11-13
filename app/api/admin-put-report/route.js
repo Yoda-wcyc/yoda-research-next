@@ -22,7 +22,7 @@ export async function POST(req) {
   try {
     if ((req.headers.get('x-yoda-encoding') || '').toLowerCase() === 'gzip') {
       const buf = Buffer.from(await req.arrayBuffer());
-      body = JSON.parse(gunzipSync(buf).toString('utf8'));
+      body = JSON.parse(gunzipSync(buf, { maxOutputLength: 8e6 }).toString('utf8'));
     } else {
       body = await req.json();
     }

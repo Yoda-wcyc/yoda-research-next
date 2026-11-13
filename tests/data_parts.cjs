@@ -51,5 +51,65 @@ t("接回＋sha256：順序對才過，壞一個位元組就回 null", () => {
   assert.strictEqual(assemble([cuts[0], cuts[1], Buffer.alloc(0)], SHA), null);   // 缺段（讀不到）
 });
 
-console.log(fails ? fails + " FAIL" : "all ok");
-process.exit(fails ? 1 : 0);
+t("白名單：美股面板 us_rs_panel 也收", () => {
+  assert.ok(!checkPart(ok({ name: "us_rs_panel" })).error);
+  assert.ok(checkPart(ok({ name: "us_rs_panelx" })).error);
+});
+
+// 路由（app/api/admin-put-data/route.js）：Blob 換成記憶體假的
+function esm(file, over) {
+  const c = transformSync(fs.readFileSync(file, "utf8"), { jsc: { parser: { syntax: "ecmascript" }, target: "es2020" }, module: { type: "commonjs" } }).code;
+  const mm = { exports: {} };
+  const rq = (s) => (s in over ? over[s] : s.startsWith(".") ? esm(path.resolve(path.dirname(file), s) + ".js", over) : require(s));
+  new Function("module", "exports", "require", c)(mm, mm.exports, rq);
+  return mm.exports;
+}
+const zlib = require("zlib");
+const store = {};
+process.env.ADMIN_KEY = "k-" + crypto.randomBytes(8).toString("hex");
+const rt = esm(path.join(ROOT, "app", "api", "admin-put-data", "route.js"), { "../../../lib/data-blob": {
+  put: async (p, b) => { store[p] = Buffer.from(b); return { pathname: p }; },
+  get: async (p) => (store[p] ? { stream: store[p] } : null),
+} });
+const send = (o, raw) => rt.POST(new Request("http://x/api/admin-put-data", { method: "POST", headers: { "x-yoda-encoding": "gzip" }, body: raw || zlib.gzipSync(JSON.stringify(Object.assign({ key: process.env.ADMIN_KEY }, o))) }))
+  .then(async (r) => ({ status: r.status, j: await r.json() }));
+function version(name, through, buf) {
+  const h = sha256(buf), cut = Math.ceil(buf.length / 2), ps = [buf.subarray(0, cut), buf.subarray(cut)];
+  return ps.map((p, i) => ({ name, ver: through + "-" + h.slice(0, 12), part: i, parts: 2, through, bytes: buf.length, sha256: h, data: p.toString("base64") }));
+}
+const LP = "data/us_rs_panel/latest.json", lat = () => JSON.parse(store[LP]);
+const at = [];
+at.push(["路由：兩段傳完 → latest 指向新版", async () => {
+  for (const b of version("us_rs_panel", "20261112", crypto.randomBytes(5000))) assert.strictEqual((await send(b)).status, 200);
+  assert.strictEqual(lat().through, "20261112");
+}]);
+at.push(["路由：有一段壞了（大小一樣、sha256 不對）→ 409，latest 不動", async () => {
+  const before = store[LP].toString(), v = version("us_rs_panel", "20261113", crypto.randomBytes(5000));
+  const bad = Buffer.from(v[0].data, "base64"); bad[7] ^= 1;
+  await send(Object.assign({}, v[0], { data: bad.toString("base64") }));
+  const r = await send(v[1]);
+  assert.strictEqual(r.status, 409); assert.ok(r.j.error.includes("sha256"), r.j.error);
+  assert.strictEqual(store[LP].toString(), before);
+  assert.strictEqual((await send(v[0])).status, 200);                       // 重傳那段＋最後一段 → 過
+  assert.strictEqual((await send(v[1])).j.done, true); assert.strictEqual(lat().through, "20261113");
+}]);
+at.push(["路由：資料日倒退 → 409（force:true 才放行）；同一天重傳可以", async () => {
+  const v = version("us_rs_panel", "20261110", crypto.randomBytes(3000));
+  await send(v[0]);
+  const r = await send(v[1]);
+  assert.strictEqual(r.status, 409); assert.strictEqual(lat().through, "20261113");
+  assert.strictEqual((await send(Object.assign({}, v[1], { force: "true" }))).status, 409);   // 只認布林 true
+  assert.strictEqual((await send(Object.assign({}, v[1], { force: true }))).status, 200); assert.strictEqual(lat().through, "20261110");
+  for (const b of version("us_rs_panel", "20261110", crypto.randomBytes(3000))) assert.strictEqual((await send(b)).status, 200);
+  assert.ok(!store["data/tw_rs_panel/latest.json"]);                       // 各資料名各自一份 latest
+}]);
+at.push(["路由：gzip 炸彈（解開 > 8MB）→ 400；金鑰錯 → 403", async () => {
+  const r = await send(null, zlib.gzipSync(JSON.stringify({ key: process.env.ADMIN_KEY, pad: "a".repeat(9e6) })));   // 合法 JSON，沒護欄會解開
+  assert.strictEqual(r.status, 400); assert.ok(r.j.error.startsWith("請求內容無法解析"), r.j.error);
+  assert.strictEqual((await send(Object.assign({}, version("us_rs_panel", "20261114", Buffer.from("x"))[0], { key: "nope" }))).status, 403);
+}]);
+(async () => {
+  for (const [name, fn] of at) { try { await fn(); console.log("ok  ", name); } catch (e) { fails++; console.log("FAIL", name, "→", e && e.message); } }
+  console.log(fails ? fails + " FAIL" : "all ok");
+  process.exit(fails ? 1 : 0);
+})();

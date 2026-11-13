@@ -68,6 +68,110 @@ t("load：格式不符丟錯、同 key 不重讀", () => {
   assert.strictEqual(a, b); assert.strictEqual(n, 1);
 });
 
+t("台股輸出跟加美股之前逐位元組相同（舊版 lib 算的 sha256）", () => {
+  const opts = [{ start: "2026-01-06", end: "2026-01-09", minAmt: 5e7, n: 5 }, { start: "2026-01-05", end: "2026-01-09", minAmt: 0, n: 1 }, { start: "2026-01-05", end: "2026-01-07" }];
+  const s = JSON.stringify(opts.map((o) => compute(P, o)));
+  assert.strictEqual(require("crypto").createHash("sha256").update(s).digest("hex"), "c144cf1e319418fb25e3572e3dcb23b63eb449a716e8f3d5907e5340b1397d70");
+});
+const U = Object.assign({}, P, { schema: "us-rs-1", currency: "USD", groups_ver: "treemap" });
+t("load：美股 schema、各市場分開快取、市場對錯 schema 就丟錯", () => {
+  assert.throws(() => load("u0", () => JSON.stringify(P), "us"));     // 台股面板不能當美股
+  assert.throws(() => load("u0", () => JSON.stringify(U), "tw"));
+  assert.throws(() => load("u0", () => JSON.stringify(U), "jp"));
+  const a = load("same", () => JSON.stringify(P), "tw"), b = load("same", () => JSON.stringify(U), "us");
+  assert.strictEqual(a.schema, "tw-rs-1"); assert.strictEqual(b.schema, "us-rs-1");
+  assert.strictEqual(load("same", () => "{}", "tw"), a); assert.strictEqual(load("same", () => "{}", "us"), b);
+  assert.strictEqual(m.exports.loaded("same", "us"), true); assert.strictEqual(m.exports.loaded("same"), true);
+});
+
+// 路由（app/api/ta-rs/route.js）：會員閘門、Blob 換成記憶體假的；每個情境重新載入（模組層快取歸零）
+function esm(file, over) {
+  const c = transformSync(fs.readFileSync(file, "utf8"), { jsc: { parser: { syntax: "ecmascript" }, target: "es2020" }, module: { type: "commonjs" } }).code;
+  const mm = { exports: {} };
+  const rq = (s) => (s in over ? over[s] : s.startsWith(".") ? esm(path.resolve(path.dirname(file), s) + ".js", over) : require(s));
+  new Function("module", "exports", "require", c)(mm, mm.exports, rq);
+  return mm.exports;
+}
+function route(files, calls) {
+  const live = { authOf: () => ({ sub: "o" }), owners: () => ["o"], store: async () => ({ isOwner: async () => true, allowed: async () => true }) };
+  const get = async (p) => {
+    calls.push(p);
+    await new Promise((r) => setTimeout(r, 5));
+    const v = files[p];
+    if (v instanceof Error) throw v;
+    return v === undefined ? null : { stream: Buffer.from(v) };
+  };
+  return esm(path.join(ROOT, "app", "api", "ta-rs", "route.js"), { "../../../lib/ta-live": live, "../../../lib/data-blob": { get } });
+}
+function blobOf(name, panel, through) {
+  const gz = zlib.gzipSync(JSON.stringify(panel)), h = require("crypto").createHash("sha256").update(gz).digest("hex"), ver = through + "-" + h.slice(0, 12);
+  const cut = Math.floor(gz.length / 2), f = {};
+  f["data/" + name + "/latest.json"] = JSON.stringify({ ver, parts: 2, through, bytes: gz.length, sha256: h });
+  f["data/" + name + "/" + ver + "/part0.bin"] = gz.subarray(0, cut);
+  f["data/" + name + "/" + ver + "/part1.bin"] = gz.subarray(cut);
+  return f;
+}
+const ask = (rt, body) => rt.POST(new Request("http://x/api/ta-rs", { method: "POST", body: JSON.stringify(body) })).then(async (r) => ({ status: r.status, j: await r.json() }));
+const at = [];
+const step = (name, fn) => at.push([name, fn]);
+delete process.env.TA_RS_LOCAL_FILE; delete process.env.TA_RS_US_LOCAL_FILE;
+step("路由：美股 market:'us' 讀 us_rs_panel、預設門檻 0、回 market／currency／groups_ver；同時兩個請求只下載一次", async () => {
+  const calls = [], rt = route(Object.assign(blobOf("tw_rs_panel", P, "20260109"), blobOf("us_rs_panel", U, "20260109")), calls);
+  const [a, b] = await Promise.all([ask(rt, { market: "us", start: "2026-01-06", end: "2026-01-09" }), ask(rt, { market: "us", start: "2026-01-06", end: "2026-01-09" })]);
+  assert.strictEqual(a.status, 200, JSON.stringify(a.j)); assert.strictEqual(b.status, 200);
+  assert.strictEqual(a.j.market, "us"); assert.strictEqual(a.j.currency, "USD"); assert.strictEqual(a.j.groups_ver, "treemap");
+  assert.strictEqual(a.j.universe.eligible, 3);                                 // 美股預設 minAmt 0：量小的 1104 也排
+  assert.strictEqual(calls.filter((p) => p.endsWith("part0.bin")).length, 1, calls.join(","));
+  assert.ok(calls.every((p) => p.startsWith("data/us_rs_panel/")));
+  const tw = await ask(rt, { start: "2026-01-06", end: "2026-01-09" });     // 沒給 market＝台股、預設 5e7、跟 compute 直接算一樣
+  assert.strictEqual(tw.j.market, "tw"); assert.strictEqual(tw.j.currency, "TWD");
+  const { ok, market, currency, ...rest } = tw.j;
+  assert.deepStrictEqual(rest, JSON.parse(JSON.stringify(compute(P, { start: "2026-01-06", end: "2026-01-09", minAmt: 5e7, n: 20 }))));
+  const again = await ask(rt, { market: "us", start: "2026-01-06", end: "2026-01-09" });   // 美股快取沒被台股擠掉
+  assert.strictEqual(again.j.market, "us"); assert.strictEqual(calls.filter((p) => p.endsWith("part0.bin")).length, 2);
+});
+step("路由：market／minAmt 驗證", async () => {
+  const rt = route({}, []);
+  for (const bad of [{ market: "jp" }, { market: null }, { market: "toString" }, { market: "us", minAmt: 2e11 }, { market: "us", minAmt: -1 }, { minAmt: "1" }]) {
+    const r = await ask(rt, bad);
+    assert.strictEqual(r.status, 400, JSON.stringify(bad)); assert.strictEqual(r.j.reason, "bad-input");
+  }
+  assert.ok((await ask(rt, { market: "us", minAmt: 2e11 })).j.error.includes("億美元"));
+});
+step("路由：latest.json 讀失敗／JSON 壞 → 記憶體有好面板就照用；沒有才 500", async () => {
+  const files = blobOf("us_rs_panel", U, "20260109"), calls = [], rt = route(files, calls), Q = { market: "us", start: "2026-01-06", end: "2026-01-09" };
+  assert.strictEqual((await ask(rt, Q)).status, 200);
+  const now = Date.now, real = files["data/us_rs_panel/latest.json"];
+  try {
+    Date.now = () => now() + 11 * 60 * 1000;                                  // 10 分鐘到了要回源看 latest
+    files["data/us_rs_panel/latest.json"] = new Error("Blob 503");
+    const a = await ask(rt, Q);
+    assert.strictEqual(a.status, 200, JSON.stringify(a.j)); assert.strictEqual(a.j.market, "us");
+    files["data/us_rs_panel/latest.json"] = "{not json";
+    assert.strictEqual((await ask(rt, Q)).status, 200);
+    const fresh = route(files, []);                                           // 冷啟動、沒有好面板 → 500
+    assert.strictEqual((await ask(fresh, Q)).status, 500);
+  } finally { Date.now = now; files["data/us_rs_panel/latest.json"] = real; }
+});
+step("路由：段跟 latest 對不上 → 503 updating", async () => {
+  const files = blobOf("us_rs_panel", U, "20260109"), k = Object.keys(files).find((p) => p.endsWith("part1.bin"));
+  files[k] = Buffer.from(files[k]); files[k][0] ^= 1;
+  const r = await ask(route(files, []), { market: "us" });
+  assert.strictEqual(r.status, 503); assert.strictEqual(r.j.reason, "updating");
+});
+
+const US_REAL = "G:\\Yoda x Claude\\Skill\\data\\us_rs\\us_rs_panel.json.gz";
+if (!fs.existsSync(US_REAL)) console.log("skip 美股真面板不在：", US_REAL);
+else t("美股真面板：2026-11-02→11-12 SPY +0.1853%、APP rel ≈ +72.10pp", () => {
+  const R = load("us-real", () => zlib.gunzipSync(fs.readFileSync(US_REAL)).toString("utf8"), "us");
+  if (R.through < "20261112") throw new Error("美股面板資料日 " + R.through + " < 20261112");
+  const r = compute(R, { start: "2026-11-02", end: "2026-11-12", minAmt: 0, n: 20 });
+  assert.strictEqual(r.base, "2026-10-30"); assert.strictEqual(r.groups.length, 13);
+  near(r.bench.tr, 0.1853, 1e-9);
+  const app = r.strong.find((x) => x.code === "APP");
+  assert.ok(app, "APP 不在強勢前 20"); near(app.rel, 72.10, 0.01);
+});
+
 const REAL = "G:\\Yoda x Claude\\Skill\\data\\tw_rs\\tw_rs_panel.json.gz";
 if (!fs.existsSync(REAL)) console.log("skip 真面板不在：", REAL);
 else {
@@ -96,5 +200,8 @@ else {
     assert.ok(!r.weak.some((x) => x.code === "2327" && x.ret < -40));
   });
 }
-if (fails) { console.log(fails + " 項失敗"); process.exit(1); }
-console.log("全部通過");
+(async () => {
+  for (const [name, fn] of at) { try { await fn(); console.log("ok  ", name); } catch (e) { fails++; console.log("FAIL", name, "→", e && e.message); } }
+  if (fails) { console.log(fails + " 項失敗"); process.exit(1); }
+  console.log("全部通過");
+})();
