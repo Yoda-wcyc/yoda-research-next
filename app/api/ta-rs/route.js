@@ -87,6 +87,13 @@ export async function POST(req) {
     let b = {};
     try { b = (await req.json()) || {}; } catch (e) { b = {}; }
     if (typeof b !== 'object' || Array.isArray(b)) b = {};
+    if (b.op === 'names') {   // 查代號下拉顯示台股中文名（11-14）：台股面板的代號 → 名稱；記憶體已有面板就不重讀 Blob
+      const tw = await panel('tw');
+      if (!tw || tw === 'updating') return R({ ok: false, reason: tw ? 'updating' : 'no-source', error: tw ? '資料更新中' : '資料來源尚未設定' }, 503);
+      const names = {};
+      tw.codes.forEach((c, i) => { if (typeof tw.names[i] === 'string' && tw.names[i]) names[c] = tw.names[i]; });
+      return R({ ok: true, names });
+    }
     const mk = b.market === undefined ? 'tw' : b.market;
     if (!Object.prototype.hasOwnProperty.call(MKT, mk)) return R({ ok: false, reason: 'bad-input', error: '市場要是 tw 或 us' }, 400);
     for (const k of ['start', 'end']) if (b[k] !== undefined && b[k] !== '' && !(typeof b[k] === 'string' && DATE_RE.test(b[k]) && new Date(Date.parse(b[k]) || 0).toISOString().slice(0, 10) === b[k])) return R({ ok: false, reason: 'bad-input', error: '日期格式要 YYYY-MM-DD' }, 400);

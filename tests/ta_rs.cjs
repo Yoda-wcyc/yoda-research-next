@@ -130,6 +130,16 @@ step("路由：美股 market:'us' 讀 us_rs_panel、預設門檻 0、回 market�
   const again = await ask(rt, { market: "us", start: "2026-01-06", end: "2026-01-09" });   // 美股快取沒被台股擠掉
   assert.strictEqual(again.j.market, "us"); assert.strictEqual(calls.filter((p) => p.endsWith("part0.bin")).length, 2);
 });
+step("路由：op:'names' 回台股代號 → 中文名（不管 market／門檻）；記憶體有面板不重讀段；沒來源 503", async () => {
+  const calls = [], rt = route(blobOf("tw_rs_panel", P, "20260109"), calls);
+  const a = await ask(rt, { op: "names", market: "jp", minAmt: -1 });
+  assert.strictEqual(a.status, 200, JSON.stringify(a.j));
+  assert.deepStrictEqual(a.j.names, { 1101: "甲", 1102: "乙", 1103: "丙", 1104: "丁", 1105: "戊" });
+  await ask(rt, { op: "names" }); await ask(rt, { start: "2026-01-06", end: "2026-01-09" });
+  assert.strictEqual(calls.filter((p) => p.endsWith("part0.bin")).length, 1, calls.join(","));
+  const none = await ask(route({}, []), { op: "names" });
+  assert.strictEqual(none.status, 503); assert.strictEqual(none.j.reason, "no-source");
+});
 step("路由：market／minAmt 驗證", async () => {
   const rt = route({}, []);
   for (const bad of [{ market: "jp" }, { market: null }, { market: "toString" }, { market: "us", minAmt: 2e11 }, { market: "us", minAmt: -1 }, { minAmt: "1" }]) {

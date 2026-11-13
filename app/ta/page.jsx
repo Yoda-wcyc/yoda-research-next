@@ -68,14 +68,16 @@ function mktBadge(s) {
 // 週期分頁：引擎有給 symbol.tfs（台指期／費半期＝["D","W"]）時其他週期停用並註明；舊回應沒有 tfs＝全部可用
 const TWF_ONLY_TXT = "期交所只有日資料";
 // 輸入框下拉的最近查過（11-13，取代左欄底部清單）：整塊 onMouseDown 擋掉，輸入框才不會先 blur 把清單收掉
-function RecentDrop({ items, hi, cur, onPick, onClear }) {
+// 台股（數字開頭的代號）名稱改用 zh（台股面板的中文名，/api/ta-rs op:names）；面板沒有的（ETF 等）只顯示代號，不用引擎的英文名
+const recentName = (r, zh) => (/^\d/.test(r.s) ? (zh && typeof zh[r.s] === "string" ? zh[r.s] : "") : r.n);
+function RecentDrop({ items, hi, cur, onPick, onClear, zh }) {
   return (
     <div id="ta-dd" className="ta-dd" role="listbox" aria-label="最近查過" onMouseDown={(e) => e.preventDefault()}>
-      {items.map((r, i) => (
+      {items.map((r, i) => { const n = recentName(r, zh); return (
         <div key={r.s} id={"ta-dd-" + i} role="option" aria-selected={i === hi} className={"ta-li" + (r.s === cur ? " on" : "") + (i === hi ? " hi" : "")} onClick={() => onPick(r.s)}>
-          <div className="l1"><b className="mono">{r.s}</b><span className="nm" title={r.n}>{r.n}</span></div>
+          <div className="l1"><b className="mono">{r.s}</b><span className="nm" title={n}>{n}</span></div>
         </div>
-      ))}
+      ); })}
       <div className="ta-ddfoot"><button type="button" className="ta-link" onClick={onClear}>清除紀錄</button></div>
     </div>
   );
@@ -1393,6 +1395,8 @@ export default function TaPage() {
   const [err, setErr] = useState(null);         // {reason, error}
   const [recent, setRecent] = useState([]);
   const [dd, setDd] = useState(null);           // 最近查過下拉：null＝收起；-1＝打開沒反白；0…＝↑↓反白第幾筆
+  const [zh, setZh] = useState(null);           // 台股代號 → 中文名（下拉用）；null＝還沒拿到
+  const zhAsk = useRef(false);
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [loginBusy, setLoginBusy] = useState(false);
@@ -1536,6 +1540,14 @@ export default function TaPage() {
     return () => document.removeEventListener("visibilitychange", f);
   }, [phase, gate]);
 
+  useEffect(() => {   // 下拉的台股中文名：清單裡有台股才抓一次；失敗（沒登入、網路、Blob 沒資料）就只顯示代號，下次清單變了再試；不走 gate，不影響查圖
+    if (phase !== "app" || zh || zhAsk.current || !recent.some((r) => /^\d/.test(r.s))) return;
+    zhAsk.current = true;
+    call("/api/ta-rs", { op: "names" }).then((j) => {
+      if (j.ok && j.names && typeof j.names === "object") setZh(j.names); else zhAsk.current = false;
+    });
+  }, [phase, recent, zh, call]);
+
   useEffect(() => {   // 指數位階：第一次打開才抓（idx 故意不放進相依：拿到了就不再抓）
     if (phase !== "app" || view !== "idx" || (idx && !idx.error)) return;
     let live = true;
@@ -1635,7 +1647,7 @@ export default function TaPage() {
                 aria-activedescendant={dd !== null && dd >= 0 && !q && dd < recent.length ? "ta-dd-" + dd : undefined}
                 onFocus={() => setDd(-1)} onClick={() => setDd((x) => (x === null ? -1 : x))} onBlur={() => setDd(null)} onKeyDown={ddKey} />
               <button type="submit" className="ta-btn ta-go" disabled={busy || !q.trim()}>查</button>
-              {dd !== null && !q && recent.length ? <RecentDrop items={recent} hi={dd} cur={symInfo.code || sym} onPick={pickRecent}
+              {dd !== null && !q && recent.length ? <RecentDrop items={recent} hi={dd} cur={symInfo.code || sym} onPick={pickRecent} zh={zh}
                 onClear={() => { lsSet(RECENT_KEY, null); setRecent([]); setDd(null); }} /> : null}
             </div>
           </form>

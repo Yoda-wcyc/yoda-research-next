@@ -150,13 +150,23 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   });
   await t("最近查過：改成輸入框下拉（11-13），點一筆就查；顯示代號＋名稱、反白、目前這檔", async () => {
     const picked = [];
-    const el = P.RecentDrop({ items: [{ s: "2330", n: "台積電" }, { s: "NVDA", n: "" }], hi: 1, cur: "2330", onPick: (s) => picked.push(s), onClear: () => {} });
+    const el = P.RecentDrop({ items: [{ s: "2330", n: "" }, { s: "NVDA", n: "" }], hi: 1, cur: "2330", onPick: (s) => picked.push(s), onClear: () => {}, zh: { 2330: "台積電" } });
     const html = renderToString(el);
     assert.ok(html.includes("台積電") && html.includes('role="listbox"') && html.includes("清除紀錄"), html);
     assert.ok(html.includes('id="ta-dd-0"') && html.includes('id="ta-dd-1"'), "選項要有 id（輸入框 aria-activedescendant 指過去）");
     assert.ok(/class="ta-li on"[^>]*>.*2330/.test(html) && /aria-selected="true" class="ta-li hi"[^>]*>.*NVDA/.test(html), html);
     el.props.children[0][1].props.onClick(); assert.deepStrictEqual(picked, ["NVDA"]);
     let stopped = 0; el.props.onMouseDown({ preventDefault: () => stopped++ }); assert.strictEqual(stopped, 1, "mousedown 沒擋 → 輸入框 blur 先把清單收掉");
+  });
+  await t("最近查過下拉：台股用 zh 中文名（舊紀錄的英文名不顯示）、面板沒有的只顯示代號、美股照舊用 n；zh 沒拿到／壞值不崩", async () => {
+    const items = [{ s: "2330", n: "Taiwan Semiconductor" }, { s: "00878", n: "Cathay ETF" }, { s: "NVDA", n: "NVIDIA Corporation" }, { s: "TXF1!", n: "台指期" }];
+    const html = renderToString(P.RecentDrop({ items, hi: -1, cur: "", onPick: () => {}, onClear: () => {}, zh: { 2330: "台積電", "00878": { x: 1 } } }));
+    assert.ok(html.includes("台積電") && html.includes("NVIDIA Corporation") && html.includes("台指期"), html);
+    assert.ok(!html.includes("Taiwan Semiconductor") && !html.includes("Cathay") && html.includes("00878"), html);
+    for (const zh of [null, undefined, {}]) {
+      const h = renderToString(P.RecentDrop({ items, hi: 0, cur: "", onPick: () => {}, onClear: () => {}, zh }));
+      assert.ok(h.includes(">2330<") && h.includes("NVIDIA Corporation") && !h.includes("Taiwan Semiconductor"), h);
+    }
   });
   // ⛔ 2026-11-13 Yoda 永久刪除，不准重建：輸入框下的代號說明（台股打數字代號…指數只收 ^SOX）＋左欄底部「最近查過」清單
   await t("⛔ 輸入框代號說明、左欄底部最近查過清單已永久刪除", async () => {
