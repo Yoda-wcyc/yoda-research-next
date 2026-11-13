@@ -5,9 +5,10 @@ import { latestPath, partPath, assemble } from '../../../lib/data-parts';
 import { gunzipSync } from 'zlib';
 
 // 市場 → Blob 資料名、本機 dev 檔的環境變數、預設成交值門檻（台股 5,000 萬元；美股 0＝S&P 500 成分本來就夠大）
+// maxTxt＝上限 1e11 用頁面輸入框的單位講（台股輸入「萬」、美股輸入「百萬美元」）
 const MKT = {
-  tw: { name: 'tw_rs_panel', env: 'TA_RS_LOCAL_FILE', minAmt: 5e7, unit: '億元' },
-  us: { name: 'us_rs_panel', env: 'TA_RS_US_LOCAL_FILE', minAmt: 0, unit: '億美元' },
+  tw: { name: 'tw_rs_panel', env: 'TA_RS_LOCAL_FILE', minAmt: 5e7, maxTxt: '10,000,000 萬（＝1,000 億元）' },
+  us: { name: 'us_rs_panel', env: 'TA_RS_US_LOCAL_FILE', minAmt: 0, maxTxt: '100,000 百萬美元' },
 };
 
 export const runtime = 'nodejs';
@@ -90,7 +91,7 @@ export async function POST(req) {
     if (!Object.prototype.hasOwnProperty.call(MKT, mk)) return R({ ok: false, reason: 'bad-input', error: '市場要是 tw 或 us' }, 400);
     for (const k of ['start', 'end']) if (b[k] !== undefined && b[k] !== '' && !(typeof b[k] === 'string' && DATE_RE.test(b[k]) && new Date(Date.parse(b[k]) || 0).toISOString().slice(0, 10) === b[k])) return R({ ok: false, reason: 'bad-input', error: '日期格式要 YYYY-MM-DD' }, 400);
     const minAmt = b.minAmt === undefined ? MKT[mk].minAmt : b.minAmt;   // 只收數字（null、字串都擋）
-    if (typeof minAmt !== 'number' || !Number.isFinite(minAmt) || minAmt < 0 || minAmt > 1e11) return R({ ok: false, reason: 'bad-input', error: '成交值門檻要在 0 ～ 1,000 ' + MKT[mk].unit + '之間' }, 400);
+    if (typeof minAmt !== 'number' || !Number.isFinite(minAmt) || minAmt < 0 || minAmt > 1e11) return R({ ok: false, reason: 'bad-input', error: '成交值門檻要在 0 ～ ' + MKT[mk].maxTxt + ' 之間' }, 400);
     const n = b.n === undefined ? 20 : b.n;
     if (!Number.isInteger(n) || n < 5 || n > 100) return R({ ok: false, reason: 'bad-input', error: '名次要是 5 ～ 100 的整數' }, 400);
 

@@ -136,7 +136,9 @@ step("路由：market／minAmt 驗證", async () => {
     const r = await ask(rt, bad);
     assert.strictEqual(r.status, 400, JSON.stringify(bad)); assert.strictEqual(r.j.reason, "bad-input");
   }
-  assert.ok((await ask(rt, { market: "us", minAmt: 2e11 })).j.error.includes("億美元"));
+  assert.ok((await ask(rt, { market: "us", minAmt: 2e11 })).j.error.includes("100,000 百萬美元"));   // 同頁面輸入單位
+  assert.ok((await ask(rt, { minAmt: 2e11 })).j.error.includes("10,000,000 萬"));
+  assert.strictEqual((await ask(rt, { market: "us", minAmt: 1e11 })).j.reason !== "bad-input", true);   // 上限本身可以
 });
 step("路由：latest.json 讀失敗／JSON 壞 → 記憶體有好面板就照用；沒有才 500", async () => {
   const files = blobOf("us_rs_panel", U, "20260109"), calls = [], rt = route(files, calls), Q = { market: "us", start: "2026-01-06", end: "2026-01-09" };

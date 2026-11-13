@@ -3,7 +3,7 @@
 //  2. 兩支報告 API 的原始碼都是 verifyJwt(token, secret) 兩個參數（沒有偷開 allowAud）；全 repo 只有 lib/ta-live.js 開 allowAud（lib/jwt.js 只讀 opts.allowAud）
 //  3. tokenExp：不傳 maxSec＝12 小時不變；30 天被權益到期日 23:59 台北截短；寬限期（到期日已過）只給 12 小時
 //  4. renewTa（mock store）：普通票→換發 aud:'ta'、約 30 天；新的 TA 票不重發；過半壽命才重發；查會員失敗不續；wm＝現查會員重算
-//  5. 寬限續票（11-13）：aud:'ta' 票過期 7 天內只有 /api/ta-live status 能換新票（現查付費＋開通，不過 → need-login）；
+//  5. 寬限續票（11-13）：aud:'ta' 票過期 7 天內只有 /api/ta-live status 能換新票（現查付費＋開通，不過 → need-login；DB 出錯 → 503 error、頁面不清票）；
 //     過期超過 7 天、查代號、/api/ta-idx、/api/ta-rs、報告式驗票一律拒；aud 白名單嚴格相等（['ta']、'TA'、'ta ' 都拒）
 const fs = require("fs"), path = require("path"), assert = require("assert"), Mod = require("module");
 const ROOT = path.join(__dirname, "..");
@@ -122,14 +122,11 @@ const req = (tok) => ({ headers: { get: (k) => (k.toLowerCase() === "authorizati
     }
     assert.strictEqual(J.verifyJwt(normal, S, { allowAud: "ta" }).sub, "MTEST1");
   });
-  await t("寬限續票：不是付費會員／查會員出錯／沒開通 → need-login（不發票）", async () => {
+  await t("寬限續票：不是付費會員／沒開通 → need-login（不發票）", async () => {
     const st = await LV.store(), orig = st.paidMember;
     st.paidMember = async () => null;
     let r = await call(ex(2), { action: "status" });
     assert.strictEqual(r.status, 401); assert.strictEqual(r.j.reason, "need-login"); assert.ok(!r.j.token);
-    st.paidMember = async () => { throw new Error("db down"); };
-    r = await call(ex(2), { action: "status" });
-    assert.strictEqual(r.status, 401);
     st.paidMember = orig;
     process.env.TA_MOCK_ACCESS = "MTEST1:0";
     r = await call(ex(2), { action: "status" });
@@ -137,6 +134,45 @@ const req = (tok) => ({ headers: { get: (k) => (k.toLowerCase() === "authorizati
     r = await call(ta, { action: "status" });   // 沒過期的票沒開通 → 照舊 not-enabled
     assert.strictEqual(r.status, 403);
     process.env.TA_MOCK_ACCESS = "MTEST1:1";
+  });
+  await t("寬限續票：查會員／付費／開通時 DB 出錯 → 503 reason:error（不是 need-login、不發票）；沒過期票不受影響", async () => {
+    const st = await LV.store(), o = { paidMember: st.paidMember, allowed: st.allowed, isOwner: st.isOwner };
+    const boom = async () => { throw new Error("db down"); };
+    try {
+      st.paidMember = boom;
+      await assert.rejects(LV.renewTa(J.verifyJwt(normal, S), true), /db down/);   // force＝丟出去
+      assert.strictEqual(await LV.renewTa(J.verifyJwt(normal, S)), "");          // 一般續票照舊吞掉
+      let r = await call(ex(2), { action: "status" });
+      assert.strictEqual(r.status, 503, JSON.stringify(r.j)); assert.strictEqual(r.j.reason, "error"); assert.ok(!r.j.token);
+      r = await call(ta, { action: "status" });   // 沒過期的新票：不續、照常 200
+      assert.strictEqual(r.status, 200); assert.ok(!r.j.token);
+      st.paidMember = o.paidMember;
+      const seen = [];
+      st.allowed = async (sub, strict) => { seen.push(strict); if (strict) throw new Error("db down"); return true; };
+      r = await call(ex(2), { action: "status" });
+      assert.strictEqual(r.status, 503); assert.strictEqual(r.j.reason, "error");
+      assert.strictEqual((await call(ta, { action: "status" })).status, 200);
+      assert.deepStrictEqual(seen, [true, false], "只有過期票才 strict");
+      st.allowed = o.allowed; st.isOwner = async (sub, strict) => { if (strict) throw new Error("db down"); return false; };
+      r = await call(ex(2), { action: "status" });
+      assert.strictEqual(r.status, 503); assert.strictEqual(r.j.reason, "error");
+    } finally { Object.assign(st, o); }
+    assert.strictEqual((await call(ex(2), { action: "status" })).status, 200);   // 復原後恢復換票
+  });
+  await t("neonStore：isOwner／allowed 出錯 → 預設 false（寧可擋錯）；strict 才往外丟", async () => {
+    const ns = LV.neonStore(() => Promise.reject(new Error("db down")));
+    assert.strictEqual(await ns.isOwner("X"), false);
+    assert.strictEqual(await ns.allowed("X"), false);
+    await assert.rejects(ns.isOwner("X", true), /db down/);
+    await assert.rejects(ns.allowed("X", true), /db down/);
+  });
+  await t("頁面：只有 need-login 清票；暫時錯誤畫面有「重試」（重跑 start、不清票）", async () => {
+    const pg = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
+    const gate = pg.slice(pg.indexOf("const gate = useCallback"), pg.indexOf("const call = useCallback"));
+    assert.strictEqual((gate.match(/lsSet\(TOK_KEY, null\)/g) || []).length, 1);
+    assert.ok(/if \(j\.reason === "need-login"\) \{ if \(lsGet\(TOK_KEY\) === tok\.current\) lsSet\(TOK_KEY, null\)/.test(gate));
+    assert.ok(/phase === "error" \? <button[^>]*onClick=\{\(\) => \{ setPhase\("init"\); start\(\); \}\}>重試<\/button>/.test(pg));
+    assert.ok(/step="any" value=\{f\.wan\}/.test(pg) && !/step=\{M\.step\}/.test(pg), "成交值門檻 step=any");
   });
   await t("body 是 null 不丟例外（沒票 401）；頁面查代號／指數位階／區間強弱都走 call（need-login 先換票重試）", async () => {
     const r = await RT.POST(new Request("http://t/api/ta-live", { method: "POST", body: "null" }));

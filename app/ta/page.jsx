@@ -1288,9 +1288,9 @@ const RS_MKTS = [["tw", "台股"], ["us", "美股"]];
 function readRsMkt() { return lsGet(RS_MKT_KEY) === "us" ? "us" : "tw"; }
 // 每個市場的字：門檻單位（輸入值 × mul ＝ API 要的元／美元）、大盤、註腳
 const RS_M = {
-  tw: { wan: "5000", unit: "萬", mul: 1e4, step: "1000", bench: ["加權報酬指數", "加權指數（價格，參考）"], uni: "上市＋上櫃普通股", mktCol: "市場", amtCol: "日均成交值（億）", amt: (m) => yi(m),
+  tw: { wan: "5000", unit: "萬", mul: 1e4, bench: ["加權報酬指數", "加權指數（價格，參考）"], uni: "上市＋上櫃普通股", mktCol: "市場", amtCol: "日均成交值（億）", amt: (m) => yi(m),
     note: "相對大盤＝區間報酬 − 加權報酬指數同期報酬；股價已還原除權息與減資；族群＝台股報告現行 v6 分類回頭套用，生技、資訊服務這類近期才成群的族群，在過去區間的強弱帶有事後歸類的成分；成分股等權平均。" },
-  us: { wan: "0", unit: "百萬美元", mul: 1e6, step: "10", bench: ["SPY 含息", "SPY 不含息（參考）"], uni: "標普 500 成分股", mktCol: "交易所", amtCol: "日均成交值（百萬美元）", amt: (m) => (Number.isFinite(Number(m)) ? Math.round(m).toLocaleString("en-US") : "—"),
+  us: { wan: "0", unit: "百萬美元", mul: 1e6, bench: ["SPY 含息", "SPY 不含息（參考）"], uni: "標普 500 成分股", mktCol: "交易所", amtCol: "日均成交值（百萬美元）", amt: (m) => (Number.isFinite(Number(m)) ? Math.round(m).toLocaleString("en-US") : "—"),
     note: "相對大盤＝區間報酬 − SPY 含息同期報酬；股價已還原拆股與股利；族群＝美股報告熱力圖 13 族群，成分股等權平均；成分只含現在的標普 500，期間內被剔除的公司不在其中。" },
 };
 function rsCols(onCode, rank, M = RS_M.tw) {
@@ -1331,7 +1331,7 @@ function RsView({ rs, run, onCode, mk = "tw" }) {
         <label>迄日 <input type="date" className="ta-q" min={rg.min} max={rg.max} value={f.end} onChange={set("end")} required /></label>
         <span className="ta-rs-pre">{RS_PRE.map(([k, nm]) => (
           <button key={k} type="button" className="ta-btn" disabled={!rg.max || rs.busy} onClick={() => go({ start: presetStart(rg.max, k), end: rg.max })}>{nm}</button>))}</span>
-        <label>日均成交值 ≥ <input type="number" className="ta-q ta-rs-num" min="0" step={M.step} value={f.wan} onChange={set("wan")} /> {M.unit}</label>
+        <label>日均成交值 ≥ <input type="number" className="ta-q ta-rs-num" min="0" step="any" value={f.wan} onChange={set("wan")} /> {M.unit}</label>
         <label>前後各 <input type="number" className="ta-q ta-rs-num" min="5" max="100" step="1" value={f.n} onChange={set("n")} /> 名</label>
         <button type="submit" className="ta-btn ta-go" disabled={rs.busy}>{rs.busy ? "計算中…" : "計算"}</button>
       </form>
@@ -1603,6 +1603,7 @@ export default function TaPage() {
         <div className="ta-gate">
           <h1>{phase === "denied" ? "技術分析未開通" : "暫時讀不到資料"}</h1>
           <p>{phase === "denied" ? "這個會員帳號還沒有開通技術分析。需要使用請洽站方。" : msg}</p>
+          {phase === "error" ? <button type="button" className="ta-btn ta-go" onClick={() => { setPhase("init"); start(); }}>重試</button> : null}
           <button type="button" className="ta-btn" onClick={logout}>換一個帳號登入</button>
         </div>
       </main>
