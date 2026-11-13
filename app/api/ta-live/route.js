@@ -1,4 +1,4 @@
-import { authOf, owners, store, todayTaipei, cleanSym, symKey, callEngine, TFS, DAILY_MAX } from '../../../lib/ta-live';
+import { authOf, owners, store, todayTaipei, cleanSym, symKey, callEngine, renewTa, TFS, DAILY_MAX } from '../../../lib/ta-live';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -7,7 +7,7 @@ export const maxDuration = 60;
 // 獨立技術分析頁 /ta 的唯一資料來源（同網域呼叫，不開 CORS）。
 //
 //   POST  Authorization: Bearer <會員登入票>
-//     {action:'status'}            → {ok, owner, quota, wm}           （頁面一進來先問：開通了沒、今天剩幾檔）
+//     {action:'status'}            → {ok, owner, quota, wm, token?}   （頁面一進來先問：開通了沒、今天剩幾檔；token＝換發的 aud:'ta' 長效票）
 //     {symbol:'2330', tf:'D'}      → {ok, owner, quota, wm, data:<引擎回應>}
 //   失敗 → {ok:false, reason, error, quota?}
 //     reason：need-login 401｜not-enabled 403｜bad-request 400｜quota-exceeded 429｜symbol-not-found 404/422｜coming-soon 422｜
@@ -35,7 +35,10 @@ export async function POST(req) {
     const used = owner ? [] : await st.used(sub, day);
     const quota = (n) => (owner ? { unlimited: true } : { used: n, max: DAILY_MAX, left: Math.max(0, DAILY_MAX - n) });
 
-    if (body.action === 'status') return R({ ok: true, owner, quota: quota(used.length), wm });
+    if (body.action === 'status') {   // 已確認開通才續長效票（token 空＝沒換，頁面沿用舊票）
+      const token = await renewTa(p);
+      return R({ ok: true, owner, quota: quota(used.length), wm, ...(token ? { token } : {}) });
+    }
 
     const sym = cleanSym(body.symbol);
     const tf = TFS.includes(body.tf) ? body.tf : '';

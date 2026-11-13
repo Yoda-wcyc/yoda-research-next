@@ -153,6 +153,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     const el = P.RecentDrop({ items: [{ s: "2330", n: "台積電" }, { s: "NVDA", n: "" }], hi: 1, cur: "2330", onPick: (s) => picked.push(s), onClear: () => {} });
     const html = renderToString(el);
     assert.ok(html.includes("台積電") && html.includes('role="listbox"') && html.includes("清除紀錄"), html);
+    assert.ok(html.includes('id="ta-dd-0"') && html.includes('id="ta-dd-1"'), "選項要有 id（輸入框 aria-activedescendant 指過去）");
     assert.ok(/class="ta-li on"[^>]*>.*2330/.test(html) && /aria-selected="true" class="ta-li hi"[^>]*>.*NVDA/.test(html), html);
     el.props.children[0][1].props.onClick(); assert.deepStrictEqual(picked, ["NVDA"]);
     let stopped = 0; el.props.onMouseDown({ preventDefault: () => stopped++ }); assert.strictEqual(stopped, 1, "mousedown 沒擋 → 輸入框 blur 先把清單收掉");
@@ -162,6 +163,9 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
     for (const w of ["台股打數字代號", "指數只收", "美股打英文代號"]) assert.ok(!raw.includes(w), "page.jsx 又出現「" + w + "」");
     assert.ok(!/ta-rhead|ta-recent|>最近查過</.test(raw), "page.jsx 又出現底部最近查過區塊");
+    // 換種寫法（{"最近查過"}、「最近查過：」小標）也擋：拿掉註解和下拉的 aria-label 之後，程式裡不准再出現這四個字
+    const code = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'])\/\/.*$/gm, "$1").replace('aria-label="最近查過"', "");
+    assert.ok(!code.includes("最近查過"), "page.jsx 程式裡（註解與下拉 aria-label 以外）又出現「最近查過」字樣");
   });
   await t("Boundary：子元件丟例外 → 顯示『這一塊顯示失敗』與錯誤摘要", async () => {
     const st = P.Boundary.getDerivedStateFromError(new TypeError("(x.gaps || []).forEach is not a function"));
@@ -294,6 +298,33 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     assert.strictEqual(lib3.hasVolume([null, 0, NaN]), false); assert.strictEqual(lib3.hasVolume([null, 5]), true); assert.strictEqual(lib3.hasVolume([null, 5], 1), false);
     const w2 = P.withTrade(mkD({}), p);
     assert.strictEqual(w2.trade.p.vol_on, true);
+  });
+  await t("記號旁的字（多進／出場原因）滑過也出說明：帶 data-tip＋滑鼠事件、aria-hidden、不可 tab（11-13）", async () => {
+    const w = P.withTrade(mkD({}), { ...lib3.normParams({}).p, vol_on: false, fresh_n: 1 });
+    assert.ok(w.trade.trades.length > 0, "測資沒有交易");
+    const tips = [];
+    const full = P.fullSeries(w);
+    const el = P.KChart({ d: w, full, smas: [], a: 0, b: full.bars.length, gaps: [], islands: [], top: [], rolls: [], onTip: (k, t) => tips.push(k) });
+    const flat = [], walk = (x) => { if (Array.isArray(x)) x.forEach(walk); else if (x && x.props) { flat.push(x); walk(x.props.children); } };
+    walk(el);
+    const labs = flat.filter((x) => x.type === "text" && /\bmk-lab\b/.test(x.props.className || ""));
+    assert.ok(labs.some((x) => /\bte\b/.test(x.props.className)) && labs.some((x) => /\btx\b/.test(x.props.className)), "進場／出場字沒掛上");
+    for (const x of labs) {
+      assert.ok(x.props["data-tip"] && x.props["aria-hidden"] === "true" && x.props.tabIndex === undefined, JSON.stringify(Object.keys(x.props)));
+      x.props.onMouseEnter({ clientX: 1, clientY: 1 });
+    }
+    assert.ok(tips.includes("entry") && tips.includes("exit"), tips.join());
+  });
+  await t("停損出場的說明多一列「停損由來」（沿用進場說明的寫法）；其他出場沒有", async () => {
+    const res = { ctx: { O: [10, 10, 9], H: [11, 11, 10], L: [9, 9, 8], C: [10, 10, 8.5], T: ["a", "b", "c"], M: [[], [], []], XM: [], vr: [], atr: [1, 1, 1] } };
+    const pp = { ...lib3.normParams({}).p, stop: "low_n", stop_n: 5, stop_on: "touch" };
+    const st = lib3.explainExit(res, pp, { exit_i: 2, entry_i: 1, side: 1, why: "停損", stop: 9, entry: 10, exit_px: 9, pct: -10 });
+    const row = st.rows.find((r) => r[0] === "停損由來");
+    assert.ok(row && row[1] === "9＝進場時近 5 根（含進場根）的最低點", JSON.stringify(st.rows));
+    const atrRow = lib3.explainExit(res, { ...pp, stop: "atr", atr_n: 14, atr_k: 2 }, { exit_i: 2, entry_i: 1, side: 1, why: "停損", stop: 8, entry: 10, exit_px: 8, pct: -20 }).rows.find((r) => r[0] === "停損由來");
+    assert.ok(atrRow && atrRow[1].includes("ATR14 1 × 2 倍"), JSON.stringify(atrRow));
+    const hold = lib3.explainExit(res, { ...pp, max_hold: 1 }, { exit_i: 2, entry_i: 1, side: 1, why: "持有到期", stop: 9, entry: 10, exit_px: 8.5, pct: -15 });
+    assert.ok(!hold.rows.some((r) => r[0] === "停損由來"));
   });
   // lib/ta-live.js（swc 轉 CJS；jwt 同法載入）
   const ldMod = (rel) => { const f = path.join(ROOT, "lib", rel), mm = new Mod(f); mm.filename = f; mm.paths = Mod._nodeModulePaths(ROOT); mm._compile(transformSync(fs.readFileSync(f, "utf8"), opts).code, f); require.cache[f] = mm; mm.loaded = true; return mm.exports; };

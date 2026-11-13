@@ -72,7 +72,7 @@ function RecentDrop({ items, hi, cur, onPick, onClear }) {
   return (
     <div id="ta-dd" className="ta-dd" role="listbox" aria-label="最近查過" onMouseDown={(e) => e.preventDefault()}>
       {items.map((r, i) => (
-        <div key={r.s} role="option" aria-selected={i === hi} className={"ta-li" + (r.s === cur ? " on" : "") + (i === hi ? " hi" : "")} onClick={() => onPick(r.s)}>
+        <div key={r.s} id={"ta-dd-" + i} role="option" aria-selected={i === hi} className={"ta-li" + (r.s === cur ? " on" : "") + (i === hi ? " hi" : "")} onClick={() => onPick(r.s)}>
           <div className="l1"><b className="mono">{r.s}</b><span className="nm" title={r.n}>{r.n}</span></div>
         </div>
       ))}
@@ -486,9 +486,12 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top, rolls }) {
   if (op) {
     const ly = (kind) => { const ln = (trd.lines || []).find((x) => x.kind === kind); return ln && ln.y != null ? ln.y : null; };
     const tag = op.side === 1 ? "多" : "空";
+    // 兩個標籤滑過都出這筆持倉的進場說明（含停損怎麼來的）
+    const tip = { "data-tip": "entry", onMouseEnter: (e) => onTip && onTip("entry", op, e, false), onMouseLeave: () => onTip && onTip(null),
+      onClick: (e) => { e.stopPropagation(); onTip && onTip("entry", op, e, true); }, "aria-hidden": "true" };
     for (const [kind, w, col] of [["open_entry", tag + "單進場 ", TR_ENT], ["open_stop", "停損 ", TR_STOP]]) {
       const v = ly(kind);
-      if (v != null) lab.push({ y: Y(v), t: w + fpx(v), col, nt: "" });
+      if (v != null) lab.push({ y: Y(v), t: w + fpx(v), col, nt: "", tip });
     }
   }
   // 進出場：每筆進場到出場一條細虛線（這筆賺＝紅、賠＝綠）
@@ -512,6 +515,8 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top, rolls }) {
       onClick: (e) => { e.stopPropagation(); onTip && onTip(m.kind, t, e, true); }, onFocus: (e) => onTip && onTip(m.kind, t, e, false),
       onBlur: () => onTip && onTip(null), tabIndex: 0, role: "button",
       "aria-label": (t.side === 1 ? "多單" : "空單") + (m.kind === "entry" ? "進場 " + t.entry_t : "出場 " + t.exit_t) };
+    // 旁邊的字（多進 價格／原因 價格 報酬%）滑過也出同一個說明；不另給 tabIndex（鍵盤焦點留在記號上，免得一筆聚焦兩次）
+    const lt = { "data-tip": m.kind, onMouseEnter: hit.onMouseEnter, onMouseLeave: hit.onMouseLeave, onClick: hit.onClick, "aria-hidden": "true" };
     if (m.kind === "entry") {
       const s = t.side, y = s === 1 ? Y(bb.l) + 5 : Y(bb.h) - 5, col = s === 1 ? K_UP : K_DN;
       els.push(<g key={"me" + m.i} className="mk-hit" {...hit}>
@@ -521,7 +526,7 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top, rolls }) {
       placed.push([x - 7, Math.min(y, y + s * 12), x + 7, Math.max(y, y + s * 12)]);
       const y0 = s === 1 ? y + 26 : y - 16, ym = y + s * 6 + 4;
       want.push([(s === 1 ? "多進 " : "空進 ") + fpx(t.entry), col, "te", [[x, y0, "middle"], [x + 10, ym, "start"], [x - 10, ym, "end"],
-        [x, y0 + s * 13, "middle"], [x + 10, ym + s * 13, "start"], [x - 10, ym + s * 13, "end"], [x, y0 + s * 26, "middle"], [x, y0 + s * 39, "middle"]]]);
+        [x, y0 + s * 13, "middle"], [x + 10, ym + s * 13, "start"], [x - 10, ym + s * 13, "end"], [x, y0 + s * 26, "middle"], [x, y0 + s * 39, "middle"]], lt]);
     } else {
       const col = TONE[m.tone] || "#ffffff", y = Y(m.px);
       els.push(<g key={"mx" + m.i} className="mk-hit" {...hit}>
@@ -532,7 +537,7 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top, rolls }) {
       const dy = t.side === 1 ? 13 : -13, yb = y + (t.side === 1 ? 16 : -9), yo = y + (t.side === 1 ? -9 : 16);
       want.push([(t.label || t.why) + " " + fpx(t.exit_px) + " " + fpc(t.pct), col, "tx", [[x + 9, yb, "start"], [x - 9, yb, "end"],
         [x + 10, y + 4, "start"], [x - 10, y + 4, "end"], [x + 9, yo, "start"], [x - 9, yo, "end"],
-        [x + 9, yb + dy, "start"], [x - 9, yb + dy, "end"], [x + 9, yb + 2 * dy, "start"], [x - 9, yb + 2 * dy, "end"], [x + 9, yb + 3 * dy, "start"]]]);
+        [x + 9, yb + dy, "start"], [x - 9, yb + dy, "end"], [x + 9, yb + 2 * dy, "start"], [x - 9, yb + 2 * dy, "end"], [x + 9, yb + 3 * dy, "start"]], lt]);
     }
   });
   // 前五大量編號：相鄰幾根都上榜、或碰到 ▲▼✕ 時往上錯開，不疊在一起（量區的編號同樣錯開）
@@ -596,7 +601,7 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top, rolls }) {
   }
   els.push(...kels);   // 圖上直接寫線的名字（不用點開圖例；位置上面已佔好）
   if (trd.sideLabel && !marks.length) els.push(<text key="sidenone" className="ckey" data-side-empty="" x={xr - 6} y={T + 13} textAnchor="end" style={{ fill: "#ffffff" }}>{"區間內沒有" + trd.sideNone + "訊號"}</text>);
-  if (showLab) want.forEach(([s, col, cls, cands]) => {
+  if (showLab) want.forEach(([s, col, cls, cands, lt]) => {
     const w = tw(s);
     let best = null;
     for (const [x, y, anchor] of cands) {
@@ -606,7 +611,7 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top, rolls }) {
       if (o === 0) break;
     }
     placed.push(best[3]);
-    tlab.push(<text key={"tlb" + tlab.length} className={cls} x={best[0]} y={best[1]} textAnchor="start" style={{ fill: col }} data-ov={best[2] ? Math.round(best[2]) : undefined}>{s}</text>);
+    tlab.push(<text key={"tlb" + tlab.length} className={cls + " mk-lab"} {...lt} x={best[0]} y={best[1]} textAnchor="start" style={{ fill: col }} data-ov={best[2] ? Math.round(best[2]) : undefined}>{s}</text>);
   });
   els.push(...rkEls, ...islEls, ...unfEls, ...tlab);  // 右側標籤避讓（由上到下排、不重疊、不超出價格區）；圖外的價位貼邊、加 ↑／↓
   for (const z of lab) {
@@ -625,7 +630,7 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top, rolls }) {
   lab.forEach((z, k) => {
     const ty = ys[k];
     els.push(<line key={"lk" + k} x1={xr} x2={xr + 7} y1={z.y} y2={ty} stroke={z.col} strokeWidth="1" strokeOpacity=".6" />);
-    els.push(<text key={"lt" + k} className="srl" x={xr + 10} y={ty + 4} style={{ fill: z.col }}>{z.t}</text>);
+    els.push(<text key={"lt" + k} className={"srl" + (z.tip ? " mk-lab" : "")} {...z.tip} x={xr + 10} y={ty + 4} style={{ fill: z.col }}>{z.t}</text>);
     if (z.nt) els.push(<text key={"ln" + k} className="srn" x={xr + 10} y={ty + 17}>{z.nt}</text>);
   });
   const lc = bars[n - 1].c;
@@ -1084,7 +1089,7 @@ function withTrade(d, p0) {
     { key: "link", label: "進→出", desc: "細虛線連進場與出場：這筆賺錢紅、賠錢綠" },
     { key: "island", label: "島狀反轉", desc: "金色虛線框＝懸空的那幾根 K，框上方標頂部島狀反轉、框下方標底部島狀反轉" },
     { key: "open", label: "持倉中", desc: "還沒出場的線延伸到右緣，右側標進場價與停損價" },
-    { key: "tip", label: "滑過記號", desc: "滑鼠停在三角或 ✕ 上（手機點一下）會列出這筆進出場每個條件的實際數值" },
+    { key: "tip", label: "滑過記號", desc: "滑鼠停在三角、✕ 或旁邊的字上（含右側持倉中的進場／停損標籤；手機點一下）會列出這筆進出場每個條件的實際數值；停損出場另列停損怎麼來的" },
   ].filter(Boolean);
   return {
     ...d,
@@ -1271,7 +1276,7 @@ const pc1 = (x) => (x === null || x === undefined || !Number.isFinite(Number(x))
 const yi = (m) => (Number.isFinite(Number(m)) ? (m / 100).toFixed(2) : "—");   // 百萬 → 億
 const mdd = (s) => String(s || "").slice(5).replace("-", "/");
 const RS_PRE = [["1w", "近 1 週"], ["1m", "近 1 月"], ["3m", "近 3 月"], ["ytd", "今年以來"]];
-const RS_NOTE = "相對大盤＝區間報酬 − 加權報酬指數同期報酬；股價已還原除權息與減資；族群＝台股報告 v6 分類，成分股等權平均。";
+const RS_NOTE = "相對大盤＝區間報酬 − 加權報酬指數同期報酬；股價已還原除權息與減資；族群＝台股報告現行 v6 分類回頭套用，生技、資訊服務這類近期才成群的族群，在過去區間的強弱帶有事後歸類的成分；成分股等權平均。";
 function rsCols(onCode, rank) {
   const c = [
     { label: "代號", render: (x) => <button type="button" className="ta-link mono" title="看 K 線" onClick={(e) => { e.stopPropagation(); onCode(x.code); }}>{x.code}</button>, sort: (x) => x.code },
@@ -1475,6 +1480,7 @@ export default function TaPage() {
       if (gate(j)) return;
       setMsg(j.error || "讀取失敗"); setPhase("error"); return;
     }
+    if (typeof j.token === "string" && j.token) { tok.current = j.token; lsSet(TOK_KEY, j.token); }   // 伺服器換發的長效票（只能用在 /ta）；密碼從不存
     setOwner(!!j.owner); setQuota(j.quota || null); setWm(j.wm || ""); setPhase("app");
     const h = readHash();
     if (h.s) load(h.s, TFS.some(([k]) => k === h.tf) ? h.tf : "D");
@@ -1581,6 +1587,7 @@ export default function TaPage() {
               <input id="ta-in" type="search" className="ta-q" placeholder="2330、00878、NVDA、NQ1!、台指期" value={q}
                 onChange={(e) => setQ(e.target.value)} autoComplete="off" spellCheck={false} enterKeyHint="search"
                 role="combobox" aria-expanded={dd !== null && !q && recent.length > 0} aria-controls="ta-dd"
+                aria-activedescendant={dd !== null && dd >= 0 && !q && dd < recent.length ? "ta-dd-" + dd : undefined}
                 onFocus={() => setDd(-1)} onClick={() => setDd((x) => (x === null ? -1 : x))} onBlur={() => setDd(null)} onKeyDown={ddKey} />
               <button type="submit" className="ta-btn ta-go" disabled={busy || !q.trim()}>查</button>
               {dd !== null && !q && recent.length ? <RecentDrop items={recent} hi={dd} cur={symInfo.code || sym} onPick={pickRecent}
