@@ -1,5 +1,10 @@
 import { authOf, owners, store } from '../../../lib/ta-live';
-import { load, compute, presetStart, range } from '../../../lib/ta-rs';
+import { load, loaded, compute, presetStart, range } from '../../../lib/ta-rs';
+import { get } from '../../../lib/data-blob';
+import { latestPath, partPath, assemble } from '../../../lib/data-parts';
+import { gunzipSync } from 'zlib';
+
+const NAME = 'tw_rs_panel';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,12 +18,32 @@ function R(data, status) {
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-// shortcut: 正式環境的資料來源待 Yoda 決定（Blob 上傳 or 進 repo 的檔），決定前正式站一律回 503；本機用 TA_RS_LOCAL_FILE 指到 tw_rs_panel.json.gz
+// 資料來源（2026-11-13 Yoda 定）：私有 Blob，本機每天 python tw_rs_export.py --upload 分段上傳（見 lib/data-parts.js）。
+//   讀 data/tw_rs_panel/latest.json（最多每 10 分鐘回源看一次）→ 版本變了才下載各段、接起來驗 sha256、解 gzip。
+//   回 panel；null＝還沒有 latest.json；'updating'＝段跟 latest 對不上（不快取，下一個請求重看 latest）
+//   本機另可用 TA_RS_LOCAL_FILE 直接指到 tw_rs_panel.json.gz（正式站不看）
+const LATEST_MS = 10 * 60 * 1000;
+let LATEST = { t: 0, meta: null };
 async function panel() {
   const f = process.env.NODE_ENV !== 'production' && process.env.TA_RS_LOCAL_FILE;
-  if (!f) return null;
-  const fs = await import('fs'), { gunzipSync } = await import('zlib');
-  return load(f + '|' + fs.statSync(f).mtimeMs, () => gunzipSync(fs.readFileSync(f)).toString('utf8'));
+  if (f) {
+    const fs = await import('fs');
+    return load(f + '|' + fs.statSync(f).mtimeMs, () => gunzipSync(fs.readFileSync(f)).toString('utf8'));
+  }
+  if (!LATEST.t || Date.now() - LATEST.t > LATEST_MS) {
+    const r = await get(latestPath(NAME), { access: 'private', useCache: false });
+    LATEST = { t: r ? Date.now() : 0, meta: r ? JSON.parse(await new Response(r.stream).text()) : null };   // 沒有 latest 不快取：第一次上傳後馬上看得到
+  }
+  const m = LATEST.meta;
+  if (!m) return null;
+  if (loaded(m.ver)) return load(m.ver, () => '');
+  const bufs = await Promise.all(Array.from({ length: m.parts }, async (_, i) => {
+    const r = await get(partPath(NAME, m.ver, i), { access: 'private' });   // 段路徑帶版本、不覆寫＝可以吃 CDN 快取
+    return r ? Buffer.from(await new Response(r.stream).arrayBuffer()) : Buffer.alloc(0);
+  }));
+  const gz = assemble(bufs, m.sha256);
+  if (!gz) { LATEST = { t: 0, meta: null }; return 'updating'; }
+  return load(m.ver, () => gunzipSync(gz).toString('utf8'));
 }
 
 export async function POST(req) {
@@ -41,6 +66,7 @@ export async function POST(req) {
 
     const pn = await panel();
     if (!pn) return R({ ok: false, reason: 'no-source', error: '資料來源尚未設定' }, 503);
+    if (pn === 'updating') return R({ ok: false, reason: 'updating', error: '資料更新中' }, 503);
     const rg = range(pn);
     const end = b.end || rg.max;
     const start = b.start || presetStart(end, '1m');
