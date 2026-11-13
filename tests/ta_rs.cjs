@@ -174,6 +174,23 @@ step("路由：latest 換到壞版（sha256 不對／schema 不符）而記憶�
     } finally { Date.now = now; }
   }
 });
+step("路由：新版下載段時 Blob 丟錯 → 記憶體有舊面板就回舊的；沒有才 500；修好後下一個請求就載到新版（不留卡住的 INFLIGHT）", async () => {
+  const files = blobOf("us_rs_panel", U, "20260109"), rt = route(files, []), Q = { market: "us", start: "2026-01-06", end: "2026-01-07" };
+  assert.strictEqual((await ask(rt, Q)).j.through, "2026-01-09");
+  const nf = blobOf("us_rs_panel", Object.assign({}, U, { through: "20260110" }), "20260110"), k = Object.keys(nf).find((p) => p.endsWith("part1.bin")), good = nf[k];
+  nf[k] = new Error("Blob 503"); Object.assign(files, nf);
+  const now = Date.now;
+  try {
+    Date.now = () => now() + 11 * 60 * 1000;
+    const r = await ask(rt, Q);
+    assert.strictEqual(r.status, 200, JSON.stringify(r.j)); assert.strictEqual(r.j.through, "2026-01-09");
+    const cold = route(files, []);
+    assert.strictEqual((await ask(cold, Q)).status, 500);
+    files[k] = good;
+    const a = await ask(rt, Q), b = await ask(cold, Q);
+    assert.strictEqual(a.j.through, "2026-01-10", JSON.stringify(a.j)); assert.strictEqual(b.j.through, "2026-01-10", JSON.stringify(b.j));
+  } finally { Date.now = now; }
+});
 
 const US_REAL ="G:\\Yoda x Claude\\Skill\\data\\us_rs\\us_rs_panel.json.gz";
 if (!fs.existsSync(US_REAL)) console.log("skip 美股真面板不在：", US_REAL);
