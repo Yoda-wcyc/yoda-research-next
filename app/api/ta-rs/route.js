@@ -1,5 +1,5 @@
 import { authOf, owners, store } from '../../../lib/ta-live';
-import { load, loaded, compute, presetStart, range } from '../../../lib/ta-rs';
+import { load, loaded, compute, presetStart, range, nameMap } from '../../../lib/ta-rs';
 import { get } from '../../../lib/data-blob';
 import { latestPath, partPath, assemble } from '../../../lib/data-parts';
 import { gunzipSync } from 'zlib';
@@ -90,9 +90,7 @@ export async function POST(req) {
     if (b.op === 'names') {   // 查代號下拉顯示台股中文名（11-14）：台股面板的代號 → 名稱；記憶體已有面板就不重讀 Blob
       const tw = await panel('tw');
       if (!tw || tw === 'updating') return R({ ok: false, reason: tw ? 'updating' : 'no-source', error: tw ? '資料更新中' : '資料來源尚未設定' }, 503);
-      const names = {};
-      tw.codes.forEach((c, i) => { if (typeof tw.names[i] === 'string' && tw.names[i]) names[c] = tw.names[i]; });
-      return R({ ok: true, names });
+      return R({ ok: true, names: nameMap(tw) });
     }
     const mk = b.market === undefined ? 'tw' : b.market;
     if (!Object.prototype.hasOwnProperty.call(MKT, mk)) return R({ ok: false, reason: 'bad-input', error: '市場要是 tw 或 us' }, 400);

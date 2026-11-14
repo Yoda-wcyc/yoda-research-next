@@ -69,6 +69,8 @@ function mktBadge(s) {
 const TWF_ONLY_TXT = "期交所只有日資料";
 // 輸入框下拉的最近查過（11-13，取代左欄底部清單）：整塊 onMouseDown 擋掉，輸入框才不會先 blur 把清單收掉
 // 台股（數字開頭的代號）名稱改用 zh（台股面板的中文名，/api/ta-rs op:names）；面板沒有的（ETF 等）只顯示代號，不用引擎的英文名
+// 標題列（11-14）：台股有 zh 中文名就用，沒有照舊用引擎回的名稱；美股、期貨不變
+const titleName = (s, code, zh) => (s.market === "tw" && zh && typeof zh[code] === "string" && zh[code] ? zh[code] : s.name || "");
 const recentName = (r, zh) => (/^\d/.test(r.s) ? (zh && typeof zh[r.s] === "string" ? zh[r.s] : "") : r.n);
 function RecentDrop({ items, hi, cur, onPick, onClear, zh }) {
   return (
@@ -1540,7 +1542,7 @@ export default function TaPage() {
     return () => document.removeEventListener("visibilitychange", f);
   }, [phase, gate]);
 
-  useEffect(() => {   // 下拉的台股中文名：清單裡有台股才抓一次；失敗（沒登入、網路、Blob 沒資料）就只顯示代號，下次清單變了再試；不走 gate，不影響查圖
+  useEffect(() => {   // 下拉與標題列的台股中文名：清單裡有台股才抓一次（查到新台股會進清單＝也會觸發）；失敗（沒登入、網路、Blob 沒資料）就只顯示代號，下次清單變了再試；不走 gate，不影響查圖
     if (phase !== "app" || zh || zhAsk.current || !recent.some((r) => /^\d/.test(r.s))) return;
     zhAsk.current = true;
     call("/api/ta-rs", { op: "names" }).then((j) => {
@@ -1720,7 +1722,7 @@ export default function TaPage() {
               <Boundary reset={bkey}>
               <div className="ta-one" data-sym={symInfo.yahoo}>
                 <div className="ta-ch">
-                  <h2><span className="mono">{symInfo.code || sym}</span>{symInfo.name || ""}</h2>
+                  <h2><span className="mono">{symInfo.code || sym}</span>{titleName(symInfo, symInfo.code || sym, zh)}</h2>
                   <span className="ta-px mono">{fnum(lastB && lastB.c)} <span className={ud(chg)}>{fpct(chg)}</span></span>
                   <span className="ta-chip asof">{TF_ZH[d.tf]}・最後定案 {d.asof || "—"}</span>
                   {unfB ? <span className="ta-chip warn">{d.unfinished_label || "盤中未定"} {fnum(unfB.c)}</span> : null}

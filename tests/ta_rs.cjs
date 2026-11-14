@@ -6,7 +6,7 @@ const { transformSync } = require(path.join(ROOT, "node_modules", "next", "dist"
 const code = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-rs.js"), "utf8"), { jsc: { parser: { syntax: "ecmascript" }, target: "es2020" }, module: { type: "commonjs" } }).code;
 const m = { exports: {} };
 new Function("module", "exports", "require", code)(m, m.exports, require);
-const { load, compute, snap, range, presetStart } = m.exports;
+const { load, compute, snap, range, presetStart, nameMap } = m.exports;
 
 let fails = 0;
 function t(name, fn) { try { fn(); console.log("ok  ", name); } catch (e) { fails++; console.log("FAIL", name, "→", e && e.message); } }
@@ -139,6 +139,16 @@ step("路由：op:'names' 回台股代號 → 中文名（不管 market／門檻
   assert.strictEqual(calls.filter((p) => p.endsWith("part0.bin")).length, 1, calls.join(","));
   const none = await ask(route({}, []), { op: "names" });
   assert.strictEqual(none.status, 503); assert.strictEqual(none.j.reason, "no-source");
+});
+step("路由：op:'names' 併入面板的 xnames（面板外 ETF）、同代號面板 names 優先、壞值略過；舊面板沒 xnames 照常", async () => {
+  const X = Object.assign({}, P, { xnames: { "0050": "元大台灣50", "00878": "國泰永續高股息", 1101: "別名", "00679B": "", 9105: 3 } });
+  const a = await ask(route(blobOf("tw_rs_panel", X, "20260109"), []), { op: "names" });
+  assert.strictEqual(a.status, 200, JSON.stringify(a.j));
+  assert.deepStrictEqual(a.j.names, { "0050": "元大台灣50", "00878": "國泰永續高股息", 1101: "甲", 1102: "乙", 1103: "丙", 1104: "丁", 1105: "戊" });
+  for (const xn of [null, [], "x"]) assert.deepStrictEqual(nameMap(Object.assign({}, P, { xnames: xn })), nameMap(P));
+  assert.deepStrictEqual(Object.keys(nameMap(P)), P.codes);
+  const r = await ask(route(blobOf("tw_rs_panel", X, "20260109"), []), { start: "2026-01-06", end: "2026-01-09" });   // 多一欄不影響區間強弱
+  assert.strictEqual(r.status, 200, JSON.stringify(r.j));
 });
 step("路由：market／minAmt 驗證", async () => {
   const rt = route({}, []);

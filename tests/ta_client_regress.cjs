@@ -120,7 +120,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   const opts = { jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "classic" } }, target: "es2020" }, module: { type: "commonjs" } };
   const src = 'const React = require("react");\n' + fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8")
     .replace('"../../lib/ta-trade"', JSON.stringify(path.join(ROOT, "lib", "ta-trade.js").replace(/\\/g, "/")))
-    .replace('"../../lib/ta-rs"', JSON.stringify(path.join(ROOT, "lib", "ta-rs.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, pastHalf };\n";
+    .replace('"../../lib/ta-rs"', JSON.stringify(path.join(ROOT, "lib", "ta-rs.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, pastHalf, titleName };\n";
   const Mod = require("module");
   const libSrc = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-trade.js"), "utf8"), opts).code;
   const lib = new Mod(path.join(ROOT, "lib", "ta-trade.js")); lib.paths = Mod._nodeModulePaths(ROOT); lib._compile(libSrc, lib.id);
@@ -167,6 +167,17 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
       const h = renderToString(P.RecentDrop({ items, hi: 0, cur: "", onPick: () => {}, onClear: () => {}, zh }));
       assert.ok(h.includes(">2330<") && h.includes("NVIDIA Corporation") && !h.includes("Taiwan Semiconductor"), h);
     }
+  });
+  await t("標題列名稱（11-14）：台股有 zh 用中文名，沒有退回引擎名；美股、期貨不吃 zh；zh 沒拿到／壞值不崩", async () => {
+    const zh = { 2330: "台積電", "0050": "元大台灣50", NVDA: "亂入", TXF1: "亂入", 2317: { x: 1 } };
+    assert.strictEqual(P.titleName({ market: "tw", name: "TSMC" }, "2330", zh), "台積電");
+    assert.strictEqual(P.titleName({ market: "tw", name: "Yuanta 50" }, "0050", zh), "元大台灣50");
+    assert.strictEqual(P.titleName({ market: "tw", name: "Hon Hai" }, "2317", zh), "Hon Hai");
+    assert.strictEqual(P.titleName({ market: "tw", name: "X" }, "9999", zh), "X");
+    assert.strictEqual(P.titleName({ market: "us", name: "NVIDIA Corporation" }, "NVDA", zh), "NVIDIA Corporation");
+    assert.strictEqual(P.titleName({ market: "fut", name: "台指期" }, "TXF1", zh), "台指期");
+    for (const z of [null, undefined, {}]) assert.strictEqual(P.titleName({ market: "tw", name: "TSMC" }, "2330", z), "TSMC");
+    assert.strictEqual(P.titleName({}, "2330", zh), "");
   });
   // ⛔ 2026-11-13 Yoda 永久刪除，不准重建：輸入框下的代號說明（台股打數字代號…指數只收 ^SOX）＋左欄底部「最近查過」清單
   await t("⛔ 輸入框代號說明、左欄底部最近查過清單已永久刪除", async () => {
