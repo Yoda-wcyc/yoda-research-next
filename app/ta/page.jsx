@@ -520,7 +520,8 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top, rolls }) {
   // 記號：▲多進（紅大三角，K 低點下）／▼空進（綠大三角，K 高點上）、✕出場（同進場色）；旁邊標「多進 價格」「多出（或多停損） 價格 報酬%」（空單同理），原因滑過看。
   // 可見根數 > 250 只留圖形。標籤依序試幾個靠近記號的位置（原位→記號左右→另一側→往外錯開），選第一個不撞任何字／記號的；
   // 都撞就選重疊最少的。標籤夾在價格區內（右緣不超過 xr，不會蓋到右側撐壓標籤）
-  const showLab = n <= 250, tlab = [], want = [];
+  // ✕ 先畫、▲▼ 後畫（entMk 最後才放進 els），出場隔一兩根就碰到下一筆進場時 ✕ 不會蓋掉三角
+  const showLab = n <= 250, tlab = [], want = [], entMk = [];
   marks.forEach((m) => {
     const li = m.i - a, bb = bars[li], x = X(li);
     const t = m.kind === "entry" ? byEntry.get(m.i) : byExit.get(m.i);
@@ -530,31 +531,35 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top, rolls }) {
       onBlur: () => onTip && onTip(null), tabIndex: 0, role: "button",
       "aria-label": (t.side === 1 ? "多單" : "空單") + (m.kind === "entry" ? "進場 " + t.entry_t : "出場 " + t.exit_t) };
     // 旁邊的字（多進 價格／原因 價格 報酬%）滑過也出同一個說明；不另給 tabIndex（鍵盤焦點留在記號上，免得一筆聚焦兩次）
-    const lt = { "data-tip": m.kind, onMouseEnter: hit.onMouseEnter, onMouseLeave: hit.onMouseLeave, onClick: hit.onClick, "aria-hidden": "true" };
+    const lt = { "data-tip": m.kind, "data-i": m.i, onMouseEnter: hit.onMouseEnter, onMouseLeave: hit.onMouseLeave, onClick: hit.onClick, "aria-hidden": "true" };
     if (m.kind === "entry") {
       const s = t.side, y = s === 1 ? Y(bb.l) + 5 : Y(bb.h) - 5, col = s === 1 ? K_UP : K_DN;
-      els.push(<g key={"me" + m.i} className="mk-hit" {...hit}>
+      entMk.push(<g key={"me" + m.i} className="mk-hit" {...hit}>
         <circle cx={x} cy={y + s * 7} r="12" fill="transparent" />
         <path className="mk-entry" d={`M${x.toFixed(1)} ${y.toFixed(1)} l-7 ${s * 12} h14 z`} fill={col} stroke="#0b0f15" strokeWidth="1" />
       </g>);
       placed.push([x - 7, Math.min(y, y + s * 12), x + 7, Math.max(y, y + s * 12)]);
       const y0 = s === 1 ? y + 26 : y - 16, ym = y + s * 6 + 4;
       want.push([(s === 1 ? "多進 " : "空進 ") + fpx(t.entry), col, "te", [[x, y0, "middle"], [x + 10, ym, "start"], [x - 10, ym, "end"],
-        [x, y0 + s * 13, "middle"], [x + 10, ym + s * 13, "start"], [x - 10, ym + s * 13, "end"], [x, y0 + s * 26, "middle"], [x, y0 + s * 39, "middle"]], lt]);
+        [x, y0 + s * 13, "middle"], [x + 10, ym + s * 13, "start"], [x - 10, ym + s * 13, "end"], [x, y0 + s * 26, "middle"], [x, y0 + s * 39, "middle"]], lt, t, x, y + s * 7]);
     } else {
       const col = sideCol(t.side), y = Y(m.px); // ✕ 和字都用這筆的進場色，一眼對回它的多進／空進
+      // ✕ 縮回 10px、描邊 2.4（墊底 4.5）：加大版會蓋到隔壁 K 的 ▲
       els.push(<g key={"mx" + m.i} className="mk-hit" {...hit}>
         <circle cx={x} cy={y} r="11" fill="transparent" />
-        <path className="mk-exit-bg" d={`M${(x - 6).toFixed(1)} ${(y - 6).toFixed(1)}l12 12m0 -12l-12 12`} stroke="#0b0f15" strokeWidth="6" strokeLinecap="round" />
-        <path className="mk-exit" d={`M${(x - 6).toFixed(1)} ${(y - 6).toFixed(1)}l12 12m0 -12l-12 12`} stroke={col} strokeWidth="3" strokeLinecap="round" />
+        <path className="mk-exit-bg" d={`M${(x - 5).toFixed(1)} ${(y - 5).toFixed(1)}l10 10m0 -10l-10 10`} stroke="#0b0f15" strokeWidth="4.5" strokeLinecap="round" />
+        <path className="mk-exit" d={`M${(x - 5).toFixed(1)} ${(y - 5).toFixed(1)}l10 10m0 -10l-10 10`} stroke={col} strokeWidth="2.4" strokeLinecap="round" />
       </g>);
       placed.push([x - 6, y - 6, x + 6, y + 6]);
       const dy = t.side === 1 ? 13 : -13, yb = y + (t.side === 1 ? 16 : -9), yo = y + (t.side === 1 ? -9 : 16);
-      want.push([(t.side === 1 ? "多" : "空") + (m.tone === "stop" ? "停損 " : "出 ") + fpx(t.exit_px) + " " + fpc(t.pct), col, "tx", [[x + 9, yb, "start"], [x - 9, yb, "end"],
+      const sd = t.side === 1 ? "多" : "空", stop = m.tone === "stop";
+      want.push([sd + (stop ? "停損 " : "出 ") + fpx(t.exit_px) + " " + fpc(t.pct), col, "tx", [[x + 9, yb, "start"], [x - 9, yb, "end"],
         [x + 10, y + 4, "start"], [x - 10, y + 4, "end"], [x + 9, yo, "start"], [x - 9, yo, "end"],
-        [x + 9, yb + dy, "start"], [x - 9, yb + dy, "end"], [x + 9, yb + 2 * dy, "start"], [x - 9, yb + 2 * dy, "end"], [x + 9, yb + 3 * dy, "start"]], lt]);
+        [x + 9, yb + dy, "start"], [x - 9, yb + dy, "end"], [x + 9, yb + 2 * dy, "start"], [x - 9, yb + 2 * dy, "end"], [x + 9, yb + 3 * dy, "start"]], lt, t, x, y,
+        sd + (stop ? "停損 " : " ") + fpx(t.entry) + "→" + fpx(t.exit_px) + " " + fpc(t.pct)]);   // 跟進場字合併時用
     }
   });
+  els.push(...entMk);
   // 前五大量編號：相鄰幾根都上榜、或碰到 ▲▼✕ 時往上錯開，不疊在一起（量區的編號同樣錯開）
   const rkEls = [];
   for (const [i, x, h, v, rk] of rkAt) {
@@ -616,19 +621,43 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top, rolls }) {
   }
   els.push(...kels);   // 圖上直接寫線的名字（不用點開圖例；位置上面已佔好）
   if (trd.sideLabel && !marks.length) els.push(<text key="sidenone" className="ckey" data-side-empty="" x={xr - 6} y={T + 13} textAnchor="end" style={{ fill: "#ffffff" }}>{"區間內沒有" + trd.sideNone + "訊號"}</text>);
-  if (showLab) want.forEach(([s, col, cls, cands, lt]) => {
-    const w = tw(s);
-    let best = null;
-    for (const [x, y, anchor] of cands) {
-      const x0 = Math.min(xr - 2 - w, Math.max(L + 2, anchor === "middle" ? x - w / 2 : anchor === "end" ? x - w : x));
-      const yy = Math.min(T + PH - 2, Math.max(T + 12, y)), bx = [x0, yy - 12, x0 + w, yy + 4], o = hitArea(bx);
-      if (!best || o < best[2]) best = [x0, yy, o, bx];
-      if (o === 0) break;
+  // 同一筆的出場字若貼到（8px 內）它的進場字、或進出只隔 ≤2 根：拿掉進場字（▲ 留著），出場處改寫一個「多 進價→出價 報酬%」（停損：「多停損 …」）
+  const near = (p, q, g) => p[0] < q[2] + g && p[2] > q[0] - g && p[1] < q[3] + g && p[3] > q[1] - g;
+  const ents = new Map(), labs = [];
+  if (showLab) want.forEach(([s0, col, cls0, cands, lt, t, mx, my, ms]) => {
+    const fit = (s) => {
+      const w = tw(s);
+      let best = null;
+      for (const [x, y, anchor] of cands) {
+        const x0 = Math.min(xr - 2 - w, Math.max(L + 2, anchor === "middle" ? x - w / 2 : anchor === "end" ? x - w : x));
+        const yy = Math.min(T + PH - 2, Math.max(T + 12, y)), bx = [x0, yy - 12, x0 + w, yy + 4], o = hitArea(bx);
+        if (!best || o < best[2]) best = [x0, yy, o, bx];
+        if (o === 0) break;
+      }
+      return best;
+    };
+    let s = s0, cls = cls0, best = fit(s);
+    const e = cls0 === "tx" ? ents.get(t.entry_i) : null;
+    if (e && !e.gone && (t.exit_i - t.entry_i <= 2 || near(best[3], e.bx, 8))) {
+      e.gone = true; placed[e.pi] = [-1e9, -1e9, -1e9, -1e9]; tlab[e.ti] = null;
+      s = ms; cls = "tx tm"; best = fit(s);
     }
+    const r = { bx: best[3], pi: placed.length, ti: tlab.length, mx, my, col };
+    if (cls0 === "te") ents.set(t.entry_i, r);
+    labs.push(r);
     placed.push(best[3]);
     tlab.push(<text key={"tlb" + tlab.length} className={cls + " mk-lab"} {...lt} x={best[0]} y={best[1]} textAnchor="start" style={{ fill: col }} data-ov={best[2] ? Math.round(best[2]) : undefined}>{s}</text>);
   });
-  els.push(...rkEls, ...islEls, ...unfEls, ...tlab);  // 右側標籤避讓（由上到下排、不重疊、不超出價格區）；圖外的價位貼邊、加 ↑／↓
+  // 字被擠到離記號 >20px：畫 1px 同色細引線，從字框最近的點連到記號（停在記號外 8px，不蓋到記號）
+  const leads = [];
+  for (const { bx, mx, my, col, gone } of labs) {
+    if (gone) continue;
+    const px = Math.min(bx[2], Math.max(bx[0], mx)), py = Math.min(bx[3], Math.max(bx[1], my)), dd = Math.hypot(mx - px, my - py);
+    if (dd <= 20) continue;
+    const f = (dd - 8) / dd;
+    leads.push(<line key={"ld" + leads.length} className="mk-lead" x1={px} y1={py} x2={px + (mx - px) * f} y2={py + (my - py) * f} stroke={col} strokeWidth="1" />);
+  }
+  els.push(...rkEls, ...islEls, ...unfEls, ...leads, ...tlab);  // 右側標籤避讓（由上到下排、不重疊、不超出價格區）；圖外的價位貼邊、加 ↑／↓
   for (const z of lab) {
     if (z.y < T) { z.y = T; z.t = "↑" + z.t; }
     else if (z.y > T + PH) { z.y = T + PH; z.t = "↓" + z.t; }
@@ -1100,7 +1129,7 @@ function withTrade(d, p0) {
     exLab ? { key: "exit_ma", label: exLab, desc: "收盤跌破（空單站上）就整筆出場" + (p.exit_delay ? "；進場後第 " + (p.exit_delay + 1) + " 根起才看" : "") } : null,
     { key: "entry", label: "多進／空進", desc: "紅色大三角多進、綠色大三角空進，旁邊標進場價：" + rt.entry },
     { key: "stop", label: "停損", desc: "紅虛線：" + rt.stop },
-    { key: "exit", label: "✕ 出場", desc: "整筆出場，✕ 和旁邊的字跟它那筆進場同色（多單紅、空單綠），寫「多出／空出 出場價 這筆報酬%」，停損出場寫「多停損／空停損」；原因（破N線／爆量反K／到期）滑過記號或字看；畫面超過 250 根時只留記號、不寫字" },
+    { key: "exit", label: "✕ 出場", desc: "整筆出場，✕ 和旁邊的字跟它那筆進場同色（多單紅、空單綠），寫「多出／空出 出場價 這筆報酬%」，停損出場寫「多停損／空停損」；進出只隔一兩根（兩串字會黏在一起）時併成一串寫在 ✕ 旁：「多 進場價→出場價 報酬%」（停損「多停損 進場價→出場價 報酬%」），三角旁不再寫字；字被擠遠時有一條細線連回記號；原因（破N線／爆量反K／到期）滑過記號或字看；畫面超過 250 根時只留記號、不寫字" },
     { key: "link", label: "進→出", desc: "每筆一條實線從進場三角連到它的 ✕，顏色跟進場同色（多單紅、空單綠）；賺賠看 ✕ 旁的報酬%；還沒出場的持倉不畫" },
     { key: "island", label: "島狀反轉", desc: "金色虛線框＝懸空的那幾根 K，框上方標頂部島狀反轉、框下方標底部島狀反轉" },
     { key: "open", label: "持倉中", desc: "還沒出場的線延伸到右緣，右側標進場價與停損價" },

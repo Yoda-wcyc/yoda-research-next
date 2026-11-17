@@ -344,7 +344,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     walk(el);
     const col = (s) => (s === 1 ? "#e0525e" : "#3fae7a"), txt = (x) => [].concat(x.props.children).join("");
     const tx = flat.filter((x) => x.type === "text" && /\btx\b/.test(x.props.className || ""));
-    assert.ok(tx.length > 0 && tx.every((x) => /^(多出|空出|多停損|空停損) /.test(txt(x))), tx.map(txt).join("|"));
+    assert.ok(tx.length > 0 && tx.every((x) => /^(多出|空出|多停損|空停損) |^(多|空)(停損)? [\d.,]+→/.test(txt(x))), tx.map(txt).join("|"));
     assert.ok(!tx.some((x) => /^(出場|停損) /.test(txt(x))), "還有舊的「出場／停損」字");
     assert.ok(tx.some((x) => txt(x)[0] === "多") && tx.some((x) => txt(x)[0] === "空"), "測資要有多單也有空單");
     const links = flat.filter((x) => x.type === "line" && x.props.className === "trlink");
@@ -358,6 +358,70 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
       const f2 = []; (function wk(x) { if (Array.isArray(x)) x.forEach(wk); else if (x && x.props) { f2.push(x); wk(x.props.children); } })(P.KChart({ d: w2, full, smas: [], a: 0, b: full.bars.length, gaps: [], islands: [], top: [], rolls: [] }));
       assert.strictEqual(f2.filter((x) => x.type === "line" && x.props.className === "trlink").length, tr.length - 1, "持倉中不該畫連線");
     }
+  });
+  await t("出場記號／字／連線（11-17 第三版）：多單賠、空單賺、停損都用進場色；連線兩端＝▲▼ 中心與 ✕ 中心；隔 ≤2 根併成一串；擠遠有引線", async () => {
+    const d = mkD({}), c = d.history.c, WS = "停損";
+    const mkT = (side, ei, xi, why) => ({ side, entry_i: ei, exit_i: xi, entry: c[ei], exit_px: c[xi], stop: c[ei] * (1 - 0.05 * side), entry_t: "e" + ei, exit_t: "x" + xi,
+      pct: ((c[xi] / c[ei] - 1) * 100) * side, pts: (c[xi] - c[ei]) * side, why, label: why });
+    const TR = [mkT(1, 5, 15, "破均線"), mkT(-1, 17, 24, "破均線"), mkT(-1, 31, 33, WS), mkT(1, 38, 47, WS), mkT(1, 49, 50, "破均線")];
+    assert.ok(TR[0].pct < 0 && TR[1].pct > 0, "測資要有多單賠、空單賺");
+    const base = { trades: TR, open: null };
+    const w = { ...d, trade: { ...base, ...lib3.chartMarks(base, 0), p: {} } };
+    const full = P.fullSeries(w);
+    const flat = [], walk = (x) => { if (Array.isArray(x)) x.forEach(walk); else if (x && x.props) { flat.push(x); walk(x.props.children); } };
+    walk(P.KChart({ d: w, full, smas: [], a: 0, b: full.bars.length, gaps: [], islands: [], top: [], rolls: [] }));
+    const col = (s) => (s === 1 ? "#e0525e" : "#3fae7a"), txt = (x) => [].concat(x.props.children).join("");
+    const kid = (k, cls) => { const g = flat.find((x) => x.key === k); assert.ok(g, "找不到 " + k); return [].concat(g.props.children).find((x) => x && x.props && x.props.className === cls); };
+    const M = (dd) => dd.match(/^M\s*([-\d.]+)\s+([-\d.]+)/).slice(1).map(Number);
+    const lab = (cls, i) => flat.filter((x) => x.type === "text" && new RegExp("\\b" + cls + "\\b").test(x.props.className || "") && x.props["data-i"] === i);
+    for (const tr of TR) {
+      const s = tr.side, C = col(s), nm = JSON.stringify([tr.entry_i, tr.exit_i]);
+      // ✕：進場色（不是賺賠色、不是白）
+      const xp = kid("mx" + tr.exit_i, "mk-exit");
+      assert.strictEqual(xp.props.stroke, C, "✕ 顏色 " + nm);
+      // 連線：進場色實線，起點＝三角中心（尖端往內 7px）、終點＝✕ 中心
+      const ln = flat.find((x) => x.key === "trk" + tr.entry_i), [ex, ey] = M(kid("me" + tr.entry_i, "mk-entry").props.d), [xx, xy] = M(xp.props.d);
+      assert.ok(ln && ln.props.stroke === C && !ln.props.strokeDasharray, "連線顏色 " + nm);
+      const close = (u, v) => Math.abs(u - v) < 0.11;
+      assert.ok(close(ln.props.x1, ex) && close(ln.props.y1, ey + s * 7), "連線起點≠三角中心 " + nm + JSON.stringify([ln.props.x1, ln.props.y1, ex, ey]));
+      assert.ok(close(ln.props.x2, xx + 5) && close(ln.props.y2, xy + 5), "連線終點≠✕ 中心 " + nm + JSON.stringify([ln.props.x2, ln.props.y2, xx + 5, xy + 5]));
+      // 字：停損寫多停損／空停損；隔 ≤2 根併成一串（進場處不寫字）；其他分開寫多進／多出
+      const te = lab("te", tr.entry_i), tx = lab("tx", tr.exit_i), sd = s === 1 ? "多" : "空";
+      assert.strictEqual(tx.length, 1, "出場字 " + nm);
+      const T0 = txt(tx[0]);
+      assert.strictEqual(tx[0].props.style.fill, C, "出場字顏色 " + nm);
+      if (tr.why === WS) assert.ok(T0.startsWith(sd + "停損 "), "停損字樣 " + T0);
+      if (tr.exit_i - tr.entry_i <= 2) {
+        assert.strictEqual(te.length, 0, "隔 ≤2 根不該另寫進場字 " + nm);
+        assert.ok(new RegExp("^" + sd + (tr.why === WS ? "停損" : "") + " [\\d.,]+→[\\d.,]+ [-−+]?[\\d.]+%$").test(T0) && /\btm\b/.test(tx[0].props.className), "合併標籤 " + T0);
+      } else {
+        assert.strictEqual(te.length, 1, "分開時要有進場字 " + nm);
+        assert.ok(txt(te[0]).startsWith(sd + "進 ") && !T0.includes("→"), "分開標籤 " + T0);
+        if (tr.why !== WS) assert.ok(T0.startsWith(sd + "出 "), "出場字樣 " + T0);
+      }
+    }
+    assert.ok(!flat.some((x) => x.props.className === "mk-exit" && x.props.stroke === "#ffffff"), "✕ 不能是白色");
+    // ▲▼ 畫在 ✕ 後面（不被 ✕ 蓋住）
+    const order = flat.filter((x) => /^m[ex]\d/.test(String(x.key))).map((x) => x.key[1]);
+    assert.ok(order.lastIndexOf("x") < order.indexOf("e"), order.join(""));
+  });
+  await t("出場字被擠遠 >20px → 1px 同色引線從字連到記號；沒擠遠就不畫（11-17 第三版）", async () => {
+    const d = mkD({}), c = d.history.c;
+    // 連續幾筆空單在同一段、互相擠：字一定有被推遠的
+    const TR = [];
+    for (let i = 20; i < 58; i += 3) TR.push({ side: -1, entry_i: i, exit_i: i + 1, entry: c[i], exit_px: c[i + 1], stop: c[i] * 1.05, entry_t: "e", exit_t: "x", pct: 0.5, pts: 0.5, why: "破均線", label: "破均線" });
+    const base = { trades: TR, open: null }, w = { ...d, trade: { ...base, ...lib3.chartMarks(base, 0), p: {} } }, full = P.fullSeries(w);
+    const flat = [], walk = (x) => { if (Array.isArray(x)) x.forEach(walk); else if (x && x.props) { flat.push(x); walk(x.props.children); } };
+    walk(P.KChart({ d: w, full, smas: [], a: 0, b: full.bars.length, gaps: [], islands: [], top: [], rolls: [] }));
+    const leads = flat.filter((x) => x.type === "line" && x.props.className === "mk-lead");
+    assert.ok(leads.length > 0, "擠在一起卻沒有引線");
+    for (const L of leads) {
+      assert.ok(L.props.stroke === "#3fae7a" && L.props.strokeWidth === "1", JSON.stringify(L.props));
+      assert.ok(Math.hypot(L.props.x2 - L.props.x1, L.props.y2 - L.props.y1) > 12, "引線太短");
+    }
+    // 第一個測資（字都在原位附近）不畫引線
+    const flat0 = []; (function wk(x) { if (Array.isArray(x)) x.forEach(wk); else if (x && x.props) { flat0.push(x); wk(x.props.children); } })(P.KChart({ d: { ...d, trade: { trades: [TR[0]], open: null, ...lib3.chartMarks({ trades: [TR[0]], open: null }, 0), p: {} } }, full, smas: [], a: 0, b: full.bars.length, gaps: [], islands: [], top: [], rolls: [] }));
+    assert.strictEqual(flat0.filter((x) => x.props.className === "mk-lead").length, 0, "字沒被擠遠不該有引線");
   });
   await t("停損出場的說明多一列「停損由來」（沿用進場說明的寫法）；其他出場沒有", async () => {
     const res = { ctx: { O: [10, 10, 9], H: [11, 11, 10], L: [9, 9, 8], C: [10, 10, 8.5], T: ["a", "b", "c"], M: [[], [], []], XM: [], vr: [], atr: [1, 1, 1] } };
