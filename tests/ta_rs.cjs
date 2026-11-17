@@ -92,8 +92,8 @@ function esm(file, over) {
   new Function("module", "exports", "require", c)(mm, mm.exports, rq);
   return mm.exports;
 }
-function route(files, calls) {
-  const live = { authOf: () => ({ sub: "o" }), owners: () => ["o"], store: async () => ({ isOwner: async () => true, allowed: async () => true }) };
+function route(files, calls, sub = "o") {
+  const live = { authOf: () => (sub ? { sub } : null), owners: () => ["o"], store: async () => ({ isOwner: async () => true, allowed: async () => true }) };
   const get = async (p) => {
     calls.push(p);
     await new Promise((r) => setTimeout(r, 5));
@@ -149,6 +149,26 @@ step("路由：op:'names' 併入面板的 xnames（面板外 ETF）、同代號�
   assert.deepStrictEqual(Object.keys(nameMap(P)), P.codes);
   const r = await ask(route(blobOf("tw_rs_panel", X, "20260109"), []), { start: "2026-01-06", end: "2026-01-09" });   // 多一欄不影響區間強弱
   assert.strictEqual(r.status, 200, JSON.stringify(r.j));
+});
+step("路由：op:'tt' 回面板的 tt（台股／美股各自的面板、不帶整份面板）；舊面板沒 tt → 503 no-source；壞 market 400；未登入 401", async () => {
+  const TT = { day: "20260109", long: [{ code: "1101", name: "甲", group: "G1", close: 13, dhi: -1.5, dlo: 60.2, rs: 95, amt20: 1e8 }], short: [],
+    funnel_long: [{ code: "C1", solo: 3, left: 3 }], funnel_short: [], history: [{ d: "20260108", nl: 1, ns: 0, n: 4 }, { d: "20260109", nl: 1, ns: 0, n: 4 }] };
+  const UT = Object.assign({}, TT, { long: [{ code: "AAA", name: "A Inc", group: "科技", close: 1, dhi: 0, dlo: 50, rs: 99, amt20: 100 }] });
+  const files = Object.assign(blobOf("tw_rs_panel", Object.assign({}, P, { tt: TT }), "20260109"), blobOf("us_rs_panel", Object.assign({}, U, { tt: UT }), "20260109"));
+  const rt = route(files, []);
+  const a = await ask(rt, { op: "tt" });
+  assert.strictEqual(a.status, 200, JSON.stringify(a.j));
+  assert.deepStrictEqual(a.j, Object.assign({ ok: true, market: "tw" }, TT));   // 只有 tt 的欄位：沒有 px／dates 等整份面板
+  const u = await ask(rt, { op: "tt", market: "us" });
+  assert.strictEqual(u.status, 200); assert.strictEqual(u.j.market, "us"); assert.strictEqual(u.j.long[0].code, "AAA");
+  const old = await ask(route(blobOf("tw_rs_panel", P, "20260109"), []), { op: "tt" });
+  assert.strictEqual(old.status, 503); assert.strictEqual(old.j.reason, "no-source");
+  const none = await ask(route({}, []), { op: "tt", market: "us" });
+  assert.strictEqual(none.status, 503); assert.strictEqual(none.j.reason, "no-source");
+  const bad = await ask(rt, { op: "tt", market: "jp" });
+  assert.strictEqual(bad.status, 400); assert.strictEqual(bad.j.reason, "bad-input");
+  const calls = [], anon = await ask(route(files, calls, null), { op: "tt" });
+  assert.strictEqual(anon.status, 401); assert.strictEqual(anon.j.reason, "need-login"); assert.strictEqual(calls.length, 0, "未登入不該讀 Blob");
 });
 step("路由：market／minAmt 驗證", async () => {
   const rt = route({}, []);

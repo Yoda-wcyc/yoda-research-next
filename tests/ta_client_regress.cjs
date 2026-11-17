@@ -120,7 +120,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   const opts = { jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "classic" } }, target: "es2020" }, module: { type: "commonjs" } };
   const src = 'const React = require("react");\n' + fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8")
     .replace('"../../lib/ta-trade"', JSON.stringify(path.join(ROOT, "lib", "ta-trade.js").replace(/\\/g, "/")))
-    .replace('"../../lib/ta-rs"', JSON.stringify(path.join(ROOT, "lib", "ta-rs.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, pastHalf, titleName };\n";
+    .replace('"../../lib/ta-rs"', JSON.stringify(path.join(ROOT, "lib", "ta-rs.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName };\n";
   const Mod = require("module");
   const libSrc = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-trade.js"), "utf8"), opts).code;
   const lib = new Mod(path.join(ROOT, "lib", "ta-trade.js")); lib.paths = Mod._nodeModulePaths(ROOT); lib._compile(libSrc, lib.id);
@@ -499,6 +499,40 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     for (const x of ["加權報酬指數", "加權指數", "日均成交值（億）", "上市＋上櫃"]) assert.ok(!us.includes(x), "美股不該有 " + x);
     for (const x of ["加權報酬指數", "加權指數（價格，參考）", "日均成交值（億）", "市場", "v6 分類", 'value="5000"']) assert.ok(tw.includes(x), "台股少了 " + x);
     assert.ok(us.includes('value="0"') && !tw.includes("SPY"));
+  });
+  await t("趨勢樣板（11-17）：分頁在區間強弱右邊、記得住；多空兩張表七欄可排序＋十列視窗、點代號回 K 線；折線紅多綠空；註腳只寫事實", async () => {
+    const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
+    assert.ok(/>區間強弱<\/button>\s*<button[^]*?pickView\(view === "tt" \? "chart" : "tt"\)}>趨勢樣板<\/button>/.test(raw), "分頁鈕「趨勢樣板」要緊接在「區間強弱」右邊");
+    assert.ok(raw.includes('call("/api/ta-rs", { op: "tt", market: mk })'), "要打 /api/ta-rs op:'tt' 帶 market");
+    const st = {}; globalThis.localStorage = { getItem: (k) => (k in st ? st[k] : null), setItem: (k, v) => { st[k] = String(v); }, removeItem: (k) => { delete st[k]; } };
+    st.yoda_ta_view = "tt"; assert.strictEqual(P.readView(), "tt");
+    st.yoda_ta_view = "junk"; assert.strictEqual(P.readView(), "chart");
+    const row = (code, rs) => ({ code, name: "名" + code, group: "半導體業", close: 123.5, dhi: -3.25, dlo: 80.1, rs });
+    const x = { day: "20261116", long: [row("2330", 99), row("2454", 90)], short: [row("2233", 1)],
+      history: [{ d: "20261113", nl: 88, ns: 33, n: 642 }, { d: "20261116", nl: 64, ns: 37, n: 643 }, null] };
+    const picked = [];
+    const el = React.createElement(P.TtView, { x, mk: "tw", onCode: (c) => picked.push(c) });
+    const h = renderToString(el).replace(/<!-- -->/g, "");
+    for (const w of ["資料日 2026-11-16", "母體 643 檔", "多方樣板 2 檔", "空方樣板 1 檔", "多方樣板檔數占比 %", "空方樣板檔數占比 %", "ta-win10", "上市＋上櫃普通股", "RS ≥ 70"]) assert.ok(h.includes(w), "少了 " + w);
+    for (const w of ["代號", "名稱", "族群", "收盤", "距 52 週高", "離 52 週低", "RS"]) assert.ok(h.includes(">" + w + "<"), "表頭少了 " + w);
+    assert.ok((h.match(/<th /g) || []).length === 14 && (h.match(/點一下排序/g) || []).length === 14, "兩張表各 7 欄、每欄都可排序");
+    assert.ok(h.includes('class="tt-l"') && h.includes('class="tt-s"') && h.includes("-3.3%") && h.includes("+80.1%"), h.slice(0, 400));
+    const us = renderToString(React.createElement(P.TtView, { x, mk: "us", onCode: () => {} })).replace(/<!-- -->/g, "");
+    assert.ok(us.includes("標普 500 現任成分股") && us.includes("80 百萬美元") && !us.includes("上市＋上櫃"), "美股註腳");
+    // 代號欄的按鈕點一下 → onCode（頁面接 rsCode＝切回 K 線查這檔）
+    const btn = P.ttCols((c) => picked.push(c))[0].render(row("2454", 90));
+    let stopped = 0; btn.props.onClick({ stopPropagation: () => stopped++ });
+    assert.deepStrictEqual(picked, ["2454"]); assert.strictEqual(stopped, 1);
+    assert.ok(/<TtView x=\{tt\[rsMkt\]\.data\} mk=\{rsMkt\} onCode=\{rsCode\} \/>/.test(raw), "名單點代號要接 rsCode（切回 K 線）");
+    // 守門：這一頁不准出現已永久刪除的字、不做進出訊號、不給買賣建議
+    for (const w of ["怎麼看", "最近查過", "加碼", "停利", "2R", "出一半", "移保本", "多空排列", "進場", "出場", "買進", "賣出", "建議", "優勢", "勝率"]) {
+      assert.ok(!h.includes(w) && !us.includes(w), "趨勢樣板分頁出現「" + w + "」");
+    }
+    // 資料壞掉不崩：沒有 history／名單不是陣列
+    for (const bad of [{ day: "20261116" }, { day: "x", long: "x", short: null, history: [{ d: "1", nl: 1, ns: 1, n: 0 }] }]) {
+      const b = renderToString(React.createElement(P.TtView, { x: bad, mk: "tw", onCode: () => {} }));
+      assert.ok(b.includes("歷史天數不足") && b.includes("今天沒有符合的個股"), b.slice(0, 300));
+    }
   });
   await t("pastHalf：TA 票過半才續；普通票、壞票、沒期限 → 要問 status", async () => {
     const tk = (p) => "h." + Buffer.from(JSON.stringify(p)).toString("base64url") + ".s", n = Date.now() / 1000;

@@ -18,6 +18,7 @@ export const dynamic = 'force-dynamic';
 //   POST  Authorization: Bearer <會員登入票>  body {market?（'tw'｜'us'，預設 tw）, start?, end?（YYYY-MM-DD）,
 //         minAmt?（該市場貨幣，0..1e11，預設 tw 5e7／us 0）, n?（5..100，預設 20）}
 //   → {ok, market, currency, ...compute 結果（含 groups_ver）, range:{min,max}}；沒給日期＝近 1 月。失敗 → {ok:false, reason, error}；閘門同 /api/ta-idx
+//   op:'tt'（market 同上）→ {ok, market, day, long, short, funnel_long, funnel_short, history:[{d,nl,ns,n}]}（Skill tw_rs_export／us_tt 寫進面板的 tt）
 function R(data, status) {
   return Response.json(data, { status: status || 200, headers: { 'Cache-Control': 'private, no-store' } });
 }
@@ -94,6 +95,12 @@ export async function POST(req) {
     }
     const mk = b.market === undefined ? 'tw' : b.market;
     if (!Object.prototype.hasOwnProperty.call(MKT, mk)) return R({ ok: false, reason: 'bad-input', error: '市場要是 tw 或 us' }, 400);
+    if (b.op === 'tt') {   // 趨勢樣板分頁（11-17）：只回面板的 tt（多空名單＋每日多空檔數），不回整份面板；舊面板沒 tt＝no-source
+      const pn = await panel(mk);
+      if (pn === 'updating') return R({ ok: false, reason: 'updating', error: '資料更新中' }, 503);
+      if (!pn || !pn.tt || typeof pn.tt !== 'object') return R({ ok: false, reason: 'no-source', error: '趨勢樣板資料尚未產生' }, 503);
+      return R({ ok: true, market: mk, ...pn.tt });
+    }
     for (const k of ['start', 'end']) if (b[k] !== undefined && b[k] !== '' && !(typeof b[k] === 'string' && DATE_RE.test(b[k]) && new Date(Date.parse(b[k]) || 0).toISOString().slice(0, 10) === b[k])) return R({ ok: false, reason: 'bad-input', error: '日期格式要 YYYY-MM-DD' }, 400);
     const minAmt = b.minAmt === undefined ? MKT[mk].minAmt : b.minAmt;   // 只收數字（null、字串都擋）
     if (typeof minAmt !== 'number' || !Number.isFinite(minAmt) || minAmt < 0 || minAmt > 1e11) return R({ ok: false, reason: 'bad-input', error: '成交值門檻要在 0 ～ ' + MKT[mk].maxTxt + ' 之間' }, 400);

@@ -17,6 +17,7 @@ import { presetStart } from "../../lib/ta-rs";
 //   左欄「交易規則」面板（11-09）：勾選／填數字 → 瀏覽器用 lib/ta-trade.js 即時重算進出場與回測（不打伺服器、不扣額度）；
 //           5 組內建策略（唯讀）＋自己存的策略，只存在自己的瀏覽器（localStorage）。手機寬（≤760px）面板排到圖下方。
 //   圖上進出場記號：滑過（手機點一下）出自製浮動說明，逐條列進出場條件的實際數值（lib/ta-trade.js explainEntry／explainExit）。
+//   右上分頁「指數位階」「區間強弱」「趨勢樣板」（11-17：多空樣板檔數占比折線＋今天多空名單，/api/ta-rs op:'tt'；台股｜美股切換跟區間強弱共用）
 // 資料全部來自 Python 計算引擎（ta-engine，契約見 docs/ta-engine-contract.md）；最後一根盤中未定只上圖，不進訊號與回測。
 
 const TOK_KEY = "yoda_ta_jwt";
@@ -1288,7 +1289,7 @@ function RulePanel({ draft, set, errors, status, saved, active, nm, setNm, rn, s
 // ───────── 指數位階分頁（2026-11-11）：最新美股報告「02 指數位階」整章原樣（/api/ta-idx）─────────
 // 章內腳本靠 document.currentScript／inline onclick，只能跑在自己的文件裡 → iframe srcdoc（同源：父頁直接量高度、換深淺）
 const VIEW_KEY = "yoda_ta_view";
-function readView() { const v = lsGet(VIEW_KEY); return v === "idx" || v === "rs" ? v : "chart"; }
+function readView() { const v = lsGet(VIEW_KEY); return v === "idx" || v === "rs" || v === "tt" ? v : "chart"; }
 const isLight = () => document.documentElement.getAttribute("data-theme") === "light";
 function IdxView({ x }) {
   const ifr = useRef(null);
@@ -1405,6 +1406,96 @@ function RsView({ rs, run, onCode, mk = "tw" }) {
   );
 }
 
+// ───────── 趨勢樣板分頁（2026-11-17）：面板 tt（Skill tw_minervini／us_tt）＝每日多空樣板檔數占比折線＋今天的多空名單（/api/ta-rs op:'tt'）─────────
+const TT_M = {
+  tw: { uni: "上市＋上櫃普通股，近 20 日日均成交值 ≥ 5,000 萬元、上市滿 120 個交易日", rs: "RS＝近四季加權報酬在全部上市櫃普通股（滿 253 個交易日、不設成交值門檻）裡的百分位（1–99）" },
+  us: { uni: "標普 500 現任成分股，近 20 日日均成交值 ≥ 80 百萬美元、上市滿 120 個交易日", rs: "RS＝近四季加權報酬在標普 500 內的百分位（1–99，與美股報告的全市場 RS 不同）；52 週高低用收盤價；歷史檔數用現任成分往回算" },
+};
+const TT_DEF = "多方樣板＝收盤在 50／150／200 日均線之上、50＞150＞200、200 日線上升、高於 52 週低點三成以上、距 52 週高點兩成五以內、RS ≥ 70，八條全部符合；空方樣板＝八條反向（RS ≤ 30）";
+const isoD = (d) => (/^\d{8}$/.test(String(d)) ? d.slice(0, 4) + "-" + d.slice(4, 6) + "-" + d.slice(6) : String(d || "—"));
+function ttCols(onCode) {
+  return [
+    { label: "代號", render: (x) => <button type="button" className="ta-link mono" title="看 K 線" onClick={(e) => { e.stopPropagation(); onCode(x.code); }}>{x.code}</button>, sort: (x) => x.code },
+    { label: "名稱", render: (x) => x.name || "—", sort: (x) => x.name },
+    { label: "族群", render: (x) => x.group || "—", sort: (x) => x.group },
+    { label: "收盤", num: 1, render: (x) => fnum(x.close), sort: (x) => x.close },
+    { label: "距 52 週高", num: 1, render: (x) => pc1(x.dhi), sort: (x) => x.dhi },
+    { label: "離 52 週低", num: 1, render: (x) => pc1(x.dlo), sort: (x) => x.dlo },
+    { label: "RS", num: 1, render: (x) => (has(x.rs) ? x.rs : "—"), sort: (x) => x.rs },
+  ];
+}
+// 折線：x＝日期、y＝檔數 ÷ 母體 %；滑過（手機按住拖）看當天多方／空方／母體幾檔
+function TtChart({ hist }) {
+  const [hi, setHi] = useState(null);
+  const pts = hist.filter((h) => h && h.n > 0).map((h) => ({ d: String(h.d), nl: h.nl, ns: h.ns, n: h.n, pl: (h.nl / h.n) * 100, ps: (h.ns / h.n) * 100 }));
+  const N = pts.length;
+  if (N < 2) return <div className="ta-nochart">歷史天數不足</div>;
+  const W = 1000, H = 260, L = 44, R = 12, T = 22, B = 24, pw = W - L - R, ph = H - T - B;
+  const top = Math.max(5, Math.ceil(Math.max(...pts.map((p) => Math.max(p.pl, p.ps))) / 5) * 5);
+  const X = (i) => L + (pw * i) / (N - 1), Y = (v) => T + ph - (v / top) * ph;
+  const line = (k) => pts.map((p, i) => X(i).toFixed(1) + "," + Y(p[k]).toFixed(1)).join(" ");
+  const step = top <= 20 ? 5 : 10, grid = [];
+  for (let v = 0; v <= top; v += step) grid.push(v);
+  const ticks = [];
+  let lastX = -1e9;
+  pts.forEach((p, i) => { if ((i === 0 || p.d.slice(0, 6) !== pts[i - 1].d.slice(0, 6)) && X(i) - lastX >= 70 && X(i) < W - R - 30) { ticks.push(i); lastX = X(i); } });
+  const move = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    if (!r.width) return;
+    setHi(Math.max(0, Math.min(N - 1, Math.round((((e.clientX - r.left) / r.width) * W - L) / pw * (N - 1)))));
+  };
+  const p = hi === null ? null : pts[hi];
+  return (
+    <div className="ta-tt-ch">
+      <svg viewBox={`0 0 ${W} ${H}`} className="ta-tt-svg" role="img" aria-label="多方與空方樣板檔數占比" onPointerMove={move} onPointerDown={move} onPointerLeave={() => setHi(null)}>
+        {grid.map((v) => <g key={v}><line className="grid" x1={L} x2={W - R} y1={Y(v)} y2={Y(v)} /><text className="ax" x={L - 6} y={Y(v) + 4} textAnchor="end">{v}%</text></g>)}
+        {ticks.map((i) => <text key={i} className="ax" x={X(i)} y={H - 6} textAnchor="middle">{pts[i].d.slice(0, 4) + "/" + pts[i].d.slice(4, 6)}</text>)}
+        <polyline className="tt-l" points={line("pl")} fill="none" />
+        <polyline className="tt-s" points={line("ps")} fill="none" />
+        <text className="tt-k tt-kl" x={L + 6} y={13}>多方樣板檔數占比 %</text>
+        <text className="tt-k tt-ks" x={L + 150} y={13}>空方樣板檔數占比 %</text>
+        {p ? <g>
+          <line className="tt-hl" x1={X(hi)} x2={X(hi)} y1={T} y2={T + ph} />
+          <circle className="tt-dl" cx={X(hi)} cy={Y(p.pl)} r="4" /><circle className="tt-ds" cx={X(hi)} cy={Y(p.ps)} r="4" />
+        </g> : null}
+      </svg>
+      {p ? (
+        <div className={"ta-tt-tip" + (hi > N / 2 ? " l" : "")} style={hi > N / 2 ? { right: (100 - (X(hi) / W) * 100) + "%" } : { left: (X(hi) / W) * 100 + "%" }}>
+          <b>{isoD(p.d)}</b><br /><span className="up">多方 {p.nl} 檔（{p.pl.toFixed(1)}%）</span><br /><span className="dn">空方 {p.ns} 檔（{p.ps.toFixed(1)}%）</span><br />母體 {p.n} 檔
+        </div>
+      ) : null}
+    </div>
+  );
+}
+function TtView({ x, mk = "tw", onCode }) {
+  const M = TT_M[mk] || TT_M.tw;
+  const hist = Array.isArray(x.history) ? x.history : [];
+  const last = hist.filter((h) => h && h.n > 0).pop() || {};
+  const long = Array.isArray(x.long) ? x.long : [], short = Array.isArray(x.short) ? x.short : [];
+  const cols = useMemo(() => ttCols(onCode), [onCode]);
+  const pct = (k) => (last.n > 0 ? "（" + ((k / last.n) * 100).toFixed(1) + "%）" : "");
+  return (
+    <div className="ta-tt">
+      <div className="ta-rs-sum">
+        <b>資料日 {isoD(x.day)}</b>
+        <span className="sep">｜</span>母體 {has(last.n) ? last.n : "—"} 檔
+        <span className="sep">｜</span>多方 <b className="up">{long.length} 檔{pct(long.length)}</b>
+        <span className="sep">｜</span>空方 <b className="dn">{short.length} 檔{pct(short.length)}</b>
+      </div>
+      <TtChart hist={hist} />
+      <div className="ta-rs-two">
+        {[["多方樣板", long], ["空方樣板", short]].map(([t, a]) => (
+          <div key={t}>
+            <div className="ta-cap">{t} {a.length} 檔</div>
+            {a.length ? <div className="ta-win10"><SortTable className="ta-dt" cols={cols} rows={a} rowKey={(r) => r.code} /></div> : <div className="ta-empty">今天沒有符合的個股</div>}
+          </div>
+        ))}
+      </div>
+      <div className="ta-notes ta-rs-foot">資料到 {isoD(x.day)}；母體＝{M.uni}；{TT_DEF}；{M.rs}。</div>
+    </div>
+  );
+}
+
 // ───────── 主頁 ─────────
 async function post(url, body, token) {
   const headers = { "Content-Type": "application/json" };
@@ -1471,6 +1562,7 @@ export default function TaPage() {
   const [rsMkt, setRsMkt] = useState(readRsMkt); // tw｜us，記在 localStorage
   const pickRsMkt = (k) => { setRsMkt(k); lsSet(RS_MKT_KEY, k); };
   const rsSeq = useRef({});
+  const [tt, setTt] = useState({});             // 趨勢樣板：市場 → {busy}｜{data}｜{error}；市場切換跟區間強弱共用 rsMkt
   const pickSide = (k) => { setSide(k); lsSet(SIDE_KEY, k); pickView("chart"); };
   const dvs = useMemo(() => sideTrade(dv, side), [dv, side]);
   const bkey = useMemo(() => [dvs, maSet], [dvs, maSet]);   // Boundary 重試鍵：資料、交易參數、均線組、訊號篩選任一換了就重試
@@ -1605,6 +1697,20 @@ export default function TaPage() {
   }, [gate, call]);
   useEffect(() => { if (phase === "app" && view === "rs" && !rs[rsMkt]) runRs(rsMkt, {}); }, [phase, view, rs, rsMkt, runRs]);   // 每個市場第一次打開＝近 1 月
   const rsCode = useCallback((c) => { pickView("chart"); load(c, "D"); }, [load]);
+  useEffect(() => {   // 趨勢樣板：每個市場第一次打開抓一次（失敗按重試＝清掉該市場再抓）
+    if (phase !== "app" || view !== "tt" || tt[rsMkt]) return;
+    const mk = rsMkt;
+    setTt((a) => ({ ...a, [mk]: { busy: true } }));
+    call("/api/ta-rs", { op: "tt", market: mk }).then((j) => {
+      if (gate(j)) { setTt({}); return; }
+      setTt((a) => ({ ...a, [mk]: j.ok ? { data: j } : { error: j.error || "讀取失敗" } }));
+    });
+  }, [phase, view, tt, rsMkt, gate, call]);
+  const mktSeg = (
+    <div className="ta-seg ta-rs-mkt" role="group" aria-label="市場">
+      {RS_MKTS.map(([k, nm]) => <button key={k} type="button" aria-pressed={rsMkt === k} className={"ta-tab" + (rsMkt === k ? " on" : "")} onClick={() => pickRsMkt(k)}>{nm}</button>)}
+    </div>
+  );
 
   const login = async (e) => {
     e.preventDefault();
@@ -1721,6 +1827,8 @@ export default function TaPage() {
                 onClick={() => pickView(view === "idx" ? "chart" : "idx")}>指數位階</button>
               <button type="button" aria-pressed={view === "rs"} className={"ta-tab" + (view === "rs" ? " on" : "")}
                 onClick={() => pickView(view === "rs" ? "chart" : "rs")}>區間強弱</button>
+              <button type="button" aria-pressed={view === "tt"} className={"ta-tab" + (view === "tt" ? " on" : "")}
+                onClick={() => pickView(view === "tt" ? "chart" : "tt")}>趨勢樣板</button>
             </div>
             {busy ? <span className="ta-kbd">計算中…</span> : null}
           </div>
@@ -1733,14 +1841,22 @@ export default function TaPage() {
           ) : null}
           {view === "rs" ? (
             <div className="ta-pane">
-              <div className="ta-seg ta-rs-mkt" role="group" aria-label="市場">
-                {RS_MKTS.map(([k, nm]) => <button key={k} type="button" aria-pressed={rsMkt === k} className={"ta-tab" + (rsMkt === k ? " on" : "")} onClick={() => pickRsMkt(k)}>{nm}</button>)}
-              </div>
+              {mktSeg}
               {RS_MKTS.map(([k]) => (   // 兩個市場都留著（只藏起來）＝各自的輸入與結果切回來還在
                 <div key={k} hidden={rsMkt !== k}>
                   <Boundary reset={rs[k]}>{rs[k] ? <RsView key={rs[k].data ? "ok" : "init"} mk={k} rs={rs[k]} run={(b) => runRs(k, b)} onCode={rsCode} /> : <div className="ta-ph">讀取中…</div>}</Boundary>
                 </div>
               ))}
+            </div>
+          ) : null}
+          {view === "tt" ? (
+            <div className="ta-pane">
+              {mktSeg}
+              <Boundary reset={tt[rsMkt]}>
+                {!tt[rsMkt] || tt[rsMkt].busy ? <div className="ta-ph">讀取中…</div>
+                  : tt[rsMkt].error ? <div className="ta-err" role="alert"><span>{tt[rsMkt].error}</span><button type="button" className="ta-btn" onClick={() => setTt((a) => ({ ...a, [rsMkt]: undefined }))}>重試</button></div>
+                  : <TtView x={tt[rsMkt].data} mk={rsMkt} onCode={rsCode} />}
+              </Boundary>
             </div>
           ) : null}
           <div className="ta-pane" hidden={view !== "chart"}>
