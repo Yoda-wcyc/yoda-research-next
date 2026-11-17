@@ -541,11 +541,12 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     const x = { day: "20261116", history: [{ d: "20261113", nl: 3, ns: 1, n: 600 }, { d: "20261116", nl: 3, ns: 1, n: 600 }],
       long: [row("2330", 99, 12, 5.5), row("2454", 90, 1, 0), row("3008", 80, 300, 40, { trunc: true }), row("6234", 75, 1, 0)],
       short: [row("2233", 2, 4, -6.2)],
-      exits_long: [row("3287", 60, 20, 5.62, { why: ["C7"] }), row("4903", 50, 9, -16.7, { why: ["C5", "C7", "U"] }), row("2881", 70, 5, null, { why: ["C8"], close: null }), row("1101", 70, 1, -1, { why: ["C5"] })],
+      exits_long: [row("3287", 60, 20, 5.62, { why: ["C7"] }), row("4903", 50, 9, -16.7, { why: ["C5", "C7", "U"] }), row("2881", 70, 5, null, { why: ["X"], close: null }), row("1101", 70, 1, -1, { why: ["C1", "C4", "C8"] })],
       exits_short: [] };
     const h = renderToString(React.createElement(P.TtView, { x, mk: "tw", onCode: () => {} })).replace(/<!-- -->/g, "");
     for (const w of [">天數<", ">符合以來 %<", "多方新進 2／跳出 4", "空方新進 0／跳出 0", "今日跳出・多方 4 檔", "今日跳出・空方 0 檔", "今天沒有<",
-      ">符合天數<", ">符合期間 %<", ">跳出原因<", "距 52 週高超過兩成五", "跌破 50 日線、距 52 週高超過兩成五、掉出母體", "RS 不足 70", "≥300", "新進＝今天八條全部符合"]) assert.ok(h.includes(w), "少了 " + w);
+      ">符合天數<", ">符合期間 %<", ">跳出原因<", "距 52 週高超過兩成五", "沒站上 50 日線、距 52 週高超過兩成五、掉出母體",
+      "沒站上 150 或 200 日線、50 日線沒在 150 或 200 日線之上、RS 不足 70", ">今天沒有收盤<", "≥300", "新進＝今天八條全部符合"]) assert.ok(h.includes(w), "少了 " + w);
     assert.ok((h.match(/<th /g) || []).length === 9 * 2 + 7, "名單 9 欄 ×2＋跳出表 7 欄（空方沒有＝不畫表）");
     // 新進排最前（2454、6234 照原順序），其餘照原順序；trunc 的 1 天不算新進
     const codes = [...h.split("多方樣板 4 檔")[1].split("空方樣板")[0].matchAll(/title="看 K 線">(\w+)</g)].map((m) => m[1]);
@@ -555,8 +556,8 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     assert.ok(/>2881<[^]*?<td class="r ">—<\/td>[^]*?<td class="r ">5<\/td><td class="r "><span class="">—<\/span>/.test(h), "沒收盤的跳出股：收盤、符合期間 % 顯示 —");
     const ttNewRow = P.ttCols(() => {})[7].render({ days: 1, trunc: true });
     assert.strictEqual(ttNewRow, "≥1", "trunc 的 1 天不標新進");
-    const us = renderToString(React.createElement(P.TtView, { x: { ...x, exits_long: undefined, exits_short: [row("BSX", 50, 3, 2, { why: ["S5", "S8"] })] }, mk: "us", onCode: () => {} })).replace(/<!-- -->/g, "");
-    assert.ok(us.includes("站回 50 日線、RS 高於 30") && us.includes("今日跳出・多方 0 檔") && us.includes("多方新進 2／跳出 0"), "美股空方跳出原因");
+    const us = renderToString(React.createElement(P.TtView, { x: { ...x, exits_long: undefined, exits_short: [row("BSX", 50, 3, 2, { why: ["S1", "S4", "S5", "S8"] })] }, mk: "us", onCode: () => {} })).replace(/<!-- -->/g, "");
+    assert.ok(us.includes("站上 150 或 200 日線、50 日線沒在 150 或 200 日線之下、沒跌破 50 日線、RS 高於 30") && us.includes("今日跳出・多方 0 檔") && us.includes("多方新進 2／跳出 0"), "美股空方跳出原因");
     for (const w of ["怎麼看", "最近查過", "加碼", "停利", "2R", "出一半", "移保本", "多空排列", "進場", "出場", "買進", "賣出", "建議", "優勢", "勝率"]) {
       assert.ok(!h.includes(w) && !us.includes(w), "訊號畫面出現「" + w + "」");
     }
