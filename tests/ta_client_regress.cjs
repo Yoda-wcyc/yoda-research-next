@@ -336,6 +336,29 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     }
     assert.ok(tips.includes("entry") && tips.includes("exit"), tips.join());
   });
+  await t("出場跟進場成對（11-17）：字寫多出／空出／多停損／空停損、✕＋字＋連線用進場色；每筆已平倉一條實線、持倉中不畫", async () => {
+    const w = P.withTrade(mkD({}), { ...lib3.normParams({}).p, vol_on: false, fresh_n: 1 });
+    const full = P.fullSeries(w), tr = w.trade.trades;
+    const el = P.KChart({ d: w, full, smas: [], a: 0, b: full.bars.length, gaps: [], islands: [], top: [], rolls: [] });
+    const flat = [], walk = (x) => { if (Array.isArray(x)) x.forEach(walk); else if (x && x.props) { flat.push(x); walk(x.props.children); } };
+    walk(el);
+    const col = (s) => (s === 1 ? "#e0525e" : "#3fae7a"), txt = (x) => [].concat(x.props.children).join("");
+    const tx = flat.filter((x) => x.type === "text" && /\btx\b/.test(x.props.className || ""));
+    assert.ok(tx.length > 0 && tx.every((x) => /^(多出|空出|多停損|空停損) /.test(txt(x))), tx.map(txt).join("|"));
+    assert.ok(!tx.some((x) => /^(出場|停損) /.test(txt(x))), "還有舊的「出場／停損」字");
+    assert.ok(tx.some((x) => txt(x)[0] === "多") && tx.some((x) => txt(x)[0] === "空"), "測資要有多單也有空單");
+    const links = flat.filter((x) => x.type === "line" && x.props.className === "trlink");
+    assert.strictEqual(links.length, tr.length, "每筆已平倉一條線");
+    assert.ok(!flat.some((x) => x.props.className === "trbox"), "淡色框要拿掉");
+    for (const L of links) assert.ok(L.props.stroke === col(L.props["data-side"]) && L.props.strokeWidth === "2.5" && !L.props.strokeDasharray, JSON.stringify(L.props));
+    for (const x of tx) assert.strictEqual(x.props.fill || (x.props.style && x.props.style.fill), col(txt(x).startsWith("多") ? 1 : -1), txt(x));
+    // 持倉中：把最後一筆改成未平倉 → 線少一條
+    if (tr.length) {
+      const w2 = { ...w, trade: { ...w.trade, trades: tr.slice(0, -1), open: { side: tr.at(-1).side, entry: tr.at(-1).entry, entry_i: tr.at(-1).entry_i, entry_t: tr.at(-1).entry_t, stop: tr.at(-1).stop } } };
+      const f2 = []; (function wk(x) { if (Array.isArray(x)) x.forEach(wk); else if (x && x.props) { f2.push(x); wk(x.props.children); } })(P.KChart({ d: w2, full, smas: [], a: 0, b: full.bars.length, gaps: [], islands: [], top: [], rolls: [] }));
+      assert.strictEqual(f2.filter((x) => x.type === "line" && x.props.className === "trlink").length, tr.length - 1, "持倉中不該畫連線");
+    }
+  });
   await t("停損出場的說明多一列「停損由來」（沿用進場說明的寫法）；其他出場沒有", async () => {
     const res = { ctx: { O: [10, 10, 9], H: [11, 11, 10], L: [9, 9, 8], C: [10, 10, 8.5], T: ["a", "b", "c"], M: [[], [], []], XM: [], vr: [], atr: [1, 1, 1] } };
     const pp = { ...lib3.normParams({}).p, stop: "low_n", stop_n: 5, stop_on: "touch" };
