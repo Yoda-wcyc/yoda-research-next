@@ -515,7 +515,9 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     const h = renderToString(el).replace(/<!-- -->/g, "");
     for (const w of ["資料日 2026-11-16", "母體 643 檔", "多方樣板 2 檔", "空方樣板 1 檔", "多方樣板檔數占比 %", "空方樣板檔數占比 %", "ta-win10", "上市＋上櫃普通股", "RS ≥ 70", "離 52 週高點三成以上、距 52 週低點兩成五以內、RS ≤ 30"]) assert.ok(h.includes(w), "少了 " + w);
     for (const w of ["代號", "名稱", "族群", "收盤", "距 52 週高", "離 52 週低", "RS"]) assert.ok(h.includes(">" + w + "<"), "表頭少了 " + w);
-    assert.ok((h.match(/<th /g) || []).length === 14 && (h.match(/點一下排序/g) || []).length === 14, "兩張表各 7 欄、每欄都可排序");
+    assert.ok((h.match(/<th /g) || []).length === 18 && (h.match(/點一下排序/g) || []).length === 18, "兩張表各 9 欄、每欄都可排序");
+    // 舊面板（沒有 since／days／exits）：訊號欄留空、沒有新進／跳出摘要與跳出表
+    assert.ok(!h.includes("新進") && !h.includes("跳出") && !h.includes("ta-tt-new"), "舊面板不該出現訊號");
     assert.ok(h.includes('class="tt-l"') && h.includes('class="tt-s"') && h.includes("-3.3%") && h.includes("+80.1%"), h.slice(0, 400));
     const us = renderToString(React.createElement(P.TtView, { x, mk: "us", onCode: () => {} })).replace(/<!-- -->/g, "");
     assert.ok(us.includes("標普 500 現任成分股") && us.includes("80 百萬美元") && !us.includes("上市＋上櫃") && us.includes("距 52 週低點兩成五以內、RS ≤ 30") && !us.includes("八條反向"), "美股註腳");
@@ -533,6 +535,34 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
       const b = renderToString(React.createElement(P.TtView, { x: bad, mk: "tw", onCode: () => {} }));
       assert.ok(b.includes("歷史天數不足") && b.includes("今天沒有符合的個股"), b.slice(0, 300));
     }
+  });
+  await t("趨勢樣板進出訊號（11-17）：天數＋符合以來 % 兩欄、新進排最前、摘要新進／跳出、今日跳出兩張表＋原因轉中文、沒有＝今天沒有；守門字", async () => {
+    const row = (code, rs, days, chg, o) => ({ code, name: "名" + code, group: "半導體業", close: 100, dhi: -3, dlo: 80, rs, since: "20261101", days, chg, ...o });
+    const x = { day: "20261116", history: [{ d: "20261113", nl: 3, ns: 1, n: 600 }, { d: "20261116", nl: 3, ns: 1, n: 600 }],
+      long: [row("2330", 99, 12, 5.5), row("2454", 90, 1, 0), row("3008", 80, 300, 40, { trunc: true }), row("6234", 75, 1, 0)],
+      short: [row("2233", 2, 4, -6.2)],
+      exits_long: [row("3287", 60, 20, 5.62, { why: ["C7"] }), row("4903", 50, 9, -16.7, { why: ["C5", "C7", "U"] }), row("2881", 70, 5, null, { why: ["C8"], close: null }), row("1101", 70, 1, -1, { why: ["C5"] })],
+      exits_short: [] };
+    const h = renderToString(React.createElement(P.TtView, { x, mk: "tw", onCode: () => {} })).replace(/<!-- -->/g, "");
+    for (const w of [">天數<", ">符合以來 %<", "多方新進 2／跳出 4", "空方新進 0／跳出 0", "今日跳出・多方 4 檔", "今日跳出・空方 0 檔", "今天沒有<",
+      ">符合天數<", ">符合期間 %<", ">跳出原因<", "距 52 週高超過兩成五", "跌破 50 日線、距 52 週高超過兩成五、掉出母體", "RS 不足 70", "≥300", "新進＝今天八條全部符合"]) assert.ok(h.includes(w), "少了 " + w);
+    assert.ok((h.match(/<th /g) || []).length === 9 * 2 + 7, "名單 9 欄 ×2＋跳出表 7 欄（空方沒有＝不畫表）");
+    // 新進排最前（2454、6234 照原順序），其餘照原順序；trunc 的 1 天不算新進
+    const codes = [...h.split("多方樣板 4 檔")[1].split("空方樣板")[0].matchAll(/title="看 K 線">(\w+)</g)].map((m) => m[1]);
+    assert.deepStrictEqual(codes, ["2454", "6234", "2330", "3008"]);
+    assert.strictEqual((h.match(/class="ta-tt-new">新進</g) || []).length, 2, "跳出表 days=1 不標新進");
+    assert.ok(h.includes('class="up">+5.5%') && h.includes('class="dn">-6.2%') && h.includes('class="up">+5.6%') && h.includes('class="dn">-16.7%'), "漲紅跌綠");
+    assert.ok(/>2881<[^]*?<td class="r ">—<\/td>[^]*?<td class="r ">5<\/td><td class="r "><span class="">—<\/span>/.test(h), "沒收盤的跳出股：收盤、符合期間 % 顯示 —");
+    const ttNewRow = P.ttCols(() => {})[7].render({ days: 1, trunc: true });
+    assert.strictEqual(ttNewRow, "≥1", "trunc 的 1 天不標新進");
+    const us = renderToString(React.createElement(P.TtView, { x: { ...x, exits_long: undefined, exits_short: [row("BSX", 50, 3, 2, { why: ["S5", "S8"] })] }, mk: "us", onCode: () => {} })).replace(/<!-- -->/g, "");
+    assert.ok(us.includes("站回 50 日線、RS 高於 30") && us.includes("今日跳出・多方 0 檔") && us.includes("多方新進 2／跳出 0"), "美股空方跳出原因");
+    for (const w of ["怎麼看", "最近查過", "加碼", "停利", "2R", "出一半", "移保本", "多空排列", "進場", "出場", "買進", "賣出", "建議", "優勢", "勝率"]) {
+      assert.ok(!h.includes(w) && !us.includes(w), "訊號畫面出現「" + w + "」");
+    }
+    // 壞資料不崩：exits 裡有 null、why 不是陣列
+    const b = renderToString(React.createElement(P.TtView, { x: { day: "x", long: [null, { code: "1" }], exits_long: [null, { code: "9", why: "C5" }], exits_short: "x" }, mk: "tw", onCode: () => {} })).replace(/<!-- -->/g, "");
+    assert.ok(b.includes("今日跳出・多方 1 檔") && b.includes("今日跳出・空方 0 檔"), b.slice(0, 300));
   });
   await t("pastHalf：TA 票過半才續；普通票、壞票、沒期限 → 要問 status", async () => {
     const tk = (p) => "h." + Buffer.from(JSON.stringify(p)).toString("base64url") + ".s", n = Date.now() / 1000;

@@ -1413,16 +1413,35 @@ const TT_M = {
 };
 const TT_DEF = "多方樣板＝收盤在 50／150／200 日均線之上、50＞150＞200、200 日線上升、高於 52 週低點三成以上、距 52 週高點兩成五以內、RS ≥ 70，八條全部符合；空方樣板＝收盤在 50／150／200 日均線之下、50＜150＜200、200 日線下彎、離 52 週高點三成以上、距 52 週低點兩成五以內、RS ≤ 30，八條全部符合";
 const isoD = (d) => (/^\d{8}$/.test(String(d)) ? d.slice(0, 4) + "-" + d.slice(4, 6) + "-" + d.slice(6) : String(d || "—"));
-function ttCols(onCode) {
-  return [
+// 進出訊號（11-17，Skill tw_minervini.signals）：名單每檔 since／days（今天新進＝1）／chg（／trunc＝往回算到資料頭，days 只是下限）；exits_*＝今天跳出＋why（今天沒過的條件代號，U＝掉出母體）
+const TT_WHY = {
+  C1: "跌破 150／200 日線", C2: "150 日線落到 200 日線下", C3: "200 日線不再上升", C4: "50 日線落到 150／200 日線下",
+  C5: "跌破 50 日線", C6: "離 52 週低不到三成", C7: "距 52 週高超過兩成五", C8: "RS 不足 70",
+  S1: "站回 150／200 日線", S2: "150 日線回到 200 日線上", S3: "200 日線不再下彎", S4: "50 日線回到 150／200 日線上",
+  S5: "站回 50 日線", S6: "離 52 週高不到三成", S7: "距 52 週低超過兩成五", S8: "RS 高於 30", U: "掉出母體",
+};
+const ttNew = (x) => x.days === 1 && !x.trunc;
+const ttDays = (x) => (!has(x.days) ? "" : ttNew(x) ? <span className="ta-tt-new">新進</span> : (x.trunc ? "≥" : "") + x.days);
+const ttChg = (x) => (has(x.days) ? <span className={ud(x.chg)}>{pc1(x.chg)}</span> : "");   // 舊面板沒訊號欄位＝留空
+function ttCols(onCode, exit) {
+  const base = [
     { label: "代號", render: (x) => <button type="button" className="ta-link mono" title="看 K 線" onClick={(e) => { e.stopPropagation(); onCode(x.code); }}>{x.code}</button>, sort: (x) => x.code },
     { label: "名稱", render: (x) => x.name || "—", sort: (x) => x.name },
     { label: "族群", render: (x) => x.group || "—", sort: (x) => x.group },
     { label: "收盤", num: 1, render: (x) => fnum(x.close), sort: (x) => x.close },
+  ];
+  if (exit) return base.concat([
+    { label: "符合天數", num: 1, render: (x) => (has(x.days) ? (x.trunc ? "≥" : "") + x.days : "—"), sort: (x) => x.days },   // 跳出的 days 算到前一天：1＝只符合一天，不標新進
+    { label: "符合期間 %", num: 1, render: ttChg, sort: (x) => x.chg },
+    { label: "跳出原因", render: (x) => (Array.isArray(x.why) ? x.why.map((c) => TT_WHY[c] || c).join("、") : "—"), sort: (x) => (Array.isArray(x.why) ? x.why.join() : null) },
+  ]);
+  return base.concat([
     { label: "距 52 週高", num: 1, render: (x) => pc1(x.dhi), sort: (x) => x.dhi },
     { label: "離 52 週低", num: 1, render: (x) => pc1(x.dlo), sort: (x) => x.dlo },
     { label: "RS", num: 1, render: (x) => (has(x.rs) ? x.rs : "—"), sort: (x) => x.rs },
-  ];
+    { label: "天數", num: 1, render: ttDays, sort: (x) => x.days },
+    { label: "符合以來 %", num: 1, render: ttChg, sort: (x) => x.chg },
+  ]);
 }
 // 折線：x＝日期、y＝檔數 ÷ 母體 %；滑過（手機按住拖）看當天多方／空方／母體幾檔
 function TtChart({ hist }) {
@@ -1471,8 +1490,12 @@ function TtView({ x, mk = "tw", onCode }) {
   const M = TT_M[mk] || TT_M.tw;
   const hist = Array.isArray(x.history) ? x.history : [];
   const last = hist.filter((h) => h && h.n > 0).pop() || {};
-  const long = Array.isArray(x.long) ? x.long : [], short = Array.isArray(x.short) ? x.short : [];
+  const arr = (k) => (Array.isArray(x[k]) ? x[k].filter((r) => r && typeof r === "object") : []);
+  const nf = (a) => a.filter(ttNew).concat(a.filter((r) => !ttNew(r)));   // 預設：新進排最前，其餘照原排序（RS）
+  const long = nf(arr("long")), short = nf(arr("short")), exL = arr("exits_long"), exS = arr("exits_short");
+  const sig = Array.isArray(x.exits_long) || Array.isArray(x.exits_short);   // 舊面板沒訊號欄位：不顯示新進／跳出
   const cols = useMemo(() => ttCols(onCode), [onCode]);
+  const xcols = useMemo(() => ttCols(onCode, 1), [onCode]);
   const pct = (k) => (last.n > 0 ? "（" + ((k / last.n) * 100).toFixed(1) + "%）" : "");
   return (
     <div className="ta-tt">
@@ -1481,6 +1504,10 @@ function TtView({ x, mk = "tw", onCode }) {
         <span className="sep">｜</span>母體 {has(last.n) ? last.n : "—"} 檔
         <span className="sep">｜</span>多方 <b className="up">{long.length} 檔{pct(long.length)}</b>
         <span className="sep">｜</span>空方 <b className="dn">{short.length} 檔{pct(short.length)}</b>
+        {sig ? <>
+          <span className="sep">｜</span>多方新進 {long.filter(ttNew).length}／跳出 {exL.length}
+          <span className="sep">｜</span>空方新進 {short.filter(ttNew).length}／跳出 {exS.length}
+        </> : null}
       </div>
       <TtChart hist={hist} />
       <div className="ta-rs-two">
@@ -1490,8 +1517,14 @@ function TtView({ x, mk = "tw", onCode }) {
             {a.length ? <div className="ta-win10"><SortTable className="ta-dt" cols={cols} rows={a} rowKey={(r) => r.code} /></div> : <div className="ta-empty">今天沒有符合的個股</div>}
           </div>
         ))}
+        {sig ? [["多方", exL], ["空方", exS]].map(([t, a]) => (
+          <div key={"x" + t}>
+            <div className="ta-cap">今日跳出・{t} {a.length} 檔</div>
+            {a.length ? <div className="ta-win10"><SortTable className="ta-dt" cols={xcols} rows={a} rowKey={(r) => r.code} /></div> : <div className="ta-empty">今天沒有</div>}
+          </div>
+        )) : null}
       </div>
-      <div className="ta-notes ta-rs-foot">資料到 {isoD(x.day)}；母體＝{M.uni}；{TT_DEF}；{M.rs}。</div>
+      <div className="ta-notes ta-rs-foot">資料到 {isoD(x.day)}；母體＝{M.uni}；{TT_DEF}；{M.rs}。{sig ? "新進＝今天八條全部符合、前一個交易日沒有；跳出＝前一個交易日符合、今天不符合（原因＝今天沒過的條件）；天數＝連續符合的交易日數（≥＝往回算到資料起點）；符合以來 %／符合期間 %＝連續符合第一天收盤到今天收盤的還原報酬。" : ""}</div>
     </div>
   );
 }
