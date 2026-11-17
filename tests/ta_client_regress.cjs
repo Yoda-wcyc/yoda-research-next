@@ -513,12 +513,12 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     const picked = [];
     const el = React.createElement(P.TtView, { x, mk: "tw", onCode: (c) => picked.push(c) });
     const h = renderToString(el).replace(/<!-- -->/g, "");
-    for (const w of ["資料日 2026-11-16", "母體 643 檔", "多方樣板 2 檔", "空方樣板 1 檔", "多方樣板檔數占比 %", "空方樣板檔數占比 %", "ta-win10", "上市＋上櫃普通股", "RS ≥ 70"]) assert.ok(h.includes(w), "少了 " + w);
+    for (const w of ["資料日 2026-11-16", "母體 643 檔", "多方樣板 2 檔", "空方樣板 1 檔", "多方樣板檔數占比 %", "空方樣板檔數占比 %", "ta-win10", "上市＋上櫃普通股", "RS ≥ 70", "離 52 週高點三成以上、距 52 週低點兩成五以內、RS ≤ 30"]) assert.ok(h.includes(w), "少了 " + w);
     for (const w of ["代號", "名稱", "族群", "收盤", "距 52 週高", "離 52 週低", "RS"]) assert.ok(h.includes(">" + w + "<"), "表頭少了 " + w);
     assert.ok((h.match(/<th /g) || []).length === 14 && (h.match(/點一下排序/g) || []).length === 14, "兩張表各 7 欄、每欄都可排序");
     assert.ok(h.includes('class="tt-l"') && h.includes('class="tt-s"') && h.includes("-3.3%") && h.includes("+80.1%"), h.slice(0, 400));
     const us = renderToString(React.createElement(P.TtView, { x, mk: "us", onCode: () => {} })).replace(/<!-- -->/g, "");
-    assert.ok(us.includes("標普 500 現任成分股") && us.includes("80 百萬美元") && !us.includes("上市＋上櫃"), "美股註腳");
+    assert.ok(us.includes("標普 500 現任成分股") && us.includes("80 百萬美元") && !us.includes("上市＋上櫃") && us.includes("距 52 週低點兩成五以內、RS ≤ 30") && !us.includes("八條反向"), "美股註腳");
     // 代號欄的按鈕點一下 → onCode（頁面接 rsCode＝切回 K 線查這檔）
     const btn = P.ttCols((c) => picked.push(c))[0].render(row("2454", 90));
     let stopped = 0; btn.props.onClick({ stopPropagation: () => stopped++ });
