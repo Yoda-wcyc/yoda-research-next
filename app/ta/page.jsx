@@ -505,16 +505,21 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top, rolls }) {
       if (v != null) lab.push({ y: Y(v), t: w + fpx(v), col, nt: "", tip });
     }
   }
-  // 進出場：每筆進場到出場一條細虛線（這筆賺＝紅、賠＝綠）
+  // 進出場：每筆一塊淡色框（左右＝進場到出場那根、上下＝進場價到出場價）＋框內粗虛線從進場價連到 ✕（這筆賺＝紅、賠＝綠）；
+  // 粗虛線底下墊深色，蓋在 K 棒和均線上也分得出（11-17 Yoda：原本只有細虛線，看不出多單在哪出場）。持倉中的不畫
   const byEntry = new Map(), byExit = new Map();
   for (const t of trd.trades || []) {
     byEntry.set(t.entry_i, t); byExit.set(t.exit_i, t);
     if (t.exit_i < a || t.entry_i >= b) continue;
-    els.push(<line key={"trk" + t.entry_i} className="trlink" x1={X(t.entry_i - a)} y1={Y(t.entry)} x2={X(t.exit_i - a)} y2={Y(t.exit_px)}
-      stroke={t.pct > 0 ? K_UP : K_DN} strokeWidth="1" strokeDasharray="4 3" strokeOpacity=".9" clipPath={clip} />);
+    const x1 = X(t.entry_i - a), y1 = Y(t.entry), x2 = X(t.exit_i - a), y2 = Y(t.exit_px), col = t.pct > 0 ? K_UP : K_DN;
+    const lk = { x1, y1, x2, y2, clipPath: clip, strokeLinecap: "round" };
+    els.push(<rect key={"trb" + t.entry_i} className="trbox" x={Math.min(x1, x2)} y={Math.min(y1, y2)} width={Math.abs(x2 - x1)} height={Math.max(1, Math.abs(y2 - y1))}
+      fill={col} fillOpacity=".16" stroke={col} strokeOpacity=".55" strokeWidth="1" clipPath={clip} />,
+      <line key={"trh" + t.entry_i} className="trlink-bg" {...lk} stroke="#0b0f15" strokeWidth="5" strokeOpacity=".8" />,
+      <line key={"trk" + t.entry_i} className="trlink" {...lk} stroke={col} strokeWidth="2.2" strokeDasharray="6 4" />);
   }
   if (op) byEntry.set(op.entry_i, op);
-  // 記號：▲多進（紅大三角，K 低點下）／▼空進（綠大三角，K 高點上）、✕出場；旁邊標「多進 價格」「原因 價格 報酬%」。
+  // 記號：▲多進（紅大三角，K 低點下）／▼空進（綠大三角，K 高點上）、✕出場；旁邊標「多進 價格」「出場（或停損） 價格 報酬%」，原因滑過看。
   // 可見根數 > 250 只留圖形。標籤依序試幾個靠近記號的位置（原位→記號左右→另一側→往外錯開），選第一個不撞任何字／記號的；
   // 都撞就選重疊最少的。標籤夾在價格區內（右緣不超過 xr，不會蓋到右側撐壓標籤）
   const showLab = n <= 250, tlab = [], want = [];
@@ -546,7 +551,7 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top, rolls }) {
       </g>);
       placed.push([x - 6, y - 6, x + 6, y + 6]);
       const dy = t.side === 1 ? 13 : -13, yb = y + (t.side === 1 ? 16 : -9), yo = y + (t.side === 1 ? -9 : 16);
-      want.push([(t.label || t.why) + " " + fpx(t.exit_px) + " " + fpc(t.pct), col, "tx", [[x + 9, yb, "start"], [x - 9, yb, "end"],
+      want.push([(m.tone === "stop" ? "停損 " : "出場 ") + fpx(t.exit_px) + " " + fpc(t.pct), col, "tx", [[x + 9, yb, "start"], [x - 9, yb, "end"],
         [x + 10, y + 4, "start"], [x - 10, y + 4, "end"], [x + 9, yo, "start"], [x - 9, yo, "end"],
         [x + 9, yb + dy, "start"], [x - 9, yb + dy, "end"], [x + 9, yb + 2 * dy, "start"], [x - 9, yb + 2 * dy, "end"], [x + 9, yb + 3 * dy, "start"]], lt]);
     }
@@ -813,7 +818,7 @@ const SW = {
   stop: <i className="sw dash" style={{ color: TR_STOP }} />,
   exit: <><b style={{ color: TR_STOP }}>✕</b><b>✕</b></>,
   open: <i className="sw" style={{ color: TR_ENT }} />,
-  link: <><i className="sw dash" style={{ color: K_UP }} /><i className="sw dash" style={{ color: K_DN }} /></>,
+  link: <><i className="bx" style={{ background: K_UP }} /><i className="bx" style={{ background: K_DN }} /></>,
   island: <i className="bx isl" />,
   unfinished: <i className="bx unf" />,
   roll: <i className="sw dash" style={{ color: "#8b95a3" }} />,
@@ -1096,8 +1101,8 @@ function withTrade(d, p0) {
     exLab ? { key: "exit_ma", label: exLab, desc: "收盤跌破（空單站上）就整筆出場" + (p.exit_delay ? "；進場後第 " + (p.exit_delay + 1) + " 根起才看" : "") } : null,
     { key: "entry", label: "多進／空進", desc: "紅色大三角多進、綠色大三角空進，旁邊標進場價：" + rt.entry },
     { key: "stop", label: "停損", desc: "紅虛線：" + rt.stop },
-    { key: "exit", label: "✕ 出場", desc: "整筆出場，✕ 旁邊寫「原因 出場價 這筆報酬%」：停損（紅）／破N線／爆量反K／到期（白）；畫面超過 250 根時只留記號、不寫字" },
-    { key: "link", label: "進→出", desc: "細虛線連進場與出場：這筆賺錢紅、賠錢綠" },
+    { key: "exit", label: "✕ 出場", desc: "整筆出場，✕ 旁邊寫「出場 出場價 這筆報酬%」，停損出場寫「停損」（紅 ✕），其他出場白 ✕；原因（破N線／爆量反K／到期）滑過記號或字看；畫面超過 250 根時只留記號、不寫字" },
+    { key: "link", label: "進→出", desc: "每筆一塊淡色框＋粗虛線，從進場價連到出場的 ✕（框的左右＝抱的期間、上下＝進出價差）：這筆賺錢紅、賠錢綠；還沒出場的持倉不畫" },
     { key: "island", label: "島狀反轉", desc: "金色虛線框＝懸空的那幾根 K，框上方標頂部島狀反轉、框下方標底部島狀反轉" },
     { key: "open", label: "持倉中", desc: "還沒出場的線延伸到右緣，右側標進場價與停損價" },
     { key: "tip", label: "滑過記號", desc: "滑鼠停在三角、✕ 或旁邊的字上（含右側持倉中的進場／停損標籤；手機點一下）會列出這筆進出場每個條件的實際數值；停損出場另列停損怎麼來的" },

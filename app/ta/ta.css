@@ -233,7 +233,7 @@ svg.ta-k .gl.up{fill:#ff8f96} svg.ta-k .gl.dn{fill:#6fd6a0} svg.ta-k .gl.filled{
 .ta-err.r-quota-exceeded,.ta-err.r-symbol-not-found{color:var(--text)}
 /* 圖上記號（同 ta_local） */
 svg.ta-k .te{font-size:12px;font-weight:700;paint-order:stroke;stroke:#0b0f15;stroke-width:3px}
-svg.ta-k .tx{font-size:11px;font-weight:600;paint-order:stroke;stroke:#0b0f15;stroke-width:3px}
+svg.ta-k .tx{font-size:12px;font-weight:700;paint-order:stroke;stroke:#0b0f15;stroke-width:3px}
 svg.ta-k .isl-t{fill:#ffc94a;font-size:12px;font-weight:700;paint-order:stroke;stroke:#0b0f15;stroke-width:3px}
 svg.ta-k .ckey{font-size:11px;font-weight:600;paint-order:stroke;stroke:#0b0f15;stroke-width:3px}
 svg.ta-k .mk-hit{cursor:pointer;outline:none}
