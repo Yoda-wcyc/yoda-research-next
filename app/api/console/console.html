@@ -557,6 +557,20 @@ tr:hover td{background:var(--surface2)}
       <input class="filter" id="digestHeader" type="text" autocomplete="off" style="flex:1 1 200px;min-width:160px" placeholder="預設：N 份新報告上線">
       <span style="font-size:11.5px;color:var(--dim)">只影響這一批；主旨 ≤80 字、頁首 ≤40 字、不能換行；主旨前面自動加「Yoda Research｜」</span>
     </div>
+    <!-- 彙整通知：這一批加一段公告（選填·放在「時間不夠？」提示下面、報告清單上面；四欄都空＝沒有公告；寄出成功後自動清空）Yoda 2026-11-18 -->
+    <div class="toolbar" style="align-items:center">
+      <label style="font-size:12.5px;color:var(--dim);white-space:nowrap" for="digestNoticeTitle">公告小標題（選填）</label>
+      <input class="filter" id="digestNoticeTitle" type="text" autocomplete="off" style="flex:1 1 200px;min-width:160px" placeholder="例：🚦 新的小遊戲：信號燈怎麼看">
+      <label style="font-size:12.5px;color:var(--dim);white-space:nowrap" for="digestNoticeUrl">連結</label>
+      <input class="filter" id="digestNoticeUrl" type="text" autocomplete="off" style="flex:2 1 320px;min-width:220px" placeholder="https://…">
+      <label style="font-size:12.5px;color:var(--dim);white-space:nowrap" for="digestNoticeBtn">按鈕字</label>
+      <input class="filter" id="digestNoticeBtn" type="text" autocomplete="off" style="flex:1 1 160px;min-width:140px" placeholder="預設：🎮 開啟">
+    </div>
+    <div class="toolbar" style="align-items:flex-start">
+      <label style="font-size:12.5px;color:var(--dim);white-space:nowrap" for="digestNotice">公告說明</label>
+      <textarea class="filter" id="digestNotice" rows="3" autocomplete="off" style="flex:1 1 480px;min-width:220px;resize:vertical;font:inherit" placeholder="一段說明（≤300 字，可換行）"></textarea>
+      <span style="font-size:11.5px;color:var(--dim)">只影響這一批；有填就要小標題＋說明＋連結三欄都填；小標題 ≤30、按鈕字 ≤30、連結只准 https://</span>
+    </div>
     <div class="tbl-wrap">
       <table>
         <thead><tr><th>reportId（付費檔）</th><th>最後更新（台北）</th><th>狀態</th><th>已寄出通知</th><th>寄通知</th><th style="width:1%;text-align:center;white-space:nowrap"><input type="checkbox" id="paidChkAll" onclick="toggleAllPaid(this)"> 全選</th></tr></thead>
@@ -2730,6 +2744,23 @@ function digestDefaults(ids){
   var names=ord.map(function(id){return digestTitleOf(id).replace(/\s·\s\d{4}-\d{2}-\d{2}$/,'');});
   return { subject: 'Yoda Research｜新報告上線：'+(names.length<=3?names.join('・'):names.length+' 份'), header: names.length+' 份新報告上線' };
 }
+/* 彙整通知「本次加一段公告」（Yoda 2026-11-18）：規則跟 Code.gs mailNotice_ 同一套（伺服器才是最後把關）。
+   四欄都空＝沒有公告；有填任何一欄 → 小標題＋說明＋連結都要有；只有說明可換行；連結只准 https://。回 {err} 或 {n:null|{title,text,url,btn}} */
+var NOTICE_TITLE_MAX=30, NOTICE_TEXT_MAX=300, NOTICE_URL_MAX=500, NOTICE_BTN_MAX=30, NOTICE_BTN_DEFAULT='🎮 開啟';
+function digestNoticeCheck(){
+  var g=function(id){var el=$(id);return el?el.value:'';};
+  var t=digestOvCheck(g('digestNoticeTitle'),'公告小標題',NOTICE_TITLE_MAX); if(t.err)return t;
+  var u=digestOvCheck(g('digestNoticeUrl'),'公告連結',NOTICE_URL_MAX); if(u.err)return u;
+  var b=digestOvCheck(g('digestNoticeBtn'),'公告按鈕字',NOTICE_BTN_MAX); if(b.err)return b;
+  var raw=g('digestNotice').replace(/\r\n?/g,'\n');
+  var x=digestOvCheck(raw.replace(/\n/g,' '),'公告說明',NOTICE_TEXT_MAX); if(x.err)return x; // 換行先當空白過檢查，字數用原字算
+  var xv=raw.trim(), xn=Array.from(xv).length; if(xn>NOTICE_TEXT_MAX)return {err:'公告說明太長：'+xn+' 字，上限 '+NOTICE_TEXT_MAX+' 字'};
+  if(!t.v&&!xv&&!u.v&&!b.v)return {n:null};
+  var miss=[]; if(!t.v)miss.push('小標題'); if(!xv)miss.push('說明'); if(!u.v)miss.push('連結');
+  if(miss.length)return {err:'公告只填了一部分：還缺'+miss.join('、')+'（不要公告就四欄都清空）'};
+  if(!/^https:\/\/[^\s\/?#]+\.[^\s\/?#]+/i.test(u.v)||/[\s<>"']/.test(u.v))return {err:'公告連結要是 https:// 開頭的完整網址，不能有空白或引號'};
+  return {n:{title:t.v,text:xv,url:u.v,btn:b.v}};
+}
 function digestCheckedIds(){return Array.prototype.slice.call(document.querySelectorAll('#paidBody .paid-chk:checked')).map(function(c){return c.dataset.id;}).filter(function(id){return id && !isBriefReport(id);});} // 簡報本來就沒有勾選框；這裡再擋一次
 function refreshDigestPlaceholders(){
   var s=$('digestSubject'), h=$('digestHeader'); if(!s||!h)return;
@@ -2746,17 +2777,20 @@ async function notifyBatchSelected(){
   var sIn=$('digestSubject'), hIn=$('digestHeader');
   var sc=digestOvCheck(sIn?sIn.value:'','主旨',DIGEST_SUBJECT_MAX); if(sc.err){ await uiAlert(sc.err); return; }
   var hc=digestOvCheck(hIn?hIn.value:'','頁首標題',DIGEST_HEADER_MAX); if(hc.err){ await uiAlert(hc.err); return; }
-  var ovSubject=sc.v, ovHeader=hc.v;
+  var nc=digestNoticeCheck(); if(nc.err){ await uiAlert(nc.err); return; }
+  var ovSubject=sc.v, ovHeader=hc.v, ovNotice=nc.n;
   var finalSubject=ovSubject?(/^yoda\s*research/i.test(ovSubject)?ovSubject:DIGEST_SUBJECT_PREFIX+ovSubject):'';
   var dft=digestDefaults(ids);
   var subjLine=finalSubject?('主旨（自訂）：'+finalSubject):('主旨（預設）：'+dft.subject+'\n　※ 預設主旨依每人缺的報告自動產生，少數人可能只列他缺的那幾份');
   var headLine=ovHeader?('頁首（自訂）：'+ovHeader):('頁首（預設）：'+dft.header+'\n　※ 預設頁首的份數依每人缺的報告而定');
+  var noticeLine=ovNotice?('\n公告（本次）：'+ovNotice.title+'\n　按鈕「'+(ovNotice.btn||NOTICE_BTN_DEFAULT)+'」→ '+ovNotice.url):'';
   var list=ids.map(function(id){return '　· '+prettyPaidTitle(id);}).join('\n');
-  if(!await uiConfirm('這封彙整信包含以下 '+ids.length+' 份報告：\n\n'+list+'\n\n'+subjLine+'\n'+headLine+'\n\n寄給「還沒收到的付費會員」，每人一封、只列他缺的那幾份。\n（已收過的不再列、不重寄；退訂者不寄）\n\n確定寄出？'))return;
+  if(!await uiConfirm('這封彙整信包含以下 '+ids.length+' 份報告：\n\n'+list+'\n\n'+subjLine+'\n'+headLine+noticeLine+'\n\n寄給「還沒收到的付費會員」，每人一封、只列他缺的那幾份。\n（已收過的不再列、不重寄；退訂者不寄）\n\n確定寄出？'))return;
   if(mailBegin('彙整寄送中…')===null)return;
   var payload={action:'adminNotifyBatchDigest',key:KEY,reportIds:ids,force:false};
   if(ovSubject)payload.subject=ovSubject;   // 只送 Yoda 打的字；前綴由伺服器加（同一套規則）
   if(ovHeader)payload.header=ovHeader;
+  if(ovNotice){ payload.noticeTitle=ovNotice.title; payload.notice=ovNotice.text; payload.noticeUrl=ovNotice.url; if(ovNotice.btn)payload.noticeBtn=ovNotice.btn; } // 按鈕字空＝伺服器用預設
   mailAutoRun(payload,'彙整寄送中').then(function(o){
     mailEnd();
     // 停下來時保留自訂主旨／頁首：排除原因後再按一次，續寄的人收到的仍是同一版
@@ -2764,7 +2798,9 @@ async function notifyBatchSelected(){
     var r=o.res||{};
     // 自訂了卻沒被套用＝GAS 還是舊版（不認 subject/header）——提醒先部署 GAS（最後一段沒寄任何人時 subjectCustom 仍會照實回）
     if((ovSubject&&!r.subjectCustom)||(ovHeader&&!r.headerCustom)) uiAlert('⚠ 信已寄出，但伺服器沒有套用自訂主旨／頁首（GAS 可能還沒部署 2026-10-08-b）。這批用的是預設字。');
+    if(ovNotice&&!r.noticeCustom&&(r.sent||0)>0) uiAlert('⚠ 信已寄出，但伺服器沒有放公告（GAS 可能還沒部署 2026-11-18-a）。這批信裡沒有公告。');
     if(sIn)sIn.value=''; if(hIn)hIn.value='';  // 只影響這一批：寄出後清空，下一批回到預設
+    ['digestNoticeTitle','digestNotice','digestNoticeUrl','digestNoticeBtn'].forEach(function(id){var el=$(id); if(el)el.value='';});
     var msg=mailDoneText(o);
     if(r.failed)msg+='｜失敗 '+r.failed;
     if(r.optedOut)msg+='｜退訂 '+r.optedOut;
