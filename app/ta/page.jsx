@@ -216,7 +216,7 @@ function SortTable({ cols, rows, rowKey, className, rowClass, onRow }) {
 const K_UP = "#e0525e", K_DN = "#3fae7a", GOLD = "#ffc94a";
 const MA_COL = ["#ff4d4f", "#f5c518", "#3d8bfd"];   // 均線由短到長：紅、黃、藍（Yoda 2026-11-09）
 const EMA_COL = "#ff5ce1";
-const YR_COL = "#b9a3ff";   // 年線 SMA240（11-19）：日K 常駐細線，不屬於均線組、不進交易計算
+const YR_COL = "#b9a3ff";   // 年線 SMA240（11-19）：日K 常駐細線；週K 對應 52 週線 SMA52（11-19）；不屬於均線組、不進交易計算
 const TR_STOP = "#ff4d4d", TR_ENT = "#9ad0ff";
 const LINE_STYLE = { stop: [TR_STOP, "5 3"], open_entry: [TR_ENT, ""], open_stop: [TR_STOP, "5 3"] };
 const MARKS = "①②③④⑤";
@@ -336,8 +336,9 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls }) {
   const hitArea = (bx) => placed.reduce((z, r) => z + Math.max(0, Math.min(bx[2], r[2] + 1) - Math.max(bx[0], r[0] - 1)) * Math.max(0, Math.min(bx[3], r[3] + 1) - Math.max(bx[1], r[1] - 1)), 0);
   const busyAt = (bx) => placed.some((p) => bx[0] < p[2] && bx[2] > p[0] && bx[1] < p[3] && bx[3] > p[1]);
   // 圖左上線名（三條均線、出場線、停損）：先佔位，後面的島狀反轉、盤中未定、進出場標籤才會避開；字最後才畫（蓋在 K 棒上面）
-  const yrOn = !!yr && yr.slice(a, b).some(Number.isFinite);   // 不足 240 根那段 NaN 不畫；整個區間都不足就連線名都不寫
-  const ckey = [...smas.map(([m], k) => ["SMA" + m, MA_COL[k], ""]), ...(yrOn ? [["年線", YR_COL, ""]] : []),
+  const yrOn = !!yr && yr.slice(a, b).some(Number.isFinite);   // 不足 240／52 根那段 NaN 不畫；整個區間都不足就連線名都不寫
+  const yrW = d.tf === "W", yrName = yrW ? "52 週線" : "年線";
+  const ckey = [...smas.map(([m], k) => ["SMA" + m, MA_COL[k], ""]), ...(yrOn ? [[yrName, YR_COL, ""]] : []),
     ...(ch.exit_line ? [["出場線 " + (trd.p ? maName(trd.p, trd.p.exit_k) : ""), EMA_COL, ""]] : []), ...(marks.length || trd.open ? [["停損", TR_STOP, "4 3"]] : [])];
   const kels = [];
   let kx = L + 6;
@@ -475,7 +476,7 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls }) {
     });
   };
   smas.forEach(([m, arr], k) => poly(arr, "sma" + m, MA_COL[k], 1.6, true));
-  if (yrOn) poly(yr, "sma240", YR_COL, 1.2, true);
+  if (yrOn) poly(yr, yrW ? "sma52" : "sma240", YR_COL, 1.2, true);
   poly(ch.exit_line, "exit_ma", EMA_COL, 1, false);
   // 支撐（白實線）／壓力（白虛線）
   const lab = [];   // {y, t, col, nt}
@@ -775,7 +776,7 @@ function ChartArea({ d, maSet }) {
   const full = useMemo(() => fullSeries(d), [d.history, ch.bars, d.bars_completed]);   // eslint-disable-line react-hooks/exhaustive-deps
   const N = full.bars.length;
   const smas = useMemo(() => (g(ch, "ma_sets", maSet) || []).map((m) => [m, smaSeq(full.c, Number(m))]), [full, ch.ma_sets, maSet]);   // eslint-disable-line react-hooks/exhaustive-deps
-  const yr = useMemo(() => (d.tf === "D" ? smaSeq(full.c, 240) : null), [full, d.tf]);   // 年線＝240 日線，只在日K 畫
+  const yr = useMemo(() => (d.tf === "D" ? smaSeq(full.c, 240) : d.tf === "W" ? smaSeq(full.c, 52) : null), [full, d.tf]);   // 日K 年線＝240 日線、週K 52 週線；1H/4H 不畫
   const [rng, setRng] = useState(() => [Math.max(0, Math.min(full.k0, N - 2)), N]);   // 預設＝引擎的圖視窗（近 120 根）
   const b = Math.min(rng[1], N), a = Math.max(0, Math.min(rng[0], b - 2));
   const nf = d.bars_completed != null ? Math.min(d.bars_completed, N) : N;
@@ -868,7 +869,8 @@ function Legend({ d, maSet }) {
       <dl>
         <div className="ta-rule"><dt><span className="lg">{set.map((m, k) => <i key={m} className="sw" style={{ color: MA_COL[k] }} />)}</span>均線</dt>
           <dd>{set.map((m) => "SMA" + m).join("／")}（紅→黃→藍＝短到長；簡單均線，上方「均線組」切換）；K 棒紅漲綠跌，下方是成交量</dd></div>
-        {d.tf === "D" ? <div className="ta-rule"><dt><span className="lg"><i className="sw" style={{ color: YR_COL }} /></span>年線</dt><dd>SMA240（240 日均線），日K 常駐；不屬於均線組、不進交易規則；不足 240 根那段不畫</dd></div> : null}
+        {d.tf === "D" ? <div className="ta-rule"><dt><span className="lg"><i className="sw" style={{ color: YR_COL }} /></span>年線</dt><dd>SMA240（240 日均線），日K 常駐；不屬於均線組、不進交易規則；不足 240 根那段不畫</dd></div>
+          : d.tf === "W" ? <div className="ta-rule"><dt><span className="lg"><i className="sw" style={{ color: YR_COL }} /></span>52 週線</dt><dd>SMA52（52 週均線），週K 常駐；不屬於均線組、不進交易規則；不足 52 根那段不畫</dd></div> : null}
         {items.map((x) => (
           <div key={x.key} className="ta-rule"><dt><span className="lg">{SW[x.key] || null}</span>{x.label}</dt><dd>{x.desc}</dd></div>
         ))}

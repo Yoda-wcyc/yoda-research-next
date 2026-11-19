@@ -120,7 +120,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   const opts = { jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "classic" } }, target: "es2020" }, module: { type: "commonjs" } };
   const src = 'const React = require("react");\n' + fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8")
     .replace('"../../lib/ta-trade"', JSON.stringify(path.join(ROOT, "lib", "ta-trade.js").replace(/\\/g, "/")))
-    .replace('"../../lib/ta-rs"', JSON.stringify(path.join(ROOT, "lib", "ta-rs.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName };\n";
+    .replace('"../../lib/ta-rs"', JSON.stringify(path.join(ROOT, "lib", "ta-rs.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea };\n";
   const Mod = require("module");
   const libSrc = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-trade.js"), "utf8"), opts).code;
   const lib = new Mod(path.join(ROOT, "lib", "ta-trade.js")); lib.paths = Mod._nodeModulePaths(ROOT); lib._compile(libSrc, lib.id);
@@ -255,13 +255,13 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
 
   // ---------- 4. 期貨／費半 ----------
   const mkD = (o = {}) => {
-    const n = 60, t = [], O = [], H = [], Lo = [], C = [], V = [];
+    const n = o.n || 60, t = [], O = [], H = [], Lo = [], C = [], V = [];
     for (let i = 0; i < n; i++) {
       const c = 100 + 10 * Math.sin(i / 5) + (i >= 40 ? 6 : 0);   // 第 40 根往上跳（當作換月）
       t.push("2026-0" + (1 + Math.floor(i / 28)) + "-" + String(1 + (i % 28)).padStart(2, "0")); O.push(c - 0.5); H.push(c + 1); Lo.push(c - 1); C.push(c);
       V.push(o.noVol ? null : 1000 + (i % 3) * 800);
     }
-    const bars = t.slice(-40).map((x, k) => ({ t: x, o: O[20 + k], h: H[20 + k], l: Lo[20 + k], c: C[20 + k], v: V[20 + k], final: true }));
+    const bars = t.slice(-40).map((x, k) => ({ t: x, o: O[n - 40 + k], h: H[n - 40 + k], l: Lo[n - 40 + k], c: C[n - 40 + k], v: V[n - 40 + k], final: true }));
     const d = { tf: "D", bars_completed: n, history: { n, t, o: O, h: H, l: Lo, c: C, v: V },
       symbol: o.symbol || { market: "fut", exchange: "CME", type: "FUTURE", code: "NQ1!", yahoo: "NQ=F", contract: "Nasdaq 100 Dec 26" },
       chart: { bars, ma_sets: { short: [5, 10, 20] }, overlays: { sr: [], gaps: { cols: [], rows: [] }, islands: [] }, legend: [] }, signals: {} };
@@ -468,7 +468,19 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     const tw = chartHtml(mkD({ symbol: { market: "tw", type: "EQUITY", code: "2330" } }));
     assert.ok(tw.includes("量（張）") && !tw.includes("指數量"), "個股量單位被改到");
     const src = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
-    assert.ok(/d\.tf === "D" \? smaSeq\(full\.c, 240\)/.test(src), "年線只在日K 用 smaSeq(full.c, 240) 算");
+    assert.ok(/d\.tf === "D" \? smaSeq\(full\.c, 240\) : d\.tf === "W" \? smaSeq\(full\.c, 52\) : null/.test(src), "日K smaSeq(full.c, 240)、週K smaSeq(full.c, 52)、其他不算");
+  });
+  await t("週K 52 週線（11-19）：週K 畫 SMA52 標「52 週線」；日K 仍是 240 年線；1H/4H 都沒有；不足根數不畫", async () => {
+    const ca = (tf, n) => { const d = mkD({ n }); d.tf = tf; const ce = console.error; console.error = () => {}; try { return renderToString(React.createElement(P.ChartArea, { d, maSet: "short" })); } finally { console.error = ce; } };   // 伺服端 render 的 useLayoutEffect 警告不印
+    const w = ca("W", 60);
+    assert.ok(w.includes(">52 週線<") && w.includes('data-ma="sma52"') && !w.includes("年線") && !w.includes('data-ma="sma240"'), "週K 沒畫 52 週線／混到年線");
+    const dd = ca("D", 260);
+    assert.ok(dd.includes(">年線<") && dd.includes('data-ma="sma240"') && !dd.includes("52 週線") && !dd.includes('data-ma="sma52"'), "日K 年線被改到");
+    for (const tf of ["1H", "4H"]) { const h = ca(tf, 260); assert.ok(!h.includes("年線") && !h.includes("52 週線") && !/data-ma="sma(52|240)"/.test(h), tf + " 不該畫"); }
+    const w0 = ca("W", 51);
+    assert.ok(!w0.includes("52 週線") && !w0.includes('data-ma="sma52"'), "不足 52 根也畫了");
+    const d0 = ca("D", 239);
+    assert.ok(!d0.includes("年線") && !d0.includes('data-ma="sma240"'), "不足 240 根也畫了");
   });
   // ---------- 5. 台指期／費半期（期交所） ----------
   const TWF = { market: "fut", exchange: "TAIFEX", type: "FUTURE", code: "TXF1!", yahoo: "TXF1!", contract: "202611", tfs: ["D", "W"], session: "含夜盤（夜盤算到隔天）" };
