@@ -825,13 +825,14 @@ def gaps_full(dc, skip=()):
     return gp
 
 
-def analyze_bars(df, market, final=None, rolls=None, fut_note=None):
+def analyze_bars(df, market, final=None, rolls=None, fut_note=None, vol_why=None):
     """盤中週期（index 有不是 00:00 的 K）整段時間都帶時分：期貨 1H 每天 00:00 那根不會只剩日期（股票盤中沒有 00:00 的 K，輸出不變）。"""
     with A.full_times(bool((df.index != df.index.normalize()).any())):
-        return _analyze_bars(df, market, final, rolls, fut_note)
+        return _analyze_bars(df, market, final, rolls, fut_note, vol_why)
 
 
-def _analyze_bars(df, market, final=None, rolls=None, fut_note=None):
+def _analyze_bars(df, market, final=None, rolls=None, fut_note=None, vol_why=None):
+    """vol_why：缺量註記的原因（None＝依 market 給預設；指數由 run() 帶，最後一根缺量時非空 → 沒有其他缺量也照樣註記）。"""
     """純函式。df：o/h/l/c/v（index＝K 棒時間，舊到新）；final：每根是否定案（None＝全部定案；未定只能在尾巴）；
     rolls：期貨換月那幾根（find_rolls 的輸出，i＝df 位置）→ 那根不算缺口，上圖標「換月」。
     訊號、均線排列只用定案 K；圖＝最後 120 根定案 K ＋ 尾巴的盤中未定 K；history＝全部 K（瀏覽器回測只用前 bars_completed 根）。
@@ -887,9 +888,10 @@ def _analyze_bars(df, market, final=None, rolls=None, fut_note=None):
     nv = int(np.isnan(dc['v'].to_numpy()[k0:]).sum())
     if not has_vol:
         notes.append('這檔 Yahoo 不給成交量（指數沒有量）：量比、前五大量、量的進出場條件都停用')
-    elif nv:
-        why = {'tw': '（台股盤中第一根常見）', 'fut': '（期貨每天 18:00 開盤那根、日K 最近一天常見）'}.get(market, '')
-        notes.append('近 %d 根裡有 %d 根 Yahoo 沒給量%s，量比與前五大量會跳過這些 K' % (nf - k0, nv, why))
+    elif nv or vol_why:
+        why = vol_why if vol_why is not None else {'tw': '（台股盤中第一根常見）', 'fut': '（期貨每天 18:00 開盤那根、日K 最近一天常見）'}.get(market, '')
+        # nv＝0 但 vol_why 非空：週K 最後一週少了當天的量（加總照算、不是 NaN）、或當天那根還沒定案
+        notes.append('近 %d 根裡有 %d 根 Yahoo 沒給量%s，量比與前五大量會跳過這些 K' % (nf - k0, nv, why) if nv else '最後一根少了當天的量%s' % why)
     if market == 'fut':
         notes.append(fut_note or '期貨連續月是 Yahoo 直接接下一個合約、價格沒有還原：換月那根（圖上標「%s」）的跳空不算缺口、不進撐壓、不算島狀反轉'
                      % ROLL_LABEL)
@@ -927,8 +929,12 @@ def run(raw, tf, now=None, http=None, post=None):
         raise EngineError(422, 'not_supported', '只支援個股與 ETF（%s 是 %s）' % (code, m.get('instrumentType')))
     tz = m.get('exchangeTimezoneName') or ('Asia/Taipei' if market == 'tw' else 'America/New_York')
     src = frame(res, TFS[tf])
+    vol_why = None
     if sp and sp['type'] == 'INDEX':
-        src.loc[src['v'] == 0, 'v'] = np.nan       # 指數量 0＝Yahoo 沒給（^TWII 日K 十年 9 天、當天盤中那根），當缺量
+        # 指數量 0＝Yahoo 沒給，當缺量：^TWII 日K 十年 9 天；當天那根盤中、收盤後都是 0，隔天才補
+        src.loc[src['v'] == 0, 'v'] = np.nan
+        vol_why = '（加權指數當天的量 Yahoo 隔天才補，這根的量比要明天才算得出來）' \
+            if market == 'tw' and len(src) and np.isnan(src['v'].iloc[-1]) else ''
     rmt =m.get('regularMarketTime') if market == 'fut' else None
     bars, final = build(src, tf, market, _local(min(now, fetched), tz), _local(rmt, tz) if rmt else None)
     rolls = None
@@ -940,8 +946,10 @@ def run(raw, tf, now=None, http=None, post=None):
         except EngineError:
             pass                                   # 參考標的抓不到 → 只用日曆
         rolls = find_rolls(sp['kind'], tf, bars if tf == '1H' else bars_1h(src, 'fut')[0] if tf == '4H' else src, bars, R)
-    out = analyze_bars(bars, market, final, rolls)
-    sym = {'input': raw, 'code': code, 'yahoo': ysym, 'market': market, 'type': m.get('instrumentType'),
+    out = analyze_bars(bars, market, final, rolls, vol_why=vol_why)
+    if sp and sp['type'] == 'INDEX' and market == 'tw':
+        out['signals']['top_volume']['unit'] = '指數量'   # analyze_symbol 只看 market（tw＝股）；跟前端 idx 標籤一致
+    sym ={'input': raw, 'code': code, 'yahoo': ysym, 'market': market, 'type': m.get('instrumentType'),
            'name': m.get('longName') or m.get('shortName'), 'exchange': m.get('fullExchangeName'),
            'currency': m.get('currency'), 'timezone': tz, 'has_volume': out['has_volume']}
     if sp:                                         # 期貨／費半：中文名＋交易所；期貨另給目前合約（Yahoo shortName，例 E-Mini S&P 500 Dec 26）
@@ -1417,6 +1425,20 @@ def selftest():
     ok(rt['symbol']['code'] == '^TWII' and rt['symbol']['market'] == 'tw' and rt['symbol']['name'] == '加權指數'
        and rt['symbol']['exchange'] == 'TWSE' and rt['has_volume'] is True and rt['history']['v'][5] is None
        and rt['history']['v'][6] == 1000, '^TWII：台股盤別、中文名；日K 有量照用、量 0 那根當缺量（history.v＝null）')
+    ok(rt['signals']['top_volume']['unit'] == '指數量' and rt['notes'] == [], '^TWII：前五大量單位＝指數量；舊的缺量不在近 120 根 → 沒有註記')
+
+    def mock_l(url):                               # 收盤後當天那根量 0（Yahoo 隔天才補）
+        st, j = mock_f(url)
+        if '%5ETWII' in url or '^TWII' in url:
+            j['chart']['result'][0]['indicators']['quote'][0]['volume'][-1] = 0
+        return st, j
+    _CACHE.clear()
+    why = '加權指數當天的量 Yahoo 隔天才補，這根的量比要明天才算得出來'
+    ld, lw = run('加權', 'D', now, mock_l), run('加權', 'W', now, mock_l)
+    ok(ld['history']['v'][-1] is None and len(ld['notes']) == 1 and why in ld['notes'][0] and '盤中第一根' not in ld['notes'][0]
+       and len(lw['notes']) == 1 and why in lw['notes'][0],
+       '^TWII 最後一根缺量：日K／週K 註記寫「%s」（不是台股盤中第一根）' % why)
+    _CACHE.clear()
     for sym, code in (('ES', 'not_found'), ('IDXX', 'not_supported')):
         try:
             run(sym, 'D', now, lambda u: (404, None) if '/ES?' in u else mock_f(u))
