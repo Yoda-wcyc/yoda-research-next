@@ -19,7 +19,7 @@ vendor.json 記 sha256，兩邊各有檢查，副本不能偷偷漂移：
       tests/ta_trade_parity.py 驗）。引擎不再回 trade，免得兩份打架。
 授權  handle() 第一步就驗 X-TA-Engine-Key＝HMAC-SHA256(TA_ENGINE_KEY, "ta-engine") 小寫 hex（引擎專用密鑰，跟會員登入用的密鑰分開）；
       不對或引擎沒設 TA_ENGINE_KEY 就 401，不碰 Yahoo。原始密鑰不上線路，只傳衍生值。
-期貨  11-10：美國期貨連續月 ES／NQ／YM／RTY／GC／CL（ES1!、ES=F、/ES、小那…，special()）＋ 指數只收 ^SOX。期貨盤別＝CME 交易日
+期貨  11-10：美國期貨連續月 ES／NQ／YM／RTY／GC／CL（ES1!、ES=F、/ES、小那…，special()）＋ 指數只收 ^SOX、^TWII（11-19，加權／大盤／TAIEX）。期貨盤別＝CME 交易日
       （前一天 18:00～當天 17:00 美東；1H 23 根、4H 從 18:00 起切、日K 用 Yahoo 交易日＋結算價）。換月：用「期貨 ÷ 參考標的」價差跳動找
       （find_rolls），價格不還原，換月那根不算缺口、回應 chart.overlays.rolls 標「換月」。整段沒有量（^SOX）→ has_volume=false。
       只加欄位，舊頁面拿到新回應不會壞（docs/ta-engine-contract.md §2.1／§2.2）。
@@ -68,7 +68,12 @@ FUT_BARE = ('NQ', 'YM', 'RTY', 'GC')     # 不帶 =F／1!／斜線也當期貨�
 TWF_ROOT = {'TX': 'TX', 'TXF': 'TX', 'SXF': 'SXF'}
 TWF = {'TX': ('TXF1!', '台指期近月連續'), 'SXF': ('SXF1!', '費城半導體期貨近月連續')}
 SOX = {'yahoo': '^SOX', 'code': '^SOX', 'market': 'us', 'type': 'INDEX', 'name': '費城半導體指數', 'exchange': 'Nasdaq'}
-ALIAS = {'小那': 'NQ1!', '小那斯達克': 'NQ1!', '那指期': 'NQ1!', '那斯達克期': 'NQ1!', '小道': 'YM1!', '小道瓊': 'YM1!', '道瓊期': 'YM1!',
+# 加權指數（11-19）：Yahoo ^TWII，走台股盤別／定案規則；日K 有量（Yahoo 自己的指數量，跟證交所成交股數／金額相關 0.83／0.87、
+# 不是股、張、筆，單位未公開 → 前端標「量（Yahoo 指數量）」只看相對大小）；1H 的量全 0 → has_volume=false、量的條件自動停用
+TWII = {'yahoo': '^TWII', 'code': '^TWII', 'market': 'tw', 'type': 'INDEX', 'name': '加權指數', 'exchange': 'TWSE'}
+IDX = {'^SOX': SOX, '^TWII': TWII}
+ALIAS = {'TWII': '^TWII', 'TAIEX': '^TWII', '加權': '^TWII', '加權指數': '^TWII', '大盤': '^TWII',
+         '小那': 'NQ1!', '小那斯達克': 'NQ1!', '那指期': 'NQ1!', '那斯達克期': 'NQ1!', '小道': 'YM1!', '小道瓊': 'YM1!', '道瓊期': 'YM1!',
          '小標普': 'ES1!', '標普期': 'ES1!', '小羅素': 'RTY1!', '羅素期': 'RTY1!', '黃金期': 'GC1!', '原油期': 'CL1!', '輕原油': 'CL1!',
          'SOX': '^SOX', '費半': '^SOX', '費城半導體': '^SOX', '台指期': 'TXF1!', '台指': 'TXF1!', '費半期': 'SXF1!'}
 FUT_IN = re.compile(r'^(/)?([A-Z]{2,3})(=F|1!)?$')
@@ -185,7 +190,7 @@ def candidates(raw):
         return ([code + suf] if suf else [code + '.TW', code + '.TWO']), 'tw', code
     if s.startswith('^') or not US_IN.match(s):
         raise EngineError(400, 'bad_symbol', '代號格式不對：台股填數字代號（如 2330、00878），美股填英文代號（如 NVDA），'
-                                             '期貨填 ES1!、NQ1!、YM1!、RTY1!、GC1!、CL1!、台指期 TXF1!、費半期 SXF1!；指數只收 ^SOX（費半）')
+                                             '期貨填 ES1!、NQ1!、YM1!、RTY1!、GC1!、CL1!、台指期 TXF1!、費半期 SXF1!；指數只收 ^TWII（加權）、^SOX（費半）')
     return [s.replace('.', '-')], 'us', s
 
 
@@ -194,8 +199,8 @@ def special(raw):
     收 ES=F／ES1!／/ES、純 NQ／YM／RTY／GC、中文別名（ALIAS）；台指期 TX／TXF／TXF1!、費半期 SXF／SXF1! → 期交所（src='taifex'）。"""
     s = (raw or '').strip().upper().replace(' ', '')
     s = ALIAS.get(s, s)
-    if s == '^SOX':
-        return dict(SOX)
+    if s in IDX:
+        return dict(IDX[s])
     m = FUT_IN.match(s)
     if not m:
         return None
@@ -922,7 +927,9 @@ def run(raw, tf, now=None, http=None, post=None):
         raise EngineError(422, 'not_supported', '只支援個股與 ETF（%s 是 %s）' % (code, m.get('instrumentType')))
     tz = m.get('exchangeTimezoneName') or ('Asia/Taipei' if market == 'tw' else 'America/New_York')
     src = frame(res, TFS[tf])
-    rmt = m.get('regularMarketTime') if market == 'fut' else None
+    if sp and sp['type'] == 'INDEX':
+        src.loc[src['v'] == 0, 'v'] = np.nan       # 指數量 0＝Yahoo 沒給（^TWII 日K 十年 9 天、當天盤中那根），當缺量
+    rmt =m.get('regularMarketTime') if market == 'fut' else None
     bars, final = build(src, tf, market, _local(min(now, fetched), tz), _local(rmt, tz) if rmt else None)
     rolls = None
     if market == 'fut':
@@ -1202,7 +1209,7 @@ def selftest():
     calls.clear()
     run('6488', 'D', now + 60, mock)
     ok(calls == [], '同代號＋週期 15 分鐘內走快取（含 .TW 查無的負快取），不重打 Yahoo')
-    for sym, code in (('^TWII', 'bad_symbol'), ('2330.HK', 'bad_symbol'), ('BTC-USD', 'bad_symbol'), ('IDXX', 'not_supported'),
+    for sym, code in (('^N225', 'bad_symbol'), ('2330.HK', 'bad_symbol'), ('BTC-USD', 'bad_symbol'), ('IDXX', 'not_supported'),
                       ('ZZZZ', 'not_found')):
         try:
             run(sym, 'D', now, mock)
@@ -1388,6 +1395,10 @@ def selftest():
             return 200, {'chart': {'result': [c]}}
         if sym == '^NDX':
             return 502, None
+        if sym == '^TWII':
+            c = _fake_chart(sym, 'INDEX')
+            c['indicators']['quote'][0]['volume'][5] = 0
+            return 200, {'chart': {'result': [c]}}
         return mock(url)
     _CACHE.clear()
     rs = run('費半', 'D', now, mock_f)
@@ -1400,6 +1411,12 @@ def selftest():
        and rq['symbol']['exchange'] == 'CME' and rq['symbol']['contract'] == 'Nasdaq 100 Dec 26' and rq['has_volume'] is True
        and isinstance(rq['chart']['overlays']['rolls'], list),
        'NQ1!：期貨白名單、中文名＋CME＋目前合約；參考標的 ^NDX 抓不到也照算（只用日曆）')
+    ok([sp(x) for x in ('加權', '加權指數', '大盤', 'TAIEX', 'twii', '^TWII', ' ^twii ')] == ['^TWII'] * 7
+       and special('^TWII')['market'] == 'tw' and special('^TWII')['type'] == 'INDEX', '^TWII：別名 加權／加權指數／大盤／TAIEX／TWII')
+    rt = run('加權', 'D', now, mock_f)
+    ok(rt['symbol']['code'] == '^TWII' and rt['symbol']['market'] == 'tw' and rt['symbol']['name'] == '加權指數'
+       and rt['symbol']['exchange'] == 'TWSE' and rt['has_volume'] is True and rt['history']['v'][5] is None
+       and rt['history']['v'][6] == 1000, '^TWII：台股盤別、中文名；日K 有量照用、量 0 那根當缺量（history.v＝null）')
     for sym, code in (('ES', 'not_found'), ('IDXX', 'not_supported')):
         try:
             run(sym, 'D', now, lambda u: (404, None) if '/ES?' in u else mock_f(u))
@@ -1607,7 +1624,7 @@ def selftest():
     src = open(os.path.abspath(__file__), encoding='utf-8').read()
     ok(src.count('JWT' + '_SECRET') == 0, '引擎原始碼完全不讀 JWT' + '_SECRET')
     s2, b2 = handle('/api/engine?symbol=2330&tf=D', good, sec, now, mock)
-    s3, b3 = handle('/api/engine?symbol=%5ETWII', good, sec, now, mock)
+    s3, b3 = handle('/api/engine?symbol=%5EN225', good, sec, now, mock)
     ok(s2 == 200 and b2['ok'] and s3 == 400 and b3['error']['code'] == 'bad_symbol', '對的金鑰 → 200；壞代號 → 400 帶錯誤碼')
 
     # 副本：在 Next repo 的 ta-engine\ 跑時驗 vendor.json

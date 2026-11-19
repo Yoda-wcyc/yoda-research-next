@@ -454,6 +454,22 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     assert.deepStrictEqual(bad, [], "被擋掉的別名");
   });
 
+  await t("^TWII 加權指數＋年線（11-19）：代號別名收得進來；指數量標「指數量」不換算張；年線 yr 有值才畫（不足 240 根＝NaN 不畫）、只在日K 算", async () => {
+    for (const x of ["^TWII", "^twii", "加權", "加權指數", "大盤", "TAIEX", "TWII"]) assert.ok(LV.cleanSym(x), x);
+    assert.strictEqual(LV.symKey("^TWII"), "^TWII");
+    const d = mkD({ symbol: { market: "tw", type: "INDEX", code: "^TWII", yahoo: "^TWII", exchange: "TWSE" } });
+    const full = P.fullSeries(d), N = full.bars.length;
+    const r = (yr) => renderToString(React.createElement(P.KChart, { d, full, smas: [], yr, a: 0, b: N, gaps: [], islands: [], top: [], rolls: [] }));
+    const h0 = r(undefined);
+    assert.ok(h0.includes("指數量") && !h0.includes("量（張）") && !h0.includes("年線") && !h0.includes('data-ma="sma240"'), "指數量標籤／沒給年線");
+    const h1 = r(full.c.map((c, i) => (i < N / 2 ? NaN : c)));
+    assert.ok(h1.includes(">年線<") && h1.includes('data-ma="sma240"'), "年線沒畫");
+    assert.ok(!r(full.c.map(() => NaN)).includes("年線"), "整段不足 240 根也畫了年線");
+    const tw = chartHtml(mkD({ symbol: { market: "tw", type: "EQUITY", code: "2330" } }));
+    assert.ok(tw.includes("量（張）") && !tw.includes("指數量"), "個股量單位被改到");
+    const src = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
+    assert.ok(/d\.tf === "D" \? smaSeq\(full\.c, 240\)/.test(src), "年線只在日K 用 smaSeq(full.c, 240) 算");
+  });
   // ---------- 5. 台指期／費半期（期交所） ----------
   const TWF = { market: "fut", exchange: "TAIFEX", type: "FUTURE", code: "TXF1!", yahoo: "TXF1!", contract: "202611", tfs: ["D", "W"], session: "含夜盤（夜盤算到隔天）" };
   const html0 = (el) => renderToString(el).replace(/<!-- -->/g, "");

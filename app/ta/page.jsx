@@ -50,7 +50,9 @@ function fvol(v, market) {
   if (market === "fut") return Math.round(x).toLocaleString("en-US");        // 口
   return (x / 1e6).toFixed(1) + "M";
 }
-const volUnit = (market) => (market === "tw" ? "量（張）" : market === "fut" ? "量（口）" : "量（股）");
+const volUnit = (market) => (market === "idx" ? "量（Yahoo 指數量）" : market === "tw" ? "量（張）" : market === "fut" ? "量（口）" : "量（股）");
+// 指數（^TWII，11-19）的量是 Yahoo 自己的指數量：不是股、張、筆（單位未公開，只看相對大小）→ 不換算張、照原值 M 顯示
+const volMkt = (d) => (g(d, "symbol", "type") === "INDEX" ? "idx" : g(d, "symbol", "market"));
 // 沒有成交量（^SOX 指數）：引擎 has_volume=false，或舊回應沒這欄但定案 K 的量全是 null／0
 const NOVOL_TXT = "此標的沒有成交量";
 function noVolume(d) {
@@ -214,6 +216,7 @@ function SortTable({ cols, rows, rowKey, className, rowClass, onRow }) {
 const K_UP = "#e0525e", K_DN = "#3fae7a", GOLD = "#ffc94a";
 const MA_COL = ["#ff4d4f", "#f5c518", "#3d8bfd"];   // 均線由短到長：紅、黃、藍（Yoda 2026-11-09）
 const EMA_COL = "#ff5ce1";
+const YR_COL = "#b9a3ff";   // 年線 SMA240（11-19）：日K 常駐細線，不屬於均線組、不進交易計算
 const TR_STOP = "#ff4d4d", TR_ENT = "#9ad0ff";
 const LINE_STYLE = { stop: [TR_STOP, "5 3"], open_entry: [TR_ENT, ""], open_stop: [TR_STOP, "5 3"] };
 const MARKS = "①②③④⑤";
@@ -275,11 +278,11 @@ function topVolume(full, a, b, nf, eng) {
 }
 
 // K 線圖畫整段歷史的 [a, b) 這一段；Y 軸依區間內高低。K 棒與量柱併成幾條 path（1H 五千根拖曳才不卡）
-function KChart({ d, full, smas, a, b, onTip, gaps, islands, top, rolls }) {
+function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls }) {
   const ch = d.chart || {};
   const bars = full.bars.slice(a, b), n = bars.length;
   if (n < 2) return <div className="ta-nochart">沒有 K 線資料</div>;
-  const market = g(d, "symbol", "market");
+  const market = volMkt(d);
   const intra = d.tf === "1H" || d.tf === "4H";
   const oi = (i) => (i == null ? null : i - a);   // 缺口、島、前五大量的 i 都是整段 history 的絕對位置
   const sr = g(d, "signals", "sr_levels") || {};
@@ -325,7 +328,7 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top, rolls }) {
   els.push(<text key="dl" className="ax" x={xr} y={H - 7} textAnchor="end">{longD ? String(bars[n - 1].t).slice(0, 10) : md(bars[n - 1].t)}</text>);
   const noVol = noVolume(d);
   if (noVol) els.push(<text key="nov" className="ax" data-novol="" x={L + pw / 2} y={T + PH + GP + VH / 2 + 4} textAnchor="middle">{NOVOL_TXT}</text>);
-  else els.push(<text key="vl" className="ax" x={L - 6} y={T + PH + GP + 10} textAnchor="end">{market === "tw" ? "量（張）" : market === "fut" ? "量（口）" : "量"}</text>);
+  else els.push(<text key="vl" className="ax" x={L - 6} y={T + PH + GP + 10} textAnchor="end">{market === "idx" ? "指數量" : market === "tw" ? "量（張）" : market === "fut" ? "量（口）" : "量"}</text>);
   // 圖上文字／記號佔的位置（缺口代號、島狀反轉的字、前五大量編號、圖左上線名、進出場記號先放，進出場標籤再找不撞的位置）；tw＝字寬估計（中文 12、英數 6.8）
   const placed = [];
   const tw = (s) => [...s].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? 12 : 6.8), 0);
@@ -333,7 +336,8 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top, rolls }) {
   const hitArea = (bx) => placed.reduce((z, r) => z + Math.max(0, Math.min(bx[2], r[2] + 1) - Math.max(bx[0], r[0] - 1)) * Math.max(0, Math.min(bx[3], r[3] + 1) - Math.max(bx[1], r[1] - 1)), 0);
   const busyAt = (bx) => placed.some((p) => bx[0] < p[2] && bx[2] > p[0] && bx[1] < p[3] && bx[3] > p[1]);
   // 圖左上線名（三條均線、出場線、停損）：先佔位，後面的島狀反轉、盤中未定、進出場標籤才會避開；字最後才畫（蓋在 K 棒上面）
-  const ckey = [...smas.map(([m], k) => ["SMA" + m, MA_COL[k], ""]),
+  const yrOn = !!yr && yr.slice(a, b).some(Number.isFinite);   // 不足 240 根那段 NaN 不畫；整個區間都不足就連線名都不寫
+  const ckey = [...smas.map(([m], k) => ["SMA" + m, MA_COL[k], ""]), ...(yrOn ? [["年線", YR_COL, ""]] : []),
     ...(ch.exit_line ? [["出場線 " + (trd.p ? maName(trd.p, trd.p.exit_k) : ""), EMA_COL, ""]] : []), ...(marks.length || trd.open ? [["停損", TR_STOP, "4 3"]] : [])];
   const kels = [];
   let kx = L + 6;
@@ -471,6 +475,7 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top, rolls }) {
     });
   };
   smas.forEach(([m, arr], k) => poly(arr, "sma" + m, MA_COL[k], 1.6, true));
+  if (yrOn) poly(yr, "sma240", YR_COL, 1.2, true);
   poly(ch.exit_line, "exit_ma", EMA_COL, 1, false);
   // 支撐（白實線）／壓力（白虛線）
   const lab = [];   // {y, t, col, nt}
@@ -607,7 +612,7 @@ function KChart({ d, full, smas, a, b, onTip, gaps, islands, top, rolls }) {
     let hiP = -Infinity, loP = Infinity;
     for (let j = Math.max(0, Math.floor(i - (w + step) / step)); j <= i; j++) {
       const bj = bars[j];
-      for (const v of [bj.h, bj.l, bj.c, ch.exit_line ? ch.exit_line[a + j] : null, ...smas.map(([, arr]) => (arr ? arr[a + j] : null))]) {
+      for (const v of [bj.h, bj.l, bj.c, ch.exit_line ? ch.exit_line[a + j] : null, yr ? yr[a + j] : null, ...smas.map(([, arr]) => (arr ? arr[a + j] : null))]) {
         if (v != null && Number.isFinite(v)) { hiP = Math.max(hiP, v); loP = Math.min(loP, v); }
       }
     }
@@ -770,6 +775,7 @@ function ChartArea({ d, maSet }) {
   const full = useMemo(() => fullSeries(d), [d.history, ch.bars, d.bars_completed]);   // eslint-disable-line react-hooks/exhaustive-deps
   const N = full.bars.length;
   const smas = useMemo(() => (g(ch, "ma_sets", maSet) || []).map((m) => [m, smaSeq(full.c, Number(m))]), [full, ch.ma_sets, maSet]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const yr = useMemo(() => (d.tf === "D" ? smaSeq(full.c, 240) : null), [full, d.tf]);   // 年線＝240 日線，只在日K 畫
   const [rng, setRng] = useState(() => [Math.max(0, Math.min(full.k0, N - 2)), N]);   // 預設＝引擎的圖視窗（近 120 根）
   const b = Math.min(rng[1], N), a = Math.max(0, Math.min(rng[0], b - 2));
   const nf = d.bars_completed != null ? Math.min(d.bars_completed, N) : N;
@@ -822,7 +828,7 @@ function ChartArea({ d, maSet }) {
   const info = tip && trd.ctx && trd.p ? (tip.kind === "entry" ? explainEntry(trd, trd.p, tip.t) : explainExit(trd, trd.p, tip.t)) : null;
   return (
     <>
-      <KChart d={d} full={full} smas={smas} a={a} b={b} onTip={onTip} gaps={gapsAll} islands={islAll} top={top} rolls={rollsAll} />
+      <KChart d={d} full={full} smas={smas} yr={yr} a={a} b={b} onTip={onTip} gaps={gapsAll} islands={islAll} top={top} rolls={rollsAll} />
       {N > NAV_MIN ? <RangeNav bars={full.bars} a={a} b={b} onChange={setRng} /> : null}
       <BlockTabs d={d} view={view} />
       {info ? (
@@ -862,6 +868,7 @@ function Legend({ d, maSet }) {
       <dl>
         <div className="ta-rule"><dt><span className="lg">{set.map((m, k) => <i key={m} className="sw" style={{ color: MA_COL[k] }} />)}</span>均線</dt>
           <dd>{set.map((m) => "SMA" + m).join("／")}（紅→黃→藍＝短到長；簡單均線，上方「均線組」切換）；K 棒紅漲綠跌，下方是成交量</dd></div>
+        {d.tf === "D" ? <div className="ta-rule"><dt><span className="lg"><i className="sw" style={{ color: YR_COL }} /></span>年線</dt><dd>SMA240（240 日均線），日K 常駐；不屬於均線組、不進交易規則；不足 240 根那段不畫</dd></div> : null}
         {items.map((x) => (
           <div key={x.key} className="ta-rule"><dt><span className="lg">{SW[x.key] || null}</span>{x.label}</dt><dd>{x.desc}</dd></div>
         ))}
@@ -888,7 +895,7 @@ function islandText(x) {
 
 const rangeTxt = (v) => (v.from === v.to ? v.from : v.from + " ～ " + v.to) + "（" + (v.b - v.a) + " 根）";
 function TopVolume({ d, view }) {
-  const market = g(d, "symbol", "market");
+  const market = volMkt(d);
   if (noVolume(d)) {
     return (
       <div className="ta-block" data-blk="vol">
@@ -1806,7 +1813,7 @@ export default function TaPage() {
       <header className="ta-head">
         <div className="ta-hrow">
           <span className="ta-badge">會員專屬</span>
-          <h1 className="ta-h1">技術分析<span className="sep">｜</span><span className="ta-sub2">台股上市櫃・美股・ETF・美國期貨・台指期・費半，1H／4H／日K／週K</span></h1>
+          <h1 className="ta-h1">技術分析<span className="sep">｜</span><span className="ta-sub2">台股上市櫃・美股・ETF・美國期貨・台指期・加權指數・費半，1H／4H／日K／週K</span></h1>
         </div>
       </header>
 
