@@ -121,7 +121,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   const src = 'const React = require("react");\n' + fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8")
     .replace('"../../lib/ta-trade"', JSON.stringify(path.join(ROOT, "lib", "ta-trade.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-rs"', JSON.stringify(path.join(ROOT, "lib", "ta-rs.js").replace(/\\/g, "/")))
-    .replace('"../../lib/ta-opt"', JSON.stringify(path.join(ROOT, "lib", "ta-opt.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, zoomAt };\n";
+    .replace('"../../lib/ta-opt"', JSON.stringify(path.join(ROOT, "lib", "ta-opt.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, zoomAt, mtfBlink, tzMs };\n";
   const Mod = require("module");
   const libSrc = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-trade.js"), "utf8"), opts).code;
   const lib = new Mod(path.join(ROOT, "lib", "ta-trade.js")); lib.paths = Mod._nodeModulePaths(ROOT); lib._compile(libSrc, lib.id);
@@ -653,6 +653,36 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     // 守門：不做賣出／價差／Covered Call／Roll、不放專業欄位、不寫建議字、已永久刪除的字
     for (const s of [h, tc, tp]) for (const w of ["建議", "應該", "最佳", "推薦", "Delta", "Covered", "Roll", "賣出", "價差", "進場", "出場", "加碼", "停利", "2R", "出一半", "移保本", "怎麼看", "最近查過", "多空排列", "未平倉"]) assert.ok(!s.includes(w), "選擇權分頁出現「" + w + "」");
     assert.strictEqual((h.match(/隱含波動率/g) || []).length, 1, "隱含波動率只出現在機率欄名");
+  });
+  await t("共振閃爍（11-23）：1H／4H 同方向最近一次進場都在 8 小時內才閃；訊號篩選連動；時區換算；週期鈕 class／hover", async () => {
+    const TP = "Asia/Taipei", H = 3600e3;
+    assert.strictEqual(P.tzMs("2026-11-23 09:00", TP), Date.UTC(2026, 10, 23, 1, 0));
+    assert.strictEqual(P.tzMs("2026-07-01 09:30", "America/New_York"), Date.UTC(2026, 6, 1, 13, 30));   // 夏令 UTC-4
+    assert.strictEqual(P.tzMs("2026-12-01 09:30", "America/New_York"), Date.UTC(2026, 11, 1, 14, 30));   // 冬令 UTC-5
+    assert.ok(Number.isNaN(P.tzMs("2026-11-23", TP)) && Number.isNaN(P.tzMs(null, TP)));
+    const now = Date.UTC(2026, 10, 23, 6, 0);   // 台北 14:00
+    const tr = (side, t) => ({ side, entry_t: t });
+    const r1 = { trades: [tr(1, "2026-11-20 10:00"), tr(-1, "2026-11-23 12:00")], open: null };
+    const r4 = { trades: [tr(-1, "2026-11-23 09:00")], open: { side: 1, entry_t: "2026-11-23 13:00" } };
+    const b = P.mtfBlink(r1, r4, TP, "all", now);
+    assert.ok(b && b.s === -1 && b.tip === "1H 空進 11/23 12:00、4H 空進 11/23 09:00" && b.key === "-1|2026-11-23 12:00|2026-11-23 09:00", JSON.stringify(b));
+    assert.strictEqual(P.mtfBlink(r1, r4, TP, "long", now), null, "1H 多進在三天前");
+    assert.ok(P.mtfBlink(r1, r4, TP, "short", now));
+    assert.strictEqual(P.mtfBlink(r1, r4, TP, "short", Date.UTC(2026, 10, 23, 1, 0) + 8 * H + 60e3), null, "4H 那次超過 8 小時就停");
+    assert.ok(P.mtfBlink(r1, r4, TP, "short", Date.UTC(2026, 10, 23, 1, 0) + 8 * H));
+    const r1b = { trades: [], open: { side: 1, entry_t: "2026-11-23 13:00" } };   // 兩邊都成立 → 取比較新的（多）
+    const bb = P.mtfBlink(r1b, { trades: [tr(-1, "2026-11-23 12:00")], open: { side: 1, entry_t: "2026-11-23 12:00" } }, TP, "all", now);
+    assert.ok(bb && bb.s === 1 && bb.tip.startsWith("1H 多進 11/23 13:00"), JSON.stringify(bb));
+    assert.strictEqual(P.mtfBlink(null, r4, TP, "all", now), null);
+    assert.strictEqual(P.mtfBlink({ trades: [], open: null }, r4, TP, "all", now), null);
+    const h = html0(React.createElement(P.TfTabs, { tf: "D", tfs: undefined, onPick: () => {}, blink: b }));
+    assert.strictEqual((h.match(/ta-blink b-dn/g) || []).length, 2, h);
+    assert.ok(/ta-blink b-dn" title="1H 空進 11\/23 12:00、4H 空進 11\/23 09:00">1H</.test(h) && /ta-blink b-dn"[^>]*>4H</.test(h) && !/ta-blink[^>]*>日K</.test(h), h);
+    assert.ok(html0(React.createElement(P.TfTabs, { tf: "D", tfs: undefined, onPick: () => {}, blink: { ...b, s: 1 } })).includes("ta-blink b-up"));
+    assert.ok(!html0(React.createElement(P.TfTabs, { tf: "D", tfs: TWF.tfs, onPick: () => {}, blink: b })).includes("ta-blink"), "1H／4H 停用時不閃");
+    assert.ok(!html0(React.createElement(P.TfTabs, { tf: "D", tfs: undefined, onPick: () => {} })).includes("ta-blink"));
+    const css = fs.readFileSync(path.join(ROOT, "app", "ta", "ta.css"), "utf8");
+    assert.ok(/prefers-reduced-motion:reduce\)\{\.ta-tab\.ta-blink\{animation:none/.test(css), "減少動態要停閃");
   });
   await t("pastHalf：TA 票過半才續；普通票、壞票、沒期限 → 要問 status", async () => {
     const tk = (p) => "h." + Buffer.from(JSON.stringify(p)).toString("base64url") + ".s", n = Date.now() / 1000;

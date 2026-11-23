@@ -20,6 +20,8 @@ import { OPT_GROUPS, optSym, dte, fmtTs, candidates, cost as optCost, pnl as opt
 //   圖上進出場記號：滑過（手機點一下）出自製浮動說明，逐條列進出場條件的實際數值（lib/ta-trade.js explainEntry／explainExit）。
 //   右上分頁「指數位階」「區間強弱」「趨勢樣板」（11-17：多空樣板檔數占比折線＋今天多空名單，/api/ta-rs op:'tt'；台股｜美股切換跟區間強弱共用）
 //           「選擇權」（11-23）：下拉 11 檔美股／ETF（不跟 K 線代號連動）→ 看漲買 Call／看跌買 Put 的到期損益表＋試算（/api/ta-opt，CBOE 延遲報價；計算在 lib/ta-opt.js）
+//   週期列共振閃爍（11-23）：背景另抓同一檔的 1H、4H（跟點週期共用同一次請求），用面板規則回測、只看定案 K；同方向最近一次進場都在 8 小時內 → 1H／4H 鈕一起閃
+//           （多紅空綠，跟訊號篩選連動；hover 列兩邊進場時間；過 8 小時或點過那次就停，新訊號再閃；減少動態＝不閃、改外框）
 // 資料全部來自 Python 計算引擎（ta-engine，契約見 docs/ta-engine-contract.md）；最後一根盤中未定只上圖，不進訊號與回測。
 
 const TOK_KEY = "yoda_ta_jwt";
@@ -90,15 +92,50 @@ function RecentDrop({ items, hi, cur, onPick, onClear, zh }) {
   );
 }
 
-function TfTabs({ tf, tfs, onPick }) {
+// 共振閃爍（Yoda 11-23）：同一檔的 1H、4H 用面板規則回測（只用定案 K），同方向最近一次進場都在 8 小時內（以現在時間）→ 1H／4H 鈕一起閃
+const MTF_WIN = 8 * 3600e3, MTF_TFS = ["1H", "4H"], GONE_KEY = "yoda_ta_blink_gone";
+// 交易所當地時間 "YYYY-MM-DD HH:MM"（引擎契約）→ epoch 毫秒；兩次修正夏令時間
+function tzMs(t, tz) {
+  const m = /^(\d{4})-(\d\d)-(\d\d)[ T](\d\d):(\d\d)/.exec(String(t || ""));
+  if (!m) return NaN;
+  const u = Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5]);
+  try {
+    const f = new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric" });
+    const off = (x) => { const q = {}; for (const p of f.formatToParts(x)) q[p.type] = +p.value; return Date.UTC(q.year, q.month - 1, q.day, q.hour % 24, q.minute) - x; };
+    return u - off(u - off(u));
+  } catch (e) { return NaN; }
+}
+function lastEntry(r, s) {   // 某方向最近一次進場的 K 時間（持倉中的那筆一定最新）
+  if (r.open && r.open.side === s) return r.open.entry_t;
+  for (let k = r.trades.length - 1; k >= 0; k--) if (r.trades[k].side === s) return r.trades[k].entry_t;
+  return null;
+}
+// r1／r4＝backtest 結果；side＝訊號篩選（all 兩邊都看，同時成立取比較新的）→ {s, key, tip}｜null
+function mtfBlink(r1, r4, tz, side, now) {
+  if (!r1 || !r4) return null;
+  let best = null;
+  for (const s of side === "long" ? [1] : side === "short" ? [-1] : [1, -1]) {
+    const t1 = lastEntry(r1, s), t4 = lastEntry(r4, s);
+    if (!t1 || !t4) continue;
+    const a = tzMs(t1, tz), b = tzMs(t4, tz);
+    if (!(now - a <= MTF_WIN && now - b <= MTF_WIN)) continue;
+    const nm = s === 1 ? "多進" : "空進", hm = (t) => String(t).slice(5, 16).replace("-", "/");
+    if (!best || Math.min(a, b) > best.m) best = { s, m: Math.min(a, b), key: s + "|" + t1 + "|" + t4, tip: "1H " + nm + " " + hm(t1) + "、4H " + nm + " " + hm(t4) };
+  }
+  return best;
+}
+function readGone() { try { const a = JSON.parse(lsGet(GONE_KEY) || "[]"); return Array.isArray(a) ? a.filter((x) => typeof x === "string") : []; } catch (e) { return []; } }
+
+function TfTabs({ tf, tfs, onPick, blink }) {
   const ok = Array.isArray(tfs) && tfs.length ? tfs : null;
   return (
     <div className="ta-seg" role="tablist" aria-label="週期">
       {TFS.map(([k, nm]) => {
         const off = !!ok && !ok.includes(k);
+        const bl = !!blink && !off && MTF_TFS.includes(k);
         return (
-          <button key={k} type="button" role="tab" aria-selected={tf === k} className={"ta-tab" + (tf === k ? " on" : "")} disabled={off}
-            title={off ? TWF_ONLY_TXT : undefined} onClick={() => onPick(k)}>{nm}</button>
+          <button key={k} type="button" role="tab" aria-selected={tf === k} className={"ta-tab" + (tf === k ? " on" : "") + (bl ? " ta-blink " + (blink.s === 1 ? "b-up" : "b-dn") : "")} disabled={off}
+            title={off ? TWF_ONLY_TXT : bl ? blink.tip : undefined} onClick={() => onPick(k)}>{nm}</button>
         );
       })}
       {ok && TFS.some(([k]) => !ok.includes(k)) ? <span className="ta-seglab ta-tfnote">{TWF_ONLY_TXT}</span> : null}
@@ -1879,6 +1916,21 @@ export default function TaPage() {
     return post(url, body, tok.current);
   }, []);
 
+  // 查一個週期：快取有就用；同一個 sym|tf 正在抓就共用那一次（共振的背景 1H／4H 跟使用者點週期不重複打）
+  const fly = useRef(new Map());
+  const fetchTf = useCallback((s, t) => {
+    const ck = s + "|" + t;
+    if (cache.current.has(ck)) return Promise.resolve({ ok: true, data: cache.current.get(ck) });
+    if (!fly.current.has(ck)) {
+      fly.current.set(ck, call("/api/ta-live", { symbol: s, tf: t }).then((j) => {
+        fly.current.delete(ck);
+        if (j.ok) cache.current.set(ck, j.data);
+        return j;
+      }));
+    }
+    return fly.current.get(ck);
+  }, [call]);
+
   const load = useCallback(async (s, t) => {
     s = String(s || "").trim().toUpperCase();
     if (!s) return;
@@ -1888,7 +1940,7 @@ export default function TaPage() {
     if (cache.current.has(ck)) { setData(cache.current.get(ck)); return; }
     const my = ++seq.current;
     setBusy(true);
-    const j = await call("/api/ta-live", { symbol: s, tf: t });
+    const j = await fetchTf(s, t);
     if (my !== seq.current) return;
     setBusy(false);
     if (j.quota) setQuota(j.quota);
@@ -1897,12 +1949,47 @@ export default function TaPage() {
       if (j.reason === "daily-only" && t !== "D") { load(s, "D"); return; }   // 台指期／費半期只有日K、週K：選著 1H／4H 查就自動改日K
       setErr({ reason: j.reason, error: j.error || "讀取失敗" }); setData(null); return;
     }
-    cache.current.set(ck, j.data);
     setData(j.data);
     const code = g(j.data, "symbol", "code") || s;
     const nx = cleanRecent([{ s: String(code), n: g(j.data, "symbol", "name") }, ...readRecent().filter((x) => x.s !== code && x.s !== s)]).slice(0, RECENT_MAX);
     lsSet(RECENT_KEY, JSON.stringify(nx)); setRecent(nx);
-  }, [gate, call]);
+  }, [gate, fetchTf]);
+
+  // 共振閃爍：主圖查好（不在讀、沒錯）才在背景抓同一檔的 1H、4H；期交所只有日資料的不抓
+  const [mtf, setMtf] = useState(null);         // {s, h1, h4}
+  const [now, setNow] = useState(() => Date.now());
+  const [gone, setGone] = useState([]);         // 使用者點掉的那幾次共振（sym|方向|1H 時間|4H 時間）
+  useEffect(() => setGone(readGone()), []);
+  useEffect(() => {
+    if (phase !== "app" || !sym || !data || busy || err) return;
+    const tfs = g(data, "symbol", "tfs");
+    if (Array.isArray(tfs) && tfs.length && !MTF_TFS.every((k) => tfs.includes(k))) { setMtf(null); return; }
+    let live = true;
+    Promise.all(MTF_TFS.map((k) => fetchTf(sym, k))).then(([a, b]) => {
+      if (!live) return;
+      setNow(Date.now());
+      setMtf(a.ok && b.ok ? { s: sym, h1: a.data, h4: b.data } : null);   // 背景抓失敗就不閃，不打斷畫面
+    });
+    return () => { live = false; };
+  }, [phase, sym, data, busy, err, fetchTf]);
+  useEffect(() => {   // 每分鐘看一次現在時間：過 8 小時自己停
+    if (!mtf) return;
+    const id = setInterval(() => setNow(Date.now()), 60e3);
+    return () => clearInterval(id);
+  }, [mtf]);
+  const mtfRes = useMemo(() => {   // 面板規則一改就重算；只用定案 K（backtest 只吃前 bars_completed 根）
+    if (!mtf || mtf.s !== sym || !g(mtf.h1, "history", "c") || !g(mtf.h4, "history", "c")) return null;
+    try {
+      return { r1: backtest(mtf.h1.history, mtf.h1.bars_completed, applied), r4: backtest(mtf.h4.history, mtf.h4.bars_completed, applied), tz: g(mtf.h1, "symbol", "timezone") || "Asia/Taipei" };
+    } catch (e) { console.error("[ta] 共振計算失敗", e); return null; }
+  }, [mtf, sym, applied]);
+  const bl0 = mtfRes ? mtfBlink(mtfRes.r1, mtfRes.r4, mtfRes.tz, side, now) : null;
+  const blink = bl0 && !gone.includes(sym + "|" + bl0.key) ? bl0 : null;
+  const dropBlink = () => {   // 點過 1H 或 4H 就停這一次；新的一次訊號（時間不同）會再閃
+    if (!blink) return;
+    const nx = [sym + "|" + blink.key, ...gone].slice(0, 50);
+    setGone(nx); lsSet(GONE_KEY, JSON.stringify(nx));
+  };
 
   const start = useCallback(async () => {
     const j = await post("/api/ta-live", { action: "status" }, tok.current);
@@ -2002,7 +2089,7 @@ export default function TaPage() {
       start();
     } else setMsg((j && j.error) || "登入失敗，請確認 email 與密碼");
   };
-  const logout = () => { lsSet(TOK_KEY, null); tok.current = ""; cache.current.clear(); setData(null); setSym(""); setMsg(""); setPhase("login"); };
+  const logout = () => { lsSet(TOK_KEY, null); tok.current = ""; cache.current.clear(); fly.current.clear(); setMtf(null); setData(null); setSym(""); setMsg(""); setPhase("login"); };
   const submit = (e) => { e.preventDefault(); const s = q.trim(); if (s) { setDd(null); pickView("chart"); load(s, tf); setQ(""); } };
   const pickRecent = (s) => { setDd(null); pickView("chart"); load(s, tf); };
   const ddKey = (e) => {   // 只有輸入框空著（下拉打開）時 ↑↓Enter 才管清單；打了字 Enter 照舊查打的代號
@@ -2087,7 +2174,7 @@ export default function TaPage() {
         {/* ── 右 3/4：週期＋均線組＋圖＋表 ── */}
         <div className="ta-right">
           <div className="ta-tabs" data-view={view}>
-            <TfTabs tf={tf} tfs={symInfo.tfs} onPick={(k) => { pickView("chart"); if (sym) load(sym, k); else setTf(k); }} />
+            <TfTabs tf={tf} tfs={symInfo.tfs} blink={blink} onPick={(k) => { if (MTF_TFS.includes(k)) dropBlink(); pickView("chart"); if (sym) load(sym, k); else setTf(k); }} />
             <div className="ta-seg" role="group" aria-label="均線組">
               <span className="ta-seglab">均線</span>
               {MA_SETS.map(([k, nm]) => (
