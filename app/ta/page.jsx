@@ -721,7 +721,7 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
 // 時間區間導覽列：整段收盤縮圖＋可拖的視窗（拖中間＝平移、拖兩邊把手＝縮放、點軌道＝跳過去）；鍵盤 ←→、Shift 加大步距
 const NAV_MIN = 20;
 function RangeNav({ bars, a, b, onChange }) {
-  const N = bars.length, MIN = Math.min(NAV_MIN, N);
+  const N = bars.length, MIN = Math.min(ZOOM_MIN, N);   // 跟框選／滾輪同一個下限
   const box = useRef(null), drag = useRef(null), raf = useRef(0), pend = useRef(null);
   useEffect(() => () => cancelAnimationFrame(raf.current), []);
   const line = useMemo(() => {
@@ -818,11 +818,12 @@ function ChartArea({ d, maSet }) {
   const span = (s, c) => [Math.floor(Math.min(s.c, c)), Math.floor(Math.max(s.c, c))];
   const kDown = (e) => {
     ate.current = false;
-    if (e.pointerType !== "mouse" || e.button !== 0) return;
+    if (!fine || e.pointerType !== "mouse" || e.button !== 0) return;
     const c = kAt(e);
     if (c != null) drg.current = { x: e.clientX, c, on: false, el: e.currentTarget, id: e.pointerId };
   };
   const kMove = (e) => {
+    if (drg.current && !(e.buttons & 1)) { drg.current = null; setBrush(null); return; }   // 在圖外放開、圖沒收到 pointerup
     const s = drg.current, c = s && kAt(e);
     if (c == null) return;
     if (!s.on) {
@@ -835,9 +836,9 @@ function ChartArea({ d, maSet }) {
   const kUp = (e) => {
     const s = drg.current;
     drg.current = null;
+    setBrush(null);
     if (!s || !s.on) return;
     ate.current = true;   // 放開後的 click 不要再觸發標記
-    setBrush(null);
     const c = kAt(e), r = c == null ? null : span(s, c);
     if (r && r[1] - r[0] + 1 >= ZOOM_MIN) setRng([r[0], r[1] + 1]);
   };
