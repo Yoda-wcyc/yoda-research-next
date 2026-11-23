@@ -65,7 +65,13 @@ t("代號白名單 11 檔、OCC 解析、預設到期日（第一個 ≥ 14 天�
   assert.deepStrictEqual(O.parseOcc("QQQ261127C00612500"), { root: "QQQ", e: "2026-11-27", cp: "C", k: 612.5 });
   assert.strictEqual(O.parseOcc("junk"), null);
   const now = Date.parse("2026-11-23T01:38:43Z");   // 美東 11-22 20:38
-  assert.strictEqual(O.dte("2026-11-27", now), 5); assert.strictEqual(O.dte("2026-11-22", now), 1);
+  assert.strictEqual(O.dte("2026-11-27", now), 5); assert.strictEqual(O.dte("2026-11-22", now), 0, "今天到期＝0");
+  assert.strictEqual(O.dte("2026-11-20", now), 0);
+  assert.strictEqual(O.regular("2026-11-23 01:38:43"), false, "週日晚上");
+  assert.strictEqual(O.regular("2026-11-23 15:00:00"), true, "週一美東 10:00");
+  assert.strictEqual(O.regular("2026-11-23 14:29:00"), false, "盤前 09:29");
+  assert.strictEqual(O.regular("2026-11-23 21:00:00"), false, "盤後 16:00");
+  assert.strictEqual(O.regular("2026-11-21 15:00:00"), false, "週六");
   assert.strictEqual(O.defaultExpiry(["2026-11-27", "2026-12-04", "2026-12-05", "2027-01-15"], now), "2027-01-15");   // 12-04＝12 天、12-05＝13 天
   assert.strictEqual(O.defaultExpiry(["2026-11-27", "2026-12-06", "2026-12-18"], now), "2026-12-06");
   assert.strictEqual(O.defaultExpiry(["2026-11-24", "2026-11-27"], now), "2026-11-27");
@@ -83,7 +89,9 @@ const RAW = { timestamp: "2026-11-23 01:38:43", data: { current_price: 130.01, c
 ] } };
 t("parseChain：只收代號本身的 OCC、買賣權併成一列、到期日排序、整條沒報價的到期日不列、只留 b／a／iv／oi、壞值當 0", () => {
   const c = O.parseChain(RAW, "NVDA");
-  assert.strictEqual(c.price, 130.01); assert.deepStrictEqual(c.expiries, ["2026-11-27", "2026-12-18"]); assert.deepStrictEqual(Object.keys(c.by), c.expiries);
+  assert.strictEqual(c.price, 125.53, "週末用正規盤 close，不用夜盤 current_price"); assert.strictEqual(c.off, true);
+  const live = O.parseChain({ ...RAW, timestamp: "2026-11-23 15:00:00" }, "NVDA");
+  assert.strictEqual(live.price, 130.01); assert.strictEqual(live.off, false); assert.deepStrictEqual(c.expiries, ["2026-11-27", "2026-12-18"]); assert.deepStrictEqual(Object.keys(c.by), c.expiries);
   assert.deepStrictEqual(c.by["2026-11-27"], [{ k: 127.5, c: { b: 4, a: 0, iv: 0.6, oi: 1 }, p: { b: 3, a: 3.2, iv: 0.6, oi: 1 } }]);
   const none = O.parseChain({ data: { current_price: 1, options: [{ option: "NVDA261204C00130000", bid: 0, ask: 0 }] } }, "NVDA");
   assert.deepStrictEqual(none.expiries, ["2026-12-04"], "全部沒報價就照列");

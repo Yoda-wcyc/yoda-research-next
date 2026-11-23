@@ -1602,7 +1602,7 @@ function PayChart({ r, n, price, tgt, S, onS }) {
 // 試算：點表格一列帶入；口數、到期價格（輸入框＋拖拉條）即時算
 function OptTry({ r, price, tgt, n, setN, S, setS }) {
   const N = lots(n), lo = price * 0.6, hi = price * 1.4;
-  const Sv = S === "" ? NaN : Number(S);
+  const Sv = S === "" ? NaN : Math.max(0, Number(S));   // 打負數當 0（min=0 擋不住打字）
   const c = optCost(r.ask, N), v = Number.isFinite(Sv) ? optPnl(r.cp, r.k, r.ask, Sv, N) : null, mg = maxGain(r.cp, r.k, r.ask, N);
   return (
     <div className="ta-opt-try">
@@ -1631,8 +1631,8 @@ function OptCalc({ x, exp, busy, onExp }) {
   const [sel, setSel] = useState(null);   // {e, cp, k}
   const [n, setN] = useState("1");
   const [S, setS] = useState("");
-  const tgt = tg === "" ? NaN : Number(tg);
-  const days = dte(x.expiry);
+  const tgt = tg === "" ? NaN : Math.max(0, Number(tg));
+  const days = Math.max(1, dte(x.expiry));   // 今天到期也照 1 天估機率（盤中還有幾小時，不當 0 直接判 0／1）
   const rows = useMemo(() => candidates(x.rows, cp, x.price, tgt, days), [x, cp, tgt, days]);
   const cols = useMemo(() => optionCols(cp), [cp]);
   const r = sel && sel.e === x.expiry && sel.cp === cp ? rows.find((y) => y.k === sel.k) || null : null;
@@ -1644,7 +1644,7 @@ function OptCalc({ x, exp, busy, onExp }) {
         <b>你的看法</b>
         <label>方向 <select className="ta-q" value={cp} onChange={(e) => pickDir(e.target.value)}><option value="C">看漲</option><option value="P">看跌</option></select></label>
         <label>目標價 <input type="number" className="ta-q ta-rs-num" min="0" step="any" value={tg} onChange={(e) => setTg(e.target.value)} /></label>
-        <label>到期日 <select className="ta-q" value={exp} onChange={(e) => onExp(e.target.value)}>{x.expiries.map((e) => <option key={e} value={e}>{e}（剩 {dte(e)} 天）</option>)}</select></label>
+        <label>到期日 <select className="ta-q" value={exp} onChange={(e) => onExp(e.target.value)}>{x.expiries.map((e) => <option key={e} value={e}>{e}（{dte(e) ? "剩 " + dte(e) + " 天" : "今天到期"}）</option>)}</select></label>
       </div>
       <div className="ta-cap">符合的選擇 <span className="mut">{x.expiry} 到期的{cp === "C" ? "買權" : "賣權"}，履約價在現價 ±25% 內、有買賣報價的 {rows.length} 檔；點一列帶入試算</span></div>
       <div className={busy ? "ta-opt-busy" : ""}>
@@ -1664,7 +1664,7 @@ function OptView({ opt, run }) {
         <label>商品 <select className="ta-q" value={opt.sym} onChange={(e) => run(e.target.value, "")}>
           {OPT_GROUPS.map(([gn, a]) => <optgroup key={gn} label={gn}>{a.map(([s, nm]) => <option key={s} value={s}>{s}{nm ? "（" + nm + "）" : ""}</option>)}</optgroup>)}
         </select></label>
-        {d ? <span>現價 <b className="mono">{fnum(d.price)}</b></span> : null}
+        {d ? <span>現價 <b className="mono">{fnum(d.price)}</b>{d.off ? <span className="mut">（非正規盤時段，用上一個正規盤收盤價，跟選擇權報價同一時間）</span> : null}</span> : null}
         {d ? <span className="mut">CBOE 延遲報價（約 15 分鐘）<span className="sep">｜</span>資料時間 {fmtTs(d.ts, "Asia/Taipei") || "—"}（台灣）</span> : null}
       </div>
       {err ? <div className="ta-err" role="alert"><span>{err}</span><button type="button" className="ta-btn" onClick={() => run(opt.sym, opt.exp)}>重試</button></div>
