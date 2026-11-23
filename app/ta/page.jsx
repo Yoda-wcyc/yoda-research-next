@@ -108,10 +108,13 @@ function tzMs(t, tz) {
   } catch (e) { return NaN; }
 }
 // 那根 K 收完的時間（11-23）：開始＋週期小時，遇收盤那段取收盤（台股 4H 13:00 那根到 13:30、美股 1H 15:30 到 16:00），不超過當天收盤
+// 期貨（market fut，同引擎 _fut_1h／bars_4h）：18:00 開、隔天 17:00 收 → 上限 17:00，且只套在 17:00 前開始的 K（18:00 後的屬隔天交易日）
+// shortcut: 美股提早收盤日（13:00 收）不認得，12:30／09:30 那根算到 13:30（多閃 30 分，跟引擎 end 一樣），要準得接休市日曆
 const MTF_CLOSE = { "Asia/Taipei": "13:30", "America/New_York": "16:00" };
-function barEnd(t, h, tz) {
-  const e = tzMs(t, tz) + h * 3600e3, c = MTF_CLOSE[tz] ? tzMs(String(t).slice(0, 10) + " " + MTF_CLOSE[tz], tz) : NaN;
-  return c < e ? c : e;
+function barEnd(t, h, tz, mkt) {
+  const s = tzMs(t, tz), e = s + h * 3600e3, cl = mkt === "fut" ? "17:00" : MTF_CLOSE[tz];
+  const c = cl ? tzMs(String(t).slice(0, 10) + " " + cl, tz) : NaN;
+  return c > s && c < e ? c : e;
 }
 function lastEntry(r, s) {   // 某方向最近一次進場的 K 時間（持倉中的那筆一定最新）
   if (r.open && r.open.side === s) return r.open.entry_t;
@@ -119,13 +122,13 @@ function lastEntry(r, s) {   // 某方向最近一次進場的 K 時間（持倉
   return null;
 }
 // r1／r4＝backtest 結果；side＝訊號篩選（all 兩邊都看，同時成立取比較新的）→ {s, key, tip}｜null
-function mtfBlink(r1, r4, tz, side, now) {
+function mtfBlink(r1, r4, tz, side, now, mkt) {
   if (!r1 || !r4) return null;
   let best = null;
   for (const s of side === "long" ? [1] : side === "short" ? [-1] : [1, -1]) {
     const t1 = lastEntry(r1, s), t4 = lastEntry(r4, s);
     if (!t1 || !t4) continue;
-    const a = barEnd(t1, 1, tz), b = barEnd(t4, 4, tz);
+    const a = barEnd(t1, 1, tz, mkt), b = barEnd(t4, 4, tz, mkt);
     if (!(now - a <= MTF_WIN && now - b <= MTF_WIN)) continue;
     const nm = s === 1 ? "多進" : "空進", hm = (t) => String(t).slice(5, 16).replace("-", "/");
     if (!best || Math.min(a, b) > best.m) best = { s, m: Math.min(a, b), key: s + "|" + t1 + "|" + t4, tip: "1H " + nm + " " + hm(t1) + "、4H " + nm + " " + hm(t4) };
@@ -2044,10 +2047,10 @@ export default function TaPage() {
   const mtfRes = useMemo(() => {   // 面板規則一改就重算；只用定案 K（backtest 只吃前 bars_completed 根）
     if (!mtf || mtf.s !== sym || !g(mtf.h1, "history", "c") || !g(mtf.h4, "history", "c")) return null;
     try {
-      return { r1: backtest(mtf.h1.history, mtf.h1.bars_completed, applied), r4: backtest(mtf.h4.history, mtf.h4.bars_completed, applied), tz: g(mtf.h1, "symbol", "timezone") || "Asia/Taipei" };
+      return { r1: backtest(mtf.h1.history, mtf.h1.bars_completed, applied), r4: backtest(mtf.h4.history, mtf.h4.bars_completed, applied), tz: g(mtf.h1, "symbol", "timezone") || "Asia/Taipei", mkt: g(mtf.h1, "symbol", "market") };
     } catch (e) { console.error("[ta] 共振計算失敗", e); return null; }
   }, [mtf, sym, applied]);
-  const bl0 = mtfRes ? mtfBlink(mtfRes.r1, mtfRes.r4, mtfRes.tz, side, now) : null;
+  const bl0 = mtfRes ? mtfBlink(mtfRes.r1, mtfRes.r4, mtfRes.tz, side, now, mtfRes.mkt) : null;
   const blink = bl0 && !gone.includes(sym + "|" + bl0.key) ? bl0 : null;
   const dropBlink = () => {   // 點過 1H 或 4H 就停這一次；新的一次訊號（時間不同）會再閃
     if (!blink) return;

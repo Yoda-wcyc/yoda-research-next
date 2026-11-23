@@ -757,6 +757,16 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     assert.strictEqual(P.barEnd("2026-11-23 13:30", 4, NY), Date.UTC(2026, 10, 23, 21, 0), "美股 4H 13:30 → 16:00（不是 17:30）");
     assert.strictEqual(P.barEnd("2026-11-23 09:30", 4, NY), Date.UTC(2026, 10, 23, 18, 30), "美股 4H 09:30 → 13:30");
     assert.strictEqual(P.barEnd("2026-11-23 10:00", 1, "Asia/Tokyo"), P.tzMs("2026-11-23 10:00", "Asia/Tokyo") + H, "不認得的時區：只加週期");
+    // 美國期貨（fut、紐約時區）：18:00 開、隔天 17:00 收；4H 切 18／22／02／06／10／14，不套股票 16:00
+    const ft = (t) => P.tzMs(t, NY);
+    assert.strictEqual(P.barEnd("2026-11-23 18:00", 4, NY, "fut"), ft("2026-11-23 22:00"), "期貨 4H 18:00 → 22:00");
+    assert.strictEqual(P.barEnd("2026-11-23 22:00", 4, NY, "fut"), ft("2026-11-24 02:00"), "期貨 4H 22:00 → 隔天 02:00");
+    assert.strictEqual(P.barEnd("2026-11-23 14:00", 4, NY, "fut"), ft("2026-11-23 17:00"), "期貨 4H 14:00 → 17:00（不是 16:00／18:00）");
+    assert.strictEqual(P.barEnd("2026-11-23 23:00", 1, NY, "fut"), ft("2026-11-24 00:00"), "期貨 1H 23:00 → 00:00");
+    assert.strictEqual(P.barEnd("2026-11-23 16:00", 1, NY, "fut"), ft("2026-11-23 17:00"), "期貨 1H 16:00 → 17:00");
+    const r1f = { trades: [tr(1, "2026-11-24 01:00")], open: null }, r4f = { trades: [tr(1, "2026-11-23 22:00")], open: null };
+    assert.ok(P.mtfBlink(r1f, r4f, NY, "all", ft("2026-11-24 02:20"), "fut"), "期貨 4H 22:00＋1H 01:00 多進，隔天 02:20 還閃");
+    assert.ok(P.mtfBlink(r1f, r4f, NY, "all", ft("2026-11-24 10:00"), "fut") && !P.mtfBlink(r1f, r4f, NY, "all", ft("2026-11-24 10:01"), "fut"), "從 02:00 收完起算 8 小時（10:00）");
     // 台股 4H 13:00 那根：13:30 收完 → 21:30 還閃、21:31 停（1H 同在 13:00）
     const r1c = { trades: [], open: { side: 1, entry_t: "2026-11-23 13:00" } }, r4c = { trades: [tr(1, "2026-11-23 13:00")], open: null };
     assert.ok(P.mtfBlink(r1c, r4c, TP, "all", Date.UTC(2026, 10, 23, 13, 30)), "台股 13:30 收完後 8 小時（21:30）還閃");
