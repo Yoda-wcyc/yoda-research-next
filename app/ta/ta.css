@@ -167,6 +167,13 @@ svg.ta-k .gl.up{fill:#ff8f96} svg.ta-k .gl.dn{fill:#6fd6a0} svg.ta-k .gl.filled{
 .ta-cnote .lg .sw{margin:0 0 0 4px}
 .ta-cnote .gd{color:#c9a13a;font-weight:600}
 .ta-cnote .bx{display:inline-block;width:12px;height:10px;vertical-align:middle;margin:0 3px 0 8px;opacity:.6}
+/* 框選放大（11-23，只桌機）：圖上拖曳＝框選，重設鈕在右下角（價格標籤欄下方的空白） */
+.ta-kwrap{position:relative;user-select:none}
+.ta-kwrap.fine svg.ta-k{cursor:crosshair}
+svg.ta-k .brush{pointer-events:none}
+svg.ta-k .brush-t{font-size:12px;font-weight:700;paint-order:stroke;stroke:#0b0f15;stroke-width:3px;pointer-events:none}
+.ta-kreset{position:absolute;right:8px;bottom:8px;font-size:12px;padding:3px 10px;border-radius:6px;border:1px solid #2a3442;background:#141b25;color:#d6dde6;cursor:pointer}
+.ta-kreset:hover{background:#1c2633;color:#fff}
 /* 時間區間導覽列（11-09）：整段收盤縮圖＋可拖視窗；窗外用大 box-shadow 壓暗，touch-action:none 讓觸控拖曳不捲頁 */
 .ta-navw{margin:6px 0 2px}
 .ta-nav{position:relative;height:46px;background:#0b0f15;border:1px solid #1c2330;border-radius:8px;overflow:hidden;touch-action:none;user-select:none;cursor:pointer}

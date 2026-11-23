@@ -121,7 +121,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   const src = 'const React = require("react");\n' + fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8")
     .replace('"../../lib/ta-trade"', JSON.stringify(path.join(ROOT, "lib", "ta-trade.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-rs"', JSON.stringify(path.join(ROOT, "lib", "ta-rs.js").replace(/\\/g, "/")))
-    .replace('"../../lib/ta-opt"', JSON.stringify(path.join(ROOT, "lib", "ta-opt.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym };\n";
+    .replace('"../../lib/ta-opt"', JSON.stringify(path.join(ROOT, "lib", "ta-opt.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, zoomAt };\n";
   const Mod = require("module");
   const libSrc = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-trade.js"), "utf8"), opts).code;
   const lib = new Mod(path.join(ROOT, "lib", "ta-trade.js")); lib.paths = Mod._nodeModulePaths(ROOT); lib._compile(libSrc, lib.id);
@@ -274,6 +274,26 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   };
   const chartHtml = (d) => { const full = P.fullSeries(d); return renderToString(React.createElement(P.KChart, { d, full, smas: [], a: 0, b: full.bars.length, gaps: [], islands: [], top: [], rolls: g4(d) })); };
   const g4 = (d) => (Array.isArray(d.chart.overlays.rolls) ? d.chart.overlays.rolls : []);
+  await t("框選放大／滾輪縮放（11-23）：zoomAt 游標下那根不動、最少 10 根、最多全段；框選框＋「起～迄，共 N 根」，不到 10 根框變灰；重設鈕、雙擊", async () => {
+    const z = P.zoomAt;
+    assert.deepStrictEqual(z(380, 500, 500, 440, 0.5), [410, 470], "放大：以 440 為中心");
+    assert.deepStrictEqual(z(380, 500, 500, 499.5, 0.5), [440, 500], "游標在最右：右端不動");
+    assert.deepStrictEqual(z(380, 500, 500, 440, 2), [260, 500], "縮小：右邊到底就往左補");
+    assert.deepStrictEqual(z(0, 500, 500, 250, 2), [0, 500], "已是全段：不動");
+    assert.deepStrictEqual(z(100, 110, 500, 105, 0.5), [100, 110], "已是 10 根：不再放大");
+    const s = z(100, 200, 500, 150, 1.0001); assert.strictEqual(s[1] - s[0], 101, "觸控板小量也至少動 1 根");
+    const f = z(100, 200, 500, 150, 0.9999); assert.strictEqual(f[1] - f[0], 99);
+    assert.deepStrictEqual(z(0, 6, 6, 3, 0.5), [0, 6], "全段不到 10 根：不放大");
+    const d = mkD(), full = P.fullSeries(d);
+    const h = renderToString(React.createElement(P.KChart, { d, full, smas: [], a: 10, b: 60, gaps: [], islands: [], top: [], rolls: [], brush: [20, 34] })).replace(/<!-- -->/g, "");
+    assert.ok(/class="brush"[^>]*data-n="15"/.test(h) && h.includes(full.bars[20].t + "～" + full.bars[34].t + "，共 15 根"), "框選框與根數");
+    const h2 = renderToString(React.createElement(P.KChart, { d, full, smas: [], a: 10, b: 60, gaps: [], islands: [], top: [], rolls: [], brush: [20, 25] }));
+    assert.ok(/class="brush"[^>]*fill="#8b95a3"/.test(h2), "不到 10 根框變灰");
+    assert.ok(!renderToString(React.createElement(P.KChart, { d, full, smas: [], a: 10, b: 60, gaps: [], islands: [], top: [], rolls: [] })).includes('class="brush"'), "沒框選不畫");
+    const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
+    assert.ok(raw.includes('matchMedia("(pointer: fine)")') && raw.includes('e.pointerType !== "mouse"'), "只桌機（觸控不啟用）");
+    assert.ok(raw.includes('onDoubleClick={fine ? reset : undefined}') && raw.includes(">重設</button>") && raw.includes('addEventListener("wheel", wh, { passive: false })'), "雙擊、重設鈕、滾輪");
+  });
   await t("市場標籤：美國期貨・CME／指數／台股／美股·NASDAQ·ETF；怪值不崩", async () => {
     assert.strictEqual(P.mktBadge({ market: "fut", exchange: "CME" }), "美國期貨・CME");
     assert.strictEqual(P.mktBadge({ market: "fut", exchange: "NYMEX" }), "美國期貨・NYMEX");

@@ -280,7 +280,18 @@ function topVolume(full, a, b, nf, eng) {
 }
 
 // K 線圖畫整段歷史的 [a, b) 這一段；Y 軸依區間內高低。K 棒與量柱併成幾條 path（1H 五千根拖曳才不卡）
-function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls }) {
+// 框選放大／滾輪縮放（11-23，只桌機）：KW／KL／KR＝K 線圖 viewBox 寬與價格區左右留白，ChartArea 用來把滑鼠位置換成第幾根
+const KW = 1000, KL = 62, KR = 178, ZOOM_MIN = 10;
+// 以 c（絕對位置，可帶小數）為中心縮放 f 倍（>1 縮小、<1 放大），游標下那根留在原處；最少 10 根、最多全段；每次至少動 1 根（觸控板一格很小）
+function zoomAt(a, b, N, c, f) {
+  const w0 = b - a, mn = Math.min(ZOOM_MIN, N);
+  const w = Math.max(mn, Math.min(N, f > 1 ? Math.max(w0 + 1, Math.round(w0 * f)) : Math.min(w0 - 1, Math.round(w0 * f))));
+  if (w === w0) return [a, b];
+  const a1 = Math.max(0, Math.min(N - w, Math.round(c - ((c - a) * w) / w0)));
+  return [a1, a1 + w];
+}
+
+function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, brush }) {
   const ch = d.chart || {};
   const bars = full.bars.slice(a, b), n = bars.length;
   if (n < 2) return <div className="ta-nochart">沒有 K 線資料</div>;
@@ -292,7 +303,7 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls }) {
   const trd = d.trade || {};
   const tlines = (trd.lines || []).filter((ln) => (ln.i1 == null || ln.i1 >= a) && (ln.i0 == null || ln.i0 < b));
   const marks = (trd.markers || []).filter((m) => m.i != null && m.i >= a && m.i < b);
-  const W = 1000, L = 62, R = 178, T = 16, PH = 400, GP = 14, VH = 72, B = 24;
+  const W = KW, L = KL, R = KR, T = 16, PH = 400, GP = 14, VH = 72, B = 24;
   const H = T + PH + GP + VH + B, pw = W - L - R, xr = L + pw;
   const vals = [];
   for (const x of bars) { if (x.h != null) vals.push(x.h); if (x.l != null) vals.push(x.l); }
@@ -688,6 +699,16 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls }) {
   });
   const lc = bars[n - 1].c;
   if (lc != null && b === full.bars.length) els.push(<circle key="lc" className="lastc" cx={X(n - 1)} cy={Y(lc)} r="3" fill="#ffffff" />);
+  // 框選中：半透明框＋「起～迄，共 N 根」；不到 10 根（放開不會放大）框改灰
+  if (brush) {
+    const u0 = Math.max(0, brush[0] - a), u1 = Math.min(n - 1, brush[1] - a), cnt = u1 - u0 + 1, ok = cnt >= ZOOM_MIN;
+    const bx0 = X(u0) - step / 2, bx1 = X(u1) + step / 2;
+    const s = String(bars[u0].t || "").slice(0, 16) + "～" + String(bars[u1].t || "").slice(0, 16) + "，共 " + cnt + " 根";
+    const cx = Math.min(xr - tw(s) / 2 - 4, Math.max(L + tw(s) / 2 + 4, (bx0 + bx1) / 2));
+    els.push(<rect key="brush" className="brush" x={bx0} y={T} width={Math.max(1, bx1 - bx0)} height={VB - T} fill={ok ? "#3d8bfd" : "#8b95a3"} fillOpacity=".16"
+      stroke={ok ? "#9ad0ff" : "#8b95a3"} strokeWidth="1" data-n={cnt} />);
+    els.push(<text key="brusht" className="brush-t" x={cx} y={T + 30} textAnchor="middle" style={{ fill: ok ? "#ffffff" : "#9aa4b2" }}>{s}</text>);
+  }
   return (
     <svg className="ta-k" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label={TF_ZH[d.tf] + "線圖"} data-n={n} data-a={a} data-b={b}>
       <rect x="0" y="0" width={W} height={H} fill="#0b0f15" />
@@ -779,8 +800,71 @@ function ChartArea({ d, maSet }) {
   const N = full.bars.length;
   const smas = useMemo(() => (g(ch, "ma_sets", maSet) || []).map((m) => [m, smaSeq(full.c, Number(m))]), [full, ch.ma_sets, maSet]);   // eslint-disable-line react-hooks/exhaustive-deps
   const yr = useMemo(() => (d.tf === "D" ? smaSeq(full.c, 240) : d.tf === "W" ? smaSeq(full.c, 52) : null), [full, d.tf]);   // 日K 年線＝240 日線、週K 52 週線；1H/4H 不畫
-  const [rng, setRng] = useState(() => [Math.max(0, Math.min(full.k0, N - 2)), N]);   // 預設＝引擎的圖視窗（近 120 根）
+  const def0 = Math.max(0, Math.min(full.k0, N - 2));
+  const [rng, setRng] = useState(() => [def0, N]);   // 預設＝引擎的圖視窗（近 120 根）
   const b = Math.min(rng[1], N), a = Math.max(0, Math.min(rng[0], b - 2));
+  // 框選放大＋滾輪縮放＋雙擊／重設（只桌機：pointer: fine；框選另外只認滑鼠）。位移不到 5px 當點擊，標記的 hover／點擊照舊
+  const [fine, setFine] = useState(false);
+  useEffect(() => { try { setFine(window.matchMedia("(pointer: fine)").matches); } catch (er) {} }, []);
+  const [brush, setBrush] = useState(null);
+  const kref = useRef(null), drg = useRef(null), ate = useRef(false), live = useRef(null);
+  live.current = { a, b, N };
+  const kAt = (e) => {   // 滑鼠 → 第幾根（絕對位置、帶小數）；viewBox 是 meet 縮放，用 getScreenCTM 換算
+    const svg = kref.current && kref.current.querySelector("svg.ta-k"), m = svg && svg.getScreenCTM && svg.getScreenCTM();
+    if (!m || !m.a) return null;
+    const { a: a0, b: b0 } = live.current, w = b0 - a0;
+    return a0 + Math.max(0, Math.min(w - 1e-6, (((e.clientX - m.e) / m.a - KL) * w) / (KW - KL - KR)));
+  };
+  const span = (s, c) => [Math.floor(Math.min(s.c, c)), Math.floor(Math.max(s.c, c))];
+  const kDown = (e) => {
+    ate.current = false;
+    if (e.pointerType !== "mouse" || e.button !== 0) return;
+    const c = kAt(e);
+    if (c != null) drg.current = { x: e.clientX, c, on: false, el: e.currentTarget, id: e.pointerId };
+  };
+  const kMove = (e) => {
+    const s = drg.current, c = s && kAt(e);
+    if (c == null) return;
+    if (!s.on) {
+      if (Math.abs(e.clientX - s.x) < 5) return;
+      s.on = true;
+      try { s.el.setPointerCapture(s.id); } catch (er) {}
+    }
+    setBrush(span(s, c));
+  };
+  const kUp = (e) => {
+    const s = drg.current;
+    drg.current = null;
+    if (!s || !s.on) return;
+    ate.current = true;   // 放開後的 click 不要再觸發標記
+    setBrush(null);
+    const c = kAt(e), r = c == null ? null : span(s, c);
+    if (r && r[1] - r[0] + 1 >= ZOOM_MIN) setRng([r[0], r[1] + 1]);
+  };
+  useEffect(() => {
+    if (!brush) return undefined;
+    const esc = (e) => {
+      if (e.key !== "Escape" || !drg.current) return;
+      try { drg.current.el.releasePointerCapture(drg.current.id); } catch (er) {}
+      drg.current = null; setBrush(null);
+    };
+    document.addEventListener("keydown", esc);
+    return () => document.removeEventListener("keydown", esc);
+  }, [brush]);
+  useEffect(() => {   // React 的 onWheel 是 passive、擋不住頁面捲動，改掛原生
+    const el = kref.current;
+    if (!fine || !el) return undefined;
+    const wh = (e) => {
+      const c = kAt(e);
+      if (c == null || !e.deltaY) return;
+      e.preventDefault();
+      const { a: a0, b: b0, N: n0 } = live.current, r = zoomAt(a0, b0, n0, c, Math.min(2, Math.max(0.5, Math.exp(e.deltaY * (e.deltaMode ? 0.05 : 0.0015)))));
+      if (r[0] !== a0 || r[1] !== b0) setRng(r);
+    };
+    el.addEventListener("wheel", wh, { passive: false });
+    return () => el.removeEventListener("wheel", wh);
+  }, [fine]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const reset = () => setRng([def0, N]);
   const nf = d.bars_completed != null ? Math.min(d.bars_completed, N) : N;
   const gapsAll = useMemo(() => decodeGaps(g(ch, "overlays", "gaps"), full.bars), [ch.overlays, full]);   // eslint-disable-line react-hooks/exhaustive-deps
   const islAll = g(ch, "overlays", "islands") || [];
@@ -831,7 +915,11 @@ function ChartArea({ d, maSet }) {
   const info = tip && trd.ctx && trd.p ? (tip.kind === "entry" ? explainEntry(trd, trd.p, tip.t) : explainExit(trd, trd.p, tip.t)) : null;
   return (
     <>
-      <KChart d={d} full={full} smas={smas} yr={yr} a={a} b={b} onTip={onTip} gaps={gapsAll} islands={islAll} top={top} rolls={rollsAll} />
+      <div ref={kref} className={"ta-kwrap" + (fine ? " fine" : "")} onPointerDown={kDown} onPointerMove={kMove} onPointerUp={kUp} onPointerCancel={kUp}
+        onClickCapture={(e) => { if (ate.current) { ate.current = false; e.stopPropagation(); } }} onDoubleClick={fine ? reset : undefined}>
+        <KChart d={d} full={full} smas={smas} yr={yr} a={a} b={b} onTip={onTip} gaps={gapsAll} islands={islAll} top={top} rolls={rollsAll} brush={brush} />
+        {fine && (a !== def0 || b !== N) ? <button type="button" className="ta-kreset" onPointerDown={(e) => e.stopPropagation()} onClick={reset}>重設</button> : null}
+      </div>
       {N > NAV_MIN ? <RangeNav bars={full.bars} a={a} b={b} onChange={setRng} /> : null}
       <BlockTabs d={d} view={view} />
       {info ? (
