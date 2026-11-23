@@ -2,6 +2,7 @@
 import { Component, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { normParams, backtest, chartMarks, exitLine, ruleText, maName, smaSeq, PRESETS, explainEntry, explainExit, fpx, fpc, statsOf, hasVolume, effParams } from "../../lib/ta-trade";
 import { presetStart } from "../../lib/ta-rs";
+import { OPT_GROUPS, optSym, dte, fmtTs, candidates, cost as optCost, pnl as optPnl, retPct, maxGain, lots } from "../../lib/ta-opt";
 
 // 會員技術分析（獨立網站版·2026-11-08 Yoda 定）
 //
@@ -18,6 +19,7 @@ import { presetStart } from "../../lib/ta-rs";
 //           5 組內建策略（唯讀）＋自己存的策略，只存在自己的瀏覽器（localStorage）。手機寬（≤760px）面板排到圖下方。
 //   圖上進出場記號：滑過（手機點一下）出自製浮動說明，逐條列進出場條件的實際數值（lib/ta-trade.js explainEntry／explainExit）。
 //   右上分頁「指數位階」「區間強弱」「趨勢樣板」（11-17：多空樣板檔數占比折線＋今天多空名單，/api/ta-rs op:'tt'；台股｜美股切換跟區間強弱共用）
+//           「選擇權」（11-23）：下拉 11 檔美股／ETF（不跟 K 線代號連動）→ 看漲買 Call／看跌買 Put 的到期損益表＋試算（/api/ta-opt，CBOE 延遲報價；計算在 lib/ta-opt.js）
 // 資料全部來自 Python 計算引擎（ta-engine，契約見 docs/ta-engine-contract.md）；最後一根盤中未定只上圖，不進訊號與回測。
 
 const TOK_KEY = "yoda_ta_jwt";
@@ -163,9 +165,9 @@ function readHash() {
 }
 
 // ───────── 可排序表格（每一欄都能排序）─────────
-function SortTable({ cols, rows, rowKey, className, rowClass, onRow }) {
-  const [sk, setSk] = useState(null);
-  const [dir, setDir] = useState(1);
+function SortTable({ cols, rows, rowKey, className, rowClass, onRow, init }) {   // init＝[第幾欄, 1 升／-1 降]：一開始就照這欄排（表頭帶箭頭）
+  const [sk, setSk] = useState(init ? init[0] : null);
+  const [dir, setDir] = useState(init ? init[1] : 1);
   const sorted = useMemo(() => {
     if (sk === null) return rows;
     const c = cols[sk];
@@ -1298,7 +1300,7 @@ function RulePanel({ draft, set, errors, status, saved, active, nm, setNm, rn, s
 // ───────── 指數位階分頁（2026-11-11）：最新美股報告「02 指數位階」整章原樣（/api/ta-idx）─────────
 // 章內腳本靠 document.currentScript／inline onclick，只能跑在自己的文件裡 → iframe srcdoc（同源：父頁直接量高度、換深淺）
 const VIEW_KEY = "yoda_ta_view";
-function readView() { const v = lsGet(VIEW_KEY); return v === "idx" || v === "rs" || v === "tt" ? v : "chart"; }
+function readView() { const v = lsGet(VIEW_KEY); return v === "idx" || v === "rs" || v === "tt" || v === "opt" ? v : "chart"; }
 const isLight = () => document.documentElement.getAttribute("data-theme") === "light";
 function IdxView({ x }) {
   const ifr = useRef(null);
@@ -1539,6 +1541,139 @@ function TtView({ x, mk = "tw", onCode }) {
   );
 }
 
+// ───────── 選擇權分頁（2026-11-23 Yoda 定案）：只做看漲買 Call／看跌買 Put、一次算一個（/api/ta-opt；數字全在 lib/ta-opt.js）─────────
+// ⛔ 不放：賣出、價差、Covered Call、Roll、隱含波動率／Delta 等欄位（機率欄除外）、說明段落
+const OPT_KEY = "yoda_ta_opt_sym";
+function readOptSym() { return optSym(lsGet(OPT_KEY)) || "QQQ"; }
+const usd0 = (v, sign) => (typeof v === "number" && Number.isFinite(v) ? (v < 0 ? "−" : sign && v > 0 ? "+" : "") + "$" + Math.round(Math.abs(v)).toLocaleString("en-US") : "—");
+const cpName = (cp) => (cp === "C" ? "Call" : "Put");
+function optionCols(cp) {
+  return [
+    { label: "選擇", render: (r) => "買 " + fnum(r.k) + " " + cpName(cp), sort: (r) => r.k },
+    { label: "成本", num: 1, render: (r) => usd0(r.cost), sort: (r) => r.cost },
+    { label: "看對時賺賠", num: 1, render: (r) => <span className={ud(r.pnl)}>{usd0(r.pnl, 1)}</span>, sort: (r) => r.pnl },
+    { label: "報酬 %", num: 1, render: (r) => <span className={ud(r.ret)}>{pc1(r.ret)}</span>, sort: (r) => r.ret },
+    { label: "市場估的賺錢機率（用隱含波動率估）", num: 1, render: (r) => (r.prob === null ? "—" : (r.prob * 100).toFixed(0) + "%"), sort: (r) => r.prob },
+    { label: "最多虧", num: 1, render: (r) => usd0(r.cost), sort: (r) => r.cost },
+    { label: "損益兩平", num: 1, render: (r) => fnum(r.be), sort: (r) => r.be },
+  ];
+}
+function niceStep(span, n) { const s = span / n, p = Math.pow(10, Math.floor(Math.log10(s))); return [1, 2, 5, 10].map((m) => m * p).find((v) => v >= s) || p * 10; }
+// 到期損益圖：橫軸到期價格（現價 ±40%）、縱軸賺賠；賺的那段紅、賠的那段綠；按住拖（或拉下面的拖拉條）移動價格點
+function PayChart({ r, n, price, tgt, S, onS }) {
+  const lo = price * 0.6, hi = price * 1.4;
+  const f = (s) => optPnl(r.cp, r.k, r.ask, s, n);
+  const xs = [lo, r.k, hi].filter((s) => s >= lo && s <= hi).sort((a, b) => a - b);
+  const W = 1000, H = 260, L = 78, R = 14, T = 40, B = 26, pw = W - L - R, ph = H - T - B;
+  let y0 = Math.min(0, ...xs.map(f)), y1 = Math.max(0, ...xs.map(f));
+  if (y1 === y0) y1 = y0 + 1;
+  const pad = (y1 - y0) * 0.08; y0 -= pad; y1 += pad;
+  const X = (s) => L + ((s - lo) / (hi - lo)) * pw, Y = (v) => T + ((y1 - v) / (y1 - y0)) * ph;
+  const ys = niceStep(y1 - y0, 5), xt = niceStep(hi - lo, 8), gy = [], gx = [];
+  for (let v = Math.ceil(y0 / ys) * ys; v <= y1; v += ys) gy.push(v);
+  for (let v = Math.ceil(lo / xt) * xt; v <= hi; v += xt) gx.push(v);
+  const pts = xs.map((s) => X(s).toFixed(1) + "," + Y(f(s)).toFixed(1)).join(" ");
+  const vx = [[price, "現價 " + fnum(price), "now"], [r.be, "損益兩平 " + fnum(r.be), "be"], [tgt, "目標價 " + fnum(tgt), "tg"]].filter(([s]) => Number.isFinite(s) && s >= lo && s <= hi);
+  const hasS = Number.isFinite(S) && S >= lo && S <= hi, vS = hasS ? f(S) : null;
+  const move = (e) => {
+    if (e.type === "pointermove" && !e.buttons) return;
+    const b = e.currentTarget.getBoundingClientRect();
+    if (!b.width) return;
+    const s = lo + ((((e.clientX - b.left) / b.width) * W - L) / pw) * (hi - lo);
+    onS(Math.max(lo, Math.min(hi, s)).toFixed(2));
+  };
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="ta-tt-svg ta-pay" role="img" aria-label="到期損益圖" onPointerDown={move} onPointerMove={move}>
+      <defs>
+        <clipPath id="ta-pay-up"><rect x={L} y={T} width={pw} height={Math.max(0, Y(0) - T)} /></clipPath>
+        <clipPath id="ta-pay-dn"><rect x={L} y={Y(0)} width={pw} height={Math.max(0, T + ph - Y(0))} /></clipPath>
+      </defs>
+      {gy.map((v) => <g key={"y" + v}><line className="grid" x1={L} x2={W - R} y1={Y(v)} y2={Y(v)} /><text className="ax" x={L - 6} y={Y(v) + 4} textAnchor="end">{usd0(v)}</text></g>)}
+      {gx.map((v) => <text key={"x" + v} className="ax" x={X(v)} y={H - 7} textAnchor="middle">{fnum(v)}</text>)}
+      <line className="zero" x1={L} x2={W - R} y1={Y(0)} y2={Y(0)} />
+      {vx.map(([s, t, c], i) => <g key={c} data-vx={c}><line className={"vx " + c} x1={X(s)} x2={X(s)} y1={T} y2={T + ph} /><text className={"vxt " + c} x={X(s)} y={12 + i * 13} textAnchor="middle">{t}</text></g>)}
+      <polyline className="pay-up" fill="none" clipPath="url(#ta-pay-up)" points={pts} />
+      <polyline className="pay-dn" fill="none" clipPath="url(#ta-pay-dn)" points={pts} />
+      {hasS ? <g data-vx="s"><line className="vx s" x1={X(S)} x2={X(S)} y1={T} y2={T + ph} /><circle className={"pay-pt " + (ud(vS) || "flat")} cx={X(S)} cy={Y(vS)} r="6" />
+        <text className={"pay-ptt " + ud(vS)} x={X(S) + (X(S) > W - 160 ? -10 : 10)} y={Math.max(T + 12, Y(vS) - 10)} textAnchor={X(S) > W - 160 ? "end" : "start"}>{fnum(S)}：{usd0(vS, 1)}</text></g> : null}
+    </svg>
+  );
+}
+// 試算：點表格一列帶入；口數、到期價格（輸入框＋拖拉條）即時算
+function OptTry({ r, price, tgt, n, setN, S, setS }) {
+  const N = lots(n), lo = price * 0.6, hi = price * 1.4;
+  const Sv = S === "" ? NaN : Number(S);
+  const c = optCost(r.ask, N), v = Number.isFinite(Sv) ? optPnl(r.cp, r.k, r.ask, Sv, N) : null, mg = maxGain(r.cp, r.k, r.ask, N);
+  return (
+    <div className="ta-opt-try">
+      <div className="ta-cap">試算</div>
+      <div className="ta-rs-form">
+        <label>買 <input type="number" className="ta-q ta-opt-n" min="1" step="1" value={n} onChange={(e) => setN(e.target.value)} onBlur={() => setN(String(N))} aria-label="口數" /> 口 {fnum(r.k)} {cpName(r.cp)}</label>
+        <label>到期價格 <input type="number" className="ta-q ta-rs-num" step="any" value={S} onChange={(e) => setS(e.target.value)} /></label>
+        <input type="range" className="ta-opt-rg" min={lo} max={hi} step={(hi - lo) / 800} value={Number.isFinite(Sv) ? Math.max(lo, Math.min(hi, Sv)) : price}
+          onChange={(e) => setS(Number(e.target.value).toFixed(2))} aria-label="拖拉到期價格" />
+      </div>
+      <dl className="ta-opt-dl">
+        <dt>到期在 {Number.isFinite(Sv) ? fnum(Sv) : "—"} 的賺賠</dt><dd className={"big " + ud(v)}>{usd0(v, 1)}<span className="sep">｜</span>{pc1(v === null ? null : retPct(v, c))}</dd>
+        <dt>損益兩平</dt><dd>{fnum(r.be)}</dd>
+        <dt>最多虧</dt><dd>{usd0(c)}</dd>
+        <dt>最多賺</dt><dd>{mg === Infinity ? "無上限" : usd0(mg)}</dd>
+      </dl>
+      <PayChart r={r} n={N} price={price} tgt={tgt} S={Sv} onS={setS} />
+    </div>
+  );
+}
+// 看法＋表格＋試算；換商品＝整份重來（key），換到期日保留方向、目標價
+function OptCalc({ x, exp, busy, onExp }) {
+  const defT = (cp) => (x.price * (cp === "C" ? 1.05 : 0.95)).toFixed(2);
+  const [cp, setCp] = useState("C");
+  const [tg, setTg] = useState(() => defT("C"));
+  const [sel, setSel] = useState(null);   // {e, cp, k}
+  const [n, setN] = useState("1");
+  const [S, setS] = useState("");
+  const tgt = tg === "" ? NaN : Number(tg);
+  const days = dte(x.expiry);
+  const rows = useMemo(() => candidates(x.rows, cp, x.price, tgt, days), [x, cp, tgt, days]);
+  const cols = useMemo(() => optionCols(cp), [cp]);
+  const r = sel && sel.e === x.expiry && sel.cp === cp ? rows.find((y) => y.k === sel.k) || null : null;
+  const pickDir = (v) => { setCp(v); setTg(defT(v)); setSel(null); };
+  const pick = (y) => { setSel({ e: x.expiry, cp, k: y.k }); setS(Number.isFinite(tgt) ? tg : x.price.toFixed(2)); };
+  return (
+    <>
+      <div className="ta-rs-form ta-opt-view">
+        <b>你的看法</b>
+        <label>方向 <select className="ta-q" value={cp} onChange={(e) => pickDir(e.target.value)}><option value="C">看漲</option><option value="P">看跌</option></select></label>
+        <label>目標價 <input type="number" className="ta-q ta-rs-num" min="0" step="any" value={tg} onChange={(e) => setTg(e.target.value)} /></label>
+        <label>到期日 <select className="ta-q" value={exp} onChange={(e) => onExp(e.target.value)}>{x.expiries.map((e) => <option key={e} value={e}>{e}（剩 {dte(e)} 天）</option>)}</select></label>
+      </div>
+      <div className="ta-cap">符合的選擇 <span className="mut">{x.expiry} 到期的{cp === "C" ? "買權" : "賣權"}，履約價在現價 ±25% 內、有買賣報價的 {rows.length} 檔；點一列帶入試算</span></div>
+      <div className={busy ? "ta-opt-busy" : ""}>
+        {rows.length ? <div className="ta-win10"><SortTable className="ta-dt ta-opt-tbl" cols={cols} rows={rows} rowKey={(y) => cp + y.k} init={[3, -1]}
+          rowClass={(y) => (r && y.k === r.k ? "sel" : "")} onRow={pick} /></div> : <div className="ta-empty">資料不足：這個到期日沒有符合的報價</div>}
+      </div>
+      {r ? <OptTry r={r} price={x.price} tgt={tgt} n={n} setN={setN} S={S} setS={setS} /> : null}
+    </>
+  );
+}
+function OptView({ opt, run }) {
+  const d = opt.data;
+  const err = opt.error ? (String(opt.error).startsWith("資料不足") ? opt.error : "資料不足：" + opt.error) : "";
+  return (
+    <div className="ta-optv">
+      <div className="ta-rs-form">
+        <label>商品 <select className="ta-q" value={opt.sym} onChange={(e) => run(e.target.value, "")}>
+          {OPT_GROUPS.map(([gn, a]) => <optgroup key={gn} label={gn}>{a.map(([s, nm]) => <option key={s} value={s}>{s}{nm ? "（" + nm + "）" : ""}</option>)}</optgroup>)}
+        </select></label>
+        {d ? <span>現價 <b className="mono">{fnum(d.price)}</b></span> : null}
+        {d ? <span className="mut">CBOE 延遲報價（約 15 分鐘）<span className="sep">｜</span>資料時間 {fmtTs(d.ts, "Asia/Taipei") || "—"}（台灣）</span> : null}
+      </div>
+      {err ? <div className="ta-err" role="alert"><span>{err}</span><button type="button" className="ta-btn" onClick={() => run(opt.sym, opt.exp)}>重試</button></div>
+        : !d ? <div className="ta-ph">讀取中…</div>
+        : <OptCalc key={d.symbol} x={d} exp={opt.exp || d.expiry} busy={!!opt.busy} onExp={(e) => run(opt.sym, e)} />}
+    </div>
+  );
+}
+
 // ───────── 主頁 ─────────
 async function post(url, body, token) {
   const headers = { "Content-Type": "application/json" };
@@ -1606,6 +1741,8 @@ export default function TaPage() {
   const pickRsMkt = (k) => { setRsMkt(k); lsSet(RS_MKT_KEY, k); };
   const rsSeq = useRef({});
   const [tt, setTt] = useState({});             // 趨勢樣板：市場 → {busy}｜{data}｜{error}；市場切換跟區間強弱共用 rsMkt
+  const [opt, setOpt] = useState({});           // 選擇權：{sym, exp, busy, data（同商品換到期日時留著上一份）}｜{sym, exp, error}
+  const optSeq = useRef(0);
   const pickSide = (k) => { setSide(k); lsSet(SIDE_KEY, k); pickView("chart"); };
   const dvs = useMemo(() => sideTrade(dv, side), [dv, side]);
   const bkey = useMemo(() => [dvs, maSet], [dvs, maSet]);   // Boundary 重試鍵：資料、交易參數、均線組、訊號篩選任一換了就重試
@@ -1749,6 +1886,16 @@ export default function TaPage() {
       setTt((a) => ({ ...a, [mk]: j.ok ? { data: j } : { error: j.error || "讀取失敗" } }));
     });
   }, [phase, view, tt, rsMkt, gate, call]);
+  const runOpt = useCallback(async (s, e) => {   // 選擇權：只收最後一次的回應；商品選擇記在 localStorage
+    const my = ++optSeq.current;
+    lsSet(OPT_KEY, s);
+    setOpt((o) => ({ sym: s, exp: e, busy: true, data: o.sym === s ? o.data : null }));
+    const j = await call("/api/ta-opt", e ? { symbol: s, expiry: e } : { symbol: s });
+    if (my !== optSeq.current) return;
+    if (gate(j)) { setOpt({}); return; }   // 重新登入後 !opt.sym 會自動再抓
+    setOpt(j.ok ? { sym: s, exp: j.expiry, data: j } : { sym: s, exp: e, error: j.error || "讀取失敗" });
+  }, [gate, call]);
+  useEffect(() => { if (phase === "app" && view === "opt" && !opt.sym) runOpt(readOptSym(), ""); }, [phase, view, opt.sym, runOpt]);
   const mktSeg = (
     <div className="ta-seg ta-rs-mkt" role="group" aria-label="市場">
       {RS_MKTS.map(([k, nm]) => <button key={k} type="button" aria-pressed={rsMkt === k} className={"ta-tab" + (rsMkt === k ? " on" : "")} onClick={() => pickRsMkt(k)}>{nm}</button>)}
@@ -1872,6 +2019,8 @@ export default function TaPage() {
                 onClick={() => pickView(view === "rs" ? "chart" : "rs")}>區間強弱</button>
               <button type="button" aria-pressed={view === "tt"} className={"ta-tab" + (view === "tt" ? " on" : "")}
                 onClick={() => pickView(view === "tt" ? "chart" : "tt")}>趨勢樣板</button>
+              <button type="button" aria-pressed={view === "opt"} className={"ta-tab" + (view === "opt" ? " on" : "")}
+                onClick={() => pickView(view === "opt" ? "chart" : "opt")}>選擇權</button>
             </div>
             {busy ? <span className="ta-kbd">計算中…</span> : null}
           </div>
@@ -1900,6 +2049,11 @@ export default function TaPage() {
                   : tt[rsMkt].error ? <div className="ta-err" role="alert"><span>{tt[rsMkt].error}</span><button type="button" className="ta-btn" onClick={() => setTt((a) => ({ ...a, [rsMkt]: undefined }))}>重試</button></div>
                   : <TtView x={tt[rsMkt].data} mk={rsMkt} onCode={rsCode} />}
               </Boundary>
+            </div>
+          ) : null}
+          {view === "opt" ? (
+            <div className="ta-pane">
+              <Boundary reset={opt}>{opt.sym ? <OptView opt={opt} run={runOpt} /> : <div className="ta-ph">讀取中…</div>}</Boundary>
             </div>
           ) : null}
           <div className="ta-pane" hidden={view !== "chart"}>

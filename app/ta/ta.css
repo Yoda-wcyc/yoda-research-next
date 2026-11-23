@@ -341,9 +341,9 @@ svg.ta-k .roll-t{fill:#9aa4b2;font-size:10px;paint-order:stroke;stroke:#0b0f15;s
 .ta-rs-pre{display:inline-flex;gap:4px}
 .ta-rs-sum{margin:0 0 12px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:calc(13.5px*var(--scale))}
 .ta-rs-sum .sep{color:var(--dim);margin:0 6px}
-.ta-rs-g tbody tr{cursor:pointer}
-.ta-rs-g tbody tr:hover td{background:color-mix(in srgb,var(--accent) 10%,transparent)}
-.ta-rs-g tbody tr.sel td{background:color-mix(in srgb,var(--accent) 20%,transparent)}
+.ta-rs-g tbody tr,.ta-opt-tbl tbody tr{cursor:pointer}
+.ta-rs-g tbody tr:hover td,.ta-opt-tbl tbody tr:hover td{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.ta-rs-g tbody tr.sel td,.ta-opt-tbl tbody tr.sel td{background:color-mix(in srgb,var(--accent) 20%,transparent)}
 .ta-rs-mem{margin:10px 0 0 18px;padding-left:10px;border-left:2px solid var(--accent)}
 .ta-rs-two>div{margin-top:16px}
 .ta-rs-foot{margin-top:12px}
@@ -359,5 +359,30 @@ svg.ta-k .roll-t{fill:#9aa4b2;font-size:10px;paint-order:stroke;stroke:#0b0f15;s
 .ta-tt-svg .tt-kl{fill:var(--red)} .ta-tt-svg .tt-ks{fill:var(--green)}
 .ta-tt-svg .tt-hl{stroke:var(--dim);stroke-width:1;stroke-dasharray:3 3}
 .ta-tt-svg .tt-dl{fill:var(--red)} .ta-tt-svg .tt-ds{fill:var(--green)}
+/* 選擇權（11-23）：表頭不折行（十列視窗照一列高算）；到期損益圖賺紅賠綠 */
+.ta-optv .ta-rs-form .sep{color:var(--dim);margin:0 6px}
+.ta-opt-view>b{font-size:calc(14px*var(--scale))}
+.ta-opt-tbl th,.ta-opt-tbl td{white-space:nowrap}
+.ta-opt-busy{opacity:.5;pointer-events:none}
+.ta-opt-try{margin-top:16px}
+.ta-rs-form .ta-opt-n{width:4.5em}
+.ta-opt-rg{flex:1 1 260px;min-width:200px;accent-color:var(--accent)}
+.ta-opt-dl{margin:0 0 10px;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 14px;font-size:calc(13.5px*var(--scale))}
+.ta-opt-dl dt{color:var(--dim);white-space:nowrap}
+.ta-opt-dl dd{margin:0;font-family:'SF Mono',Consolas,Monaco,monospace}
+.ta-opt-dl dd.big{font-size:calc(17px*var(--scale));font-weight:700}
+.ta-opt-dl .sep{color:var(--dim);margin:0 8px}
+.ta-pay{cursor:ew-resize;touch-action:none}
+.ta-pay .zero{stroke:var(--dim);stroke-width:1}
+.ta-pay .pay-up{stroke:var(--red);stroke-width:2.5}
+.ta-pay .pay-dn{stroke:var(--green);stroke-width:2.5}
+.ta-pay .vx{stroke:var(--dim);stroke-width:1;stroke-dasharray:4 4}
+.ta-pay .vx.s{stroke:var(--accent);stroke-dasharray:none}
+.ta-pay .vxt{fill:var(--dim);font-size:12px}
+.ta-pay .vxt.tg{fill:var(--accent)}
+.ta-pay .pay-pt{stroke:var(--surface,#fff);stroke-width:2}
+.ta-pay .pay-pt.up{fill:var(--red)} .ta-pay .pay-pt.dn{fill:var(--green)} .ta-pay .pay-pt.flat{fill:var(--dim)}
+.ta-pay .pay-ptt{font-size:13px;font-weight:700;fill:var(--text)}
+.ta-pay .pay-ptt.up{fill:var(--red)} .ta-pay .pay-ptt.dn{fill:var(--green)}
 .ta-tt-tip{position:absolute;top:26px;margin:0 8px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
   font-size:calc(12.5px*var(--scale));line-height:1.5;white-space:nowrap;pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,.25)}

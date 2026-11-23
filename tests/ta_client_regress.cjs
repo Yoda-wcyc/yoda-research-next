@@ -120,13 +120,16 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   const opts = { jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "classic" } }, target: "es2020" }, module: { type: "commonjs" } };
   const src = 'const React = require("react");\n' + fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8")
     .replace('"../../lib/ta-trade"', JSON.stringify(path.join(ROOT, "lib", "ta-trade.js").replace(/\\/g, "/")))
-    .replace('"../../lib/ta-rs"', JSON.stringify(path.join(ROOT, "lib", "ta-rs.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea };\n";
+    .replace('"../../lib/ta-rs"', JSON.stringify(path.join(ROOT, "lib", "ta-rs.js").replace(/\\/g, "/")))
+    .replace('"../../lib/ta-opt"', JSON.stringify(path.join(ROOT, "lib", "ta-opt.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym };\n";
   const Mod = require("module");
   const libSrc = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-trade.js"), "utf8"), opts).code;
   const lib = new Mod(path.join(ROOT, "lib", "ta-trade.js")); lib.paths = Mod._nodeModulePaths(ROOT); lib._compile(libSrc, lib.id);
   require.cache[lib.id] = lib; lib.loaded = true;
   const rsLib = new Mod(path.join(ROOT, "lib", "ta-rs.js")); rsLib._compile(transformSync(fs.readFileSync(rsLib.id, "utf8"), opts).code, rsLib.id);   // page.jsx 也 import lib/ta-rs（區間強弱，11-13）
   require.cache[rsLib.id] = rsLib; rsLib.loaded = true;
+  const optLib = new Mod(path.join(ROOT, "lib", "ta-opt.js")); optLib._compile(transformSync(fs.readFileSync(optLib.id, "utf8"), opts).code, optLib.id);   // 選擇權（11-23）
+  require.cache[optLib.id] = optLib; optLib.loaded = true;
   const m = new Mod(path.join(ROOT, "app", "ta", "page.cjs")); m.paths = Mod._nodeModulePaths(ROOT);
   m._compile(transformSync(src, opts).code, m.id);
   const P = m.exports;
@@ -592,6 +595,44 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     // 壞資料不崩：exits 裡有 null、why 不是陣列
     const b = renderToString(React.createElement(P.TtView, { x: { day: "x", long: [null, { code: "1" }], exits_long: [null, { code: "9", why: "C5" }], exits_short: "x" }, mk: "tw", onCode: () => {} })).replace(/<!-- -->/g, "");
     assert.ok(b.includes("今日跳出・多方 1 檔") && b.includes("今日跳出・空方 0 檔"), b.slice(0, 300));
+  });
+  await t("選擇權（11-23）：分頁在趨勢樣板右邊、記得住；下拉 11 檔分組；買 Call 表七欄可排序、預設報酬 % 高到低、十列視窗；試算最多賺；守門字", async () => {
+    const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
+    assert.ok(/>趨勢樣板<\/button>\s*<button[^]*?pickView\(view === "opt" \? "chart" : "opt"\)}>選擇權<\/button>/.test(raw), "分頁鈕「選擇權」要緊接在「趨勢樣板」右邊");
+    assert.ok(raw.includes('call("/api/ta-opt", e ? { symbol: s, expiry: e } : { symbol: s })'), "要打 /api/ta-opt");
+    const st = {}; globalThis.localStorage = { getItem: (k) => (k in st ? st[k] : null), setItem: (k, v) => { st[k] = String(v); }, removeItem: (k) => { delete st[k]; } };
+    st.yoda_ta_view = "opt"; assert.strictEqual(P.readView(), "opt");
+    assert.strictEqual(P.readOptSym(), "QQQ"); st.yoda_ta_opt_sym = "NVDA"; assert.strictEqual(P.readOptSym(), "NVDA"); st.yoda_ta_opt_sym = "AMD"; assert.strictEqual(P.readOptSym(), "QQQ");
+    globalThis.localStorage = { getItem: () => { throw new Error("blocked"); }, setItem: () => { throw new Error("blocked"); }, removeItem: () => {} };
+    assert.strictEqual(P.readOptSym(), "QQQ", "localStorage 不能用也不崩");
+    const q = (b, a) => ({ b, a, iv: 0.5, oi: 10 });
+    const rows = [100, 110, 120, 130, 140, 150, 170].map((k) => ({ k, c: k === 150 ? q(0, 1) : q(1, { 100: 31, 110: 22, 120: 14, 130: 9.2, 140: 3, 170: 0.1 }[k]), p: q(1, 2) }));
+    const data = { symbol: "NVDA", price: 130, ts: "2026-11-23 01:38:43", last: "", expiries: ["2026-12-18", "2027-01-15"], expiry: "2026-12-18", rows };
+    const h = renderToString(React.createElement(P.OptView, { opt: { sym: "NVDA", exp: "2026-12-18", data }, run: () => {} })).replace(/<!-- -->/g, "");
+    const opts = [...h.matchAll(/<option value="([A-Z]{2,})"/g)].map((m) => m[1]);
+    assert.deepStrictEqual(opts, ["QQQ", "SPY", "SOXX", "NVDA", "AAPL", "MSFT", "AMZN", "GOOGL", "META", "TSLA", "AVGO"]);
+    for (const w of ['<optgroup label="ETF">', '<optgroup label="大型科技股">', "QQQ（那斯達克 100）", "SOXX（費半）", "CBOE 延遲報價（約 15 分鐘）", "資料時間 2026-11-23 09:38（台灣）", "看漲", "看跌", 'value="136.50"', "2026-12-18（剩", "ta-win10"]) assert.ok(h.includes(w), "少了 " + w);
+    for (const w of ["選擇", "成本", "看對時賺賠", "報酬 %", "市場估的賺錢機率（用隱含波動率估）", "最多虧", "損益兩平"]) assert.ok(h.includes(">" + w + "<"), "表頭少了 " + w);
+    assert.ok((h.match(/<th /g) || []).length === 7 && (h.match(/點一下排序/g) || []).length === 7, "七欄都可排序");
+    assert.ok(/報酬 %<span class="arr">▼<\/span>/.test(h), "預設照報酬 % 由高到低（表頭箭頭）");
+    const order = [...h.matchAll(/<td class="">買 (\d+) Call<\/td>/g)].map((m) => m[1]);
+    assert.deepStrictEqual(order, ["110", "120", "100", "130", "140"], "只列有報價、±25% 內，照報酬 % 高到低");
+    assert.ok(h.includes('class="up">+$450') && h.includes('class="dn">−$300') && h.includes("$2,200"), "看對時賺賠漲紅跌綠");
+    // 試算：Call 最多賺無上限；Put＝(履約價 − 權利金) × 100 × 口數；到期價格的賺賠漲紅跌綠；口數打錯當 1
+    const tc = renderToString(React.createElement(P.OptTry, { r: { k: 126, cp: "C", ask: 7.75, be: 133.75 }, price: 130, tgt: 136.5, n: "2", setN: () => {}, S: "135", setS: () => {} })).replace(/<!-- -->/g, "");
+    assert.ok(tc.includes("無上限") && tc.includes('class="big up">+$250') && tc.includes("+16.1%") && tc.includes("$1,550") && tc.includes("133.75") && tc.includes('type="range"') && tc.includes("到期損益圖"), tc.slice(0, 600));
+    for (const k of ["now", "be", "tg", "s"]) assert.ok(tc.includes('data-vx="' + k + '"'), "圖上少了 " + k);
+    const tp = renderToString(React.createElement(P.OptTry, { r: { k: 100, cp: "P", ask: 4, be: 96 }, price: 100, tgt: 95, n: "0", setN: () => {}, S: "110", setS: () => {} })).replace(/<!-- -->/g, "");
+    assert.ok(tp.includes("$9,600") && !tp.includes("無上限") && tp.includes('class="big dn">−$400') && tp.includes("-100.0%"), tp.slice(0, 600));
+    // 抓不到：資料不足＋重試；不崩
+    let re = 0;
+    const he = renderToString(React.createElement(P.OptView, { opt: { sym: "QQQ", exp: "", error: "連線失敗，請再試一次" }, run: () => re++ }));
+    assert.ok(he.includes("資料不足：連線失敗") && he.includes("重試"), he);
+    const hb = renderToString(React.createElement(P.OptView, { opt: { sym: "QQQ", exp: "", data: { ...data, rows: [] } }, run: () => {} }));
+    assert.ok(hb.includes("資料不足"), hb.slice(0, 300));
+    // 守門：不做賣出／價差／Covered Call／Roll、不放專業欄位、不寫建議字、已永久刪除的字
+    for (const s of [h, tc, tp]) for (const w of ["建議", "應該", "最佳", "推薦", "Delta", "Covered", "Roll", "賣出", "價差", "進場", "出場", "加碼", "停利", "2R", "出一半", "移保本", "怎麼看", "最近查過", "多空排列", "未平倉"]) assert.ok(!s.includes(w), "選擇權分頁出現「" + w + "」");
+    assert.strictEqual((h.match(/隱含波動率/g) || []).length, 1, "隱含波動率只出現在機率欄名");
   });
   await t("pastHalf：TA 票過半才續；普通票、壞票、沒期限 → 要問 status", async () => {
     const tk = (p) => "h." + Buffer.from(JSON.stringify(p)).toString("base64url") + ".s", n = Date.now() / 1000;
