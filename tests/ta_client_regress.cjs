@@ -121,7 +121,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   const src = 'const React = require("react");\n' + fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8")
     .replace('"../../lib/ta-trade"', JSON.stringify(path.join(ROOT, "lib", "ta-trade.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-rs"', JSON.stringify(path.join(ROOT, "lib", "ta-rs.js").replace(/\\/g, "/")))
-    .replace('"../../lib/ta-opt"', JSON.stringify(path.join(ROOT, "lib", "ta-opt.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, zoomAt, mtfBlink, tzMs, readSr, readKk, keyKAll };\n";
+    .replace('"../../lib/ta-opt"', JSON.stringify(path.join(ROOT, "lib", "ta-opt.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, zoomAt, mtfBlink, tzMs, barEnd, readSr, readKk, keyKAll };\n";
   const Mod = require("module");
   const libSrc = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-trade.js"), "utf8"), opts).code;
   const lib = new Mod(path.join(ROOT, "lib", "ta-trade.js")); lib.paths = Mod._nodeModulePaths(ROOT); lib._compile(libSrc, lib.id);
@@ -293,6 +293,15 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
     assert.ok(raw.includes('matchMedia("(pointer: fine)")') && raw.includes('e.pointerType !== "mouse"'), "只桌機（觸控不啟用）");
     assert.ok(raw.includes('onDoubleClick={fine ? reset : undefined}') && raw.includes(">重設</button>") && raw.includes('addEventListener("wheel", wh, { passive: false })'), "雙擊、重設鈕、滾輪");
+    // 滾輪到頭（11-23）：全段再縮小、10 根再放大 → zoomAt 不變 → 不 preventDefault，頁面照常捲；其他情況才攔
+    const wsrc = raw.slice(raw.indexOf("const wh = (e) => {"), raw.indexOf('el.addEventListener("wheel", wh'));
+    const iSame = wsrc.indexOf("if (r[0] === a0 && r[1] === b0) return;"), iPd = wsrc.indexOf("e.preventDefault()");
+    assert.ok(iSame > 0 && iPd > iSame && wsrc.split("e.preventDefault()").length === 2, "滾輪：先判斷到頭才 preventDefault：" + wsrc);
+    for (const [a0, b0, n0, c, f, edge] of [[0, 500, 500, 250, 2, true], [0, 500, 500, 250, 1.0001, true], [100, 110, 500, 105, 0.5, true], [100, 110, 500, 105, 0.9999, true], [0, 6, 6, 3, 0.5, true],
+      [0, 500, 500, 250, 0.9999, false], [100, 110, 500, 105, 1.0001, false], [380, 500, 500, 440, 2, false], [1, 501, 600, 250, 2, false]]) {
+      const r = z(a0, b0, n0, c, f);
+      assert.strictEqual(r[0] === a0 && r[1] === b0, edge, "到頭判斷 " + JSON.stringify([a0, b0, n0, f]) + " → " + JSON.stringify(r));
+    }
   });
   await t("撐壓線開關（11-23）：關掉不畫兩條線與右側「撐／壓」標籤、撐壓不再撐大座標；預設開；localStorage 只有 \"0\" 算關、不能用＝開", async () => {
     const d = mkD(), full = P.fullSeries(d), hi = Math.max(...full.bars.map((x) => x.h));
@@ -733,8 +742,30 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     assert.ok(b && b.s === -1 && b.tip === "1H 空進 11/23 12:00、4H 空進 11/23 09:00" && b.key === "-1|2026-11-23 12:00|2026-11-23 09:00", JSON.stringify(b));
     assert.strictEqual(P.mtfBlink(r1, r4, TP, "long", now), null, "1H 多進在三天前");
     assert.ok(P.mtfBlink(r1, r4, TP, "short", now));
-    assert.strictEqual(P.mtfBlink(r1, r4, TP, "short", Date.UTC(2026, 10, 23, 1, 0) + 8 * H + 60e3), null, "4H 那次超過 8 小時就停");
-    assert.ok(P.mtfBlink(r1, r4, TP, "short", Date.UTC(2026, 10, 23, 1, 0) + 8 * H));
+    // 8 小時從那根 K 收完起算：4H 09:00 那根收在 13:00、1H 12:00 那根也收在 13:00
+    assert.strictEqual(P.mtfBlink(r1, r4, TP, "short", Date.UTC(2026, 10, 23, 5, 0) + 8 * H + 60e3), null, "4H 那根收完超過 8 小時就停");
+    assert.ok(P.mtfBlink(r1, r4, TP, "short", Date.UTC(2026, 10, 23, 5, 0) + 8 * H), "收完後剛好 8 小時還閃");
+    assert.ok(P.mtfBlink(r1, r4, TP, "short", Date.UTC(2026, 10, 23, 1, 0) + 8 * H + 60e3), "從 K 棒標的時間算已過 8 小時，但從收完算還沒");
+    // 收盤那段取實際收盤、不超過當天收盤
+    const NY = "America/New_York";
+    assert.strictEqual(P.barEnd("2026-11-23 09:00", 4, TP), Date.UTC(2026, 10, 23, 5, 0), "台股 4H 09:00 → 13:00");
+    assert.strictEqual(P.barEnd("2026-11-23 13:00", 4, TP), Date.UTC(2026, 10, 23, 5, 30), "台股 4H 13:00 → 13:30（不是 17:00）");
+    assert.strictEqual(P.barEnd("2026-11-23 13:00", 1, TP), Date.UTC(2026, 10, 23, 5, 30), "台股 1H 13:00 → 13:30");
+    assert.strictEqual(P.barEnd("2026-11-23 12:00", 1, TP), Date.UTC(2026, 10, 23, 5, 0), "台股 1H 12:00 → 13:00");
+    assert.strictEqual(P.barEnd("2026-11-23 15:30", 1, NY), Date.UTC(2026, 10, 23, 21, 0), "美股 1H 15:30 → 16:00（冬令）");
+    assert.strictEqual(P.barEnd("2026-07-01 15:30", 1, NY), Date.UTC(2026, 6, 1, 20, 0), "美股 1H 15:30 → 16:00（夏令）");
+    assert.strictEqual(P.barEnd("2026-11-23 13:30", 4, NY), Date.UTC(2026, 10, 23, 21, 0), "美股 4H 13:30 → 16:00（不是 17:30）");
+    assert.strictEqual(P.barEnd("2026-11-23 09:30", 4, NY), Date.UTC(2026, 10, 23, 18, 30), "美股 4H 09:30 → 13:30");
+    assert.strictEqual(P.barEnd("2026-11-23 10:00", 1, "Asia/Tokyo"), P.tzMs("2026-11-23 10:00", "Asia/Tokyo") + H, "不認得的時區：只加週期");
+    // 台股 4H 13:00 那根：13:30 收完 → 21:30 還閃、21:31 停（1H 同在 13:00）
+    const r1c = { trades: [], open: { side: 1, entry_t: "2026-11-23 13:00" } }, r4c = { trades: [tr(1, "2026-11-23 13:00")], open: null };
+    assert.ok(P.mtfBlink(r1c, r4c, TP, "all", Date.UTC(2026, 10, 23, 13, 30)), "台股 13:30 收完後 8 小時（21:30）還閃");
+    assert.strictEqual(P.mtfBlink(r1c, r4c, TP, "all", Date.UTC(2026, 10, 23, 13, 31)), null, "21:31 停");
+    // 美股 1H 15:30、4H 13:30：都收在 16:00 → 隔天 00:00（紐約）還閃、00:01 停
+    const r1u = { trades: [tr(-1, "2026-11-23 15:30")], open: null }, r4u = { trades: [tr(-1, "2026-11-23 13:30")], open: null };
+    const bu = P.mtfBlink(r1u, r4u, NY, "all", Date.UTC(2026, 10, 24, 5, 0));
+    assert.ok(bu && bu.tip === "1H 空進 11/23 15:30、4H 空進 11/23 13:30", "hover 仍顯示 K 棒標的時間：" + JSON.stringify(bu));
+    assert.strictEqual(P.mtfBlink(r1u, r4u, NY, "all", Date.UTC(2026, 10, 24, 5, 1)), null, "美股收盤後超過 8 小時停");
     const r1b = { trades: [], open: { side: 1, entry_t: "2026-11-23 13:00" } };   // 兩邊都成立 → 取比較新的（多）
     const bb = P.mtfBlink(r1b, { trades: [tr(-1, "2026-11-23 12:00")], open: { side: 1, entry_t: "2026-11-23 12:00" } }, TP, "all", now);
     assert.ok(bb && bb.s === 1 && bb.tip.startsWith("1H 多進 11/23 13:00"), JSON.stringify(bb));

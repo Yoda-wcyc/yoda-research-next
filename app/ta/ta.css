@@ -69,6 +69,7 @@
 .ta-tabs .sep{color:var(--dim);margin:0 2px}
 .ta-tab{font:inherit;font-size:calc(14px*var(--scale));color:var(--dim);background:none;border:1px solid transparent;border-radius:8px;
   padding:3px 14px;cursor:pointer}
+.ta-tabs .ta-tab{padding:3px 7px}   /* 14→7（11-23）：多了撐壓線、關鍵K，1440 寬工具列仍排一行（含「計算中…」） */
 .ta-tab:hover{color:var(--text)}
 .ta-tab.on{color:var(--text);background:var(--surface2);border-color:var(--border);font-weight:700}
 .ta-kbd{margin-left:auto;color:var(--dim);font-size:calc(12px*var(--scale))}

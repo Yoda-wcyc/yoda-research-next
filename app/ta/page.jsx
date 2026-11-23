@@ -107,6 +107,12 @@ function tzMs(t, tz) {
     return u - off(u - off(u));
   } catch (e) { return NaN; }
 }
+// 那根 K 收完的時間（11-23）：開始＋週期小時，遇收盤那段取收盤（台股 4H 13:00 那根到 13:30、美股 1H 15:30 到 16:00），不超過當天收盤
+const MTF_CLOSE = { "Asia/Taipei": "13:30", "America/New_York": "16:00" };
+function barEnd(t, h, tz) {
+  const e = tzMs(t, tz) + h * 3600e3, c = MTF_CLOSE[tz] ? tzMs(String(t).slice(0, 10) + " " + MTF_CLOSE[tz], tz) : NaN;
+  return c < e ? c : e;
+}
 function lastEntry(r, s) {   // 某方向最近一次進場的 K 時間（持倉中的那筆一定最新）
   if (r.open && r.open.side === s) return r.open.entry_t;
   for (let k = r.trades.length - 1; k >= 0; k--) if (r.trades[k].side === s) return r.trades[k].entry_t;
@@ -119,7 +125,7 @@ function mtfBlink(r1, r4, tz, side, now) {
   for (const s of side === "long" ? [1] : side === "short" ? [-1] : [1, -1]) {
     const t1 = lastEntry(r1, s), t4 = lastEntry(r4, s);
     if (!t1 || !t4) continue;
-    const a = tzMs(t1, tz), b = tzMs(t4, tz);
+    const a = barEnd(t1, 1, tz), b = barEnd(t4, 4, tz);
     if (!(now - a <= MTF_WIN && now - b <= MTF_WIN)) continue;
     const nm = s === 1 ? "多進" : "空進", hm = (t) => String(t).slice(5, 16).replace("-", "/");
     if (!best || Math.min(a, b) > best.m) best = { s, m: Math.min(a, b), key: s + "|" + t1 + "|" + t4, tip: "1H " + nm + " " + hm(t1) + "、4H " + nm + " " + hm(t4) };
@@ -938,9 +944,10 @@ function ChartArea({ d, maSet, srOn, kkOn = true }) {
     const wh = (e) => {
       const c = kAt(e);
       if (c == null || !e.deltaY) return;
-      e.preventDefault();
       const { a: a0, b: b0, N: n0 } = live.current, r = zoomAt(a0, b0, n0, c, Math.min(2, Math.max(0.5, Math.exp(e.deltaY * (e.deltaMode ? 0.05 : 0.0015)))));
-      if (r[0] !== a0 || r[1] !== b0) setRng(r);
+      if (r[0] === a0 && r[1] === b0) return;   // 已全段再縮小／已 10 根再放大：不攔，頁面照常捲（zoomAt 每次至少動 1 根，只有到頭才會不變）
+      e.preventDefault();
+      setRng(r);
     };
     el.addEventListener("wheel", wh, { passive: false });
     return () => el.removeEventListener("wheel", wh);
