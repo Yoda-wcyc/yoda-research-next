@@ -2557,7 +2557,7 @@ function mailAutoRun(payload, label){
     step();
   });
 }
-function mailDoneText(o){ return '✅ 完成：共嘗試 '+o.attempts+' 次，寄出 '+o.sent+' 封（略過已寄 '+o.already+' 封）'; }
+function mailDoneText(o){ if(o.res&&o.res.skipped) return 'ℹ '+(o.res.reason||'依設定不寄通知信'); return '✅ 完成：共嘗試 '+o.attempts+' 次，寄出 '+o.sent+' 封（略過已寄 '+o.already+' 封）'; }
 function mailStopAlert(o){
   uiAlert('⛔ 已停止自動重寄（第 '+o.attempts+' 次嘗試）\n\n原因：'+(o.error||'不明')+'\n\n目前已寄 '+o.sent+(o.total!=null?' / 共 '+o.total:'')+' 封。'+(/再按一次/.test(o.error||'')?'':'\n已收過的人不會重寄；排除原因後再按一次會接著寄。'));
 }
@@ -2797,7 +2797,7 @@ async function notifyBatchSelected(){
     if(!o.ok){ toast('已停止自動重寄'); mailStopAlert(o); loadPaidReports(); return; }
     var r=o.res||{};
     // 自訂了卻沒被套用＝GAS 還是舊版（不認 subject/header）——提醒先部署 GAS（最後一段沒寄任何人時 subjectCustom 仍會照實回）
-    if((ovSubject&&!r.subjectCustom)||(ovHeader&&!r.headerCustom)) uiAlert('⚠ 信已寄出，但伺服器沒有套用自訂主旨／頁首（GAS 可能還沒部署 2026-10-08-b）。這批用的是預設字。');
+    if(!r.skipped&&((ovSubject&&!r.subjectCustom)||(ovHeader&&!r.headerCustom))) uiAlert('⚠ 信已寄出，但伺服器沒有套用自訂主旨／頁首（GAS 可能還沒部署 2026-10-08-b）。這批用的是預設字。');
     if(ovNotice&&!r.noticeCustom&&(r.sent||0)>0) uiAlert('⚠ 信已寄出，但伺服器沒有放公告（GAS 可能還沒部署 2026-11-18-a）。這批信裡沒有公告。');
     if(sIn)sIn.value=''; if(hIn)hIn.value='';  // 只影響這一批：寄出後清空，下一批回到預設
     ['digestNoticeTitle','digestNotice','digestNoticeUrl','digestNoticeBtn'].forEach(function(id){var el=$(id); if(el)el.value='';});
