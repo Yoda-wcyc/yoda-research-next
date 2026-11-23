@@ -241,6 +241,9 @@ svg.ta-k .brush-t{font-size:12px;font-weight:700;paint-order:stroke;stroke:#0b0f
 /* 圖上記號（同 ta_local） */
 svg.ta-k .te{font-size:12px;font-weight:700;paint-order:stroke;stroke:#0b0f15;stroke-width:3px}
 svg.ta-k .tx{font-size:12px;font-weight:700;paint-order:stroke;stroke:#0b0f15;stroke-width:3px}
+svg.ta-k .kk-n{fill:#ffffff;font-size:11px;font-weight:700;paint-order:stroke;stroke:#0b0f15;stroke-width:3px}
+svg.ta-k .kk-b{font-size:12px;font-weight:700;paint-order:stroke;stroke:#0b0f15;stroke-width:3px;cursor:default}
+svg.ta-k text.kk-b.up{fill:#ff8f96} svg.ta-k text.kk-b.dn{fill:#6fd6a0}
 svg.ta-k .isl-t{fill:#ffc94a;font-size:12px;font-weight:700;paint-order:stroke;stroke:#0b0f15;stroke-width:3px}
 svg.ta-k .ckey{font-size:11px;font-weight:600;paint-order:stroke;stroke:#0b0f15;stroke-width:3px}
 svg.ta-k .mk-hit{cursor:pointer;outline:none}

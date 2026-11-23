@@ -121,7 +121,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   const src = 'const React = require("react");\n' + fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8")
     .replace('"../../lib/ta-trade"', JSON.stringify(path.join(ROOT, "lib", "ta-trade.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-rs"', JSON.stringify(path.join(ROOT, "lib", "ta-rs.js").replace(/\\/g, "/")))
-    .replace('"../../lib/ta-opt"', JSON.stringify(path.join(ROOT, "lib", "ta-opt.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, zoomAt, mtfBlink, tzMs, readSr };\n";
+    .replace('"../../lib/ta-opt"', JSON.stringify(path.join(ROOT, "lib", "ta-opt.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, zoomAt, mtfBlink, tzMs, readSr, readKk, keyKAll };\n";
   const Mod = require("module");
   const libSrc = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-trade.js"), "utf8"), opts).code;
   const lib = new Mod(path.join(ROOT, "lib", "ta-trade.js")); lib.paths = Mod._nodeModulePaths(ROOT); lib._compile(libSrc, lib.id);
@@ -311,6 +311,53 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     assert.strictEqual(P.readSr(), true, "localStorage 不能用＝開");
     const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
     assert.ok(raw.includes(">撐壓線</button>") && raw.includes("aria-pressed={srOn}") && raw.includes("srOn={srOn}"), "工具列按鈕接到圖");
+  });
+  await t("關鍵K（11-23）：大量 K＝之前 120 根前五大量；第一次收盤站上最高「破①↑」、跌破最低「破①↓」各只一次；框＋hover；開關記 localStorage；面板進場選項（沒量不可用）", async () => {
+    // 30 根平盤（量 1000）→ 第 30 根爆量 9000（高 104、低 98）→ 第 36 根收 105 第一次站上 → 第 40 根又站上不算 → 第 45 根收 97 第一次跌破
+    const n = 60, t = [], O = [], H = [], Lo = [], C = [], V = [];
+    const put = (o, h, l, c, v) => { t.push("2026-0" + (1 + Math.floor(t.length / 28)) + "-" + String(1 + (t.length % 28)).padStart(2, "0")); O.push(o); H.push(h); Lo.push(l); C.push(c); V.push(v); };
+    for (let i = 0; i < 30; i++) put(100, 100.5, 99.5, 100, 1000);
+    put(100, 104, 98, 103, 9000);
+    for (let i = 31; i < 36; i++) put(103, 103.4, 102, 103, 1000);
+    put(103, 106, 102.5, 105, 1000);
+    for (let i = 37; i < 39; i++) put(104, 104.3, 103.2, 103.5, 1000);
+    put(103.5, 103.8, 103.1, 103.6, 1000);
+    put(103.6, 106, 103.5, 105.5, 1000);
+    for (let i = 41; i < 45; i++) put(102, 102.4, 101.5, 102, 1000);
+    put(101, 101.2, 96, 97, 1000);
+    while (t.length < n) put(97, 97.4, 96.6, 97, 1000);
+    const d = { tf: "D", bars_completed: n, history: { n, t, o: O, h: H, l: Lo, c: C, v: V }, symbol: { market: "tw", yahoo: "2330.TW" },
+      chart: { bars: [], ma_sets: { short: [5, 10, 20] }, overlays: { gaps: { cols: [], rows: [] }, islands: [] }, legend: [] }, signals: {} };
+    const full = P.fullSeries(d), kk = P.keyKAll(full, n), ev30 = kk.ev.filter((e) => e.j === 30);
+    assert.deepStrictEqual(ev30.map((e) => [e.k, e.dir, e.rank]), [[36, 1, 1], [45, -1, 1]], JSON.stringify(ev30));
+    assert.ok(kk.cur.some((x) => x.j === 30 && x.rank === 1), "目前前五大量也框（第 30 根第 1 大）");
+    assert.strictEqual(lib3.volMult(V, 30), 9, "量倍數＝÷前 20 根均量");
+    const kc = (o) => renderToString(React.createElement(P.KChart, { d, full, smas: [], a: 0, b: n, gaps: [], islands: [], top: [], rolls: [], ...o })).replace(/<!-- -->/g, "");
+    const on = kc({ kk }), off = kc({});
+    assert.ok(/class="kk-box"[^>]*data-j="30"/.test(on) && on.includes("02/03 大量 K 最高 104 最低 98（量 9.0 倍）"), "第 30 根白框＋hover");
+    assert.ok(/class="kk-b up"[^>]*data-k="36"[^>]*>破①↑<title>突破 02\/03 大量 K 最高 104（量 9.0 倍）<\/title>/.test(on), "第 36 根破①↑（紅）＋hover");
+    assert.ok(/class="kk-b dn"[^>]*data-k="45"[^>]*>破①↓<title>跌破 02\/03 大量 K 最低 98（量 9.0 倍）<\/title>/.test(on), "第 45 根破①↓（綠）");
+    assert.ok(!off.includes("kk-box") && !off.includes("kk-b"), "關掉不畫");
+    // 進場選項：同一份事件 → 第 36 根多進（keyk），預設（均線排列）結果不變
+    const pk = lib3.normParams({ entry: "keyk", stop: "pct", exit_ma: false, vol_exit: false }).p, r = lib3.backtest(d.history, n, pk);
+    const all = r.trades.concat(r.open ? [r.open] : []), e0 = kk.ev.find((e) => e.k >= lib3.WARM);
+    assert.ok(all.length && all[0].entry_i === e0.k && all[0].side === e0.dir && all.every((x) => kk.ev.some((e) => e.k === x.entry_i && e.dir === x.side)), "keyk：進場都在關鍵 K 事件那根、第一筆＝暖身後第一個事件");
+    const ex = lib3.explainEntry(r, pk, all[0]);
+    assert.ok(ex.rows[0][1].includes("大量 K 最") && !JSON.stringify(ex).match(/NaN|undefined/), JSON.stringify(ex));
+    assert.strictEqual(lib3.normParams({}).p.entry, "ma"); assert.ok(lib3.normParams({ entry: "x" }).errors.entry);
+    assert.ok(lib3.ruleText(pk).entry.startsWith("突破／跌破關鍵 K"), "規則文字");
+    const draft = lib3.normParams({ entry: "keyk" }).p, props = { draft, set: () => {}, errors: {}, status: "", saved: [], active: null, nm: "", setNm: () => {}, rn: null, setRn: () => {}, msg: "" };
+    const rp = renderToString(React.createElement(P.RulePanel, { ...props, noVol: false })), rpn = renderToString(React.createElement(P.RulePanel, { ...props, noVol: true }));
+    assert.ok(rp.includes("突破／跌破關鍵 K") && /data-k="fresh_n" disabled=""/.test(rp) && /data-k="side_ma" disabled=""/.test(rp) && /data-k="vol_on" disabled=""/.test(rp), "選關鍵 K：排列／量比／同側停用");
+    assert.ok(/disabled="" data-k="entry-keyk"/.test(rpn) && rpn.includes("此標的沒有成交量：突破／跌破關鍵 K 不可用"), "沒量：選項不可用");
+    const st = {};
+    globalThis.localStorage = { getItem: (k) => (k in st ? st[k] : null), setItem: (k, v) => { st[k] = String(v); }, removeItem: (k) => { delete st[k]; } };
+    assert.strictEqual(P.readKk(), true, "沒存過＝開");
+    st.yoda_ta_kk = "0"; assert.strictEqual(P.readKk(), false);
+    globalThis.localStorage = { getItem: () => { throw new Error("blocked"); } };
+    assert.strictEqual(P.readKk(), true);
+    const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
+    assert.ok(raw.includes(">關鍵K</button>") && raw.includes("aria-pressed={kkOn}") && raw.includes("kkOn={kkOn}") && raw.includes("kk={kk}"), "工具列按鈕接到圖");
   });
   await t("市場標籤：美國期貨・CME／指數／台股／美股·NASDAQ·ETF；怪值不崩", async () => {
     assert.strictEqual(P.mktBadge({ market: "fut", exchange: "CME" }), "美國期貨・CME");

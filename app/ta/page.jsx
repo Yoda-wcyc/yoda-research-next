@@ -1,6 +1,6 @@
 "use client";
 import { Component, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { normParams, backtest, chartMarks, exitLine, ruleText, maName, smaSeq, PRESETS, explainEntry, explainExit, fpx, fpc, statsOf, hasVolume, effParams } from "../../lib/ta-trade";
+import { normParams, backtest, chartMarks, exitLine, ruleText, maName, smaSeq, PRESETS, explainEntry, explainExit, fpx, fpc, statsOf, hasVolume, effParams, keyKEvents, volMult, KEYK_N, KEYK_TOP } from "../../lib/ta-trade";
 import { presetStart } from "../../lib/ta-rs";
 import { OPT_GROUPS, optSym, dte, fmtTs, candidates, cost as optCost, pnl as optPnl, retPct, maxGain, lots } from "../../lib/ta-opt";
 
@@ -22,6 +22,8 @@ import { OPT_GROUPS, optSym, dte, fmtTs, candidates, cost as optCost, pnl as opt
 //           「選擇權」（11-23）：下拉 11 檔美股／ETF（不跟 K 線代號連動）→ 看漲買 Call／看跌買 Put 的到期損益表＋試算（/api/ta-opt，CBOE 延遲報價；計算在 lib/ta-opt.js）
 //   週期列共振閃爍（11-23）：背景另抓同一檔的 1H、4H（跟點週期共用同一次請求），用面板規則回測、只看定案 K；同方向最近一次進場都在 8 小時內 → 1H／4H 鈕一起閃
 //           （多紅空綠，跟訊號篩選連動；hover 列兩邊進場時間；過 8 小時或點過那次就停，新訊號再閃；減少動態＝不閃、改外框）
+//   關鍵K（11-23）：工具列「關鍵K」鈕（記 localStorage yoda_ta_kk，預設開）；大量 K＝每根之前 120 根量最大 5 根（「當時可得」，跟面板進場選項
+//           「突破／跌破關鍵 K」同一份 lib/ta-trade.js keyKEvents，不跟可見區間走）；K 棒加白框＋名次，收盤第一次站上最高標「破①↑」（紅）、跌破最低「破①↓」（綠）
 // 資料全部來自 Python 計算引擎（ta-engine，契約見 docs/ta-engine-contract.md）；最後一根盤中未定只上圖，不進訊號與回測。
 
 const TOK_KEY = "yoda_ta_jwt";
@@ -316,6 +318,16 @@ function topVolume(full, a, b, nf, eng) {
   });
 }
 
+// 關鍵K（11-23）：已定案 K 的 keyKEvents（ev）＋目前（最後定案那根之後）的前五大量（cur，還沒突破／跌破的也框）；j／k＝history 絕對位置
+function keyKAll(full, nf) {
+  const n = Math.min(nf, full.bars.length), col = (f) => full.bars.slice(0, n).map((x) => (x[f] == null ? NaN : Number(x[f])));
+  const H = col("h"), L = col("l"), C = col("c"), V = col("v");
+  const js = [];
+  for (let j = Math.max(0, n - KEYK_N); j < n; j++) if (V[j] > 0) js.push(j);
+  js.sort((x, y) => V[y] - V[x] || y - x);
+  return { ev: keyKEvents(H, L, C, V, n), cur: js.slice(0, KEYK_TOP).map((j, r) => ({ j, rank: r + 1 })), H, L, V };
+}
+
 // K 線圖畫整段歷史的 [a, b) 這一段；Y 軸依區間內高低。K 棒與量柱併成幾條 path（1H 五千根拖曳才不卡）
 // 框選放大／滾輪縮放（11-23，只桌機）：KW／KL／KR＝K 線圖 viewBox 寬與價格區左右留白，ChartArea 用來把滑鼠位置換成第幾根
 const KW = 1000, KL = 62, KR = 178, ZOOM_MIN = 10;
@@ -328,7 +340,7 @@ function zoomAt(a, b, N, c, f) {
   return [a1, a1 + w];
 }
 
-function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, brush, srOn = true }) {
+function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, brush, srOn = true, kk = null }) {
   const ch = d.chart || {};
   const bars = full.bars.slice(a, b), n = bars.length;
   if (n < 2) return <div className="ta-nochart">沒有 K 線資料</div>;
@@ -635,6 +647,37 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
       rkEls.push(<text key={"mv" + i} className="mk mkv" x={x} y={vy} textAnchor="middle">{mark(rk)}</text>);
     }
   }
+  // 關鍵K：大量 K 白框＋名次（框下方）、突破那根「破①↑」（紅，K 上方）／跌破「破①↓」（綠，K 下方）；滑過看日期價位量倍數；超過 250 根只留框和小點
+  const kkEls = [];
+  if (kk) {
+    const dt = (i) => md(full.bars[i].t).replace("-", "/"), mul = (j) => { const m = volMult(kk.V, j); return m ? "（量 " + m.toFixed(1) + " 倍）" : ""; };
+    const rk = new Map();
+    for (const e of [...kk.ev, ...kk.cur]) { if (!rk.has(e.j)) rk.set(e.j, new Set()); rk.get(e.j).add(e.rank); }
+    for (const [j, rs] of rk) {
+      if (j < a || j >= b) continue;
+      const x = X(j - a), y0 = Y(kk.H[j]) - 3, y1 = Y(kk.L[j]) + 3, lab = [...rs].sort().map(mark).join("");
+      kkEls.push(<rect key={"kb" + j} className="kk-box" x={x - step / 2 - 1} y={y0} width={step + 2} height={Math.max(2, y1 - y0)} fill="none" stroke="#ffffff"
+        strokeWidth="1.2" strokeOpacity=".85" clipPath={clip} data-j={j}><title>{dt(j) + " 大量 K 最高 " + fpx(kk.H[j]) + " 最低 " + fpx(kk.L[j]) + mul(j)}</title></rect>);
+      if (!showLab) continue;
+      let ly = y1 + 13;
+      for (let k = 0; k < 4 && busyAt([x - 8, ly - 11, x + 8, ly + 2]); k++) ly += 13;
+      placed.push([x - 8, ly - 11, x + 8, ly + 2]);
+      kkEls.push(<text key={"kn" + j} className="kk-n" x={x} y={ly} textAnchor="middle">{lab}</text>);
+    }
+    for (const e of kk.ev) {
+      if (e.k < a || e.k >= b) continue;
+      const bk = full.bars[e.k], x = X(e.k - a), up = e.dir === 1, s = "破" + mark(e.rank) + (up ? "↑" : "↓");
+      const tip = <title>{(up ? "突破 " : "跌破 ") + dt(e.j) + " 大量 K " + (up ? "最高 " + fpx(kk.H[e.j]) : "最低 " + fpx(kk.L[e.j])) + mul(e.j)}</title>;
+      if (!showLab) { kkEls.push(<circle key={"kd" + e.k + "_" + e.dir + "_" + e.j} className={"kk-b " + (up ? "up" : "dn")} cx={x} cy={up ? Y(bk.h) - 5 : Y(bk.l) + 5} r="2.5" fill={up ? K_UP : K_DN}>{tip}</circle>); continue; }
+      // 位置：K 外側往外疊 5 層 × 原位／右／左，第一個不撞的；都撞就選重疊最少的（夾在價格區內，貼底貼頂時才不會兩個疊在一起）
+      const w = tw(s), y0 = up ? Y(bk.h) - 6 : Y(bk.l) + 15, cands = [];
+      for (let k = 0; k < 5; k++) for (const dx of [0, w * 0.6, -w * 0.6]) cands.push([Math.min(xr - w / 2, Math.max(L + w / 2, x + dx)), Math.min(T + PH - 2, Math.max(T + 12, y0 + (up ? -13 : 13) * k))]);
+      const bx = ([cx, cy]) => [cx - w / 2, cy - 11, cx + w / 2, cy + 2];
+      const [lx, ly] = cands.find((c) => !busyAt(bx(c))) || cands.reduce((u, c) => (hitArea(bx(c)) < hitArea(bx(u)) ? c : u), cands[0]);
+      placed.push(bx([lx, ly]));
+      kkEls.push(<text key={"kt" + e.k + "_" + e.dir + "_" + e.j} className={"kk-b " + (up ? "up" : "dn")} x={lx} y={ly} textAnchor="middle" data-k={e.k} data-dir={e.dir}>{s}{tip}</text>);
+    }
+  }
   // 島狀反轉的字：進出場記號放好之後才放，畫在 K 棒和記號上面
   const islEls = [];
   for (const [x0, x1, yt, yb, top, k] of islWant) {
@@ -714,7 +757,7 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
     const f = (dd - 8) / dd;
     leads.push(<line key={"ld" + leads.length} className="mk-lead" x1={px} y1={py} x2={px + (mx - px) * f} y2={py + (my - py) * f} stroke={col} strokeWidth="1" />);
   }
-  els.push(...rkEls, ...islEls, ...unfEls, ...leads, ...tlab);  // 右側標籤避讓（由上到下排、不重疊、不超出價格區）；圖外的價位貼邊、加 ↑／↓
+  els.push(...kkEls, ...rkEls, ...islEls, ...unfEls, ...leads, ...tlab);  // 右側標籤避讓（由上到下排、不重疊、不超出價格區）；圖外的價位貼邊、加 ↑／↓
   for (const z of lab) {
     if (z.y < T) { z.y = T; z.t = "↑" + z.t; }
     else if (z.y > T + PH) { z.y = T + PH; z.t = "↓" + z.t; }
@@ -831,7 +874,7 @@ function RangeNav({ bars, a, b, onChange }) {
 }
 
 // 圖＋導覽列＋圖下三個分頁：區間狀態放這裡（② 缺口、③ 前五大量的表跟著區間變）；父層用 key＝代號|週期，換代號或週期就重新掛載＝回到預設區間
-function ChartArea({ d, maSet, srOn }) {
+function ChartArea({ d, maSet, srOn, kkOn = true }) {
   const ch = d.chart || {};
   const full = useMemo(() => fullSeries(d), [d.history, ch.bars, d.bars_completed]);   // eslint-disable-line react-hooks/exhaustive-deps
   const N = full.bars.length;
@@ -908,6 +951,7 @@ function ChartArea({ d, maSet, srOn }) {
   const islAll = g(ch, "overlays", "islands") || [];
   const rollsAll = Array.isArray(g(ch, "overlays", "rolls")) ? ch.overlays.rolls : [];   // 舊回應沒有 rolls
   const top = useMemo(() => topVolume(full, a, b, nf, g(d, "signals", "top_volume", "items")), [full, a, b, nf, d.signals]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const kk = useMemo(() => (kkOn && !noVolume(d) ? keyKAll(full, nf) : null), [kkOn, full, nf]);   // eslint-disable-line react-hooks/exhaustive-deps
   const view = useMemo(() => ({
     a, b, from: full.bars[a] ? full.bars[a].t : "", to: full.bars[b - 1] ? full.bars[b - 1].t : "", top,
     gaps: gapsAll.filter((x) => x.i >= a && x.i < b), islands: islAll.filter((x) => x.i1 >= a && x.i0 < b),
@@ -955,7 +999,7 @@ function ChartArea({ d, maSet, srOn }) {
     <>
       <div ref={kref} className={"ta-kwrap" + (fine ? " fine" : "")} onPointerDown={kDown} onPointerMove={kMove} onPointerUp={kUp} onPointerCancel={kUp}
         onClickCapture={(e) => { if (ate.current) { ate.current = false; e.stopPropagation(); } }} onDoubleClick={fine ? reset : undefined}>
-        <KChart d={d} full={full} smas={smas} yr={yr} a={a} b={b} onTip={onTip} gaps={gapsAll} islands={islAll} top={top} rolls={rollsAll} brush={brush} srOn={srOn} />
+        <KChart d={d} full={full} smas={smas} yr={yr} a={a} b={b} onTip={onTip} gaps={gapsAll} islands={islAll} top={top} rolls={rollsAll} brush={brush} srOn={srOn} kk={kk} />
         {fine && (a !== def0 || b !== N) ? <button type="button" className="ta-kreset" onPointerDown={(e) => e.stopPropagation()} onClick={reset}>重設</button> : null}
       </div>
       {N > NAV_MIN ? <RangeNav bars={full.bars} a={a} b={b} onChange={setRng} /> : null}
@@ -1269,6 +1313,7 @@ function withTrade(d, p0) {
     { key: "stop", label: "停損", desc: "紅虛線：" + rt.stop },
     { key: "exit", label: "✕ 出場", desc: "整筆出場，✕ 和旁邊的字跟它那筆進場同色（多單紅、空單綠），寫「多出／空出 出場價 這筆報酬%」，停損出場寫「多停損／空停損」；進出只隔一兩根（兩串字會黏在一起）時併成一串寫在 ✕ 旁：「多 進場價→出場價 報酬%」（停損「多停損 進場價→出場價 報酬%」），三角旁不再寫字；字被擠遠時有一條細線連回記號；原因（破N線／爆量反K／到期）滑過記號或字看；畫面超過 250 根時只留記號、不寫字" },
     { key: "link", label: "進→出", desc: "每筆一條實線從進場三角連到它的 ✕，顏色跟進場同色（多單紅、空單綠）；賺賠看 ✕ 旁的報酬%；還沒出場的持倉不畫" },
+    { key: "keyk", label: "關鍵K", desc: "白框＝大量 K（該根之前 " + KEYK_N + " 根量最大 " + KEYK_TOP + " 根），框下是名次；收盤第一次站上它的最高標「破①↑」（紅）、第一次跌破最低標「破①↓」（綠），各只標一次；滑過看日期、價位、量倍數" },
     { key: "island", label: "島狀反轉", desc: "金色虛線框＝懸空的那幾根 K，框上方標頂部島狀反轉、框下方標底部島狀反轉" },
     { key: "open", label: "持倉中", desc: "還沒出場的線延伸到右緣，右側標進場價與停損價" },
     { key: "tip", label: "滑過記號", desc: "滑鼠停在三角、✕ 或旁邊的字上（含右側持倉中的進場／停損標籤；手機點一下）會列出這筆進出場每個條件的實際數值；停損出場另列停損怎麼來的" },
@@ -1289,6 +1334,9 @@ function readSide() { const v = lsGet(SIDE_KEY); return SIDES.some(([k]) => k ==
 // 撐壓線開關（11-23）：關掉＝圖上兩條線、右側價位標籤都不畫，也不再撐大價格座標；預設開
 const SR_KEY = "yoda_ta_sr";
 function readSr() { return lsGet(SR_KEY) !== "0"; }
+// 關鍵K 開關（11-23）：同撐壓線，只有 "0" 算關
+const KK_KEY = "yoda_ta_kk";
+function readKk() { return lsGet(KK_KEY) !== "0"; }
 function sideTrade(d, side) {
   const S = SIDES.find(([k]) => k === side), trd = d && d.trade;
   if (!S || !S[2] || !trd) return d;
@@ -1322,9 +1370,10 @@ function RulePanel({ draft, set, errors, status, saved, active, nm, setNm, rn, s
       value={v(draft[k])} onChange={(e) => put(k, e.target.value)} aria-label={label} aria-invalid={!!errors[k]} data-k={k} disabled={!!dis} />
   );
   const NV = noVol ? NOVOL_TXT + "：量的條件不套用" : "";   // 這檔不套用，但勾選照存（換回有量的標的就恢復）
-  const Rad = (k, x, text) => (
-    <label key={String(x)}><input type="radio" name={"tr-" + k} checked={draft[k] === x} onChange={() => put(k, x)} />{text}</label>
+  const Rad = (k, x, text, dis) => (
+    <label key={String(x)} className={dis ? "off" : undefined}><input type="radio" name={"tr-" + k} checked={draft[k] === x} onChange={() => put(k, x)} disabled={!!dis} data-k={k + "-" + x} />{text}</label>
   );
+  const KK = draft.entry === "keyk";   // 關鍵 K 進場：排列剛成立、進場量比、收在均線同側不看（均線照樣給出場用）
   const Chk = (k, text, dis) => <label className={dis ? "off" : undefined}><input type="checkbox" checked={!!draft[k]} onChange={(e) => put(k, e.target.checked)} data-k={k} disabled={!!dis} />{text}</label>;
   return (
     <section className="ta-rp" aria-label="交易規則">
@@ -1375,6 +1424,7 @@ function RulePanel({ draft, set, errors, status, saved, active, nm, setNm, rn, s
 
       <fieldset>
         <legend>進場</legend>
+        <RuleOpt errors={errors} warn={noVol ? NOVOL_TXT + "：突破／跌破關鍵 K 不可用" : ""}>{Rad("entry", "ma", "均線排列")}{Rad("entry", "keyk", "突破／跌破關鍵 K", noVol)}</RuleOpt>
         <RuleOpt errors={errors} hint="EMA 對最近的價格反應快；SMA 每一根一樣重">均線 {Rad("ma", "ema", "EMA")}{Rad("ma", "sma", "SMA")}</RuleOpt>
         <RuleOpt errors={errors} k="ma_n" hint="由短到長三條；排列＝三條照順序排好（多：短＞中＞長）">
           週期
@@ -1383,11 +1433,11 @@ function RulePanel({ draft, set, errors, status, saved, active, nm, setNm, rn, s
               aria-invalid={!!errors.ma_n} data-k={"ma_n" + j} onChange={(e) => { const a = draft.ma_n.slice(); a[j] = e.target.value; put("ma_n", a); }} />
           ))}
         </RuleOpt>
-        <RuleOpt errors={errors} k="fresh_n" hint="本根排好、前 N 根還沒全排好，才算「剛成立」">排列剛成立：回看 {N("fresh_n", "排列剛成立回看根數")} 根</RuleOpt>
+        <RuleOpt errors={errors} k="fresh_n" hint="本根排好、前 N 根還沒全排好，才算「剛成立」">排列剛成立：回看 {N("fresh_n", "排列剛成立回看根數", null, KK)} 根</RuleOpt>
         <RuleOpt errors={errors} k={["vol_in", "vol_n"]} hint="量比＝本根量 ÷ 前 N 根平均量；不勾＝不看量" warn={NV}>
-          {Chk("vol_on", "量比 ≥", noVol)}{N("vol_in", "進場量比門檻", null, noVol)}，比前 {N("vol_n", "量比比較根數", null, noVol)} 根
+          {Chk("vol_on", "量比 ≥", noVol || KK)}{N("vol_in", "進場量比門檻", null, noVol || KK)}，比前 {N("vol_n", "量比比較根數", null, noVol)} 根
         </RuleOpt>
-        <RuleOpt errors={errors} hint={"多單收盤要在 " + man(0) + " 上方、空單在下方"}>{Chk("side_ma", "收在第一條均線同側（" + man(0) + "）")}</RuleOpt>
+        <RuleOpt errors={errors} hint={"多單收盤要在 " + man(0) + " 上方、空單在下方"}>{Chk("side_ma", "收在第一條均線同側（" + man(0) + "）", KK)}</RuleOpt>
       </fieldset>
 
       <fieldset>
@@ -1875,6 +1925,8 @@ export default function TaPage() {
   const pickSide = (k) => { setSide(k); lsSet(SIDE_KEY, k); pickView("chart"); };
   const [srOn, setSrOn] = useState(readSr);
   const pickSr = () => { setSrOn(!srOn); lsSet(SR_KEY, srOn ? "0" : "1"); pickView("chart"); };
+  const [kkOn, setKkOn] = useState(readKk);
+  const pickKk = () => { setKkOn(!kkOn); lsSet(KK_KEY, kkOn ? "0" : "1"); pickView("chart"); };
   const dvs = useMemo(() => sideTrade(dv, side), [dv, side]);
   const bkey = useMemo(() => [dvs, maSet], [dvs, maSet]);   // Boundary 重試鍵：資料、交易參數、均線組、訊號篩選任一換了就重試
   const actB = BUILTINS.find((x) => BI + x.name === active);
@@ -2195,6 +2247,7 @@ export default function TaPage() {
             </div>
             <div className="ta-seg" role="group" aria-label="圖上線條">
               <button type="button" aria-pressed={srOn} className={"ta-tab" + (srOn ? " on" : "")} onClick={pickSr} data-sr>撐壓線</button>
+              <button type="button" aria-pressed={kkOn} className={"ta-tab" + (kkOn ? " on" : "")} onClick={pickKk} data-kk>關鍵K</button>
             </div>
             <div className="ta-seg ta-vseg">
               <button type="button" aria-pressed={view === "idx"} className={"ta-tab" + (view === "idx" ? " on" : "")}
@@ -2271,7 +2324,7 @@ export default function TaPage() {
                   </div>
                 ) : null}
                 <BadBanner d={d} />
-                <Boundary reset={bkey}><ChartArea key={(symInfo.yahoo || sym) + "|" + d.tf} d={d} maSet={maSet} srOn={srOn} /></Boundary>
+                <Boundary reset={bkey}><ChartArea key={(symInfo.yahoo || sym) + "|" + d.tf} d={d} maSet={maSet} srOn={srOn} kkOn={kkOn} /></Boundary>
                 <Boundary reset={bkey}><Legend d={d} maSet={maSet} /></Boundary>
                 {(d.notes || []).length ? <div className="ta-notes">資料註記：{d.notes.join("；")}</div> : null}
                 <Boundary reset={bkey}><SrLevels d={d} /></Boundary>
