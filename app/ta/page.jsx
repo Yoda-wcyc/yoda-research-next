@@ -328,7 +328,7 @@ function zoomAt(a, b, N, c, f) {
   return [a1, a1 + w];
 }
 
-function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, brush }) {
+function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, brush, srOn = true }) {
   const ch = d.chart || {};
   const bars = full.bars.slice(a, b), n = bars.length;
   if (n < 2) return <div className="ta-nochart">沒有 K 線資料</div>;
@@ -336,7 +336,7 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
   const intra = d.tf === "1H" || d.tf === "4H";
   const oi = (i) => (i == null ? null : i - a);   // 缺口、島、前五大量的 i 都是整段 history 的絕對位置
   const sr = g(d, "signals", "sr_levels") || {};
-  const srl = [...(sr.support || []).slice(0, 1).map((x) => [x, "sup"]), ...(sr.resistance || []).slice(0, 1).map((x) => [x, "res"])];
+  const srl = !srOn ? [] : [...(sr.support || []).slice(0, 1).map((x) => [x, "sup"]), ...(sr.resistance || []).slice(0, 1).map((x) => [x, "res"])];
   const trd = d.trade || {};
   const tlines = (trd.lines || []).filter((ln) => (ln.i1 == null || ln.i1 >= a) && (ln.i0 == null || ln.i0 < b));
   const marks = (trd.markers || []).filter((m) => m.i != null && m.i >= a && m.i < b);
@@ -831,7 +831,7 @@ function RangeNav({ bars, a, b, onChange }) {
 }
 
 // 圖＋導覽列＋圖下三個分頁：區間狀態放這裡（② 缺口、③ 前五大量的表跟著區間變）；父層用 key＝代號|週期，換代號或週期就重新掛載＝回到預設區間
-function ChartArea({ d, maSet }) {
+function ChartArea({ d, maSet, srOn }) {
   const ch = d.chart || {};
   const full = useMemo(() => fullSeries(d), [d.history, ch.bars, d.bars_completed]);   // eslint-disable-line react-hooks/exhaustive-deps
   const N = full.bars.length;
@@ -955,7 +955,7 @@ function ChartArea({ d, maSet }) {
     <>
       <div ref={kref} className={"ta-kwrap" + (fine ? " fine" : "")} onPointerDown={kDown} onPointerMove={kMove} onPointerUp={kUp} onPointerCancel={kUp}
         onClickCapture={(e) => { if (ate.current) { ate.current = false; e.stopPropagation(); } }} onDoubleClick={fine ? reset : undefined}>
-        <KChart d={d} full={full} smas={smas} yr={yr} a={a} b={b} onTip={onTip} gaps={gapsAll} islands={islAll} top={top} rolls={rollsAll} brush={brush} />
+        <KChart d={d} full={full} smas={smas} yr={yr} a={a} b={b} onTip={onTip} gaps={gapsAll} islands={islAll} top={top} rolls={rollsAll} brush={brush} srOn={srOn} />
         {fine && (a !== def0 || b !== N) ? <button type="button" className="ta-kreset" onPointerDown={(e) => e.stopPropagation()} onClick={reset}>重設</button> : null}
       </div>
       {N > NAV_MIN ? <RangeNav bars={full.bars} a={a} b={b} onChange={setRng} /> : null}
@@ -1286,6 +1286,9 @@ function withTrade(d, p0) {
 const SIDES = [["all", "全部", 0], ["long", "只看多方", 1], ["short", "只看空方", -1]];
 const SIDE_KEY = "yoda_ta_side";
 function readSide() { const v = lsGet(SIDE_KEY); return SIDES.some(([k]) => k === v) ? v : "all"; }
+// 撐壓線開關（11-23）：關掉＝圖上兩條線、右側價位標籤都不畫，也不再撐大價格座標；預設開
+const SR_KEY = "yoda_ta_sr";
+function readSr() { return lsGet(SR_KEY) !== "0"; }
 function sideTrade(d, side) {
   const S = SIDES.find(([k]) => k === side), trd = d && d.trade;
   if (!S || !S[2] || !trd) return d;
@@ -1870,6 +1873,8 @@ export default function TaPage() {
   const [opt, setOpt] = useState({});           // 選擇權：{sym, exp, busy, data（同商品換到期日時留著上一份）}｜{sym, exp, error}
   const optSeq = useRef(0);
   const pickSide = (k) => { setSide(k); lsSet(SIDE_KEY, k); pickView("chart"); };
+  const [srOn, setSrOn] = useState(readSr);
+  const pickSr = () => { setSrOn(!srOn); lsSet(SR_KEY, srOn ? "0" : "1"); pickView("chart"); };
   const dvs = useMemo(() => sideTrade(dv, side), [dv, side]);
   const bkey = useMemo(() => [dvs, maSet], [dvs, maSet]);   // Boundary 重試鍵：資料、交易參數、均線組、訊號篩選任一換了就重試
   const actB = BUILTINS.find((x) => BI + x.name === active);
@@ -2188,6 +2193,9 @@ export default function TaPage() {
                 <button key={k} type="button" aria-pressed={side === k} className={"ta-tab" + (side === k ? " on" : "")} onClick={() => pickSide(k)} data-side={k}>{nm}</button>
               ))}
             </div>
+            <div className="ta-seg" role="group" aria-label="圖上線條">
+              <button type="button" aria-pressed={srOn} className={"ta-tab" + (srOn ? " on" : "")} onClick={pickSr} data-sr>撐壓線</button>
+            </div>
             <div className="ta-seg ta-vseg">
               <button type="button" aria-pressed={view === "idx"} className={"ta-tab" + (view === "idx" ? " on" : "")}
                 onClick={() => pickView(view === "idx" ? "chart" : "idx")}>指數位階</button>
@@ -2263,7 +2271,7 @@ export default function TaPage() {
                   </div>
                 ) : null}
                 <BadBanner d={d} />
-                <Boundary reset={bkey}><ChartArea key={(symInfo.yahoo || sym) + "|" + d.tf} d={d} maSet={maSet} /></Boundary>
+                <Boundary reset={bkey}><ChartArea key={(symInfo.yahoo || sym) + "|" + d.tf} d={d} maSet={maSet} srOn={srOn} /></Boundary>
                 <Boundary reset={bkey}><Legend d={d} maSet={maSet} /></Boundary>
                 {(d.notes || []).length ? <div className="ta-notes">資料註記：{d.notes.join("；")}</div> : null}
                 <Boundary reset={bkey}><SrLevels d={d} /></Boundary>

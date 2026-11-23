@@ -121,7 +121,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   const src = 'const React = require("react");\n' + fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8")
     .replace('"../../lib/ta-trade"', JSON.stringify(path.join(ROOT, "lib", "ta-trade.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-rs"', JSON.stringify(path.join(ROOT, "lib", "ta-rs.js").replace(/\\/g, "/")))
-    .replace('"../../lib/ta-opt"', JSON.stringify(path.join(ROOT, "lib", "ta-opt.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, zoomAt, mtfBlink, tzMs };\n";
+    .replace('"../../lib/ta-opt"', JSON.stringify(path.join(ROOT, "lib", "ta-opt.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, zoomAt, mtfBlink, tzMs, readSr };\n";
   const Mod = require("module");
   const libSrc = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-trade.js"), "utf8"), opts).code;
   const lib = new Mod(path.join(ROOT, "lib", "ta-trade.js")); lib.paths = Mod._nodeModulePaths(ROOT); lib._compile(libSrc, lib.id);
@@ -293,6 +293,24 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
     assert.ok(raw.includes('matchMedia("(pointer: fine)")') && raw.includes('e.pointerType !== "mouse"'), "只桌機（觸控不啟用）");
     assert.ok(raw.includes('onDoubleClick={fine ? reset : undefined}') && raw.includes(">重設</button>") && raw.includes('addEventListener("wheel", wh, { passive: false })'), "雙擊、重設鈕、滾輪");
+  });
+  await t("撐壓線開關（11-23）：關掉不畫兩條線與右側「撐／壓」標籤、撐壓不再撐大座標；預設開；localStorage 只有 \"0\" 算關、不能用＝開", async () => {
+    const d = mkD(), full = P.fullSeries(d), hi = Math.max(...full.bars.map((x) => x.h));
+    d.signals = { sr_levels: { support: [{ price: full.bars[full.bars.length - 1].l }], resistance: [{ price: hi * 1.02 }] } };
+    const kc = (o) => renderToString(React.createElement(P.KChart, { d, full, smas: [], a: 0, b: full.bars.length, gaps: [], islands: [], top: [], rolls: [], ...o })).replace(/<!-- -->/g, "");
+    const on = kc({}), off = kc({ srOn: false });
+    assert.ok((on.match(/class="sr-line/g) || []).length === 2 && on.includes(">撐 ") && on.includes(">壓 "), "預設開：兩條線＋標籤");
+    assert.ok(!off.includes("sr-line") && !off.includes(">撐 ") && !off.includes(">壓 "), "關：線和標籤都不畫");
+    const axMax = (h) => Math.max(...[...h.matchAll(/class="ax"[^>]*text-anchor="end">([\d.,]+)</g)].map((m) => Number(m[1].replace(/,/g, ""))));
+    assert.ok(axMax(off) < axMax(on), "關掉後撐壓不再撐大價格軸");
+    const st = {};
+    globalThis.localStorage = { getItem: (k) => (k in st ? st[k] : null), setItem: (k, v) => { st[k] = String(v); }, removeItem: (k) => { delete st[k]; } };
+    assert.strictEqual(P.readSr(), true, "沒存過＝開");
+    for (const [v, want] of [["0", false], ["1", true], ["", true], ["false", true]]) { st.yoda_ta_sr = v; assert.strictEqual(P.readSr(), want, v); }
+    globalThis.localStorage = { getItem: () => { throw new Error("blocked"); } };
+    assert.strictEqual(P.readSr(), true, "localStorage 不能用＝開");
+    const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
+    assert.ok(raw.includes(">撐壓線</button>") && raw.includes("aria-pressed={srOn}") && raw.includes("srOn={srOn}"), "工具列按鈕接到圖");
   });
   await t("市場標籤：美國期貨・CME／指數／台股／美股·NASDAQ·ETF；怪值不崩", async () => {
     assert.strictEqual(P.mktBadge({ market: "fut", exchange: "CME" }), "美國期貨・CME");
