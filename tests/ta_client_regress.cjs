@@ -1018,7 +1018,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     const p = lib3.normParams({ ma: "sma", ma_n: [8, 13, 34] }).p;
     const ca = (sc) => renderToString(React.createElement(P.ChartArea, { d, p, srOn: false, kkOn: false, sc })).replace(/<!-- -->/g, "");
     const off = ca(null);
-    assert.ok(!off.includes("data-sim") && !off.includes("ta-sctabs") && !off.includes("示意，不是預測"), "沒開不畫");
+    assert.ok(!off.includes("data-sim") && !off.includes("ta-sctl") && !off.includes("data-scpo") &&!off.includes("示意，不是預測"), "沒開不畫");
     const h = ca("up");
     assert.ok(/<rect class="sc-box"[^>]*fill="#9fb0c4" fill-opacity=".022" stroke="#9fb0c4" stroke-opacity=".32" stroke-dasharray="5 4"/.test(h), "示意區淡底＋虛線框");
     assert.ok(/<line class="sc-today"/.test(h) && h.includes("今天 " + B[n - 1][0].slice(5)), "今天線標最後一根收完的 K");
@@ -1113,9 +1113,22 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
     assert.ok(raw.includes('const PO_KEY = "yoda_ta_path";') && raw.includes('const pickPo = () => { setPo(!po); lsSet(PO_KEY, po ? "0" : "1"); };'), "記 localStorage（兩種劇本同一個 key）");
   });
-  await t("全螢幕（11-24）：工具列最右一顆 ⛶（aria-label 全螢幕）；有 API → requestFullscreen（含 webkit）、再按 exitFullscreen；沒有／被拒 → CSS 退路 class、再按還原", async () => {
+  await t("全螢幕（11-24）：鈕在圖上方「只看路徑」右邊（劇本關時那排只剩它）、工具列不再有 ⛶；有 API → requestFullscreen（含 webkit）、再按 exitFullscreen；沒有／被拒 → CSS 退路 class、再按還原", async () => {
     const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
-    assert.ok(/>選擇權<\/button>\s*<\/div>\s*<button type="button" aria-pressed=\{!!fs\} className=\{"ta-tab ta-fsbtn"[^>]*aria-label="全螢幕"/.test(raw), "鈕在工具列最右（選擇權那組後面）");
+    const tb = raw.slice(raw.indexOf('<div className="ta-seg ta-vseg">'), raw.indexOf('<div className="ta-pane" hidden={view !== "chart"}>'));
+    assert.ok(tb.includes(">選擇權</button>") && !/ta-fsbtn|⛶/.test(tb.slice(0, tb.indexOf("計算中"))), "工具列不再有全螢幕鈕");
+    assert.ok(/const fsBtn = \(\s*<button type="button" aria-pressed=\{!!fs\} className=\{"ta-tab ta-fsbtn"[^>]*aria-label="全螢幕"/.test(raw) && raw.includes("fsBtn={fsBtn} fs={!!fs} />"), "鈕交給 ChartArea");
+    assert.ok(raw.includes('{fs && !(view === "chart" && d) ? <div className="ta-sctabs">{fsBtn}</div> : null}'), "全螢幕中切到別的分頁：離開鈕照樣在");
+    const fx = JSON.parse(fs.readFileSync(path.join(ROOT, "tests", "ta_5stage_nq4h.json"), "utf8"));
+    const B = fx.bars, n = B.length, col = (j) => B.map((x) => x[j]);
+    const d = { tf: "4H", symbol: { yahoo: "NQ=F", code: "NQ1!", market: "fut", timezone: "America/New_York" }, bars_completed: n,
+      history: { t: col(0), o: col(1), h: col(2), l: col(3), c: col(4), v: col(5) }, chart: { bars: B.slice(-120).map((x) => ({ t: x[0], o: x[1], h: x[2], l: x[3], c: x[4], v: x[5] })) } };
+    const fb = React.createElement("button", { type: "button", className: "ta-tab ta-fsbtn", "data-fs": "" }, "⛶ 全螢幕");
+    const ca = (sc) => renderToString(React.createElement(P.ChartArea, { d, p: lib3.normParams({ ma: "sma", ma_n: [8, 13, 34] }).p, srOn: false, kkOn: false, sc, fsBtn: fb })).replace(/<!-- -->/g, "");
+    assert.ok(/data-scpo="">只看路徑<\/button><button type="button" class="ta-tab ta-fsbtn" data-fs="">⛶ 全螢幕<\/button><\/div>/.test(ca("up")), "劇本開：緊接在只看路徑右邊、同一排");
+    assert.ok(/^<div class="ta-sctabs"><button type="button" class="ta-tab ta-fsbtn" data-fs="">⛶ 全螢幕<\/button><\/div>/.test(ca(null)), "劇本關：那排照樣在、只有全螢幕鈕");
+    const css0 = fs.readFileSync(path.join(ROOT, "app", "ta", "ta.css"), "utf8");
+    assert.ok(!css0.includes(".ta-tabs .ta-fsbtn") && !css0.includes(".ta-tabs{gap:4px;padding-right:4px}"), "工具列間距還原（組間 6、右留白 8）");
     assert.ok(raw.includes('<div ref={fsRef} className={"ta-right" + (fs ? " ta-fs" : "") + (fs === 2 ? " ta-fsfb" : "")}>'), "全螢幕的是右欄（工具列＋圖＋導覽列，不含左側面板）；退路 class ta-fsfb");
     assert.ok(raw.includes('document.addEventListener("fullscreenchange", sync)') && raw.includes('document.addEventListener("webkitfullscreenchange", sync)'), "狀態跟 document.fullscreenElement 同步");
     assert.ok(/document\.body\.style\.overflow = "hidden";[\s\S]{0,200}document\.body\.style\.overflow = ov;/.test(raw), "退路：body 不捲、離開還原");
@@ -1133,11 +1146,13 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     got.length = 0; P.toggleFs({ requestFullscreen() { throw new Error("x"); } }, 0, set, {}); assert.deepStrictEqual(got, [2], "丟例外 → 退路");
     got.length = 0; P.toggleFs({ requestFullscreen: () => Promise.reject(new Error("denied")) }, 0, set, {}); await new Promise((r) => setTimeout(r, 0)); assert.deepStrictEqual(got, [2], "被拒 → 退路");
     // 有 API 但一直不回（內嵌瀏覽器實測：promise 永遠 pending、沒 fullscreenchange）→ 1.5 秒後退路；成功的不會被誤退
-    const g2 = [], g3 = [];
+    const g2 = [], g3 = [], g4 = [];
     P.toggleFs({ requestFullscreen: () => new Promise(() => {}) }, 0, (v) => g2.push(v), {});
     P.toggleFs({ requestFullscreen: () => Promise.resolve() }, 0, (v) => g3.push(v), {});
+    P.toggleFs({ requestFullscreen: () => Promise.reject(new Error("denied")) }, 0, (v) => g4.push(v), {});
     await new Promise((r) => setTimeout(r, 1600));
     assert.deepStrictEqual(g2, [2], "不回應 → 退路"); assert.deepStrictEqual(g3, [], "成功（之後又離開）不誤退");
+    assert.deepStrictEqual(g4, [2], "被拒只退一次（1.5 秒內按離開不會又跳回鋪滿）");
     assert.ok(/if \(e\.key === "Escape"\) setFs\(0\);/.test(raw), "退路 Esc 離開");
     assert.ok(/\(W - KL - KR\)/.test(raw) && /live\.current = \{ a, b, N: NX, W: kw \}/.test(raw), "框選換算用目前的圖寬");
     assert.ok(/setKw\(Math\.max\(KW, Math\.round\(\(KH \* el\.clientWidth\) \/ h\)\)\)/.test(raw) && /if \(!fs \|\| !pane\) \{ setKw\(KW\);/.test(raw), "全螢幕量寬高反推圖寬、離開回 KW");

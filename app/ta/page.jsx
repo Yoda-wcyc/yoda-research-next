@@ -963,7 +963,8 @@ function toggleFs(el, fs, setFs, doc = document) {
   const req = el && (el.requestFullscreen || el.webkitRequestFullscreen);
   if (!req) { setFs(2); return; }
   let ok = false;
-  try { const r = req.call(el); if (r && r.then) r.then(() => { ok = true; }, () => setFs(2)); } catch (e) { setFs(2); return; }
+  // 被拒已退路：ok＝true，1.5 秒計時不再補設（不然 1.5 秒內按離開會又跳回鋪滿）
+  try { const r = req.call(el); if (r && r.then) r.then(() => { ok = true; }, () => { ok = true; setFs(2); }); } catch (e) { setFs(2); return; }
   // 有 API 但一直不回、也沒進全螢幕（內嵌瀏覽器／App 內 webview、舊 webkit 默默失敗）→ 1.5 秒後改 CSS 退路
   setTimeout(() => { if (!ok && !fsEl(doc)) setFs(2); }, FS_WAIT);
 }
@@ -988,17 +989,23 @@ function scInfo(sc, r) {
 // 右邊「只看路徑」（11-24）：亮＝圖上只留示意 K，不畫規劃點記號／價位虛線與標籤、收起點位表；兩種劇本共用、記 localStorage
 const PO_KEY = "yoda_ta_path";
 function readPo() { return lsGet(PO_KEY) === "1"; }
-function ScTabs({ scr, k, onPick, po = false, onPo = null }) {
+// 全螢幕鈕（11-24 Yoda）緊接在「只看路徑」右邊；劇本關時這排照樣在、只剩全螢幕鈕靠右（開關劇本圖不跳）
+function ScTabs({ scr, k, onPick, po = false, onPo = null, fsBtn = null }) {
   return (
     <div className="ta-sctabs">
-      <div className="ta-sctl" role="tablist" aria-label={scr.dir === 1 ? "空轉多劇本" : "多轉空劇本"} data-scdir={scr.dir}>
-        {scr.names.map((nm, i) => (
-          <button key={i} type="button" role="tab" aria-selected={k === i} className={"ta-tab" + (k === i ? " on" : "") + (scr.list[i] ? "" : " none")} onClick={() => onPick(i)} data-sck={i}>
-            {MARKS[i]} {nm}</button>
-        ))}
-        <span className="ta-seglab ta-scord">可能性高→低</span>
-      </div>
-      <button type="button" aria-pressed={po} className={"ta-tab ta-scpo" + (po ? " on" : "")} onClick={onPo} data-scpo="">只看路徑</button>
+      {scr ? (
+        <>
+          <div className="ta-sctl" role="tablist" aria-label={scr.dir === 1 ? "空轉多劇本" : "多轉空劇本"} data-scdir={scr.dir}>
+            {scr.names.map((nm, i) => (
+              <button key={i} type="button" role="tab" aria-selected={k === i} className={"ta-tab" + (k === i ? " on" : "") + (scr.list[i] ? "" : " none")} onClick={() => onPick(i)} data-sck={i}>
+                {MARKS[i]} {nm}</button>
+            ))}
+            <span className="ta-seglab ta-scord">可能性高→低</span>
+          </div>
+          <button type="button" aria-pressed={po} className={"ta-tab ta-scpo" + (po ? " on" : "")} onClick={onPo} data-scpo="">只看路徑</button>
+        </>
+      ) : null}
+      {fsBtn}
     </div>
   );
 }
@@ -1099,7 +1106,7 @@ function RangeNav({ bars, a, b, onChange }) {
 }
 
 // 圖＋導覽列＋圖下三個分頁：區間狀態放這裡（② 缺口、③ 前五大量的表跟著區間變）；父層用 key＝代號|週期，換代號或週期就重新掛載＝回到預設區間
-function ChartArea({ d, p = DEF_P, srOn, kkOn = true, b5On = false, c5On = false, co5 = null, onCo5 = null, sc = null, fs = false }) {
+function ChartArea({ d, p = DEF_P, srOn, kkOn = true, b5On = false, c5On = false, co5 = null, onCo5 = null, sc = null, fsBtn = null, fs = false }) {
   const ch = d.chart || {};
   const full = useMemo(() => fullSeries(d), [d.history, ch.bars, d.bars_completed]);   // eslint-disable-line react-hooks/exhaustive-deps
   const N = full.bars.length;
@@ -1273,7 +1280,7 @@ function ChartArea({ d, p = DEF_P, srOn, kkOn = true, b5On = false, c5On = false
   const info = !tip ? null : tip.kind === "s5" || tip.kind === "sc" ? tip.t : trd.ctx && trd.p ? (tip.kind === "entry" ? explainEntry(trd, trd.p, tip.t) : explainExit(trd, trd.p, tip.t)) : null;
   return (
     <>
-      {scr ? <ScTabs scr={scr} k={scK} onPick={setScK} po={po} onPo={pickPo} /> : null}
+      <ScTabs scr={scr} k={scK} onPick={setScK} po={po} onPo={pickPo} fsBtn={fsBtn} />
       <div ref={kref} className={"ta-kwrap" + (fine ? " fine" : "")} onPointerDown={kDown} onPointerMove={kMove} onPointerUp={kUp} onPointerCancel={kUp}
         onClickCapture={(e) => { if (ate.current) { ate.current = false; e.stopPropagation(); } }} onDoubleClick={fine ? reset : undefined}>
         <KChart d={d} full={fullX} smas={smas} yr={yr} a={a} b={b} onTip={onTip} gaps={cur ? gapsAll.filter((x) => x.i < nf) : gapsAll} islands={cur ? islAll.filter((x) => x.i1 < nf) : islAll}
@@ -2563,6 +2570,10 @@ export default function TaPage() {
 
   const d = dvs;
   const { lastB, chg, unfB, symInfo } = headInfo(d);
+  const fsBtn = (
+    <button type="button" aria-pressed={!!fs} className={"ta-tab ta-fsbtn" + (fs ? " on" : "")} aria-label="全螢幕" title={fs ? "離開全螢幕（Esc）" : "全螢幕"}
+      onClick={() => toggleFs(fsRef.current, fs, setFs)} data-fs="">{fs ? "⛶ 離開" : "⛶ 全螢幕"}</button>
+  );
 
   return (
     <main className="ta-root ta-app">
@@ -2644,10 +2655,10 @@ export default function TaPage() {
               <button type="button" aria-pressed={view === "opt"} className={"ta-tab" + (view === "opt" ? " on" : "")}
                 onClick={() => pickView(view === "opt" ? "chart" : "opt")}>選擇權</button>
             </div>
-            <button type="button" aria-pressed={!!fs} className={"ta-tab ta-fsbtn" + (fs ? " on" : "")} aria-label="全螢幕" title={fs ? "離開全螢幕（Esc）" : "全螢幕"}
-              onClick={() => toggleFs(fsRef.current, fs, setFs)} data-fs="">{fs ? "⛶ 離開" : "⛶"}</button>
             {busy ? <span className="ta-kbd">計算中…</span> : null}
           </div>
+          {/* 全螢幕中切到別的分頁／圖沒畫出來：離開鈕照樣看得到（CSS 退路沒有 Esc 的手機才不會卡住） */}
+          {fs && !(view === "chart" && d) ? <div className="ta-sctabs">{fsBtn}</div> : null}
           {view === "idx" ? (
             <div className="ta-pane">
               <Boundary reset={idx}>
@@ -2716,7 +2727,7 @@ export default function TaPage() {
                   </div>
                 ) : null}
                 <BadBanner d={d} />
-                <Boundary reset={bkey}><ChartArea key={(symInfo.yahoo || sym) + "|" + d.tf} d={d} p={applied} srOn={srOn} kkOn={kkOn} b5On={b5On} c5On={c5On} co5={co5} onCo5={dropCo5} sc={SC_TFS.includes(d.tf) ? scOn : null} fs={!!fs} /></Boundary>
+                <Boundary reset={bkey}><ChartArea key={(symInfo.yahoo || sym) + "|" + d.tf} d={d} p={applied} srOn={srOn} kkOn={kkOn} b5On={b5On} c5On={c5On} co5={co5} onCo5={dropCo5} sc={SC_TFS.includes(d.tf) ? scOn : null} fsBtn={fsBtn} fs={!!fs} /></Boundary>
                 <Boundary reset={bkey}><Legend d={d} p={applied} /></Boundary>
                 {(d.notes || []).length ? <div className="ta-notes">資料註記：{d.notes.join("；")}</div> : null}
                 <Boundary reset={bkey}><SrLevels d={d} /></Boundary>
