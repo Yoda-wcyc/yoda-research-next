@@ -402,7 +402,8 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     assert.ok(!/(彈|修)[1-5]/.test(on + onL), "圖上不得再出現 彈1／修1 這類字");
     assert.ok(/data-step="x"[^>]*>(彈|修)均</.test(on + onL) && /style="fill:#b07a80"[^>]*data-side="s" data-step="stop"|style="fill:#7a9e8c"[^>]*data-side="l" data-step="stop"/.test(on + onL), "出場 線＝同色系暗色");
     assert.ok(/aria-label="反彈五階段 ③ 反彈結束|aria-label="反彈五階段 [①-⑤] /.test(on), "aria 用 圈號＋階段名");
-    assert.ok(/class="s5l"[^>]*stroke-dasharray="5 4"[^>]*data-kind="sup"/.test(on) && /class="s5l"[^>]*stroke="#e8c35a"[^>]*data-kind="stop"/.test(on), "支撐虛線、停損階梯");
+    assert.ok(/class="s5l"[^>]*stroke-dasharray="5 4"[^>]*data-kind="sup"/.test(on) && /class="s5l"[^>]*stroke="#b07a80"[^>]*data-kind="stop"/.test(on) && /class="s5l"[^>]*stroke="#f0a0a8"[^>]*data-kind="sup"/.test(on), "支撐虛線（淡紅）、停損階梯（暗紅）：反彈紅系");
+    assert.ok(/class="s5l"[^>]*stroke="#7a9e8c"[^>]*data-kind="stop"/.test(onL) && /class="s5l"[^>]*stroke="#8fcfb0"[^>]*data-side="l"/.test(onL), "修正線綠系");
     assert.ok(!/>(彈|修)[①②③④⑤]</.test(on) && !/>(反彈|修正)\d</.test(on), "不寫 彈①／反彈1");
     assert.ok(/<rect[^>]*class="s4box"/.test(on) && /data-step="x"[^>]*>(彈|修)均</.test(on) && /data-step="stop"[^>]*>(彈|修)線</.test(on), "出場標籤 彈均／修均、彈線／修線（11-24 改名）");
     assert.ok(!/>(彈|修)(利|停)</.test(on), "舊名 彈利／彈停／修利／修停 不該再出現");
@@ -424,7 +425,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     // 共振外框：blink 指到的標記加 s5co 框（字本身不加 class，閃的是框）
     const q5 = f5.s.find((q) => q.s5 && q.s5.i >= a);
     const bl = kc({ kk, f5: { ...f5, blink: new Map([["s|5|" + q5.s5.i, { list: [{ id: "x" }], txt: "共振" }]]) } });
-    assert.ok(/class="s5co"/.test(bl) && /class="s4t"[^>]*data-co="1"[^>]*>5</.test(bl) && /class="s5co"[^>]*stroke="#3fd08a"/.test(bl), "共振外框（照舊：反彈綠框）");
+    assert.ok(/class="s5co"/.test(bl) && /class="s4t"[^>]*data-co="1"[^>]*>5</.test(bl) && /class="s5co"[^>]*stroke="#ff5f6b"/.test(bl), "共振外框同數字色：反彈紅框");
     assert.ok(raw.includes('(bl ? " ta-blink b-dn" : "")') && raw.includes('k === "short" || k === "mid"'), "短、中一起閃（綠）");
   });
   await t("市場標籤：美國期貨・CME／指數／台股／美股·NASDAQ·ETF；怪值不崩", async () => {
@@ -986,7 +987,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     const id = P.co5Live(cos, bars, "1H", TZ, "us", end + 60e3, [], "NQ|1H|")[0].id;
     assert.strictEqual(P.co5Live(cos, bars, "1H", TZ, "us", end + 60e3, [id], "NQ|1H|").length, 0, "點過就停");
   });
-  await t("劇本（11-24）：工具列兩顆鈕在五階段後面、用分隔；一次只開一顆、再按收起；週K 停用＋一行字；不記 localStorage", async () => {
+  await t("劇本（11-24）：工具列兩顆鈕在五階段後面、用分隔；一次只開一顆、再按收起；週K 停用（說明在 title／aria）；不記 localStorage", async () => {
     const src = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
     assert.ok(/data-c5>修正<\/button>\s*<ScBtns sc=\{scOn\} tf=\{tf\} onPick=\{pickSc\} \/>/.test(src), "鈕緊接在修正五階段後面");
     const html = (o) => renderToString(React.createElement("div", null, React.createElement(P.ScBtns, { sc: null, tf: "4H", onPick: () => {}, ...o }))).replace(/<!-- -->/g, "");
@@ -995,11 +996,12 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     assert.strictEqual((h0.match(/aria-pressed="true"/g) || []).length, 0, "預設都沒開");
     const hu = html({ sc: "up" });
     assert.ok(/aria-pressed="true" class="ta-tab on"[^>]*data-sc="up"/.test(hu) && /aria-pressed="false" class="ta-tab"[^>]*data-sc="dn"/.test(hu), "開空轉多：只有那顆亮");
-    for (const tf of ["1H", "4H", "D"]) assert.ok(!html({ tf }).includes("disabled") && !html({ tf }).includes("劇本只支援"), tf + " 可用");
+    for (const tf of ["1H", "4H", "D"]) assert.ok(!html({ tf }).includes("disabled") && !html({ tf }).includes("劇本限"), tf + " 可用");
     const hw = html({ sc: "up", tf: "W" });
     assert.strictEqual((hw.match(/disabled=""/g) || []).length, 2, "週K 兩顆停用");
     assert.strictEqual((hw.match(/aria-pressed="true"/g) || []).length, 0, "週K 不顯示開著");
-    assert.ok(hw.includes("劇本只支援 1H／4H／日K"), "週K 顯示一行字");
+    assert.strictEqual((hw.match(/title="劇本限 1H／4H／日K"/g) || []).length, 2, "週K 說明只放停用鈕 title");
+    assert.ok(hw.includes('aria-label="空轉多劇本，劇本限 1H／4H／日K"') && !hw.includes("data-sc-off"), "週K 說明放 aria、工具列不另放字（1440 排一行）");
     assert.strictEqual(P.nextSc(null, "up"), "up"); assert.strictEqual(P.nextSc("up", "dn"), "dn", "互斥：按另一顆＝換過去");
     assert.strictEqual(P.nextSc("up", "up"), null, "再按收起"); assert.strictEqual(P.nextSc("dn", "dn"), null);
     assert.ok(src.includes("const pickSc = (k) => { setScOn((x) => nextSc(x, k)); pickView(\"chart\"); };"), "按下就回 K 線圖");

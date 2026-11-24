@@ -284,8 +284,8 @@ const K_UP = "#e0525e", K_DN = "#3fae7a", GOLD = "#ffc94a";
 // 五階段顏色（11-24 二改）：反彈＝紅系（1～5 紅、彈均 淡紅＋紅框、彈線 灰紅）、修正＝綠系（1～5 綠、修均 淡綠＋綠框、修線 灰綠）；
 // fr＝共振閃爍外框（照舊：反彈綠、修正紅）；line＝支撐／防線虛線、stop＝停損價階梯線
 const S5C = {
-  s: { nm: "反彈五階段 ", line: "#8fcfb0", stop: "#e8c35a", fr: "#3fd08a", col: { 1: "#ff5f6b", 2: "#ff5f6b", 3: "#ff5f6b", 4: "#ff5f6b", 5: "#ff5f6b", stop: "#b07a80", x: "#ffb3b9" } },
-  l: { nm: "修正五階段 ", line: "#f0a0a8", stop: "#e8c35a", fr: "#ff5f6b", col: { 1: "#3fd08a", 2: "#3fd08a", 3: "#3fd08a", 4: "#3fd08a", 5: "#3fd08a", stop: "#7a9e8c", x: "#a8e6c6" } },
+  s: { nm: "反彈五階段 ", line: "#f0a0a8", stop: "#b07a80", fr: "#ff5f6b", col: { 1: "#ff5f6b", 2: "#ff5f6b", 3: "#ff5f6b", 4: "#ff5f6b", 5: "#ff5f6b", stop: "#b07a80", x: "#ffb3b9" } },
+  l: { nm: "修正五階段 ", line: "#8fcfb0", stop: "#7a9e8c", fr: "#3fd08a", col: { 1: "#3fd08a", 2: "#3fd08a", 3: "#3fd08a", 4: "#3fd08a", 5: "#3fd08a", stop: "#7a9e8c", x: "#a8e6c6" } },
 };
 const K5 = [1, 2, 3, 4, 5, "x", "stop"];
 const MA_COL = ["#ff4d4f", "#f5c518", "#3d8bfd"];   // 均線由短到長：紅、黃、藍（Yoda 2026-11-09）
@@ -870,7 +870,7 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
       const S = S5C[sd], bk = full.bars[i], x = X(i - a), up = sd === "s", col = S.col[k], str = typeof k === "number" ? String(k) : step5Name(sd, k);
       const co = f5.blink && f5.blink.get(sd + "|" + k + "|" + i), h = tipOf(info5(sd, q, k, full.bars, f5.lines, f5.nm, co ? co.txt : null), co ? co.list : null);
       const aria = { tabIndex: 0, role: "button", "aria-label": S.nm + step5Name(sd, k) + " " + bk.t, onFocus: h.onMouseEnter, onBlur: h.onMouseLeave, "data-side": sd, "data-step": k, "data-i": i, "data-co": co ? 1 : undefined };
-      if (!showLab) { f5Els.push(<circle key={"f5d" + sd + q.s1.i + k} className={"s4t" + (co ? " s5co" : "")} cx={x} cy={up ? Y(bk.h) - 5 : Y(bk.l) + 5} r={co ? 3.5 : 2.5} fill={col} {...h} {...aria} />); continue; }
+      if (!showLab) { f5Els.push(<circle key={"f5d" + sd + q.s1.i + k} className={"s4t" + (co ? " s5co" : "")} cx={x} cy={up ? Y(bk.h) - 5 : Y(bk.l) + 5} r={co ? 3.5 : 2.5} fill={col} stroke={co ? S.fr : undefined} {...h} {...aria} />); continue; }
       const w = tw(str) * 1.05 + (k === "x" || co ? 8 : 2), dir = up ? -1 : 1, yo = up ? Y(bk.h) - 6 : Y(bk.l) + 15, cands = [];
       const cx = (dx) => Math.min(xr - w / 2, Math.max(L + w / 2, x + dx * w));
       for (let r = 0; r < 17; r++) for (const dx of [0, 0.7, -0.7, 1.4, -1.4, 2.1, -2.1, 2.8, -2.8, 3.5, -3.5, 4.2, -4.2, 5, -5]) cands.push([cx(dx), cl(yo + dir * 11 * r), r * 11 + Math.abs(dx * w) * 1.5]);
@@ -938,7 +938,7 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
 
 // ───────── 劇本（11-24）─────────
 // 工具列兩顆鈕：一次只開一顆、再按收起；週K 停用＋一行字
-const SC_DIRS = [["up", "空轉多劇本"], ["dn", "多轉空劇本"]], SC_TFS = ["1H", "4H", "D"], SC_ONLY_TXT = "劇本只支援 1H／4H／日K";
+const SC_DIRS = [["up", "空轉多劇本"], ["dn", "多轉空劇本"]], SC_TFS = ["1H", "4H", "D"], SC_ONLY_TXT = "劇本限 1H／4H／日K";
 const nextSc = (cur, k) => (cur === k ? null : k);
 function ScBtns({ sc, tf, onPick }) {
   const off = !SC_TFS.includes(tf);
@@ -948,9 +948,8 @@ function ScBtns({ sc, tf, onPick }) {
       <span className="ta-seglab" aria-hidden="true">劇本</span>
       {SC_DIRS.map(([k, nm]) => (
         <button key={k} type="button" aria-pressed={!off && sc === k} className={"ta-tab" + (!off && sc === k ? " on" : "")} disabled={off} title={off ? SC_ONLY_TXT : undefined}
-          onClick={() => onPick(k)} aria-label={nm} data-sc={k}>{nm.replace("劇本", "")}</button>
+          onClick={() => onPick(k)} aria-label={off ? nm + "，" + SC_ONLY_TXT : nm} data-sc={k}>{nm.replace("劇本", "")}</button>
       ))}
-      {off ? <span className="ta-seglab ta-tfnote" data-sc-off="">{SC_ONLY_TXT}</span> : null}
     </>
   );
 }
