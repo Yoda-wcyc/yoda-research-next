@@ -1017,10 +1017,10 @@ const SC_COLS = [
   { label: "時間（當地）", render: (r) => (r.t ? <span className="mono">{r.t}</span> : <span className="mut">示意段內未觸發</span>), sort: (r) => r.t || "" },
   { label: "損益", num: true, render: (r) => (r.kind === "entry" ? (r.vmul ? <span className="mut">量 {r.vmul.toFixed(1)} 倍</span> : "—") : <span className={ud(r.pnl)}>{pnlTxt(r)}</span>), sort: (r) => r.pnl },
 ];
-function ScPlan({ scr, cur }) {
+function ScPlan({ scr, cur, no }) {
   return (
     <div className="ta-scplan" data-scplan="">
-      {cur ? <SortTable cols={SC_COLS} rows={cur.plan} rowKey={(r) => r.kind} className="ta-sctbl" /> : <div className="ta-scnone" role="status">這檔目前算不出這個劇本</div>}
+      {cur ? <SortTable cols={SC_COLS} rows={cur.plan} rowKey={(r) => r.kind} className="ta-sctbl" /> : <div className="ta-scnone" role="status">{no || "這檔目前算不出這個劇本"}</div>}
       {scr.lv.length ? (
         <dl className="ta-sclv">
           {scr.lv.map((x) => <div key={x.k} className="ta-rule"><dt>{x.name} <b className="mono">{x.p == null ? "—" : fpx(x.p)}</b></dt><dd>{x.why}</dd></div>)}
@@ -1289,7 +1289,7 @@ function ChartArea({ d, p = DEF_P, srOn, kkOn = true, b5On = false, c5On = false
       </div>
       {cur ? <div className="ta-scfoot">示意，不是預測</div> : null}
       {NX > NAV_MIN ? <RangeNav bars={fullX.bars} a={a} b={b} onChange={setR} /> : null}
-      {scr && !po ? <ScPlan scr={scr} cur={cur} /> : null}
+      {scr && !po ? <ScPlan scr={scr} cur={cur} no={scr.nos && scr.nos[scK]} /> : null}
       <BlockTabs d={d} view={view} />
       {info ? (
         <div ref={box} className={"ta-tipbox " + (tip.kind === "s5" ? "s5t-" + info.cls : tip.kind === "sc" ? info.cls : tip.t.side === 1 ? "long" : "short")} role="tooltip" style={{ left: 0, top: 0, visibility: "hidden" }}>

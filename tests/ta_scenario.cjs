@@ -41,8 +41,8 @@ t("NQ 4H 中均線兩個方向四條都算得出（demo 那份資料）；全部
   for (const [nm, , , mn, , r] of all) if (nm.startsWith("NQ 4H") && mn[1] === 13) assert.ok(r.list.every(Boolean), nm + "：" + r.list.map(Boolean));
 });
 
-t("四條路徑 OHLC 合法、對齊跳動單位、量 ≥ 0、根數在 1H 60～70／4H 50～60／日K 15～25；時間接在最後一根之後、不重複", () => {
-  const rngN = { "4H": [50, 60], D: [15, 25] };
+t("四條路徑 OHLC 合法、對齊跳動單位、量 ≥ 0、根數在 1H 60～70／4H 50～60／日K 25～40（11-24 加長）；時間接在最後一根之後、不重複", () => {
+  const rngN = { "4H": [50, 60], D: [25, 40] };
   for (const [nm, bars, o, , , r] of all) for (const p of r.list) {
     if (!p) continue;
     assert.ok(p.sim.length >= rngN[o.tf][0] && p.sim.length <= rngN[o.tf][1], nm + " 根數 " + p.sim.length);
@@ -54,6 +54,7 @@ t("四條路徑 OHLC 合法、對齊跳動單位、量 ≥ 0、根數在 1H 60�
       assert.ok(b.t > prev, nm + " 時間 " + prev + " → " + b.t); prev = b.t;
     }
   }
+  assert.ok(all.some(([, , o, , , r]) => o.tf === "D" && r.list.some((p) => p && p.sim.length > 25)), "日K 示意段有超過 25 根的");
   assert.strictEqual(all[0][5].tick, 0.25, "NQ 跳動 0.25");
   // 較舊的 K 是除權息調整價（帶小數）、近 40 根都是 5 的倍數 → 跳動單位 5
   const adj = Array.from({ length: 200 }, (_, i) => (i < 150 ? { o: 2316.62, h: 2320.37, l: 2311.08, c: 2317.9 } : { o: 2310, h: 2325, l: 2305, c: 2320 }));
@@ -127,10 +128,11 @@ t("鏡像：K 上下翻轉後跑空轉多 ＝ 原資料跑多轉空（同種子�
   }
 });
 
-t("算不出回 null：沒有成交量 → 沒有多方關鍵K → W 底那條 null；K 太少、週K → 四條都 null（不硬畫）", () => {
-  const nv = NQ.map((b) => ({ ...b, v: 0 })), r = run(nv, CASES[0][2], [8, 13, 34], 1);
+t("算不出回 null：沒有成交量的 1H → 沒有多方關鍵K → W 底那條 null；K 太少、週K → 四條都 null（不硬畫）", () => {
+  const nv = NQ.map((b) => ({ ...b, v: 0 })), r = run(nv, { ...CASES[0][2], tf: "1H" }, [8, 13, 34], 1);
   assert.strictEqual(r.list[2], null, "W 底");
   assert.ok(r.lv.find((x) => x.k === "KK").p === null && !r.lv.some((x) => x.k === "V20"), "關鍵K 寫沒有、不列均量");
+  assert.ok(/放量長紅/.test(r.nos[2]) && !/1\.3 ATR/.test(r.nos[2]), "1H 的原因只講放量長紅：" + r.nos[2]);
   for (const p of r.list) if (p) { assert.ok(!/量 ≥/.test(p.plan[0].cond), "沒有量就不寫量的條件"); assert.ok(p.sim.every((b) => b.v === 0)); }
   const few = run(NQ.slice(-60), CASES[0][2], [8, 13, 34], 1);
   assert.deepStrictEqual(few.list, [null, null, null, null]); assert.ok(few.why && few.names.length === 4);
@@ -140,6 +142,68 @@ t("算不出回 null：沒有成交量 → 沒有多方關鍵K → W 底那條 n
   const dbg = {};
   S.scenarios(TW, { tf: "D", mkt: "tw", tz: "Asia/Taipei", ma: "sma", ma_n: [20, 60, 120], dir: 1, dbg });
   if (dbg["ma:前提不成立"]) assert.strictEqual(dbg["ma:前提不成立"], 1);
+});
+
+// 另寫一份關鍵K（canonical＝空轉多；多轉空用翻轉資料）：先找放量長紅，全部找不到才退到實體 ≥ 1.3 ATR 長紅（1H 不退）；缺量那根不算
+function kkRef(bars, tf) {
+  const b = bars.map((x) => ({ ...x, v: x.v == null ? null : +x.v })), N = b.length, lb = Math.min({ "1H": 120, "4H": 60, D: 60 }[tf], N - 21);
+  const tr = (i) => Math.max(b[i].h, b[i - 1].c) - Math.min(b[i].l, b[i - 1].c), atr = (i) => { let s = 0; for (let j = i - 19; j <= i; j++) s += tr(j); return s / 20; };
+  const va = (i) => { const xs = b.slice(i - 20, i).map((x) => x.v).filter((x) => x != null); return xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : 0; };
+  let iL = N - lb; for (let i = N - lb; i < N; i++) if (b[i].l < b[iL].l) iL = i;
+  const hv = va(N) > 0, ok = (i) => i >= 21 && b[i].c > b[i].o && !(hv && b[i].v == null);
+  for (let i = iL + 1; i < N; i++) if (ok(i) && hv && b[i].v >= 1.5 * va(i) && b[i].c - b[i].o >= atr(i - 1)) return { p: b[i].l, soft: false };
+  if (tf !== "1H") for (let i = iL + 1; i < N; i++) if (ok(i) && b[i].c - b[i].o >= 1.3 * atr(i - 1)) return { p: b[i].l, soft: true };
+  return null;
+}
+const flipOf = (bars) => { const K = S.mirrorK(bars, S.tickOf(bars)); return bars.map((b) => ({ t: b.t, o: K - b.o, h: K - b.l, l: K - b.h, c: K - b.c, v: b.v })); };
+const kkRow = (r) => r.lv.find((x) => x.k === "KK");
+t("關鍵K 退路：有放量長紅就用它（不被退路換掉）；全部找不到才取實體 ≥ 1.3 ATR 長紅、標「量沒放大」；1H 不退", () => {
+  const flat = NQ.map((b) => ({ ...b, v: 1000 }));   // 量全一樣＝沒有放量那根
+  const cases = [...CASES, ["NQ 4H 平量", flat, CASES[0][2]], ["NQ 平量當 1H", flat, { ...CASES[0][2], tf: "1H" }]];
+  let soft = 0, strict = 0;
+  for (const [nm, bars, o] of cases) for (const dir of [1, -1]) {
+    const r = run(bars, o, [8, 13, 34], dir), kk = kkRow(r), ref = kkRef(dir === 1 ? bars : flipOf(bars), o.tf);
+    const lab = dir === 1 ? "長紅、量沒放大" : "長黑、量沒放大";
+    if (!ref) { assert.strictEqual(kk.p, null, nm + " " + dir + " 應該沒有關鍵K"); continue; }
+    const want = dir === 1 ? ref.p : r.K - ref.p;
+    assert.ok(Math.abs(kk.p - want) < 1e-6, nm + " " + dir + " 關鍵K " + kk.p + " vs " + want);
+    if (ref.soft) { soft++; assert.ok(kk.name.includes(lab) && kk.why.includes(lab) && !kk.why.includes("第一根放量"), nm + " 退路標示：" + kk.name + "／" + kk.why); }
+    else { strict++; assert.ok(!kk.name.includes("量沒放大") && kk.why.includes("第一根放量"), nm + " 原條件標示：" + kk.why); }
+    if (o.tf === "1H") assert.ok(!ref.soft && !kk.name.includes("量沒放大"), "1H 不用退路");
+  }
+  assert.ok(soft >= 2 && strict >= 2, "兩種都有測到 soft=" + soft + " strict=" + strict);
+  // 原本就有放量長紅的（NQ 4H、2330 日K 多轉空）關鍵K 不變
+  assert.strictEqual(kkRow(run(NQ, CASES[0][2], [8, 13, 34], 1)).p, 25824);
+  assert.strictEqual(kkRow(run(TW, CASES[1][2], [8, 13, 34], -1)).p, 2320);
+  // 平量 1H：沒有關鍵K、W 底算不出、原因講放量長紅
+  const h = run(flat, { ...CASES[0][2], tf: "1H" }, [8, 13, 34], 1);
+  assert.strictEqual(kkRow(h).p, null); assert.strictEqual(h.list[2], null); assert.ok(/放量長紅/.test(h.nos[2]), h.nos[2]);
+});
+
+t("算不出時回原因句：每條 null 都有一句、算得出＝null；長均線在反彈頂之上、沒有關鍵K、種子全沒過各有固定句型", () => {
+  for (const [nm, , , , , r] of all) r.list.forEach((p, i) => {
+    if (p) assert.strictEqual(r.nos[i], null, nm); else assert.ok(typeof r.nos[i] === "string" && r.nos[i].length > 8, nm + " 第 " + (i + 1) + " 條沒有原因");
+  });
+  const tw = run(TW, CASES[1][2], [20, 60, 120], 1);
+  assert.ok(/^SMA120 [\d,.]+ 在反彈頂 [\d,.]+ 之上（空頭排列），要先站回 SMA120 才有回踩劇本$/.test(tw.nos[0]), tw.nos[0]);
+  assert.strictEqual(tw.nos[2], "低點後還沒有長紅 K（量放大或實體 ≥1.3 ATR），等出現再看");
+  assert.ok(/^這段資料走不出這個劇本的路徑（最常卡在：.+）$/.test(tw.nos[1]) && !/[a-z]{3}|前提/.test(tw.nos[1]), tw.nos[1]);
+  const dn = run(NQ, CASES[0][2], [20, 60, 120], -1);
+  assert.ok(/^這段資料走不出這個劇本的路徑（最常卡在：.+）$/.test(dn.nos[0]), dn.nos[0]);
+  const few = run(NQ.slice(-60), CASES[0][2], [8, 13, 34], 1);
+  assert.deepStrictEqual(few.nos, Array(4).fill("K 線不足 80 根"));
+});
+
+t("缺量 K（Yahoo 期貨最後一根 None）：不進均量、不當關鍵K候選", () => {
+  const o = CASES[1][2], tk = S.tickOf(TW), A = run(TW, o, [8, 13, 34], 1).A, N = TW.length;
+  const pc = TW[N - 2].c, cc = Math.round((pc + 3 * A) / tk) * tk;
+  const big = TW.map((b, i) => (i === N - 1 ? { ...b, o: pc, l: pc, c: cc, h: cc, v: 10 * TW[N - 2].v } : b));
+  assert.strictEqual(kkRow(run(big, o, [8, 13, 34], 1)).p, pc, "有量時最後一根是放量長紅");
+  const nul = big.map((b, i) => (i === N - 1 ? { ...b, v: null } : b)), r = run(nul, o, [8, 13, 34], 1);
+  assert.strictEqual(kkRow(r).p, null, "缺量那根不當關鍵K（也不走退路）");
+  const xs = TW.slice(N - 20, N - 1).map((b) => b.v), avg = xs.reduce((s, x) => s + x, 0) / xs.length;
+  assert.strictEqual(r.lv.find((x) => x.k === "V20").p, Math.round(avg), "前 20 根均量只算 19 根有量的");
+  for (const p of r.list) if (p) assert.ok(p.sim.every((b) => Number.isInteger(b.v) && b.v > 0), "示意 K 的量照樣有");
 });
 
 t("時間軸：跳週末、休市、半日市（美股 13:00、美國期貨 13:15）、美國期貨週日 18:00 開、台股 12-25／元旦", () => {
@@ -190,8 +254,8 @@ t("效能：一次算四條（兩個方向、三組均線）每次 < 300ms", () 
   console.log("     最慢 " + Math.max(...ms).toFixed(1) + "ms、平均 " + (ms.reduce((a, b) => a + b, 0) / ms.length).toFixed(1) + "ms");
 });
 
-t("用字：劇本名稱、條件、價位由來不寫機率與操作用語", () => {
-  const txt = JSON.stringify(all.map((x) => [x[5].names, x[5].lv, x[5].list.map((p) => p && p.plan)]));
+t("用字：劇本名稱、條件、價位由來、算不出的原因不寫機率與操作用語", () => {
+  const txt = JSON.stringify(all.map((x) => [x[5].names, x[5].lv, x[5].nos, x[5].list.map((p) => p && p.plan)]));
   for (const w of ["建議", "應該", "最佳", "推薦", "機率", "%的", "停利", "2R", "加碼", "出一半", "保本"]) assert.ok(!txt.includes(w), w);
 });
 
