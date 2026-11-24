@@ -1,6 +1,6 @@
 "use client";
 import { Component, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { normParams, backtest, chartMarks, exitLine, ruleText, maName, smaSeq, PRESETS, explainEntry, explainExit, fpx, fpc, statsOf, hasVolume, effParams, keyKEvents, volMult, KEYK_N, KEYK_TOP } from "../../lib/ta-trade";
+import { normParams, backtest, chartMarks, exitLine, ruleText, maName, maLines, smaSeq, PRESETS, explainEntry, explainExit, fpx, fpc, statsOf, hasVolume, effParams, keyKEvents, volMult, KEYK_N, KEYK_TOP } from "../../lib/ta-trade";
 import { presetStart } from "../../lib/ta-rs";
 import { fourStep, info4, l2Info4, step4Name } from "../../lib/ta-4step";
 import { OPT_GROUPS, optSym, dte, fmtTs, candidates, cost as optCost, pnl as optPnl, retPct, maxGain, lots } from "../../lib/ta-opt";
@@ -13,7 +13,7 @@ import { OPT_GROUPS, optSym, dte, fmtTs, candidates, cost as optCost, pnl as opt
 //   台指期／費半期（11-10，期交所日資料）：只有日K／週K（symbol.tfs → 1H／4H 停用、寫「期交所只有日資料」；選著 1H 查會自動改日K）、
 //           標題列「含夜盤（夜盤算到隔天）」、期交所讀不到時的黃色註記、費半期旁「^SOX 是指數版」可一鍵改看。
 //   新欄位（has_volume、rolls、symbol.contract／tfs／session／stale／see_also）一律可缺：舊引擎回應照舊畫。
-//   右 3/4：週期分頁 1H／4H／日K／週K ＋ 均線組 短（5/10/20）中（8/13/34）長（20/60/120）＋ K 線圖（撐壓、前五大量、缺口、島狀反轉、
+//   右 3/4：週期分頁 1H／4H／日K／週K ＋ 均線組 短（SMA5/10/20，預設）中（8/13/34）長（20/60/120）＝直接換交易規則的均線（11-24）＋ K 線圖（撐壓、前五大量、缺口、島狀反轉、
 //           進出場、停損、出場 ✕；均線紅黃藍＝短到長；圖下「時間區間導覽列」拖曳看整段歷史）
 //           ＋ 緊貼圖下三個大分頁 ①進出場 ②跳空缺口 ③前五大量（11-09；原本的均線排列分頁已永久刪除，守門見 Skill\tests\ta_engine_check.py）＋ 圖例（預設收合）＋ 支撐壓力
 //   左欄「交易規則」面板（11-09）：勾選／填數字 → 瀏覽器用 lib/ta-trade.js 即時重算進出場與回測（不打伺服器、不扣額度）；
@@ -34,7 +34,14 @@ const RECENT_KEY = "yoda_ta_recent";
 const RECENT_MAX = 15;
 const TFS = [["1H", "1H"], ["4H", "4H"], ["D", "日K"], ["W", "週K"]];
 const TF_ZH = { "1H": "1 小時 K", "4H": "4 小時 K", D: "日 K", W: "週 K" };
-const MA_SETS = [["short", "短"], ["mid", "中"], ["long", "長"]];
+// 均線組（11-24 Yoda：按短／中／長＝把交易規則的均線換成這組 SMA，立即生效；圖上畫的三條＝交易用的三條）
+const MA_SETS = [["short", "短", [5, 10, 20]], ["mid", "中", [8, 13, 34]], ["long", "長", [20, 60, 120]]];
+// 參數剛好是某組 SMA → 那組的 key；EMA 或不屬於三組 → null（三顆都不亮）
+function maSetOf(p) {
+  const s = p && p.ma === "sma" && Array.isArray(p.ma_n) && MA_SETS.find((x) => x[2].join() === p.ma_n.join());
+  return s ? s[0] : null;
+}
+const pickMaSet = (draft, k) => ({ ...draft, ma: "sma", ma_n: MA_SETS.find((x) => x[0] === k)[2].slice() });
 
 // ───────── 小工具 ─────────
 function fnum(x, nd = 2) {
@@ -412,7 +419,7 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
   // 圖左上線名（三條均線、出場線、停損）：先佔位，後面的島狀反轉、盤中未定、進出場標籤才會避開；字最後才畫（蓋在 K 棒上面）
   const yrOn = !!yr && yr.slice(a, b).some(Number.isFinite);   // 不足 240／52 根那段 NaN 不畫；整個區間都不足就連線名都不寫
   const yrW = d.tf === "W", yrName = yrW ? "52 週線" : "年線";
-  const ckey = [...smas.map(([m], k) => ["SMA" + m, MA_COL[k], ""]), ...(yrOn ? [[yrName, YR_COL, ""]] : []),
+  const ckey = [...smas.map(([m], k) => [m, MA_COL[k], ""]), ...(yrOn ? [[yrName, YR_COL, ""]] : []),
     ...(ch.exit_line ? [["出場線 " + (trd.p ? maName(trd.p, trd.p.exit_k) : ""), EMA_COL, ""]] : []), ...(marks.length || trd.open ? [["停損", TR_STOP, "4 3"]] : [])];
   const kels = [];
   let kx = L + 6;
@@ -534,7 +541,7 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
   els.push(<path key="bu" className="bd" d={pth.bu} fill={K_UP} />, <path key="bd" className="bd" d={pth.bd} fill={K_DN} />);
   els.push(<path key="vu" className="vb" d={pth.vu} fill={K_UP} fillOpacity=".55" />, <path key="vd" className="vb" d={pth.vd} fill={K_DN} fillOpacity=".55" />);
   els.push(...one);
-  // 均線（所選那組三條 SMA，紅黃藍＝短到長，底下墊一條深色描邊才不會跟紅 K 糊在一起）＋ 出場線（面板選的那條，細線）
+  // 均線（交易規則用的三條，名稱如 SMA5／EMA5，紅黃藍＝短到長，底下墊一條深色描邊才不會跟紅 K 糊在一起）＋ 出場線（面板選的那條，細線）
   const poly = (arr, key, col, w, casing) => {
     const segs = []; let cur = [];
     for (let i = 0; i < n; i = i + grp < n || i === n - 1 ? i + grp : n - 1) {   // K 棒有合併時線也每 grp 根取一點（含最後一根）
@@ -549,7 +556,7 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
       els.push(<polyline key={key + k} className="ma" data-ma={key} points={pts} fill="none" stroke={col} strokeWidth={w} strokeOpacity=".95" clipPath={clip} />);
     });
   };
-  smas.forEach(([m, arr], k) => poly(arr, "sma" + m, MA_COL[k], 1.6, true));
+  smas.forEach(([m, arr], k) => poly(arr, m.toLowerCase(), MA_COL[k], 1.6, true));
   if (yrOn) poly(yr, yrW ? "sma52" : "sma240", YR_COL, 1.2, true);
   poly(ch.exit_line, "exit_ma", EMA_COL, 1, false);
   // 支撐（白實線）／壓力（白虛線）
@@ -927,11 +934,12 @@ function RangeNav({ bars, a, b, onChange }) {
 }
 
 // 圖＋導覽列＋圖下三個分頁：區間狀態放這裡（② 缺口、③ 前五大量的表跟著區間變）；父層用 key＝代號|週期，換代號或週期就重新掛載＝回到預設區間
-function ChartArea({ d, maSet, srOn, kkOn = true, s4On = false, l4On = false }) {
+function ChartArea({ d, p = DEF_P, srOn, kkOn = true, s4On = false, l4On = false }) {
   const ch = d.chart || {};
   const full = useMemo(() => fullSeries(d), [d.history, ch.bars, d.bars_completed]);   // eslint-disable-line react-hooks/exhaustive-deps
   const N = full.bars.length;
-  const smas = useMemo(() => (g(ch, "ma_sets", maSet) || []).map((m) => [m, smaSeq(full.c, Number(m))]), [full, ch.ma_sets, maSet]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // 圖上三條均線＝交易規則 applied 的那三條（類型、週期都一樣；11-24）
+  const smas = useMemo(() => maLines(full.c, p).map((arr, k) => [maName(p, k + 1), arr]), [full, p.ma, p.ma_n.join()]);   // eslint-disable-line react-hooks/exhaustive-deps
   const yr = useMemo(() => (d.tf === "D" ? smaSeq(full.c, 240) : d.tf === "W" ? smaSeq(full.c, 52) : null), [full, d.tf]);   // 日K 年線＝240 日線、週K 52 週線；1H/4H 不畫
   const def0 = Math.max(0, Math.min(full.k0, N - 2));
   const [rng, setRng] = useState(() => [def0, N]);   // 預設＝引擎的圖視窗（近 120 根）
@@ -1078,8 +1086,8 @@ const SW = {
   unfinished: <i className="bx unf" />,
   roll: <i className="sw dash" style={{ color: "#8b95a3" }} />,
 };
-function Legend({ d, maSet }) {
-  const set = g(d, "chart", "ma_sets", maSet) || [];
+function Legend({ d, p = DEF_P }) {
+  const set = p.ma_n.map((m, k) => maName(p, k + 1));
   const eng = (g(d, "chart", "legend") || []).filter((x) => x.key !== "unfinished" || d.unfinished);
   const items = [...eng.filter((x) => x.key !== "unfinished"), ...(d.trade_legend || []), ...eng.filter((x) => x.key === "unfinished")];
   return (
@@ -1087,7 +1095,7 @@ function Legend({ d, maSet }) {
       <summary>圖例</summary>
       <dl>
         <div className="ta-rule"><dt><span className="lg">{set.map((m, k) => <i key={m} className="sw" style={{ color: MA_COL[k] }} />)}</span>均線</dt>
-          <dd>{set.map((m) => "SMA" + m).join("／")}（紅→黃→藍＝短到長；簡單均線，上方「均線組」切換）；K 棒紅漲綠跌，下方是成交量</dd></div>
+          <dd>{set.join("／")}（紅→黃→藍＝短到長；{p.ma === "sma" ? "簡單均線" : "指數均線"}＝交易規則用的三條，上方「均線」短／中／長切換或在左側面板改）；K 棒紅漲綠跌，下方是成交量</dd></div>
         {d.tf === "D" ? <div className="ta-rule"><dt><span className="lg"><i className="sw" style={{ color: YR_COL }} /></span>年線</dt><dd>SMA240（240 日均線），日K 常駐；不屬於均線組、不進交易規則；不足 240 根那段不畫</dd></div>
           : d.tf === "W" ? <div className="ta-rule"><dt><span className="lg"><i className="sw" style={{ color: YR_COL }} /></span>52 週線</dt><dd>SMA52（52 週均線），週K 常駐；不屬於均線組、不進交易規則；不足 52 根那段不畫</dd></div> : null}
         {items.map((x) => (
@@ -1188,7 +1196,7 @@ function Gaps({ view }) {
   );
 }
 
-const MA_NM = { short: "短（SMA5／10／20）", mid: "中（SMA8／13／34）", long: "長（SMA20／60／120）" };
+const MA_NM = { short: "短（SMA5／10／20）：交易規則改用這組", mid: "中（SMA8／13／34）：交易規則改用這組", long: "長（SMA20／60／120）：交易規則改用這組" };
 
 function SrLevels({ d }) {
   const sr = g(d, "signals", "sr_levels") || {};
@@ -1923,7 +1931,6 @@ export default function TaPage() {
   const [q, setQ] = useState("");
   const [sym, setSym] = useState("");
   const [tf, setTf] = useState("D");
-  const [maSet, setMaSet] = useState("short");
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);         // {reason, error}
@@ -1949,6 +1956,7 @@ export default function TaPage() {
   const norm = useMemo(() => normParams(draft, good.current), [draft]);
   const applied = norm.p;
   const hasErr = Object.keys(norm.errors).length > 0;
+  const maSet = maSetOf(applied);   // 短／中／長哪顆亮：由交易規則推（不是另存一份狀態）
   useEffect(() => { good.current = applied; }, [applied]);
   useEffect(() => {
     const r = readRules();
@@ -2290,7 +2298,7 @@ export default function TaPage() {
             <div className="ta-seg" role="group" aria-label="均線組">
               <span className="ta-seglab">均線</span>
               {MA_SETS.map(([k, nm]) => (
-                <button key={k} type="button" aria-pressed={maSet === k} className={"ta-tab" + (maSet === k ? " on" : "")} onClick={() => { setMaSet(k); pickView("chart"); }}
+                <button key={k} type="button" aria-pressed={maSet === k} className={"ta-tab" + (maSet === k ? " on" : "")} onClick={() => { setDraft((x) => pickMaSet(x, k)); pickView("chart"); }}
                   title={MA_NM[k]}>{nm}</button>
               ))}
             </div>
@@ -2381,8 +2389,8 @@ export default function TaPage() {
                   </div>
                 ) : null}
                 <BadBanner d={d} />
-                <Boundary reset={bkey}><ChartArea key={(symInfo.yahoo || sym) + "|" + d.tf} d={d} maSet={maSet} srOn={srOn} kkOn={kkOn} s4On={s4On} l4On={l4On} /></Boundary>
-                <Boundary reset={bkey}><Legend d={d} maSet={maSet} /></Boundary>
+                <Boundary reset={bkey}><ChartArea key={(symInfo.yahoo || sym) + "|" + d.tf} d={d} p={applied} srOn={srOn} kkOn={kkOn} s4On={s4On} l4On={l4On} /></Boundary>
+                <Boundary reset={bkey}><Legend d={d} p={applied} /></Boundary>
                 {(d.notes || []).length ? <div className="ta-notes">資料註記：{d.notes.join("；")}</div> : null}
                 <Boundary reset={bkey}><SrLevels d={d} /></Boundary>
               </div>

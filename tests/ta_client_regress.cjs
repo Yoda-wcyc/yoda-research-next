@@ -122,7 +122,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     .replace('"../../lib/ta-trade"', JSON.stringify(path.join(ROOT, "lib", "ta-trade.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-rs"', JSON.stringify(path.join(ROOT, "lib", "ta-rs.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-opt"', JSON.stringify(path.join(ROOT, "lib", "ta-opt.js").replace(/\\/g, "/")))
-    .replace('"../../lib/ta-4step"', JSON.stringify(path.join(ROOT, "lib", "ta-4step.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, mtfBlink, tzMs, barEnd, readSr, readKk, keyKAll, readS4, readL4 };\n";
+    .replace('"../../lib/ta-4step"', JSON.stringify(path.join(ROOT, "lib", "ta-4step.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, mtfBlink, tzMs, barEnd, readSr, readKk, keyKAll, readS4, readL4, maSetOf, pickMaSet, MA_SETS, Legend };\n";
   const Mod = require("module");
   const libSrc = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-trade.js"), "utf8"), opts).code;
   const lib = new Mod(path.join(ROOT, "lib", "ta-trade.js")); lib.paths = Mod._nodeModulePaths(ROOT); lib._compile(libSrc, lib.id);
@@ -602,7 +602,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     assert.ok(/d\.tf === "D" \? smaSeq\(full\.c, 240\) : d\.tf === "W" \? smaSeq\(full\.c, 52\) : null/.test(src), "日K smaSeq(full.c, 240)、週K smaSeq(full.c, 52)、其他不算");
   });
   await t("週K 52 週線（11-19）：週K 畫 SMA52 標「52 週線」；日K 仍是 240 年線；1H/4H 都沒有；不足根數不畫", async () => {
-    const ca = (tf, n) => { const d = mkD({ n }); d.tf = tf; const ce = console.error; console.error = () => {}; try { return renderToString(React.createElement(P.ChartArea, { d, maSet: "short" })); } finally { console.error = ce; } };   // 伺服端 render 的 useLayoutEffect 警告不印
+    const ca = (tf, n) => { const d = mkD({ n }); d.tf = tf; const ce = console.error; console.error = () => {}; try { return renderToString(React.createElement(P.ChartArea, { d })); } finally { console.error = ce; } };   // 伺服端 render 的 useLayoutEffect 警告不印
     const w = ca("W", 60);
     assert.ok(w.includes(">52 週線<") && w.includes('data-ma="sma52"') && !w.includes("年線") && !w.includes('data-ma="sma240"'), "週K 沒畫 52 週線／混到年線");
     const dd = ca("D", 260);
@@ -823,6 +823,37 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     assert.ok(!html0(React.createElement(P.TfTabs, { tf: "D", tfs: undefined, onPick: () => {} })).includes("ta-blink"));
     const css = fs.readFileSync(path.join(ROOT, "app", "ta", "ta.css"), "utf8");
     assert.ok(/prefers-reduced-motion:reduce\)\{\.ta-tab\.ta-blink\{animation:none/.test(css), "減少動態要停閃");
+  });
+  await t("均線組＝交易均線（11-24）：短／中／長＝applied 換成該組 SMA（回測筆數三組不同）、圖上畫線＝applied、非三組（EMA／手改／內建）不亮、預設 SMA5/10/20 亮「短」", async () => {
+    const def = lib3.normParams({}).p;
+    assert.ok(def.ma === "sma" && def.ma_n.join() === "5,10,20" && P.maSetOf(def) === "short", "預設 SMA5/10/20 且「短」亮");
+    const G = JSON.parse(fs.readFileSync(path.join(__dirname, "ta_4step_nq4h.json"), "utf8")), n = G.t.length;
+    const d = { tf: "4H", bars_completed: n, history: { n, t: G.t, o: G.o, h: G.h, l: G.l, c: G.c, v: G.v }, symbol: { market: "fut", yahoo: "NQ=F" },
+      chart: { bars: [], ma_sets: { short: [5, 10, 20] }, overlays: { gaps: { cols: [], rows: [] }, islands: [] }, legend: [] }, signals: {} };
+    const ca = (p) => { const ce = console.error; console.error = () => {}; try { return renderToString(React.createElement(P.ChartArea, { d, p })); } finally { console.error = ce; } };
+    const cnt = {}, draft0 = { ...def, ma: "ema", ma_n: ["7", "11", "30"], stop: "atr" };   // 面板上是字串、別的欄位要留著
+    for (const [k, , ns] of P.MA_SETS) {
+      const dr = P.pickMaSet(draft0, k), ap = lib3.normParams(dr, def).p;
+      assert.ok(ap.ma === "sma" && ap.ma_n.join() === ns.join() && ap.stop === "atr" && P.maSetOf(ap) === k, k + " applied：" + JSON.stringify(ap));
+      const w = P.withTrade(d, ap);
+      cnt[k] = w.trade.trades.length;
+      assert.ok(w.trade.p.ma === "sma" && w.trade.p.ma_n.join() === ns.join(), k + " 回測用的均線");
+      const h = ca(ap).replace(/<!-- -->/g, "");
+      for (const m of ns) assert.ok(h.includes('data-ma="sma' + m + '"') && h.includes(">SMA" + m + "<"), k + " 圖上要畫 SMA" + m);
+      assert.ok(!/data-ma="ema\d/.test(h), k + " 不該畫 EMA");
+    }
+    assert.strictEqual(new Set(Object.values(cnt)).size, 3, "三組回測筆數要不同：" + JSON.stringify(cnt));
+    const ema = { ...def, ma: "ema" }, he = ca(ema).replace(/<!-- -->/g, "");
+    assert.ok(["5", "10", "20"].every((m) => he.includes('data-ma="ema' + m + '"') && he.includes(">EMA" + m + "<")) && !/data-ma="sma(5|10|20)"/.test(he), "EMA 時圖上畫 EMA、名稱也寫 EMA");
+    const lg = renderToString(React.createElement(P.Legend, { d, p: ema })).replace(/<!-- -->/g, "");
+    assert.ok(lg.includes("EMA5／EMA10／EMA20") && lg.includes("指數均線"), "圖例跟類型一致");
+    assert.ok(renderToString(React.createElement(P.Legend, { d, p: def })).includes("SMA5／SMA10／SMA20"), "圖例 SMA");
+    for (const p of [ema, { ...def, ma_n: [5, 10, 21] }, { ...def, ma_n: [8, 13, 35] }, null, {}]) assert.strictEqual(P.maSetOf(p), null, "不屬於三組要三顆不亮：" + JSON.stringify(p));
+    const bi = lib3.PRESETS.map((x) => [x.name, P.maSetOf(lib3.normParams(x.p).p)]);
+    assert.deepStrictEqual(bi, [["預設規則", "short"], ["短線快出", null], ["波段抱長", null], ["只做多・固定 5%", null], ["長線 SMA", "long"]], "內建策略：" + JSON.stringify(bi));
+    const src = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
+    assert.ok(src.includes("const maSet = maSetOf(applied)") && !src.includes("setMaSet") && src.includes("setDraft((x) => pickMaSet(x, k))"), "按鈕亮＝由 applied 推、按下去改 draft");
+    assert.ok(src.includes("p={applied}") && !/maSet=\{maSet\}/.test(src), "圖與圖例吃 applied");
   });
   await t("pastHalf：TA 票過半才續；普通票、壞票、沒期限 → 要問 status", async () => {
     const tk = (p) => "h." + Buffer.from(JSON.stringify(p)).toString("base64url") + ".s", n = Date.now() / 1000;
