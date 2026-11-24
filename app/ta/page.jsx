@@ -282,7 +282,7 @@ function SortTable({ cols, rows, rowKey, className, rowClass, onRow, init }) {  
 // ───────── K 線圖（同 ta_local 的記號語言；底色固定深色，白色撐壓線才看得見）─────────
 const K_UP = "#e0525e", K_DN = "#3fae7a", GOLD = "#ffc94a";
 // 五階段顏色（11-24 二改）：反彈＝紅系（1～5 紅、彈均 淡紅＋紅框、彈線 灰紅）、修正＝綠系（1～5 綠、修均 淡綠＋綠框、修線 灰綠）；
-// fr＝共振閃爍外框（照舊：反彈綠、修正紅）；line＝支撐／防線虛線、stop＝停損價階梯線
+// fr＝共振閃爍外框（11-24 三改：同數字色，反彈紅、修正綠）；line＝支撐／防線虛線（淡色）、stop＝停損價階梯線（暗色，同 彈線／修線）
 const S5C = {
   s: { nm: "反彈五階段 ", line: "#f0a0a8", stop: "#b07a80", fr: "#ff5f6b", col: { 1: "#ff5f6b", 2: "#ff5f6b", 3: "#ff5f6b", 4: "#ff5f6b", 5: "#ff5f6b", stop: "#b07a80", x: "#ffb3b9" } },
   l: { nm: "修正五階段 ", line: "#8fcfb0", stop: "#7a9e8c", fr: "#3fd08a", col: { 1: "#3fd08a", 2: "#3fd08a", 3: "#3fd08a", 4: "#3fd08a", 5: "#3fd08a", stop: "#7a9e8c", x: "#a8e6c6" } },
@@ -937,7 +937,7 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
 }
 
 // ───────── 劇本（11-24）─────────
-// 工具列兩顆鈕：一次只開一顆、再按收起；週K 停用＋一行字
+// 工具列兩顆鈕：一次只開一顆、再按收起；週K 停用（說明只放鈕的 title／aria-label，工具列不另放字，1440 才排得下一行）
 const SC_DIRS = [["up", "空轉多劇本"], ["dn", "多轉空劇本"]], SC_TFS = ["1H", "4H", "D"], SC_ONLY_TXT = "劇本限 1H／4H／日K";
 const nextSc = (cur, k) => (cur === k ? null : k);
 function ScBtns({ sc, tf, onPick }) {
