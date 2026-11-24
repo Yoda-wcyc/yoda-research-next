@@ -1116,7 +1116,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   await t("全螢幕（11-24）：鈕在圖上方「只看路徑」右邊（劇本關時那排只剩它）、工具列不再有 ⛶；有 API → requestFullscreen（含 webkit）、再按 exitFullscreen；沒有／被拒 → CSS 退路 class、再按還原", async () => {
     const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
     const tb = raw.slice(raw.indexOf('<div className="ta-seg ta-vseg">'), raw.indexOf('<div className="ta-pane" hidden={view !== "chart"}>'));
-    assert.ok(tb.includes(">選擇權</button>") && !/ta-fsbtn|⛶/.test(tb.slice(0, tb.indexOf("計算中"))), "工具列不再有全螢幕鈕");
+    assert.ok(tb.includes(">選擇權</button>") && !/ta-fsbtn|⛶|fsBtn/.test(tb.slice(0, tb.indexOf("計算中"))), "工具列不再有全螢幕鈕");
     assert.ok(/const fsBtn = \(\s*<button type="button" aria-pressed=\{!!fs\} className=\{"ta-tab ta-fsbtn"[^>]*aria-label="全螢幕"/.test(raw) && raw.includes("fsBtn={fsBtn} fs={!!fs} />"), "鈕交給 ChartArea");
     assert.ok(raw.includes('{fs && !(view === "chart" && d) ? <div className="ta-sctabs">{fsBtn}</div> : null}'), "全螢幕中切到別的分頁：離開鈕照樣在");
     const fx = JSON.parse(fs.readFileSync(path.join(ROOT, "tests", "ta_5stage_nq4h.json"), "utf8"));
