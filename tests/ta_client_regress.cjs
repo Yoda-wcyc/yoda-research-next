@@ -936,7 +936,25 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     const TPE = "Asia/Taipei", twfD = P.barEndTf("2026-11-23", "D", TPE, "fut");
     assert.strictEqual(twfD, P.tzMs("2026-11-23 13:45", TPE), "台指期日K 收在 13:45");
     assert.strictEqual(P.barEndTf("2026-11-23", "D", TZ, "fut"), P.tzMs("2026-11-23 17:00", TZ), "美國期貨日K 17:00");
-    assert.strictEqual(P.barEndTf("2026-11-23", "W", TPE, "fut"), P.tzMs("2026-11-27 13:45", TPE), "台指期週K 週五 13:45");
+    // 週K（11-24）：引擎標在該週最後一個交易日 → 收在那天收盤
+    assert.strictEqual(P.barEndTf("2026-11-27", "W", TPE, "fut"), P.tzMs("2026-11-27 13:45", TPE), "台指期週K 週五 13:45");
+    assert.strictEqual(P.barEndTf("2026-11-20", "W", TZ, "us"), P.tzMs("2026-11-20 16:00", TZ), "一般週：美股週五 16:00");
+    assert.strictEqual(P.barEndTf("2026-11-20", "W", TPE, "tw"), P.tzMs("2026-11-20 13:30", TPE), "一般週：台股週五 13:30");
+    assert.strictEqual(P.barEndTf("2026-11-27", "W", TZ, "us"), P.tzMs("2026-11-27 13:00", TZ), "感恩節週：週五半日市 13:00");
+    assert.strictEqual(P.barEndTf("2026-11-27", "W", TZ, "fut"), P.tzMs("2026-11-27 17:00", TZ), "感恩節週：美國期貨照舊 17:00");
+    assert.strictEqual(P.barEndTf("2026-11-27", "D", TZ, "us"), P.tzMs("2026-11-27 13:00", TZ), "半日市日K 也 13:00");
+    assert.strictEqual(P.barEndTf("2026-12-24", "W", TZ, "us"), P.tzMs("2026-12-24 13:00", TZ), "耶誕週：週五休市、週四半日市 13:00");
+    assert.strictEqual(P.barEndTf("2026-12-24", "W", TPE, "tw"), P.tzMs("2026-12-24 13:30", TPE), "耶誕週：台股 12-25 行憲紀念日休市、收週四");
+    assert.strictEqual(P.barEndTf("2026-02-11", "W", TPE, "tw"), P.tzMs("2026-02-11 13:30", TPE), "農曆春節週：收在春節前最後交易日（週三）");
+    assert.strictEqual(P.barEndTf("2027-02-01", "W", TPE, "fut"), P.tzMs("2027-02-01 13:45", TPE), "2027 春節週：只有週一，台指期 13:45");
+    // 週五休市那週：引擎週五收盤才定案 → 8 小時從週五收盤起算（週四收盤後就算已收完）
+    const gf = [{ t: "2026-03-27" }, { t: "2026-04-02" }], gco = [{ side: "s", key: 3, iA: 0, iB: 1, late: 1 }];
+    assert.strictEqual(P.co5Live(gco, gf, "W", TZ, "us", P.tzMs("2026-04-02 15:59", TZ), [], "NQ|W|").length, 0, "耶穌受難日週：週四收盤前不閃");
+    assert.strictEqual(P.co5Live(gco, gf, "W", TZ, "us", P.tzMs("2026-04-03 16:30", TZ), [], "NQ|W|").length, 1, "週五定案後在閃");
+    assert.strictEqual(P.co5Live(gco, gf, "W", TZ, "us", P.tzMs("2026-04-04 00:30", TZ), [], "NQ|W|").length, 0, "週五收盤過 8 小時停");
+    const nw = [{ t: "2026-11-13" }, { t: "2026-11-20" }];
+    assert.strictEqual(P.co5Live(gco, nw, "W", TZ, "us", P.tzMs("2026-11-20 23:50", TZ), [], "NQ|W|").length, 1, "一般週：週五 16:00 起 8 小時內閃");
+    assert.strictEqual(P.co5Live(gco, nw, "W", TZ, "us", P.tzMs("2026-11-21 00:10", TZ), [], "NQ|W|").length, 0, "一般週：過 8 小時停");
     const dbars = [{ t: "2026-11-20" }, { t: "2026-11-23" }], dco = [{ side: "s", key: 3, iA: 0, iB: 1, late: 1 }];
     assert.strictEqual(P.co5Live(dco, dbars, "D", TPE, "fut", twfD - 60e3, [], "TXF|D|").length, 0, "13:44 還沒收完不閃");
     assert.strictEqual(P.co5Live(dco, dbars, "D", TPE, "fut", twfD + 60e3, [], "TXF|D|").length, 1, "13:46 起閃");

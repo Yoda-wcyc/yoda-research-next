@@ -1450,17 +1450,28 @@ function readC5() { return lsGet(C5_KEY) === "1"; }
 function readCo5Gone() { try { const a = JSON.parse(lsGet(CO5_GONE_KEY) || "[]"); return Array.isArray(a) ? a.filter((x) => typeof x === "string") : []; } catch (e) { return []; } }
 // 那根 K 收完的時間：1H／4H 同共振閃爍 barEnd；日K＝K 棒日期那天收盤（美國期貨 17:00、台股 13:30、美股 16:00，其他 23:59）
 // 台指期／費半期（market fut＋Asia/Taipei＝期交所，11-24）：引擎把夜盤（前一天 15:00～當天 05:00）併進當天那根，日K 收在當天日盤 13:45
-// shortcut: 週K 用週一那天收盤＋4 天（週五休市的那週算晚了），要準得接交易所行事曆
+// 週K（11-24）：引擎 bars_w 把週K 標在該週最後一個交易日（週五休市就標週四、春節前那週標最後交易日）→ 收盤＝那天收盤，不用休市表
+// 美股半日市 13:00 收（NYSE，同 Skill us_holidays.EARLY_CLOSE）；美國期貨（CME 13:15）照舊 17:00
+// shortcut: 半日市表只到 2027，之後要補
+const US_EARLY = ["2025-07-03", "2025-11-28", "2025-12-24", "2026-11-27", "2026-12-24", "2027-11-26"];
 function barEndTf(t, tf, tz, mkt) {
   if (tf === "1H" || tf === "4H") return barEnd(t, tf === "1H" ? 1 : 4, tz, mkt);
-  const cl = mkt === "fut" ? (tz === "Asia/Taipei" ? "13:45" : "17:00") : MTF_CLOSE[tz] || "23:59";
-  const e = tzMs(String(t).slice(0, 10) + " " + cl, tz);
-  return tf === "W" ? e + 4 * 86400e3 : e;
+  const d = String(t).slice(0, 10), cl = mkt === "fut" ? (tz === "Asia/Taipei" ? "13:45" : "17:00") : MTF_CLOSE[tz] || "23:59";
+  return tzMs(d + " " + (cl === "16:00" && US_EARLY.includes(d) ? "13:00" : cl), tz);
+}
+// 引擎週K 一律等到週五收盤才定案：週五休市那週 8 小時從週五收盤起算，不然還沒定案就過了窗口、整段不閃
+function friEnd(t, tz, mkt) {
+  const d = new Date(String(t).slice(0, 10) + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() + 6) % 7);
+  return barEndTf(d.toISOString().slice(0, 10), "D", tz, mkt);
 }
 // 共振（已過濾）：後成立那根收完起 8 小時內、沒點掉 → [{key, iA, iB, late, id}]
 function co5Live(cos, bars, tf, tz, mkt, now, gone, pre) {
   return (cos || []).map((c) => ({ ...c, id: pre + c.key + "|" + bars[c.iA].t + "|" + bars[c.iB].t }))
-    .filter((c) => { const e = barEndTf(bars[c.late].t, tf, tz, mkt); return now >= e && now - e <= MTF_WIN && !gone.includes(c.id); });
+    .filter((c) => {
+      const t = bars[c.late].t, e = barEndTf(t, tf, tz, mkt), f = tf === "W" ? Math.max(e, friEnd(t, tz, mkt)) : e;
+      return now >= e && now - f <= MTF_WIN && !gone.includes(c.id);
+    });
 }
 function sideTrade(d, side) {
   const S = SIDES.find(([k]) => k === side), trd = d && d.trade;
