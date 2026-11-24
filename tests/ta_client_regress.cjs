@@ -1107,6 +1107,15 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     got.length = 0; P.toggleFs({}, 2, set, {}); assert.deepStrictEqual(got, [0], "退路再按 → 還原");
     got.length = 0; P.toggleFs({ requestFullscreen() { throw new Error("x"); } }, 0, set, {}); assert.deepStrictEqual(got, [2], "丟例外 → 退路");
     got.length = 0; P.toggleFs({ requestFullscreen: () => Promise.reject(new Error("denied")) }, 0, set, {}); await new Promise((r) => setTimeout(r, 0)); assert.deepStrictEqual(got, [2], "被拒 → 退路");
+    // 有 API 但一直不回（內嵌瀏覽器實測：promise 永遠 pending、沒 fullscreenchange）→ 1.5 秒後退路；成功的不會被誤退
+    const g2 = [], g3 = [];
+    P.toggleFs({ requestFullscreen: () => new Promise(() => {}) }, 0, (v) => g2.push(v), {});
+    P.toggleFs({ requestFullscreen: () => Promise.resolve() }, 0, (v) => g3.push(v), {});
+    await new Promise((r) => setTimeout(r, 1600));
+    assert.deepStrictEqual(g2, [2], "不回應 → 退路"); assert.deepStrictEqual(g3, [], "成功（之後又離開）不誤退");
+    assert.ok(/if \(e\.key === "Escape"\) setFs\(0\);/.test(raw), "退路 Esc 離開");
+    assert.ok(/\(W - KL - KR\)/.test(raw) && /live\.current = \{ a, b, N: NX, W: kw \}/.test(raw), "框選換算用目前的圖寬");
+    assert.ok(/setKw\(Math\.max\(KW, Math\.round\(\(KH \* el\.clientWidth\) \/ h\)\)\)/.test(raw) && /if \(!fs \|\| !pane\) \{ setKw\(KW\);/.test(raw), "全螢幕量寬高反推圖寬、離開回 KW");
     const kh = (w) => renderToString(React.createElement(P.KChart, { d: { tf: "D", symbol: { yahoo: "X", market: "us" }, chart: {} }, full: { bars: [{ t: "2026-01-01", o: 1, h: 2, l: 0.5, c: 1.5, v: 1 }, { t: "2026-01-02", o: 1.5, h: 2.5, l: 1, c: 2, v: 1 }], c: [1.5, 2], k0: 0 }, smas: [], yr: null, a: 0, b: 2, gaps: [], islands: [], top: [], rolls: [], w }));
     assert.ok(kh(undefined).includes('viewBox="0 0 1000 526"') && kh(1600).includes('viewBox="0 0 1600 526"'), "KChart 依量到的寬重畫（高 526＝KH）");
   });

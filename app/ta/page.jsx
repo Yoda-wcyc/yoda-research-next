@@ -956,12 +956,16 @@ function ScBtns({ sc, tf, onPick }) {
 }
 // 全螢幕（11-24）：右欄（工具列＋圖＋導覽列，不含左側面板）用 Fullscreen API；不支援／被拒（iPhone Safari 等）改 CSS 鋪滿（fs＝2）
 const fsEl = (doc) => doc.fullscreenElement || doc.webkitFullscreenElement || null;
+const FS_WAIT = 1500;
 function toggleFs(el, fs, setFs, doc = document) {
   if (fs === 2) { setFs(0); return; }
   if (fsEl(doc)) { const ex = doc.exitFullscreen || doc.webkitExitFullscreen; if (ex) ex.call(doc); return; }
   const req = el && (el.requestFullscreen || el.webkitRequestFullscreen);
   if (!req) { setFs(2); return; }
-  try { const r = req.call(el); if (r && r.catch) r.catch(() => setFs(2)); } catch (e) { setFs(2); }
+  let ok = false;
+  try { const r = req.call(el); if (r && r.then) r.then(() => { ok = true; }, () => setFs(2)); } catch (e) { setFs(2); return; }
+  // 有 API 但一直不回、也沒進全螢幕（內嵌瀏覽器／App 內 webview、舊 webkit 默默失敗）→ 1.5 秒後改 CSS 退路
+  setTimeout(() => { if (!ok && !fsEl(doc)) setFs(2); }, FS_WAIT);
 }
 // 同商品同週期同資料不重算（換回來直接拿）；最多留 24 份
 const SC_CACHE = new Map();
