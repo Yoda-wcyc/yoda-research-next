@@ -1056,6 +1056,31 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     const srcCA = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
     assert.ok(/const gone = rng\[0\] > NX - 2;\s*const b = gone \? NX : Math\.min\(rng\[1\], NX\), a = gone \? def0 :/.test(srcCA), "收起劇本後區間回預設");
   });
+  await t("劇本點位一個數字（11-24）：同一點的價位虛線、右側標籤、點位表都是成交價；觸發價寫在條件欄（NQ 4H 兩個方向，進場成交價≠觸發價）", async () => {
+    const fx = JSON.parse(fs.readFileSync(path.join(ROOT, "tests", "ta_5stage_nq4h.json"), "utf8"));
+    const B = fx.bars, n = B.length, col = (j) => B.map((x) => x[j]);
+    const d = { tf: "4H", symbol: { yahoo: "NQ=F", code: "NQ1!", market: "fut", timezone: "America/New_York" }, bars_completed: n,
+      history: { t: col(0), o: col(1), h: col(2), l: col(3), c: col(4), v: col(5) }, chart: { bars: B.slice(-120).map((x) => ({ t: x[0], o: x[1], h: x[2], l: x[3], c: x[4], v: x[5] })) } };
+    const fp = (x) => Number(x).toLocaleString("en-US", { maximumFractionDigits: 4 });
+    for (const ma_n of [[5, 10, 20], [8, 13, 34]]) for (const [sc, dir] of [["up", 1], ["dn", -1]]) {
+      const p = lib3.normParams({ ma: "sma", ma_n }).p, nm = ma_n.join("/") + " " + sc;
+      const h = renderToString(React.createElement(P.ChartArea, { d, p, srOn: false, kkOn: false, sc })).replace(/<!-- -->/g, "");
+      const lines = Object.fromEntries([...h.matchAll(/<line class="sc-lv (\w+)"[^>]*data-p="([^"]+)"/g)].map((x) => [x[1], +x[2]]));
+      const labs = Object.fromEntries([...h.matchAll(/<text class="srl mk-lab"[^>]*>[↑↓]?(進場|停損|出場1|出場2) ([^<]+)<\/text>/g)].map((x) => [x[1], x[2]]));
+      const rows = [...h.matchAll(/<span class="sc-k (\w+)">([^<]*)<\/span><\/td><td[^>]*>([^<]*)<\/td><td[^>]*>([^<]*)<\/td>/g)].map((x) => ({ kind: x[1], name: x[2], cond: x[3], px: x[4] }));
+      assert.strictEqual(rows.length, 4, nm + " 點位表四列");
+      const plan = scLib.exports.scenarios(B.map((x) => ({ t: x[0], o: x[1], h: x[2], l: x[3], c: x[4], v: x[5] })), { tf: "4H", mkt: "fut", tz: "America/New_York", ma: "sma", ma_n, dir }).list[0].plan;
+      for (const r of rows) {
+        const pr = plan.find((z) => z.kind === r.kind);
+        if (pr.level == null) { assert.ok(!(r.kind in lines) && !(r.name in labs), nm + " " + r.name + " 沒觸發價＝不畫線"); continue; }
+        assert.strictEqual(labs[r.name], r.px, nm + " " + r.name + " 標籤 " + labs[r.name] + " ≠ 點位表 " + r.px);
+        assert.strictEqual(fp(lines[r.kind]), r.px, nm + " " + r.name + " 虛線 " + lines[r.kind] + " ≠ 點位表 " + r.px);
+        assert.ok(r.cond.includes(fp(pr.level)), nm + " " + r.name + " 條件要寫觸發價 " + fp(pr.level) + "：" + r.cond);
+      }
+      const en = plan.find((z) => z.kind === "entry");
+      assert.ok(en.p !== en.level && labs["進場"] === fp(en.p) && !h.includes("進場 " + fp(en.level) + "<"), nm + " 進場標籤是成交價、不是觸發價");
+    }
+  });
   await t("劇本只看路徑（11-24）：亮＝只剩示意 K（示意區、今天線、延伸均線），沒有規劃點記號／虛線／右側標籤／點位表；熄＝照舊；記 localStorage、讀不到＝熄；劇本關時不顯示", async () => {
     const fx = JSON.parse(fs.readFileSync(path.join(ROOT, "tests", "ta_5stage_nq4h.json"), "utf8"));
     const B = fx.bars, n = B.length, col = (j) => B.map((x) => x[j]);
@@ -1162,6 +1187,14 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     assert.strictEqual(renderToString(React.createElement(P.BadBanner, { d: P.sideTrade({ ...w, trade: { ...w.trade, banner: { bad: true, text: "表現不好" } } }, "none") })), "", "全關：圖上方規則表現橫幅不顯示");
     const th = renderToString(React.createElement(P.Trade, { d: N }));
     assert.ok(th.includes("訊號已全關") && !th.includes("<table") && !th.includes("回測期間"), th);
+    // 11-24：全關時圖例拿掉交易項目（出場線、進場、停損、✕ 出場、進→出、持倉中、滑過記號），均線／關鍵K／島狀反轉／引擎給的照舊
+    const wl = { ...w, chart: { ...w.chart, legend: [{ key: "gap", label: "缺口", desc: "方框" }] } };
+    const lgOn = renderToString(React.createElement(P.Legend, { d: wl })).replace(/<!-- -->/g, ""), lgOff = renderToString(React.createElement(P.Legend, { d: P.sideTrade(wl, "none") })).replace(/<!-- -->/g, "");
+    const TRL = ["（出場線）", "多進／空進", "</span>停損</dt>", "✕ 出場", "進→出", "持倉中", "滑過記號"], KEEP = ["均線", "關鍵K", "島狀反轉", "缺口", "右側標籤"];
+    for (const x of [...TRL, ...KEEP]) assert.ok(lgOn.includes(x), "全部：圖例有 " + x);
+    for (const x of TRL) assert.ok(!lgOff.includes(x), "全關：圖例不該有 " + x);
+    for (const x of KEEP) assert.ok(lgOff.includes(x), "全關：圖例照留 " + x);
+    assert.strictEqual(w.trade_legend.length, wl.trade_legend.length, "原資料圖例沒被改");
     const tr = (side, t) => ({ side, entry_t: t }), now = Date.UTC(2026, 10, 23, 6, 0);
     const r1 = { trades: [tr(-1, "2026-11-23 12:00")], open: { side: 1, entry_t: "2026-11-23 13:00" } }, r4 = { trades: [tr(-1, "2026-11-23 09:00")], open: { side: 1, entry_t: "2026-11-23 12:00" } };
     assert.ok(P.mtfBlink(r1, r4, "Asia/Taipei", "all", now), "測資 all 會閃");

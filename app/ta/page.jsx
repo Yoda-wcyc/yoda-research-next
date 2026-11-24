@@ -394,9 +394,9 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
     if (q.s5 && q.s5.i < b && (!q.ex || q.ex.i >= a)) f5L.push([sd, q, "stop", q.s5.i, q.ex ? q.ex.i : null, null]);
   }
   const f5P = f5L.flatMap(([, q, kind, , , p]) => (kind === "stop" ? q.stops.map((z) => z[1]) : [p]));
-  // 劇本（11-24）：sc＝{at（第一根示意 K 的位置）, dir, name, plan}；有價位的規劃點畫虛線（從「今天」到右緣）
-  const scL = sc ? sc.plan.filter((r) => r.level != null) : [];
-  for (const y of [...srl.map(([x]) => x.price), ...tlines.map((ln) => ln.y), ...f5P, ...scL.map((r) => r.level)]) {
+  // 劇本（11-24）：sc＝{at（第一根示意 K 的位置）, dir, name, plan}；有觸發價的規劃點畫虛線（從「今天」到右緣），線與標籤都在成交價 r.p（＝點位表；觸發價寫在條件裡）
+  const scL = sc ? sc.plan.filter((r) => r.level != null && r.p != null) : [];
+  for (const y of [...srl.map(([x]) => x.price), ...tlines.map((ln) => ln.y), ...f5P, ...scL.map((r) => r.p)]) {
     if (y != null && y >= lo - reach && y <= hi + reach) { lo = Math.min(lo, y); hi = Math.max(hi, y); }
   }
   const pad = (hi - lo) * 0.05 || hi * 0.01 || 1;
@@ -618,9 +618,9 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
     return { "data-tip": "sc", onMouseEnter: (e) => onTip && onTip("sc", info, e, false), onMouseLeave: () => onTip && onTip(null), onClick: (e) => { e.stopPropagation(); onTip && onTip("sc", info, e, true); } };
   };
   if (scX != null) scL.forEach((r) => {
-    els.push(<line key={"scl" + r.kind} className={"sc-lv " + r.kind} x1={scX} x2={xr} y1={Y(r.level)} y2={Y(r.level)} stroke={scCol[r.kind]} strokeWidth="1.2"
-      strokeDasharray={r.kind === "entry" ? "2 3" : "6 4"} strokeOpacity=".85" clipPath={clip} pointerEvents="none" data-kind={r.kind} data-p={r.level} />);
-    lab.push({ y: Y(r.level), t: r.name + " " + fpx(r.level), col: scCol[r.kind], nt: "", tip: scTip(r) });
+    els.push(<line key={"scl" + r.kind} className={"sc-lv " + r.kind} x1={scX} x2={xr} y1={Y(r.p)} y2={Y(r.p)} stroke={scCol[r.kind]} strokeWidth="1.2"
+      strokeDasharray={r.kind === "entry" ? "2 3" : "6 4"} strokeOpacity=".85" clipPath={clip} pointerEvents="none" data-kind={r.kind} data-p={r.p} />);
+    lab.push({ y: Y(r.p), t: r.name + " " + fpx(r.p), col: scCol[r.kind], nt: "", tip: scTip(r) });
   });
   // 持倉中：右側標籤（跟撐壓一起避讓）
   const op = trd.open;
@@ -1669,10 +1669,11 @@ function co5Live(cos, bars, tf, tz, mkt, now, gone, pre) {
       return now >= e && now - f <= MTF_WIN && !gone.includes(c.id);
     });
 }
+const TRADE_LG = ["exit_ma", "entry", "stop", "exit", "link", "open", "tip"];   // 圖例裡屬於交易記號的項目（關鍵K、島狀反轉不算）
 function sideTrade(d, side) {
   const S = SIDES.find(([k]) => k === side), trd = d && d.trade;
-  // 全關：圖上不畫 ▲▼✕、停損線、出場線、圖上方規則表現橫幅，① 只寫一行；回測照算（dv 不動），點回來立刻有
-  if (side === "none" && trd) return { ...d, chart: d.chart && { ...d.chart, exit_line: null }, trade: { ...trd, trades: [], open: null, markers: [], lines: [], banner: null, off: true } };
+  // 全關：圖上不畫 ▲▼✕、停損線、出場線、圖上方規則表現橫幅，① 只寫一行，圖例也拿掉交易項目（11-24）；回測照算（dv 不動），點回來立刻有
+  if (side === "none" && trd) return { ...d, trade_legend: (d.trade_legend || []).filter((x) => !TRADE_LG.includes(x.key)), chart: d.chart && { ...d.chart, exit_line: null }, trade: { ...trd, trades: [], open: null, markers: [], lines: [], banner: null, off: true } };
   if (!S || !S[2] || !trd) return d;
   const s = S[2], st = trd.stats || {};
   const trades = (trd.trades || []).map((t, k) => ({ ...t, no: k + 1 })).filter((t) => t.side === s);   // no＝全期第幾筆
