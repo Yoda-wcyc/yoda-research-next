@@ -881,10 +881,13 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     assert.deepStrictEqual(P.migrateRules(def), def, "新預設不變");
     const mine = { ...def, ma_n: [8, 13, 34] }; assert.deepStrictEqual(P.migrateRules(mine), mine);
     const sv = [{ name: "舊預設存一份", p: old }, { name: "我的", p: { ...old, stop_n: 5 } }];
-    const cr = P.cleanRules({ cur: old, saved: sv, active: "舊預設存一份" });
+    const cr = P.cleanRules({ cur: old, saved: sv, active: null });
     assert.deepStrictEqual(cr.cur, def);
     assert.deepStrictEqual(cr.saved, [{ name: "舊預設存一份", p: old }, { name: "我的", p: { ...old, stop_n: 5 } }], "saved 一律不動");
-    assert.strictEqual(cr.active, "舊預設存一份");
+    assert.strictEqual(cr.active, null);
+    const ca = P.cleanRules({ cur: old, saved: sv, active: "舊預設存一份" });   // 套用中的是自己存的規則 → cur 不遷移
+    assert.deepStrictEqual(ca.cur, old, "套用自己存的規則不遷移"); assert.strictEqual(ca.active, "舊預設存一份");
+    assert.deepStrictEqual(P.cleanRules({ cur: old, saved: sv, active: "內建：預設規則" }).cur, def, "套用內建預設照樣遷移");
   });
   await t("pastHalf：TA 票過半才續；普通票、壞票、沒期限 → 要問 status", async () => {
     const tk = (p) => "h." + Buffer.from(JSON.stringify(p)).toString("base64url") + ".s", n = Date.now() / 1000;

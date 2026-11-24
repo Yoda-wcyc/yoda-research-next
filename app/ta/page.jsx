@@ -1350,7 +1350,9 @@ function cleanRules(o) {
     .map((s) => ({ name: s.name.trim().slice(0, NAME_MAX), p: normParams(s.p).p }))
     .filter((s, i, a) => a.findIndex((y) => y.name === s.name) === i).slice(0, SAVED_MAX);
   const active = typeof x.active === "string" && (saved.some((s) => s.name === x.active) || BUILTINS.some((s) => BI + s.name === x.active)) ? x.active : null;
-  return { cur: migrateRules(x.cur), saved, active };
+  // 目前套用的是自己存的規則＝自己選的，不遷移（不然一進頁面就變「名稱（未存的修改）」）
+  const mine = active && saved.some((s) => s.name === active);
+  return { cur: mine ? normParams(x.cur).p : migrateRules(x.cur), saved, active };
 }
 // 舊訪客遷移（Yoda 11-24）：頁面會自動把 cur 寫回 localStorage，11-24 前開過 /ta 的都存著舊預設 EMA5/10/20。
 // 存的 cur（缺的欄位補舊預設）跟舊預設每一欄都一樣＝沒自訂過 → 換新預設；有任何一欄不同＝自己改過 → 照舊。saved 不經過這裡、不動
