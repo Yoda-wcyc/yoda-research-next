@@ -426,7 +426,8 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     const q5 = f5.s.find((q) => q.s5 && q.s5.i >= a);
     const bl = kc({ kk, f5: { ...f5, blink: new Map([["s|5|" + q5.s5.i, { list: [{ id: "x" }], txt: "共振" }]]) } });
     assert.ok(/class="s5co"/.test(bl) && /class="s4t"[^>]*data-co="1"[^>]*>5</.test(bl) && /class="s5co"[^>]*stroke="#ff5f6b"/.test(bl), "共振外框同數字色：反彈紅框");
-    assert.ok(raw.includes('(bl ? " ta-blink b-dn" : "")') && raw.includes('k === "short" || k === "mid"'), "短、中一起閃（綠）");
+    assert.ok(raw.includes('(bl ? " ta-blink b-co5" : "")') && raw.includes('k === "short" || k === "mid"'), "短、中一起閃（紅，同共振框）");
+    assert.ok(/\.ta-tab\.ta-blink\.b-co5\{--bc:#ff5f6b\}/.test(fs.readFileSync(path.join(ROOT, "app", "ta", "ta.css"), "utf8")), "b-co5＝#ff5f6b");
   });
   await t("市場標籤：美國期貨・CME／指數／台股／美股·NASDAQ·ETF；怪值不崩", async () => {
     assert.strictEqual(P.mktBadge({ market: "fut", exchange: "CME" }), "美國期貨・CME");

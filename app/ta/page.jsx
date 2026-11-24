@@ -2549,9 +2549,9 @@ export default function TaPage() {
             <div className="ta-seg" role="group" aria-label="均線組">
               <span className="ta-seglab">均線</span>
               {MA_SETS.map(([k, nm]) => {
-                const bl = co5.length > 0 && (k === "short" || k === "mid");   // 反彈五階段共振：「短」「中」一起閃（空方＝綠）
+                const bl = co5.length > 0 && (k === "short" || k === "mid");   // 反彈五階段共振：「短」「中」一起閃（同圖上共振框紅 #ff5f6b；b-co5 專用，1H/4H 的 b-up/b-dn 不動）
                 return (
-                  <button key={k} type="button" aria-pressed={maSet === k} className={"ta-tab" + (maSet === k ? " on" : "") + (bl ? " ta-blink b-dn" : "")} data-co5={bl ? 1 : undefined}
+                  <button key={k} type="button" aria-pressed={maSet === k} className={"ta-tab" + (maSet === k ? " on" : "") + (bl ? " ta-blink b-co5" : "")} data-co5={bl ? 1 : undefined}
                     onClick={() => { if (bl) dropCo5(co5); setDraft((x) => pickMaSet(x, k)); pickView("chart"); }} title={bl ? co5Tip : MA_NM[k]}>{nm}</button>
                 );
               })}

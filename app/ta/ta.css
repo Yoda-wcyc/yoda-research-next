@@ -420,6 +420,7 @@ svg.ta-k .roll-t{fill:#9aa4b2;font-size:10px;paint-order:stroke;stroke:#0b0f15;s
 /* 共振閃爍（11-23）：1H／4H 同方向進場都在 8 小時內；多紅空綠；用 box-shadow 不用 border，選中／非 K 線分頁的 border 規則蓋不掉；減少動態＝不閃、改粗外框 */
 .ta-tab.ta-blink{--bc:var(--red);box-shadow:0 0 0 1.5px var(--bc);animation:ta-blink 1.2s ease-in-out infinite}
 .ta-tab.ta-blink.b-dn{--bc:var(--green)}
+.ta-tab.ta-blink.b-co5{--bc:#ff5f6b}
 @keyframes ta-blink{50%{background:color-mix(in srgb,var(--bc) 38%,transparent);color:var(--text)}}
 @media (prefers-reduced-motion:reduce){.ta-tab.ta-blink{animation:none;box-shadow:0 0 0 2.5px var(--bc);background:color-mix(in srgb,var(--bc) 18%,transparent)}}
 
