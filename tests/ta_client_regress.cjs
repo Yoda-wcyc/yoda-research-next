@@ -122,7 +122,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     .replace('"../../lib/ta-trade"', JSON.stringify(path.join(ROOT, "lib", "ta-trade.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-rs"', JSON.stringify(path.join(ROOT, "lib", "ta-rs.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-opt"', JSON.stringify(path.join(ROOT, "lib", "ta-opt.js").replace(/\\/g, "/")))
-    .replace('"../../lib/ta-4step"', JSON.stringify(path.join(ROOT, "lib", "ta-4step.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, mtfBlink, tzMs, barEnd, readSr, readKk, keyKAll, readS4, readL4, maSetOf, pickMaSet, MA_SETS, Legend };\n";
+    .replace('"../../lib/ta-4step"', JSON.stringify(path.join(ROOT, "lib", "ta-4step.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, mtfBlink, tzMs, barEnd, readSr, readKk, keyKAll, readS4, readL4, maSetOf, pickMaSet, MA_SETS, Legend, migrateRules, cleanRules };\n";
   const Mod = require("module");
   const libSrc = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-trade.js"), "utf8"), opts).code;
   const lib = new Mod(path.join(ROOT, "lib", "ta-trade.js")); lib.paths = Mod._nodeModulePaths(ROOT); lib._compile(libSrc, lib.id);
@@ -833,7 +833,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     const css = fs.readFileSync(path.join(ROOT, "app", "ta", "ta.css"), "utf8");
     assert.ok(/prefers-reduced-motion:reduce\)\{\.ta-tab\.ta-blink\{animation:none/.test(css), "減少動態要停閃");
   });
-  await t("均線組＝交易均線（11-24）：短／中／長＝applied 換成該組 SMA（回測筆數三組不同）、圖上畫線＝applied、非三組（EMA／手改／內建）不亮、預設 SMA5/10/20 亮「短」", async () => {
+  await t("均線組＝交易均線（11-24）：短／中／長＝applied 換成該組 SMA（回測筆數三組不同）、圖上畫線＝applied、非三組（EMA／手改）不亮、內建前四組（SMA5/10/20）亮「短」、長線 SMA 亮「長」、預設 SMA5/10/20 亮「短」", async () => {
     const def = lib3.normParams({}).p;
     assert.ok(def.ma === "sma" && def.ma_n.join() === "5,10,20" && P.maSetOf(def) === "short", "預設 SMA5/10/20 且「短」亮");
     const G = JSON.parse(fs.readFileSync(path.join(__dirname, "ta_4step_nq4h.json"), "utf8")), n = G.t.length;
@@ -859,10 +859,32 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     assert.ok(renderToString(React.createElement(P.Legend, { d, p: def })).includes("SMA5／SMA10／SMA20"), "圖例 SMA");
     for (const p of [ema, { ...def, ma_n: [5, 10, 21] }, { ...def, ma_n: [8, 13, 35] }, null, {}]) assert.strictEqual(P.maSetOf(p), null, "不屬於三組要三顆不亮：" + JSON.stringify(p));
     const bi = lib3.PRESETS.map((x) => [x.name, P.maSetOf(lib3.normParams(x.p).p)]);
-    assert.deepStrictEqual(bi, [["預設規則", "short"], ["短線快出", null], ["波段抱長", null], ["只做多・固定 5%", null], ["長線 SMA", "long"]], "內建策略：" + JSON.stringify(bi));
+    assert.deepStrictEqual(bi, [["預設規則", "short"], ["短線快出", "short"], ["波段抱長", "short"], ["只做多・固定 5%", "short"], ["長線 SMA", "long"]], "內建策略：" + JSON.stringify(bi));
     const src = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
     assert.ok(src.includes("const maSet = maSetOf(applied)") && !src.includes("setMaSet") && src.includes("setDraft((x) => pickMaSet(x, k))"), "按鈕亮＝由 applied 推、按下去改 draft");
     assert.ok(src.includes("p={applied}") && !/maSet=\{maSet\}/.test(src), "圖與圖例吃 applied");
+  });
+  await t("migrateRules（11-24 舊訪客）：存的 cur＝舊預設 EMA5/10/20 → 新預設 SMA（「短」亮）；改過一欄 → 保留；壞資料 → 新預設；新預設不變；saved 不動", async () => {
+    const def = lib3.normParams({}).p;
+    const old = { ma: "ema", ma_n: [5, 10, 20], fresh_n: 3, vol_on: true, vol_in: 1.2, vol_n: 10, side_ma: true,   // 改版前 DEFAULT_PARAMS 原文
+      stop: "low_n", stop_n: 3, stop_pct: 5, atr_n: 14, atr_k: 2, stop_on: "touch", exit_ma: true, exit_k: 2, exit_delay: 0, vol_exit: true, vol_out: 2,
+      max_hold_on: false, max_hold: 20, dir: "both", fee: 0, slip: 0, entry: "ma" };
+    const m = P.migrateRules(old);
+    assert.deepStrictEqual(m, def); assert.strictEqual(P.maSetOf(m), "short");
+    const { entry, ...pre1123 } = old;   // 11-23 前存的沒有 entry 欄位＝當時也是預設
+    assert.deepStrictEqual(P.migrateRules(pre1123), def);
+    for (const [k, v] of [["ma_n", [5, 10, 21]], ["stop_n", 4], ["vol_on", false], ["dir", "long"], ["fee", 0.1], ["entry", "keyk"]]) {
+      const c = { ...old, [k]: v }, r = P.migrateRules(c);
+      assert.deepStrictEqual(r, lib3.normParams(c).p, "改過 " + k + " 要保留"); assert.strictEqual(r.ma, "ema"); assert.strictEqual(P.maSetOf(r), null);
+    }
+    for (const bad of [null, undefined, "x", 42, [], {}]) assert.deepStrictEqual(P.migrateRules(bad), def, "壞資料：" + JSON.stringify(bad));
+    assert.deepStrictEqual(P.migrateRules(def), def, "新預設不變");
+    const mine = { ...def, ma_n: [8, 13, 34] }; assert.deepStrictEqual(P.migrateRules(mine), mine);
+    const sv = [{ name: "舊預設存一份", p: old }, { name: "我的", p: { ...old, stop_n: 5 } }];
+    const cr = P.cleanRules({ cur: old, saved: sv, active: "舊預設存一份" });
+    assert.deepStrictEqual(cr.cur, def);
+    assert.deepStrictEqual(cr.saved, [{ name: "舊預設存一份", p: old }, { name: "我的", p: { ...old, stop_n: 5 } }], "saved 一律不動");
+    assert.strictEqual(cr.active, "舊預設存一份");
   });
   await t("pastHalf：TA 票過半才續；普通票、壞票、沒期限 → 要問 status", async () => {
     const tk = (p) => "h." + Buffer.from(JSON.stringify(p)).toString("base64url") + ".s", n = Date.now() / 1000;
