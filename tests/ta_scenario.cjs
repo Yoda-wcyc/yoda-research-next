@@ -132,7 +132,7 @@ t("算不出回 null：沒有成交量的 1H → 沒有多方關鍵K → W 底�
   const nv = NQ.map((b) => ({ ...b, v: 0 })), r = run(nv, { ...CASES[0][2], tf: "1H" }, [8, 13, 34], 1);
   assert.strictEqual(r.list[2], null, "W 底");
   assert.ok(r.lv.find((x) => x.k === "KK").p === null && !r.lv.some((x) => x.k === "V20"), "關鍵K 寫沒有、不列均量");
-  assert.ok(/放量長紅/.test(r.nos[2]) && !/1\.3 ATR/.test(r.nos[2]), "1H 的原因只講放量長紅：" + r.nos[2]);
+  assert.ok(/^這檔沒有成交量，1H 認不出放量長紅/.test(r.nos[2]) && !/1\.3 ATR|等出現/.test(r.nos[2]), "沒量的 1H 不寫等出現：" + r.nos[2]);
   for (const p of r.list) if (p) { assert.ok(!/量 ≥/.test(p.plan[0].cond), "沒有量就不寫量的條件"); assert.ok(p.sim.every((b) => b.v === 0)); }
   const few = run(NQ.slice(-60), CASES[0][2], [8, 13, 34], 1);
   assert.deepStrictEqual(few.list, [null, null, null, null]); assert.ok(few.why && few.names.length === 4);
@@ -204,6 +204,11 @@ t("缺量 K（Yahoo 期貨最後一根 None）：不進均量、不當關鍵K候
   const xs = TW.slice(N - 20, N - 1).map((b) => b.v), avg = xs.reduce((s, x) => s + x, 0) / xs.length;
   assert.strictEqual(r.lv.find((x) => x.k === "V20").p, Math.round(avg), "前 20 根均量只算 19 根有量的");
   for (const p of r.list) if (p) assert.ok(p.sim.every((b) => Number.isInteger(b.v) && b.v > 0), "示意 K 的量照樣有");
+  // 關鍵K 之後收盤跌破它的低點 → 原因句寫「已跌破」，不寫「離現價不到 0.3 ATR」
+  const t1 = new Date(Date.parse(TW[N - 1].t) + 3 * 864e5).toISOString().slice(0, 10);
+  const brk = [...big, { t: t1, o: cc, h: cc, l: pc - tk, c: pc - tk, v: TW[N - 2].v }], rb = run(brk, o, [8, 13, 34], 1);
+  assert.strictEqual(kkRow(rb).p, pc); assert.strictEqual(rb.list[2], null);
+  assert.ok(/^現價 [\d,.]+ 已跌破多方關鍵K低點 [\d,.]+，沒有回測的空間$/.test(rb.nos[2]), rb.nos[2]);
 });
 
 t("時間軸：跳週末、休市、半日市（美股 13:00、美國期貨 13:15）、美國期貨週日 18:00 開、台股 12-25／元旦", () => {
