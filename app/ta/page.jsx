@@ -138,11 +138,11 @@ function lastEntry(r, s) {   // 某方向最近一次進場的 K 時間（持倉
   for (let k = r.trades.length - 1; k >= 0; k--) if (r.trades[k].side === s) return r.trades[k].entry_t;
   return null;
 }
-// r1／r4＝backtest 結果；side＝訊號篩選（all 兩邊都看，同時成立取比較新的）→ {s, key, tip}｜null
+// r1／r4＝backtest 結果；side＝訊號篩選（all 兩邊都看，同時成立取比較新的；none 全關不閃）→ {s, key, tip}｜null
 function mtfBlink(r1, r4, tz, side, now, mkt) {
   if (!r1 || !r4) return null;
   let best = null;
-  for (const s of side === "long" ? [1] : side === "short" ? [-1] : [1, -1]) {
+  for (const s of side === "long" ? [1] : side === "short" ? [-1] : side === "none" ? [] : [1, -1]) {
     const t1 = lastEntry(r1, s), t4 = lastEntry(r4, s);
     if (!t1 || !t4) continue;
     const a = barEnd(t1, 1, tz, mkt), b = barEnd(t4, 4, tz, mkt);
@@ -1415,6 +1415,7 @@ function BadBanner({ d }) {
 function Trade({ d }) {
   const trd = d.trade;
   if (!trd) return null;
+  if (trd.off) return <div className="ta-block" data-blk="trade"><div className="ta-empty" data-side-off="">訊號已全關</div></div>;
   const st = trd.stats || {};
   const p = trd.open;
   const tt = trd.trades || [];
@@ -1588,7 +1589,9 @@ function withTrade(d, p0) {
 // 訊號顯示篩選（Yoda 11-10）：只篩圖上記號／線／標籤／浮動說明和 ① 進出場的清單與統計，回測本身不變（方向設定在面板）
 const SIDES = [["all", "全部", 0], ["long", "只看多方", 1], ["short", "只看空方", -1]];
 const SIDE_KEY = "yoda_ta_side";
-function readSide() { const v = lsGet(SIDE_KEY); return SIDES.some(([k]) => k === v) ? v : "all"; }
+// 開關式（11-24）：點亮著的那顆＝none（全關，三顆都不亮）；全關時點哪顆就切到那顆
+function nextSide(cur, k) { return k === cur ? "none" : k; }
+function readSide() { const v = lsGet(SIDE_KEY); return v === "none" || SIDES.some(([k]) => k === v) ? v : "all"; }
 // 撐壓線開關（11-23）：關掉＝圖上兩條線、右側價位標籤都不畫，也不再撐大價格座標；預設開
 const SR_KEY = "yoda_ta_sr";
 function readSr() { return lsGet(SR_KEY) !== "0"; }
@@ -1628,6 +1631,8 @@ function co5Live(cos, bars, tf, tz, mkt, now, gone, pre) {
 }
 function sideTrade(d, side) {
   const S = SIDES.find(([k]) => k === side), trd = d && d.trade;
+  // 全關：圖上不畫 ▲▼✕、停損線、出場線、圖上方規則表現橫幅，① 只寫一行；回測照算（dv 不動），點回來立刻有
+  if (side === "none" && trd) return { ...d, chart: d.chart && { ...d.chart, exit_line: null }, trade: { ...trd, trades: [], open: null, markers: [], lines: [], banner: null, off: true } };
   if (!S || !S[2] || !trd) return d;
   const s = S[2], st = trd.stats || {};
   const trades = (trd.trades || []).map((t, k) => ({ ...t, no: k + 1 })).filter((t) => t.side === s);   // no＝全期第幾筆
@@ -2211,7 +2216,7 @@ export default function TaPage() {
   const [tt, setTt] = useState({});             // 趨勢樣板：市場 → {busy}｜{data}｜{error}；市場切換跟區間強弱共用 rsMkt
   const [opt, setOpt] = useState({});           // 選擇權：{sym, exp, busy, data（同商品換到期日時留著上一份）}｜{sym, exp, error}
   const optSeq = useRef(0);
-  const pickSide = (k) => { setSide(k); lsSet(SIDE_KEY, k); pickView("chart"); };
+  const pickSide = (k) => { const v = nextSide(side, k); setSide(v); lsSet(SIDE_KEY, v); pickView("chart"); };
   const [srOn, setSrOn] = useState(readSr);
   const pickSr = () => { setSrOn(!srOn); lsSet(SR_KEY, srOn ? "0" : "1"); pickView("chart"); };
   const [kkOn, setKkOn] = useState(readKk);

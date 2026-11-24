@@ -124,7 +124,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     .replace('"../../lib/ta-opt"', JSON.stringify(path.join(ROOT, "lib", "ta-opt.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-5stage"', JSON.stringify(path.join(ROOT, "lib", "ta-5stage.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-scenario"', JSON.stringify(path.join(ROOT, "lib", "ta-scenario.js").replace(/\\/g, "/")))
-    .replace('"./WaveView"', JSON.stringify(path.join(ROOT, "app", "ta", "WaveView.jsx").replace(/\\/g, "/"))) + "\nexport { ScBtns, nextSc, ScTabs, ScPlan, scInfo, SC_TFS, readB5, readC5, barEndTf, co5Live, oldBuiltin, cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, mtfBlink, tzMs, barEnd, readSr, readKk, keyKAll, dropOld4, maSetOf, pickMaSet, MA_SETS, Legend, migrateRules, cleanRules };\n";
+    .replace('"./WaveView"', JSON.stringify(path.join(ROOT, "app", "ta", "WaveView.jsx").replace(/\\/g, "/"))) + "\nexport { ScBtns, nextSc, ScTabs, ScPlan, scInfo, SC_TFS, readB5, readC5, barEndTf, co5Live, oldBuiltin, cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, nextSide, Trade, BadBanner, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, mtfBlink, tzMs, barEnd, readSr, readKk, keyKAll, dropOld4, maSetOf, pickMaSet, MA_SETS, Legend, migrateRules, cleanRules };\n";
   const Mod = require("module");
   const libSrc = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-trade.js"), "utf8"), opts).code;
   const lib = new Mod(path.join(ROOT, "lib", "ta-trade.js")); lib.paths = Mod._nodeModulePaths(ROOT); lib._compile(libSrc, lib.id);
@@ -1074,6 +1074,35 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     st.yoda_ta_view = "wave"; assert.strictEqual(P.readView(), "wave");
     st.yoda_ta_view = "waves"; assert.strictEqual(P.readView(), "chart");
     assert.ok(raw.includes('.ta-tabs:not([data-view="chart"])') || fs.readFileSync(path.join(ROOT, "app", "ta", "ta.css"), "utf8").includes('.ta-tabs:not([data-view="chart"])'), "非 K 線分頁時其他鈕不顯示選中（同指數位階）");
+  });
+
+  await t("訊號開關式（11-24）：點亮著的那顆＝全關 none、全關點哪顆切哪顆；none 存得住；圖上無 ▲▼✕／停損線／出場線；不閃；① 只寫「訊號已全關」；回測照算", async () => {
+    assert.strictEqual(P.nextSide("short", "short"), "none"); assert.strictEqual(P.nextSide("all", "all"), "none");
+    assert.strictEqual(P.nextSide("none", "long"), "long"); assert.strictEqual(P.nextSide("none", "all"), "all"); assert.strictEqual(P.nextSide("long", "short"), "short");
+    const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
+    assert.ok(raw.includes("const v = nextSide(side, k); setSide(v); lsSet(SIDE_KEY, v);"), "pickSide 走 nextSide 並存 localStorage");
+    assert.ok(raw.includes("aria-pressed={side === k}"), "none 時三顆 aria-pressed 都 false");
+    const st = {}; globalThis.localStorage = { getItem: (k) => (k in st ? st[k] : null), setItem: (k, v) => { st[k] = String(v); }, removeItem: (k) => { delete st[k]; } };
+    st.yoda_ta_side = "none"; assert.strictEqual(P.readSide(), "none", "重新整理保留全關");
+    for (const v of ["NONE", "off", " none"]) { st.yoda_ta_side = v; assert.strictEqual(P.readSide(), "all", v); }
+    const w = P.withTrade(mkD({}), { ...lib3.normParams({}).p, vol_on: false, fresh_n: 1 });
+    assert.ok(w.trade.trades.length > 0 && w.chart.exit_line, "測資要有交易與出場線");
+    const kc = (d) => { const full = P.fullSeries(d); return renderToString(React.createElement(P.KChart, { d, full, smas: [], a: 0, b: full.bars.length, gaps: [], islands: [], top: [], rolls: [] })).replace(/<!-- -->/g, ""); };
+    const on = kc(w), N = P.sideTrade(w, "none"), off = kc(N);
+    assert.ok(/mk-entry|mk-exit/.test(on) && on.includes("exit_ma") && on.includes(">停損<") && /data-kind="stop"/.test(on), "全部：有記號、出場線、停損線");
+    assert.ok(!/mk-entry|mk-exit|trlink|mk-lab|data-tip="(entry|exit)"/.test(off), "全關：沒有 ▲▼✕、連線、記號字");
+    assert.ok(!off.includes("exit_ma") && !/data-kind="(stop|open_stop|open_entry)"/.test(off) && !off.includes(">停損<") && !off.includes(">出場線"), "全關：沒有停損線、出場線與線名");
+    assert.ok(!off.includes("區間內沒有"), "全關不是「沒有某方訊號」");
+    assert.strictEqual(w.trade.trades.length > 0 && N.trade.trades.length, 0); assert.ok(w.chart.exit_line, "原資料沒被改（回測照算，點回來立刻有）");
+    assert.strictEqual(P.sideTrade(w, "all"), w);
+    assert.strictEqual(renderToString(React.createElement(P.BadBanner, { d: { ...w, trade: { ...w.trade, banner: { bad: true, text: "表現不好" } } } })).includes("表現不好"), true);
+    assert.strictEqual(renderToString(React.createElement(P.BadBanner, { d: P.sideTrade({ ...w, trade: { ...w.trade, banner: { bad: true, text: "表現不好" } } }, "none") })), "", "全關：圖上方規則表現橫幅不顯示");
+    const th = renderToString(React.createElement(P.Trade, { d: N }));
+    assert.ok(th.includes("訊號已全關") && !th.includes("<table") && !th.includes("回測期間"), th);
+    const tr = (side, t) => ({ side, entry_t: t }), now = Date.UTC(2026, 10, 23, 6, 0);
+    const r1 = { trades: [tr(-1, "2026-11-23 12:00")], open: { side: 1, entry_t: "2026-11-23 13:00" } }, r4 = { trades: [tr(-1, "2026-11-23 09:00")], open: { side: 1, entry_t: "2026-11-23 12:00" } };
+    assert.ok(P.mtfBlink(r1, r4, "Asia/Taipei", "all", now), "測資 all 會閃");
+    assert.strictEqual(P.mtfBlink(r1, r4, "Asia/Taipei", "none", now), null, "全關不閃");
   });
 
   console.log(fails ? "FAILED " + fails : "all passed");
