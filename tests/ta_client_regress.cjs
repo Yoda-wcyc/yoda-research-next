@@ -124,7 +124,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     .replace('"../../lib/ta-opt"', JSON.stringify(path.join(ROOT, "lib", "ta-opt.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-5stage"', JSON.stringify(path.join(ROOT, "lib", "ta-5stage.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-scenario"', JSON.stringify(path.join(ROOT, "lib", "ta-scenario.js").replace(/\\/g, "/")))
-    .replace('"./WaveView"', JSON.stringify(path.join(ROOT, "app", "ta", "WaveView.jsx").replace(/\\/g, "/"))) + "\nexport { ScBtns, nextSc, ScTabs, ScPlan, scInfo, SC_TFS, readB5, readC5, barEndTf, co5Live, oldBuiltin, cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, nextSide, Trade, BadBanner, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, mtfBlink, tzMs, barEnd, readSr, readKk, keyKAll, dropOld4, maSetOf, pickMaSet, MA_SETS, Legend, migrateRules, cleanRules };\n";
+    .replace('"./WaveView"', JSON.stringify(path.join(ROOT, "app", "ta", "WaveView.jsx").replace(/\\/g, "/"))) + "\nexport { toggleFs, readPo, ScBtns, nextSc, ScTabs, ScPlan, scInfo, SC_TFS, readB5, readC5, barEndTf, co5Live, oldBuiltin, cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, nextSide, Trade, BadBanner, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, mtfBlink, tzMs, barEnd, readSr, readKk, keyKAll, dropOld4, maSetOf, pickMaSet, MA_SETS, Legend, migrateRules, cleanRules };\n";
   const Mod = require("module");
   const libSrc = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-trade.js"), "utf8"), opts).code;
   const lib = new Mod(path.join(ROOT, "lib", "ta-trade.js")); lib.paths = Mod._nodeModulePaths(ROOT); lib._compile(libSrc, lib.id);
@@ -1055,6 +1055,60 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     // 11-24 審查：在示意段裡放大再收起劇本 → 回預設區間（不是只剩 2 根）
     const srcCA = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
     assert.ok(/const gone = rng\[0\] > NX - 2;\s*const b = gone \? NX : Math\.min\(rng\[1\], NX\), a = gone \? def0 :/.test(srcCA), "收起劇本後區間回預設");
+  });
+  await t("劇本只看路徑（11-24）：亮＝只剩示意 K（示意區、今天線、延伸均線），沒有規劃點記號／虛線／右側標籤／點位表；熄＝照舊；記 localStorage、讀不到＝熄；劇本關時不顯示", async () => {
+    const fx = JSON.parse(fs.readFileSync(path.join(ROOT, "tests", "ta_5stage_nq4h.json"), "utf8"));
+    const B = fx.bars, n = B.length, col = (j) => B.map((x) => x[j]);
+    const d = { tf: "4H", symbol: { yahoo: "NQ=F", code: "NQ1!", market: "fut", timezone: "America/New_York" }, bars_completed: n,
+      history: { t: col(0), o: col(1), h: col(2), l: col(3), c: col(4), v: col(5) }, chart: { bars: B.slice(-120).map((x) => ({ t: x[0], o: x[1], h: x[2], l: x[3], c: x[4], v: x[5] })) } };
+    const p = lib3.normParams({ ma: "sma", ma_n: [8, 13, 34] }).p;
+    const ls0 = global.localStorage, st = {};
+    global.localStorage = { getItem: (k) => (k in st ? st[k] : null), setItem: (k, v) => { st[k] = String(v); }, removeItem: (k) => { delete st[k]; } };
+    const ca = (sc) => renderToString(React.createElement(P.ChartArea, { d, p, srOn: false, kkOn: false, sc })).replace(/<!-- -->/g, "");
+    try {
+      for (const sc of ["up", "dn"]) {
+        delete st.yoda_ta_path;
+        const off = ca(sc);
+        assert.ok(/aria-pressed="false" class="ta-tab ta-scpo" data-scpo="">只看路徑<\/button>/.test(off), sc + " 熄：鈕在子分頁那排");
+        assert.ok(/sc-mk/.test(off) && /class="sc-lv /.test(off) && /data-scplan=""/.test(off), sc + " 熄：記號、虛線、點位表照舊");
+        st.yoda_ta_path = "1";
+        const on = ca(sc);
+        assert.ok(/aria-pressed="true" class="ta-tab ta-scpo on"/.test(on), sc + " 亮");
+        assert.ok(!/sc-mk|class="sc-lv |sc-t mk-lab|data-tip="sc"|data-scplan|ta-sclv/.test(on), sc + " 亮：不畫規劃點、虛線、標籤、點位表");
+        assert.ok(/data-sim=""/.test(on) && /<line class="sc-today"/.test(on) && /class="bd sim"/.test(on) && on.includes("示意 K →"), sc + " 亮：示意區、今天線、示意 K 還在");
+        assert.strictEqual(+on.match(/data-n="(\d+)"/)[1], +off.match(/data-n="(\d+)"/)[1], "示意段長度一樣（均線跟著延伸）");
+        assert.ok(/<div class="ta-scfoot">示意，不是預測<\/div>/.test(on), "圖下那行照留");
+      }
+      assert.ok(!ca(null).includes("只看路徑"), "劇本關時不顯示");
+      st.yoda_ta_path = "1"; assert.strictEqual(P.readPo(), true);
+      st.yoda_ta_path = "x"; assert.strictEqual(P.readPo(), false);
+      global.localStorage = { getItem() { throw new Error("blocked"); }, setItem() { throw new Error("blocked"); } };
+      assert.strictEqual(P.readPo(), false, "讀不到＝熄");
+    } finally { global.localStorage = ls0; }
+    const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
+    assert.ok(raw.includes('const PO_KEY = "yoda_ta_path";') && raw.includes('const pickPo = () => { setPo(!po); lsSet(PO_KEY, po ? "0" : "1"); };'), "記 localStorage（兩種劇本同一個 key）");
+  });
+  await t("全螢幕（11-24）：工具列最右一顆 ⛶（aria-label 全螢幕）；有 API → requestFullscreen（含 webkit）、再按 exitFullscreen；沒有／被拒 → CSS 退路 class、再按還原", async () => {
+    const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
+    assert.ok(/>選擇權<\/button>\s*<\/div>\s*<button type="button" aria-pressed=\{!!fs\} className=\{"ta-tab ta-fsbtn"[^>]*aria-label="全螢幕"/.test(raw), "鈕在工具列最右（選擇權那組後面）");
+    assert.ok(raw.includes('<div ref={fsRef} className={"ta-right" + (fs ? " ta-fs" : "") + (fs === 2 ? " ta-fsfb" : "")}>'), "全螢幕的是右欄（工具列＋圖＋導覽列，不含左側面板）；退路 class ta-fsfb");
+    assert.ok(raw.includes('document.addEventListener("fullscreenchange", sync)') && raw.includes('document.addEventListener("webkitfullscreenchange", sync)'), "狀態跟 document.fullscreenElement 同步");
+    assert.ok(/document\.body\.style\.overflow = "hidden";[\s\S]{0,200}document\.body\.style\.overflow = ov;/.test(raw), "退路：body 不捲、離開還原");
+    assert.ok(raw.includes("fs={!!fs} /></Boundary>"), "圖知道全螢幕（量寬高重畫）");
+    const css = fs.readFileSync(path.join(ROOT, "app", "ta", "ta.css"), "utf8");
+    assert.ok(/\.ta-right\.ta-fsfb\{position:fixed;inset:0;z-index:9000\}/.test(css), "CSS 退路鋪滿");
+    const calls = [], got = [], set = (v) => got.push(v);
+    const el = { requestFullscreen() { calls.push("req"); return Promise.resolve(); } }, doc = { fullscreenElement: null, exitFullscreen() { calls.push("exit"); } };
+    P.toggleFs(el, 0, set, doc); assert.deepStrictEqual(calls, ["req"]); assert.deepStrictEqual(got, [], "API 成功：狀態由 fullscreenchange 設");
+    doc.fullscreenElement = el; P.toggleFs(el, 1, set, doc); assert.deepStrictEqual(calls, ["req", "exit"], "再按離開");
+    const wk = [], wel = { webkitRequestFullscreen() { wk.push("wreq"); } }, wdoc = { webkitFullscreenElement: null, webkitExitFullscreen() { wk.push("wexit"); } };
+    P.toggleFs(wel, 0, set, wdoc); wdoc.webkitFullscreenElement = wel; P.toggleFs(wel, 1, set, wdoc); assert.deepStrictEqual(wk, ["wreq", "wexit"], "webkit 前綴");
+    got.length = 0; P.toggleFs({}, 0, set, {}); assert.deepStrictEqual(got, [2], "不支援 → CSS 退路");
+    got.length = 0; P.toggleFs({}, 2, set, {}); assert.deepStrictEqual(got, [0], "退路再按 → 還原");
+    got.length = 0; P.toggleFs({ requestFullscreen() { throw new Error("x"); } }, 0, set, {}); assert.deepStrictEqual(got, [2], "丟例外 → 退路");
+    got.length = 0; P.toggleFs({ requestFullscreen: () => Promise.reject(new Error("denied")) }, 0, set, {}); await new Promise((r) => setTimeout(r, 0)); assert.deepStrictEqual(got, [2], "被拒 → 退路");
+    const kh = (w) => renderToString(React.createElement(P.KChart, { d: { tf: "D", symbol: { yahoo: "X", market: "us" }, chart: {} }, full: { bars: [{ t: "2026-01-01", o: 1, h: 2, l: 0.5, c: 1.5, v: 1 }, { t: "2026-01-02", o: 1.5, h: 2.5, l: 1, c: 2, v: 1 }], c: [1.5, 2], k0: 0 }, smas: [], yr: null, a: 0, b: 2, gaps: [], islands: [], top: [], rolls: [], w }));
+    assert.ok(kh(undefined).includes('viewBox="0 0 1000 526"') && kh(1600).includes('viewBox="0 0 1600 526"'), "KChart 依量到的寬重畫（高 526＝KH）");
   });
   await t("pastHalf：TA 票過半才續；普通票、壞票、沒期限 → 要問 status", async () => {
     const tk = (p) => "h." + Buffer.from(JSON.stringify(p)).toString("base64url") + ".s", n = Date.now() / 1000;

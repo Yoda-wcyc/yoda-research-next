@@ -363,9 +363,10 @@ function keyKAll(full, nf) {
 
 // K 線圖畫整段歷史的 [a, b) 這一段；Y 軸依區間內高低。K 棒與量柱併成幾條 path（1H 五千根拖曳才不卡）
 // 框選放大（11-23，只桌機；滾輪縮放 11-24 取消，滾輪在圖上＝一般頁面捲動）：KW／KL／KR＝K 線圖 viewBox 寬與價格區左右留白，ChartArea 用來把滑鼠位置換成第幾根
-const KW = 1000, KL = 62, KR = 178, ZOOM_MIN = 10;
+// KH＝KChart 的 T+PH+GP+VH+B（全螢幕時用它和容器寬高反推 viewBox 寬）
+const KW = 1000, KH = 526, KL = 62, KR = 178, ZOOM_MIN = 10;
 
-function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, brush, srOn = true, kk = null, f5 = null, onCo5 = null, sc = null }) {
+function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, brush, srOn = true, kk = null, f5 = null, onCo5 = null, sc = null, w = KW }) {
   const ch = d.chart || {};
   const bars = full.bars.slice(a, b), n = bars.length;
   if (n < 2) return <div className="ta-nochart">沒有 K 線資料</div>;
@@ -377,7 +378,7 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
   const trd = d.trade || {};
   const tlines = (trd.lines || []).filter((ln) => (ln.i1 == null || ln.i1 >= a) && (ln.i0 == null || ln.i0 < b));
   const marks = (trd.markers || []).filter((m) => m.i != null && m.i >= a && m.i < b);
-  const W = KW, L = KL, R = KR, T = 16, PH = 400, GP = 14, VH = 72, B = 24;
+  const W = w, L = KL, R = KR, T = 16, PH = 400, GP = 14, VH = 72, B = 24;
   const H = T + PH + GP + VH + B, pw = W - L - R, xr = L + pw;
   const vals = [];
   for (const x of bars) { if (x.h != null) vals.push(x.h); if (x.l != null) vals.push(x.l); }
@@ -953,6 +954,15 @@ function ScBtns({ sc, tf, onPick }) {
     </>
   );
 }
+// 全螢幕（11-24）：右欄（工具列＋圖＋導覽列，不含左側面板）用 Fullscreen API；不支援／被拒（iPhone Safari 等）改 CSS 鋪滿（fs＝2）
+const fsEl = (doc) => doc.fullscreenElement || doc.webkitFullscreenElement || null;
+function toggleFs(el, fs, setFs, doc = document) {
+  if (fs === 2) { setFs(0); return; }
+  if (fsEl(doc)) { const ex = doc.exitFullscreen || doc.webkitExitFullscreen; if (ex) ex.call(doc); return; }
+  const req = el && (el.requestFullscreen || el.webkitRequestFullscreen);
+  if (!req) { setFs(2); return; }
+  try { const r = req.call(el); if (r && r.catch) r.catch(() => setFs(2)); } catch (e) { setFs(2); }
+}
 // 同商品同週期同資料不重算（換回來直接拿）；最多留 24 份
 const SC_CACHE = new Map();
 function scCached(key, fn) {
@@ -971,14 +981,20 @@ function scInfo(sc, r) {
   };
 }
 // 圖上方四個子分頁（可能性高→低）
-function ScTabs({ scr, k, onPick }) {
+// 右邊「只看路徑」（11-24）：亮＝圖上只留示意 K，不畫規劃點記號／價位虛線與標籤、收起點位表；兩種劇本共用、記 localStorage
+const PO_KEY = "yoda_ta_path";
+function readPo() { return lsGet(PO_KEY) === "1"; }
+function ScTabs({ scr, k, onPick, po = false, onPo = null }) {
   return (
-    <div className="ta-sctabs" role="tablist" aria-label={scr.dir === 1 ? "空轉多劇本" : "多轉空劇本"} data-scdir={scr.dir}>
-      {scr.names.map((nm, i) => (
-        <button key={i} type="button" role="tab" aria-selected={k === i} className={"ta-tab" + (k === i ? " on" : "") + (scr.list[i] ? "" : " none")} onClick={() => onPick(i)} data-sck={i}>
-          {MARKS[i]} {nm}</button>
-      ))}
-      <span className="ta-seglab ta-scord">可能性高→低</span>
+    <div className="ta-sctabs">
+      <div className="ta-sctl" role="tablist" aria-label={scr.dir === 1 ? "空轉多劇本" : "多轉空劇本"} data-scdir={scr.dir}>
+        {scr.names.map((nm, i) => (
+          <button key={i} type="button" role="tab" aria-selected={k === i} className={"ta-tab" + (k === i ? " on" : "") + (scr.list[i] ? "" : " none")} onClick={() => onPick(i)} data-sck={i}>
+            {MARKS[i]} {nm}</button>
+        ))}
+        <span className="ta-seglab ta-scord">可能性高→低</span>
+      </div>
+      <button type="button" aria-pressed={po} className={"ta-tab ta-scpo" + (po ? " on" : "")} onClick={onPo} data-scpo="">只看路徑</button>
     </div>
   );
 }
@@ -1079,7 +1095,7 @@ function RangeNav({ bars, a, b, onChange }) {
 }
 
 // 圖＋導覽列＋圖下三個分頁：區間狀態放這裡（② 缺口、③ 前五大量的表跟著區間變）；父層用 key＝代號|週期，換代號或週期就重新掛載＝回到預設區間
-function ChartArea({ d, p = DEF_P, srOn, kkOn = true, b5On = false, c5On = false, co5 = null, onCo5 = null, sc = null }) {
+function ChartArea({ d, p = DEF_P, srOn, kkOn = true, b5On = false, c5On = false, co5 = null, onCo5 = null, sc = null, fs = false }) {
   const ch = d.chart || {};
   const full = useMemo(() => fullSeries(d), [d.history, ch.bars, d.bars_completed]);   // eslint-disable-line react-hooks/exhaustive-deps
   const N = full.bars.length;
@@ -1096,6 +1112,8 @@ function ChartArea({ d, p = DEF_P, srOn, kkOn = true, b5On = false, c5On = false
   const scK = !scr ? 0 : scPick[0] === scr ? scPick[1] : Math.max(0, scr.list.findIndex(Boolean));
   const setScK = (i) => setScPick([scr, i]);
   const cur = scr ? scr.list[scK] : null;
+  const [po, setPo] = useState(readPo);
+  const pickPo = () => { setPo(!po); lsSet(PO_KEY, po ? "0" : "1"); };
   const fullX = useMemo(() => {
     if (!cur) return full;
     const bars = full.bars.slice(0, nf).concat(cur.sim.map((x) => ({ ...x, final: true, sim: 1 })));
@@ -1117,12 +1135,30 @@ function ChartArea({ d, p = DEF_P, srOn, kkOn = true, b5On = false, c5On = false
   useEffect(() => { try { setFine(window.matchMedia("(pointer: fine)").matches); } catch (er) {} }, []);
   const [brush, setBrush] = useState(null);
   const kref = useRef(null), drg = useRef(null), ate = useRef(false), live = useRef(null);
-  live.current = { a, b, N: NX };
+  // 全螢幕（11-24）：量圖框寬＋捲動區剩下的高（扣掉圖下示意那行與導覽列），反推 viewBox 寬＝圖鋪滿一個畫面；平常固定 KW
+  const [kw, setKw] = useState(KW);
+  useEffect(() => {
+    const el = kref.current, pane = el && el.closest(".ta-pane");
+    if (!fs || !pane) { setKw(KW); return undefined; }
+    const fit = () => {
+      const top = el.getBoundingClientRect().top - pane.getBoundingClientRect().top + pane.scrollTop;
+      let below = 0;
+      for (let s = el.nextElementSibling; s && /ta-scfoot|ta-navw/.test(s.className); s = s.nextElementSibling) below += s.offsetHeight;
+      const h = Math.max(300, pane.clientHeight - top - below - 28);
+      setKw(Math.max(KW, Math.round((KH * el.clientWidth) / h)));
+    };
+    fit();
+    const ro = typeof ResizeObserver === "function" ? new ResizeObserver(fit) : null;
+    if (ro) ro.observe(pane);
+    window.addEventListener("resize", fit);
+    return () => { if (ro) ro.disconnect(); window.removeEventListener("resize", fit); };
+  }, [fs, !!scr]);   // eslint-disable-line react-hooks/exhaustive-deps
+  live.current = { a, b, N: NX, W: kw };
   const kAt = (e) => {   // 滑鼠 → 第幾根（絕對位置、帶小數）；viewBox 是 meet 縮放，用 getScreenCTM 換算
     const svg = kref.current && kref.current.querySelector("svg.ta-k"), m = svg && svg.getScreenCTM && svg.getScreenCTM();
     if (!m || !m.a) return null;
-    const { a: a0, b: b0 } = live.current, w = b0 - a0;
-    return a0 + Math.max(0, Math.min(w - 1e-6, (((e.clientX - m.e) / m.a - KL) * w) / (KW - KL - KR)));
+    const { a: a0, b: b0, W } = live.current, w = b0 - a0;
+    return a0 + Math.max(0, Math.min(w - 1e-6, (((e.clientX - m.e) / m.a - KL) * w) / (W - KL - KR)));
   };
   const span = (s, c) => [Math.floor(Math.min(s.c, c)), Math.floor(Math.max(s.c, c))];
   const kDown = (e) => {
@@ -1233,16 +1269,16 @@ function ChartArea({ d, p = DEF_P, srOn, kkOn = true, b5On = false, c5On = false
   const info = !tip ? null : tip.kind === "s5" || tip.kind === "sc" ? tip.t : trd.ctx && trd.p ? (tip.kind === "entry" ? explainEntry(trd, trd.p, tip.t) : explainExit(trd, trd.p, tip.t)) : null;
   return (
     <>
-      {scr ? <ScTabs scr={scr} k={scK} onPick={setScK} /> : null}
+      {scr ? <ScTabs scr={scr} k={scK} onPick={setScK} po={po} onPo={pickPo} /> : null}
       <div ref={kref} className={"ta-kwrap" + (fine ? " fine" : "")} onPointerDown={kDown} onPointerMove={kMove} onPointerUp={kUp} onPointerCancel={kUp}
         onClickCapture={(e) => { if (ate.current) { ate.current = false; e.stopPropagation(); } }} onDoubleClick={fine ? reset : undefined}>
         <KChart d={d} full={fullX} smas={smas} yr={yr} a={a} b={b} onTip={onTip} gaps={cur ? gapsAll.filter((x) => x.i < nf) : gapsAll} islands={cur ? islAll.filter((x) => x.i1 < nf) : islAll}
-          top={top} rolls={rollsAll} brush={brush} srOn={srOn} kk={kk} f5={f5b} onCo5={onCo5} sc={cur ? { at: nf, dir: scr.dir, name: cur.name, plan: cur.plan } : null} />
+          top={top} rolls={rollsAll} brush={brush} srOn={srOn} kk={kk} f5={f5b} onCo5={onCo5} sc={cur ? { at: nf, dir: scr.dir, name: cur.name, plan: po ? [] : cur.plan } : null} w={kw} />
         {fine && (a !== def0 || b !== NX) ? <button type="button" className="ta-kreset" onPointerDown={(e) => e.stopPropagation()} onClick={reset}>重設</button> : null}
       </div>
       {cur ? <div className="ta-scfoot">示意，不是預測</div> : null}
       {NX > NAV_MIN ? <RangeNav bars={fullX.bars} a={a} b={b} onChange={setR} /> : null}
-      {scr ? <ScPlan scr={scr} cur={cur} /> : null}
+      {scr && !po ? <ScPlan scr={scr} cur={cur} /> : null}
       <BlockTabs d={d} view={view} />
       {info ? (
         <div ref={box} className={"ta-tipbox " + (tip.kind === "s5" ? "s5t-" + info.cls : tip.kind === "sc" ? info.cls : tip.t.side === 1 ? "long" : "short")} role="tooltip" style={{ left: 0, top: 0, visibility: "hidden" }}>
@@ -2228,6 +2264,21 @@ export default function TaPage() {
   const pickC5 = () => { setC5On(!c5On); lsSet(C5_KEY, c5On ? "0" : "1"); pickView("chart"); };
   const [scOn, setScOn] = useState(null);   // 劇本：null｜"up" 空轉多｜"dn" 多轉空（不記 localStorage）
   const pickSc = (k) => { setScOn((x) => nextSc(x, k)); pickView("chart"); };
+  const fsRef = useRef(null);
+  const [fs, setFs] = useState(0);   // 0 關｜1 Fullscreen API｜2 CSS 鋪滿
+  useEffect(() => {
+    const sync = () => setFs(fsEl(document) ? 1 : 0);
+    document.addEventListener("fullscreenchange", sync); document.addEventListener("webkitfullscreenchange", sync);
+    return () => { document.removeEventListener("fullscreenchange", sync); document.removeEventListener("webkitfullscreenchange", sync); };
+  }, []);
+  useEffect(() => {   // CSS 退路：body 不捲、Esc 離開；離開還原
+    if (fs !== 2) return undefined;
+    const ov = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const esc = (e) => { if (e.key === "Escape") setFs(0); };
+    document.addEventListener("keydown", esc);
+    return () => { document.body.style.overflow = ov; document.removeEventListener("keydown", esc); };
+  }, [fs]);
   const dvs = useMemo(() => sideTrade(dv, side), [dv, side]);
   const bkey = useMemo(() => [dvs, maSet], [dvs, maSet]);   // Boundary 重試鍵：資料、交易參數、均線組、訊號篩選任一換了就重試
   const actB = BUILTINS.find((x) => BI + x.name === active);
@@ -2548,7 +2599,8 @@ export default function TaPage() {
           noVol={noVolume(dv)} />
 
         {/* ── 右 3/4：週期＋均線組＋圖＋表 ── */}
-        <div className="ta-right">
+        <div ref={fsRef} className={"ta-right" + (fs ? " ta-fs" : "") + (fs === 2 ? " ta-fsfb" : "")}>
+          {fs ? <div className="ta-wm" aria-hidden="true">{Array.from({ length: 36 }, (_, i) => <span key={i}>{wm || "會員專屬"}</span>)}</div> : null}
           <div className="ta-tabs" data-view={view}>
             <TfTabs tf={tf} tfs={symInfo.tfs} blink={blink} onPick={(k) => { if (MTF_TFS.includes(k)) dropBlink(); pickView("chart"); if (sym) load(sym, k); else setTf(k); }} />
             <div className="ta-seg" role="group" aria-label="均線組">
@@ -2587,6 +2639,8 @@ export default function TaPage() {
               <button type="button" aria-pressed={view === "opt"} className={"ta-tab" + (view === "opt" ? " on" : "")}
                 onClick={() => pickView(view === "opt" ? "chart" : "opt")}>選擇權</button>
             </div>
+            <button type="button" aria-pressed={!!fs} className={"ta-tab ta-fsbtn" + (fs ? " on" : "")} aria-label="全螢幕" title={fs ? "離開全螢幕（Esc）" : "全螢幕"}
+              onClick={() => toggleFs(fsRef.current, fs, setFs)} data-fs="">{fs ? "⛶ 離開" : "⛶"}</button>
             {busy ? <span className="ta-kbd">計算中…</span> : null}
           </div>
           {view === "idx" ? (
@@ -2657,7 +2711,7 @@ export default function TaPage() {
                   </div>
                 ) : null}
                 <BadBanner d={d} />
-                <Boundary reset={bkey}><ChartArea key={(symInfo.yahoo || sym) + "|" + d.tf} d={d} p={applied} srOn={srOn} kkOn={kkOn} b5On={b5On} c5On={c5On} co5={co5} onCo5={dropCo5} sc={SC_TFS.includes(d.tf) ? scOn : null} /></Boundary>
+                <Boundary reset={bkey}><ChartArea key={(symInfo.yahoo || sym) + "|" + d.tf} d={d} p={applied} srOn={srOn} kkOn={kkOn} b5On={b5On} c5On={c5On} co5={co5} onCo5={dropCo5} sc={SC_TFS.includes(d.tf) ? scOn : null} fs={!!fs} /></Boundary>
                 <Boundary reset={bkey}><Legend d={d} p={applied} /></Boundary>
                 {(d.notes || []).length ? <div className="ta-notes">資料註記：{d.notes.join("；")}</div> : null}
                 <Boundary reset={bkey}><SrLevels d={d} /></Boundary>
