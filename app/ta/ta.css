@@ -419,3 +419,22 @@ svg.ta-k .roll-t{fill:#9aa4b2;font-size:10px;paint-order:stroke;stroke:#0b0f15;s
 .ta-tab.ta-blink.b-dn{--bc:var(--green)}
 @keyframes ta-blink{50%{background:color-mix(in srgb,var(--bc) 38%,transparent);color:var(--text)}}
 @media (prefers-reduced-motion:reduce){.ta-tab.ta-blink{animation:none;box-shadow:0 0 0 2.5px var(--bc);background:color-mix(in srgb,var(--bc) 18%,transparent)}}
+
+/* 劇本（11-24）：工具列分隔、圖上方子分頁、圖下一行「示意，不是預測」、點位表＋價位由來；示意區在 SVG 裡（底色 .022、虛線框 .32） */
+.ta-vsep{display:inline-block;width:1px;height:18px;background:var(--border);margin:0 6px;flex:none}
+.ta-sctabs{display:flex;align-items:center;flex-wrap:wrap;gap:2px;margin:0 0 6px}
+.ta-sctabs .ta-tab{padding:3px 9px}
+.ta-sctabs .ta-tab.none{color:var(--dim);opacity:.7}
+.ta-scord{margin-left:8px;font-size:calc(12px*var(--scale))}
+.ta-scfoot{color:var(--dim);font-size:calc(12px*var(--scale));margin:2px 0 0}
+.ta-scplan{margin:8px 0 10px}
+.ta-scnone{color:var(--dim);padding:8px 2px}
+.ta-sctbl td{vertical-align:top}
+.ta-sctbl .sc-k{font-weight:700}
+.ta-sctbl .sc-k.stop{color:#ff6b6b} .ta-sctbl .sc-k.entry{color:#6fb8ff} .ta-sctbl .sc-k.ex1,.ta-sctbl .sc-k.ex2{color:#d9a400}
+.ta-sclv{margin:8px 0 0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 18px;font-size:calc(13px*var(--scale))}
+.ta-sclv .ta-rule{display:grid;grid-template-columns:minmax(150px,max-content) minmax(0,1fr);gap:8px}
+.ta-sclv dt{color:var(--dim)} .ta-sclv dt b{color:var(--text);font-weight:600} .ta-sclv dd{margin:0}
+svg.ta-k .sc-todayt{fill:#ffffff;font-size:12px;font-weight:700;paint-order:stroke;stroke:#0b0f15;stroke-width:3px}
+svg.ta-k .sc-simt{fill:#c9d3df;font-size:12px;paint-order:stroke;stroke:#0b0f15;stroke-width:3px}
+svg.ta-k .sc-t{font-size:12px;font-weight:700;paint-order:stroke;stroke:#0b0f15;stroke-width:3px;cursor:default}

@@ -122,7 +122,8 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     .replace('"../../lib/ta-trade"', JSON.stringify(path.join(ROOT, "lib", "ta-trade.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-rs"', JSON.stringify(path.join(ROOT, "lib", "ta-rs.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-opt"', JSON.stringify(path.join(ROOT, "lib", "ta-opt.js").replace(/\\/g, "/")))
-    .replace('"../../lib/ta-5stage"', JSON.stringify(path.join(ROOT, "lib", "ta-5stage.js").replace(/\\/g, "/"))) + "\nexport { readB5, readC5, barEndTf, co5Live, oldBuiltin, cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, mtfBlink, tzMs, barEnd, readSr, readKk, keyKAll, dropOld4, maSetOf, pickMaSet, MA_SETS, Legend, migrateRules, cleanRules };\n";
+    .replace('"../../lib/ta-5stage"', JSON.stringify(path.join(ROOT, "lib", "ta-5stage.js").replace(/\\/g, "/")))
+    .replace('"../../lib/ta-scenario"', JSON.stringify(path.join(ROOT, "lib", "ta-scenario.js").replace(/\\/g, "/"))) + "\nexport { ScBtns, nextSc, ScTabs, ScPlan, scInfo, SC_TFS, readB5, readC5, barEndTf, co5Live, oldBuiltin, cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, mtfBlink, tzMs, barEnd, readSr, readKk, keyKAll, dropOld4, maSetOf, pickMaSet, MA_SETS, Legend, migrateRules, cleanRules };\n";
   const Mod = require("module");
   const libSrc = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-trade.js"), "utf8"), opts).code;
   const lib = new Mod(path.join(ROOT, "lib", "ta-trade.js")); lib.paths = Mod._nodeModulePaths(ROOT); lib._compile(libSrc, lib.id);
@@ -133,6 +134,8 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   require.cache[optLib.id] = optLib; optLib.loaded = true;
   const s5Lib = new Mod(path.join(ROOT, "lib", "ta-5stage.js")); s5Lib.filename = s5Lib.id; s5Lib.paths = Mod._nodeModulePaths(ROOT);   // 五階段（11-24）；filename＝它 require("./ta-trade") 才解得到
   s5Lib._compile(transformSync(fs.readFileSync(s5Lib.id, "utf8"), opts).code, s5Lib.id); require.cache[s5Lib.id] = s5Lib; s5Lib.loaded = true;
+  const scLib = new Mod(path.join(ROOT, "lib", "ta-scenario.js")); scLib.filename = scLib.id; scLib.paths = Mod._nodeModulePaths(ROOT);   // 劇本（11-24）
+  scLib._compile(transformSync(fs.readFileSync(scLib.id, "utf8"), opts).code, scLib.id); require.cache[scLib.id] = scLib; scLib.loaded = true;
   const m = new Mod(path.join(ROOT, "app", "ta", "page.cjs")); m.paths = Mod._nodeModulePaths(ROOT);
   m._compile(transformSync(src, opts).code, m.id);
   const P = m.exports;
@@ -607,7 +610,8 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     const tw = chartHtml(mkD({ symbol: { market: "tw", type: "EQUITY", code: "2330" } }));
     assert.ok(tw.includes("量（張）") && !tw.includes("指數量"), "個股量單位被改到");
     const src = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
-    assert.ok(/d\.tf === "D" \? smaSeq\(full\.c, 240\) : d\.tf === "W" \? smaSeq\(full\.c, 52\) : null/.test(src), "日K smaSeq(full.c, 240)、週K smaSeq(full.c, 52)、其他不算");
+    // 11-24 劇本：開著時年線跟著示意 K 延伸（fullX＝實際 K＋示意 K；沒開＝full）
+    assert.ok(/d\.tf === "D" \? smaSeq\(fullX\.c, 240\) : d\.tf === "W" \? smaSeq\(fullX\.c, 52\) : null/.test(src), "日K smaSeq(fullX.c, 240)、週K smaSeq(fullX.c, 52)、其他不算");
   });
   await t("週K 52 週線（11-19）：週K 畫 SMA52 標「52 週線」；日K 仍是 240 年線；1H/4H 都沒有；不足根數不畫", async () => {
     const ca = (tf, n) => { const d = mkD({ n }); d.tf = tf; const ce = console.error; console.error = () => {}; try { return renderToString(React.createElement(P.ChartArea, { d })); } finally { console.error = ce; } };   // 伺服端 render 的 useLayoutEffect 警告不印
@@ -967,6 +971,57 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     assert.strictEqual(P.co5Live(cos, bars, "1H", TZ, "us", end - 60e3, [], "NQ|1H|").length, 0, "還沒收完不算");
     const id = P.co5Live(cos, bars, "1H", TZ, "us", end + 60e3, [], "NQ|1H|")[0].id;
     assert.strictEqual(P.co5Live(cos, bars, "1H", TZ, "us", end + 60e3, [id], "NQ|1H|").length, 0, "點過就停");
+  });
+  await t("劇本（11-24）：工具列兩顆鈕在五階段後面、用分隔；一次只開一顆、再按收起；週K 停用＋一行字；不記 localStorage", async () => {
+    const src = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
+    assert.ok(/data-c5>修正五階段<\/button>\s*<ScBtns sc=\{scOn\} tf=\{tf\} onPick=\{pickSc\} \/>/.test(src), "鈕緊接在修正五階段後面");
+    const html = (o) => renderToString(React.createElement("div", null, React.createElement(P.ScBtns, { sc: null, tf: "4H", onPick: () => {}, ...o }))).replace(/<!-- -->/g, "");
+    const h0 = html({});
+    assert.ok(/<span class="ta-vsep" aria-hidden="true"><\/span><button[^>]*data-sc="up"[^>]*>空轉多劇本<\/button><button[^>]*data-sc="dn"[^>]*>多轉空劇本<\/button>/.test(h0), "分隔＋兩顆鈕：" + h0);
+    assert.strictEqual((h0.match(/aria-pressed="true"/g) || []).length, 0, "預設都沒開");
+    const hu = html({ sc: "up" });
+    assert.ok(/aria-pressed="true" class="ta-tab on"[^>]*data-sc="up"/.test(hu) && /aria-pressed="false" class="ta-tab"[^>]*data-sc="dn"/.test(hu), "開空轉多：只有那顆亮");
+    for (const tf of ["1H", "4H", "D"]) assert.ok(!html({ tf }).includes("disabled") && !html({ tf }).includes("劇本只支援"), tf + " 可用");
+    const hw = html({ sc: "up", tf: "W" });
+    assert.strictEqual((hw.match(/disabled=""/g) || []).length, 2, "週K 兩顆停用");
+    assert.strictEqual((hw.match(/aria-pressed="true"/g) || []).length, 0, "週K 不顯示開著");
+    assert.ok(hw.includes("劇本只支援 1H／4H／日K"), "週K 顯示一行字");
+    assert.strictEqual(P.nextSc(null, "up"), "up"); assert.strictEqual(P.nextSc("up", "dn"), "dn", "互斥：按另一顆＝換過去");
+    assert.strictEqual(P.nextSc("up", "up"), null, "再按收起"); assert.strictEqual(P.nextSc("dn", "dn"), null);
+    assert.ok(src.includes("const pickSc = (k) => { setScOn((x) => nextSc(x, k)); pickView(\"chart\"); };"), "按下就回 K 線圖");
+    assert.ok(!/yoda_ta_sc|lsSet\([^)]*[Ss]c[A-Z]?On/.test(src), "不記 localStorage");
+    assert.ok(src.includes('sc={SC_TFS.includes(d.tf) ? scOn : null}'), "週K 不傳劇本給圖");
+    assert.deepStrictEqual(P.SC_TFS, ["1H", "4H", "D"]);
+  });
+  await t("劇本（11-24）：圖上示意區（淡底 .022、虛線框 .32）、今天線、半透明示意 K、子分頁＋可能性高→低、點位表、示意不是預測只在圖下一行；算不出＝一行字", async () => {
+    const fx = JSON.parse(fs.readFileSync(path.join(ROOT, "tests", "ta_5stage_nq4h.json"), "utf8"));
+    const B = fx.bars, n = B.length, col = (j) => B.map((x) => x[j]);
+    const d = { tf: "4H", symbol: { yahoo: "NQ=F", code: "NQ1!", market: "fut", timezone: "America/New_York" }, bars_completed: n,
+      history: { t: col(0), o: col(1), h: col(2), l: col(3), c: col(4), v: col(5) }, chart: { bars: B.slice(-120).map((x) => ({ t: x[0], o: x[1], h: x[2], l: x[3], c: x[4], v: x[5] })) } };
+    const p = lib3.normParams({ ma: "sma", ma_n: [8, 13, 34] }).p;
+    const ca = (sc) => renderToString(React.createElement(P.ChartArea, { d, p, srOn: false, kkOn: false, sc })).replace(/<!-- -->/g, "");
+    const off = ca(null);
+    assert.ok(!off.includes("data-sim") && !off.includes("ta-sctabs") && !off.includes("示意，不是預測"), "沒開不畫");
+    const h = ca("up");
+    assert.ok(/<rect class="sc-box"[^>]*fill="#9fb0c4" fill-opacity=".022" stroke="#9fb0c4" stroke-opacity=".32" stroke-dasharray="5 4"/.test(h), "示意區淡底＋虛線框");
+    assert.ok(/<line class="sc-today"/.test(h) && h.includes("今天 " + B[n - 1][0].slice(5)), "今天線標最後一根收完的 K");
+    assert.ok(/class="bd sim"[^>]*fill-opacity=".5"/.test(h), "示意 K 半透明");
+    assert.ok(/role="tablist" aria-label="空轉多劇本"/.test(h) && h.includes("可能性高→低"), "子分頁＋可能性高→低");
+    for (const nm of ["回踩 SMA34 再攻", "強勢上漲", "W 底回測多方關鍵K", "破底翻"]) assert.ok(h.includes(nm), "分頁名 " + nm);
+    assert.strictEqual((h.match(/示意，不是預測/g) || []).length, 1, "只寫一次");
+    assert.ok(/<div class="ta-scfoot">示意，不是預測<\/div>/.test(h), "寫在圖下");
+    assert.ok(/data-scplan=""/.test(h) && h.includes("進場") && h.includes("出場1") && h.includes("出場2") && h.includes("停損"), "點位表");
+    assert.ok(/data-n="(\d+)"/.test(h) && +h.match(/data-n="(\d+)"/)[1] > 120, "圖接上示意段");
+    const hd = ca("dn");
+    assert.ok(/aria-label="多轉空劇本"/.test(hd) && hd.includes("反彈測 SMA34 不過再跌") && hd.includes("假突破翻黑"), "多轉空四個分頁");
+    for (const w of ["建議", "應該", "最佳", "推薦", "機率", "停利", "加碼", "出一半", "保本"]) assert.ok(!h.includes(w) && !hd.includes(w), "不寫「" + w + "」");
+    // 算不出：沒有成交量 → 沒有多方關鍵K → W 底那條 null；ScPlan 寫一行字
+    const nv = renderToString(React.createElement(P.ScPlan, { scr: { dir: 1, names: ["a", "b", "c", "d"], lv: [], list: [null, null, null, null] }, cur: null }));
+    assert.ok(nv.includes("這檔目前算不出這個劇本") && !nv.includes("<table"), "算不出不硬畫");
+    const tabs = renderToString(React.createElement(P.ScTabs, { scr: { dir: -1, names: ["a", "b", "c", "d"], list: [null, {}, null, null] }, k: 0, onPick: () => {} }));
+    assert.ok(/class="ta-tab on none"/.test(tabs) && !/disabled/.test(tabs), "算不出的分頁照樣能點（點了顯示那行字）");
+    const info = P.scInfo({ name: "x", dir: -1 }, { kind: "stop", name: "停損", cond: "c", p: 10, pnl: -2, pct: -1.5 });
+    assert.strictEqual(info.sub, "示意段內未觸發（示意 K）"); assert.strictEqual(info.cls, "short");
   });
   await t("pastHalf：TA 票過半才續；普通票、壞票、沒期限 → 要問 status", async () => {
     const tk = (p) => "h." + Buffer.from(JSON.stringify(p)).toString("base64url") + ".s", n = Date.now() / 1000;
