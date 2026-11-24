@@ -436,10 +436,10 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
       if (!/:(彈|修)/.test(p[4]) && !/:(彈|修)/.test(q[4])) continue;
       assert.ok(!(p[0] < q[2] && p[2] > q[0] && p[1] < q[3] && p[3] > q[1]), "重疊：" + p[4] + " ↔ " + q[4]);
     }
-    // 共振外框：blink 指到的標記加 s5co 框、字加 s5blink
+    // 共振外框：blink 指到的標記加 s5co 框（字本身不加 class，閃的是框）
     const q5 = f5.s.find((q) => q.s5 && q.s5.i >= a);
     const bl = kc({ kk, f5: { ...f5, blink: new Map([["s|5|" + q5.s5.i, { list: [{ id: "x" }], txt: "共振" }]]) } });
-    assert.ok(/class="s5co"/.test(bl) && /class="s4t s5blink"[^>]*data-co="1"[^>]*>彈5</.test(bl), "共振外框");
+    assert.ok(/class="s5co"/.test(bl) && /class="s4t"[^>]*data-co="1"[^>]*>彈5</.test(bl), "共振外框");
     assert.ok(raw.includes('(bl ? " ta-blink b-dn" : "")') && raw.includes('k === "short" || k === "mid"'), "短、中一起閃（綠）");
   });
   await t("市場標籤：美國期貨・CME／指數／台股／美股·NASDAQ·ETF；怪值不崩", async () => {

@@ -871,7 +871,7 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
       if (Math.abs(py - ay) > 16 || Math.abs(lx - x) > 10) f5Late.unshift(<line key={"f5ld" + sd + q.s1.i + k} className="s4lead" x1={lx} y1={py} x2={x} y2={ay} stroke={col} strokeWidth="1" strokeOpacity=".7" />);
       if (k === "x") f5Els.push(<rect key={"f5b" + sd + q.s1.i} className="s4box" x={lx - w / 2} y={ly - 12} width={w} height={16} rx="3" stroke={S.col[5]} />);
       if (co) f5Els.push(<rect key={"f5c" + sd + q.s1.i + k} className="s5co" x={lx - w / 2 - 2} y={ly - 14} width={w + 4} height={20} rx="4" fill="none" stroke={S.col[5]} />);
-      f5Els.push(<text key={"f5t" + sd + q.s1.i + k} className={"s4t" + (co ? " s5blink" : "")} x={lx} y={ly} textAnchor="middle" style={{ fill: col }} data-t={bk.t} data-ov={free ? undefined : 1} {...h} {...aria}>{str}</text>);
+      f5Els.push(<text key={"f5t" + sd + q.s1.i + k} className="s4t" x={lx} y={ly} textAnchor="middle" style={{ fill: col }} data-t={bk.t} data-ov={free ? undefined : 1} {...h} {...aria}>{str}</text>);
     }
   }
   // 字被擠到離記號 >20px：畫 1px 同色細引線，從字框最近的點連到記號（停在記號外 8px，不蓋到記號）
@@ -1503,7 +1503,7 @@ function readB5() { return lsGet(B5_KEY) === "1"; }
 function readC5() { return lsGet(C5_KEY) === "1"; }
 function readCo5Gone() { try { const a = JSON.parse(lsGet(CO5_GONE_KEY) || "[]"); return Array.isArray(a) ? a.filter((x) => typeof x === "string") : []; } catch (e) { return []; } }
 // 那根 K 收完的時間：1H／4H 同共振閃爍 barEnd；日K＝當天收盤（期貨 17:00、台股 13:30、美股 16:00，其他 23:59）
-// shortcut: 週K 用週一那天收盤＋4 天、台指期日盤 13:45 收照 17:00 算（閃得比較久），要準得接交易所行事曆
+// shortcut: 週K 用週一那天收盤＋4 天、台指期日盤 13:45 收照 17:00 算（整段晚 3 小時 15 分：13:45～17:00 不閃、結束也晚），要準得接交易所行事曆
 function barEndTf(t, tf, tz, mkt) {
   if (tf === "1H" || tf === "4H") return barEnd(t, tf === "1H" ? 1 : 4, tz, mkt);
   const e = tzMs(String(t).slice(0, 10) + " " + (mkt === "fut" ? "17:00" : MTF_CLOSE[tz] || "23:59"), tz);
