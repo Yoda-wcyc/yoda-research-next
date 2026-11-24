@@ -383,7 +383,8 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
     if (y != null && y >= lo - reach && y <= hi + reach) { lo = Math.min(lo, y); hi = Math.max(hi, y); }
   }
   const pad = (hi - lo) * 0.05 || hi * 0.01 || 1;
-  lo -= pad; hi += pad;
+  // 四步開著：空方那顆開→頂端多留空間、多方那顆開→底部多留（標籤只放 K 外側，貼頂／貼底的 K 才放得下）；關著時跟原本一樣
+  lo -= pad * (s4 && s4.l ? 3 : 1); hi += pad * (s4 && s4.s ? 3 : 1);
   const step = pw / n, bw = Math.max(1.2, step * 0.62);
   const Y = (p) => T + ((hi - p) / (hi - lo)) * PH;
   const X = (i) => L + step * (i + 0.5);
@@ -610,6 +611,7 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
   // 都撞就選重疊最少的。標籤夾在價格區內（右緣不超過 xr，不會蓋到右側撐壓標籤）
   // ✕ 先畫、▲▼ 後畫（entMk 最後才放進 els），出場隔一兩根就碰到下一筆進場時 ✕ 不會蓋掉三角
   const showLab = n <= 250, tlab = [], want = [], entMk = [];
+  const s4At = els.length;   // 四步 L2／H2 虛線與感應線插在這裡：壓在進出場記號、關鍵K、各種字下面，不搶它們的滑鼠說明
   marks.forEach((m) => {
     const li = m.i - a, bb = bars[li], x = X(li);
     const t = m.kind === "entry" ? byEntry.get(m.i) : byExit.get(m.i);
@@ -768,19 +770,21 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
     tlab.push(<text key={"tlb" + tlab.length} className={cls + " mk-lab"} {...lt} x={best[0]} y={best[1]} textAnchor="start" style={{ fill: col }} data-ov={best[2] ? Math.round(best[2]) : undefined}>{s}</text>);
   });
   // 四步（11-24，不是交易訊號）：空方標 K 上方、多方標 K 下方，只寫「空1～空4、空利／多1～多4、多利」；①② 中性色、空3 綠／多3 紅、4 灰、利＝淡色空心框。
-  // 標籤最後放（避開進出場記號與字、關鍵K、線名）：外側往外疊 5 層×原位／左右，再試更遠的左右，外側貼頂／貼底沒位置就放 K 的另一側；字離 K 太遠拉引線。
+  // 標籤最後放（避開進出場記號與字、關鍵K、線名）：一律放 K 外側，外側往外疊、往左右錯開找空位；字離 K 太遠拉引線。
   // 可見區間外的步驟不畫字；超過 250 根只畫小點（滑過照樣有說明）
   const s4Els = [], s4Late = [];
   if (s4) {
     const tipOf = (info) => ({ "data-tip": "s4", onMouseEnter: (e) => onTip && onTip("s4", info, e, false), onMouseLeave: () => onTip && onTip(null),
       onClick: (e) => { e.stopPropagation(); onTip && onTip("s4", info, e, true); } });
+    const s4Lines = [];
     for (const [sd, q] of s4L) {
       const S = S4C[sd], ex = q.s4 || q.sx, x0 = XL(q.s2.i - a), x1 = ex ? X(ex.i - a) : xr, y = Y(q.L2), h = tipOf(l2Info4(sd, q, full.bars));
-      els.push(<line key={"s4l" + sd + q.s1.i} className="s4l" x1={x0} x2={x1} y1={y} y2={y} stroke={S.line} strokeWidth="1.3" strokeDasharray="5 4" strokeOpacity=".85"
-        clipPath={clip} data-l2={q.L2} data-side={sd} />);
-      s4Late.push(<line key={"s4h" + sd + q.s1.i} className="s4hit" x1={x0} x2={x1} y1={y} y2={y} stroke="transparent" strokeWidth="9" clipPath={clip} {...h} />);
+      s4Lines.push(<line key={"s4l" + sd + q.s1.i} className="s4l" x1={x0} x2={x1} y1={y} y2={y} stroke={S.line} strokeWidth="1.3" strokeDasharray="5 4" strokeOpacity=".85"
+        clipPath={clip} data-l2={q.L2} data-side={sd} />,
+        <line key={"s4h" + sd + q.s1.i} className="s4hit" x1={x0} x2={x1} y1={y} y2={y} stroke="transparent" strokeWidth="9" clipPath={clip} {...h} />);
       if (!ex) lab.push({ y, t: S.r2 + " " + fpx(q.L2), col: S.line, nt: "", tip: h });
     }
+    els.splice(s4At, 0, ...s4Lines);
     const evs = [];
     for (const sd of ["s", "l"]) for (const q of s4[sd] || []) for (const k of [1, 2, 3, 4, "x"]) { const e = q["s" + k]; if (e && e.i >= a && e.i < b) evs.push([sd, q, k, e.i]); }
     evs.sort((u, v) => u[3] - v[3] || (u[2] === "x" ? 4 : u[2]) - (v[2] === "x" ? 4 : v[2]));
@@ -789,17 +793,20 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
       const S = S4C[sd], bk = full.bars[i], x = X(i - a), up = sd === "s", col = S.col[k], str = step4Name(sd, k), h = tipOf(info4(sd, q, k, full.bars));
       const aria = { tabIndex: 0, role: "button", "aria-label": S.nm + str + " " + bk.t, onFocus: h.onMouseEnter, onBlur: h.onMouseLeave, "data-side": sd, "data-step": k, "data-i": i };
       if (!showLab) { s4Els.push(<circle key={"s4d" + sd + q.s1.i + k} className="s4t" cx={x} cy={up ? Y(bk.h) - 5 : Y(bk.l) + 5} r="2.5" fill={col} {...h} {...aria} />); continue; }
-      const w = tw(str) * 1.05 + (k === "x" ? 8 : 2), dir = up ? -1 : 1, yo = up ? Y(bk.h) - 6 : Y(bk.l) + 15, yi = up ? Y(bk.l) + 15 : Y(bk.h) - 6, cands = [];
+      // 只放 K 外側（空方上、多方下，不翻到另一側）：往外、往左右錯開的位置照離 K 的距離由近到遠試，第一個不撞的；都撞就選外側重疊最少的；離 K 遠拉引線。
+      // 夾在圖頂／圖底時幾層會落在同一高度，靠左右錯開找位置；四步開著時座標頂／底多留邊，夾住的字仍在 K 外側
+      const w = tw(str) * 1.05 + (k === "x" ? 8 : 2), dir = up ? -1 : 1, yo = up ? Y(bk.h) - 6 : Y(bk.l) + 15, cands = [];
       const cx = (dx) => Math.min(xr - w / 2, Math.max(L + w / 2, x + dx * w));
-      for (const dxs of [[0, 0.7, -0.7], [1.4, -1.4]]) for (let r = 0; r < 5; r++) for (const dx of dxs) cands.push([cx(dx), cl(yo + dir * 15 * r)]);
-      for (let r = 0; r < 3; r++) for (const dx of [0, 0.7, -0.7]) cands.push([cx(dx), cl(yi - dir * 15 * r)]);
-      const bx = ([u, v]) => [u - w / 2, v - 12, u + w / 2, v + 4];   // 字 12.5px＋利的框（高 16）
-      const [lx, ly] = cands.find((c) => !busyAt(bx(c))) || cands.reduce((u, c) => (hitArea(bx(c)) < hitArea(bx(u)) ? c : u), cands[0]);
-      placed.push(bx([lx, ly]));
-      const inner = up ? ly > Y(bk.l) : ly < Y(bk.h), ay = up === !inner ? Y(bk.h) - 2 : Y(bk.l) + 2, py = up === !inner ? ly + 2 : ly - 11;
+      for (let r = 0; r < 17; r++) for (const dx of [0, 0.7, -0.7, 1.4, -1.4, 2.1, -2.1, 2.8, -2.8, 3.5, -3.5, 4.2, -4.2, 5, -5]) cands.push([cx(dx), cl(yo + dir * 11 * r), r * 11 + Math.abs(dx * w) * 1.5]);
+      cands.sort((u, v) => u[2] - v[2]);   // 離 K 近的先試；往旁邊錯開比往外疊更容易讓人對錯 K，算重一點（往旁 1px＝往外 1.5px）
+      // 找位置用「實際字框（12.5px 字高 18，含利的框）四周再留 3px」：別的字的佔位框比它的字框小一點，留邊才不會擦到；佔位只記實際字框
+      const bx = ([u, v]) => [u - w / 2 - 3, v - 17, u + w / 2 + 3, v + 8];
+      const free = cands.find((c) => !busyAt(bx(c))), [lx, ly] = free || cands.reduce((u, c) => (hitArea(bx(c)) < hitArea(bx(u)) ? c : u), cands[0]);
+      placed.push([lx - w / 2, ly - 14, lx + w / 2, ly + 4]);
+      const ay = up ? Y(bk.h) - 2 : Y(bk.l) + 2, py = up ? ly + 2 : ly - 11;
       if (Math.abs(py - ay) > 16 || Math.abs(lx - x) > 10) s4Late.unshift(<line key={"s4ld" + sd + q.s1.i + k} className="s4lead" x1={lx} y1={py} x2={x} y2={ay} stroke={col} strokeWidth="1" strokeOpacity=".7" />);
       if (k === "x") s4Els.push(<rect key={"s4b" + sd + q.s1.i} className="s4box" x={lx - w / 2} y={ly - 12} width={w} height={16} rx="3" stroke={S.col[3]} />);
-      s4Els.push(<text key={"s4t" + sd + q.s1.i + k} className="s4t" x={lx} y={ly} textAnchor="middle" style={{ fill: col }} data-t={bk.t} {...h} {...aria}>{str}</text>);
+      s4Els.push(<text key={"s4t" + sd + q.s1.i + k} className="s4t" x={lx} y={ly} textAnchor="middle" style={{ fill: col }} data-t={bk.t} data-ov={free ? undefined : 1} {...h} {...aria}>{str}</text>);
     }
   }
   // 字被擠到離記號 >20px：畫 1px 同色細引線，從字框最近的點連到記號（停在記號外 8px，不蓋到記號）

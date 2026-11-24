@@ -251,6 +251,7 @@ svg.ta-k circle.s4t{stroke-width:1px}
 svg.ta-k .s4t:hover,svg.ta-k .s4t:focus-visible{filter:drop-shadow(0 0 3px #fff)}
 svg.ta-k .s4hit{cursor:pointer}
 svg.ta-k .s4box{fill:#0b0f15;fill-opacity:.85;stroke-width:1.1;pointer-events:none}
+svg.ta-k .s4lead,svg.ta-k .s4l{pointer-events:none}
 .ta-tipbox.s4t-s1,.ta-tipbox.s4t-s2{border-left-color:#d6dde6} .ta-tipbox.s4t-l1,.ta-tipbox.s4t-l2{border-left-color:#eadbc8}
 .ta-tipbox.s4t-s3{border-left-color:#3fae7a} .ta-tipbox.s4t-l3{border-left-color:#e0525e} .ta-tipbox.s4t-s4,.ta-tipbox.s4t-l4{border-left-color:#8b95a3}
 .ta-tipbox.s4t-sx{border-left-color:#b9ecd2} .ta-tipbox.s4t-lx{border-left-color:#ffc6cb}
