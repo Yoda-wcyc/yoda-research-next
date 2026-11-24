@@ -612,6 +612,15 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     assert.ok(!w0.includes("52 週線") && !w0.includes('data-ma="sma52"'), "不足 52 根也畫了");
     const d0 = ca("D", 239);
     assert.ok(!d0.includes("年線") && !d0.includes('data-ma="sma240"'), "不足 240 根也畫了");
+    // 面板填到跟年線／52 週線同週期：兩條都要畫、React key 不能撞（11-24 審查）
+    for (const [tf, ns, m] of [["D", ["20", "60", "240"], 240], ["W", ["10", "20", "52"], 52]]) {
+      const d = mkD({ n: 300 }); d.tf = tf;
+      const ks = [], oc = React.createElement, ce = console.error;   // 伺服端 render 不報重複 key，自己收 polyline 的 key
+      React.createElement = (ty, pr, ...r) => { if (ty === "polyline" && pr) ks.push(pr.key); return oc(ty, pr, ...r); }; console.error = () => {};
+      let h; try { h = renderToString(oc(P.ChartArea, { d, p: lib3.normParams({ ma: "sma", ma_n: ns }).p })); } finally { React.createElement = oc; console.error = ce; }
+      assert.ok((h.match(new RegExp('class="ma" data-ma="sma' + m + '"', "g")) || []).length >= 2, tf + " 交易線＋年線都要畫");
+      assert.deepStrictEqual(ks.filter((k, i) => ks.indexOf(k) !== i), [], tf + " React key 撞了");
+    }
   });
   // ---------- 5. 台指期／費半期（期交所） ----------
   const TWF = { market: "fut", exchange: "TAIFEX", type: "FUTURE", code: "TXF1!", yahoo: "TXF1!", contract: "202611", tfs: ["D", "W"], session: "含夜盤（夜盤算到隔天）" };

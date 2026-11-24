@@ -542,7 +542,7 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
   els.push(<path key="vu" className="vb" d={pth.vu} fill={K_UP} fillOpacity=".55" />, <path key="vd" className="vb" d={pth.vd} fill={K_DN} fillOpacity=".55" />);
   els.push(...one);
   // 均線（交易規則用的三條，名稱如 SMA5／EMA5，紅黃藍＝短到長，底下墊一條深色描邊才不會跟紅 K 糊在一起）＋ 出場線（面板選的那條，細線）
-  const poly = (arr, key, col, w, casing) => {
+  const poly = (arr, key, col, w, casing, rk = key) => {   // rk＝React key（data-ma 可能跟交易線同名，例如面板填 SMA240）
     const segs = []; let cur = [];
     for (let i = 0; i < n; i = i + grp < n || i === n - 1 ? i + grp : n - 1) {   // K 棒有合併時線也每 grp 根取一點（含最後一根）
       const v = arr ? arr[a + i] : null;
@@ -552,12 +552,12 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
     if (cur.length > 1) segs.push(cur);
     segs.forEach((sg, k) => {
       const pts = sg.join(" ");
-      if (casing) els.push(<polyline key={key + "c" + k} points={pts} fill="none" stroke="#0b0f15" strokeWidth={w + 2} strokeOpacity=".7" clipPath={clip} />);
-      els.push(<polyline key={key + k} className="ma" data-ma={key} points={pts} fill="none" stroke={col} strokeWidth={w} strokeOpacity=".95" clipPath={clip} />);
+      if (casing) els.push(<polyline key={rk + "c" + k} points={pts} fill="none" stroke="#0b0f15" strokeWidth={w + 2} strokeOpacity=".7" clipPath={clip} />);
+      els.push(<polyline key={rk + k} className="ma" data-ma={key} points={pts} fill="none" stroke={col} strokeWidth={w} strokeOpacity=".95" clipPath={clip} />);
     });
   };
   smas.forEach(([m, arr], k) => poly(arr, m.toLowerCase(), MA_COL[k], 1.6, true));
-  if (yrOn) poly(yr, yrW ? "sma52" : "sma240", YR_COL, 1.2, true);
+  if (yrOn) poly(yr, yrW ? "sma52" : "sma240", YR_COL, 1.2, true, "yr");
   poly(ch.exit_line, "exit_ma", EMA_COL, 1, false);
   // 支撐（白實線）／壓力（白虛線）
   const lab = [];   // {y, t, col, nt}

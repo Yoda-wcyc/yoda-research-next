@@ -307,7 +307,7 @@ const line = exitLine(d.history, p, k0);               // 出場均線（跟 cha
 
 | 參數（預設＝站方現行規則） | 說明 |
 |---|---|
-| `ma` `"ema"`、`ma_n` `[5,10,20]` | 均線種類（EMA＝pandas `ewm(span, adjust=False)` 逐位重現；SMA＝逐根累加減）與三條週期（由短到長） |
+| `ma` `"sma"`、`ma_n` `[5,10,20]` | 均線種類（EMA＝pandas `ewm(span, adjust=False)` 逐位重現；SMA＝逐根累加減）與三條週期（由短到長） |
 | `fresh_n` 3 | 排列剛成立：本根排好、前 N 根不是全部排好 |
 | `vol_on` true、`vol_in` 1.2、`vol_n` 10 | 進場量比門檻（可關）；量比＝本根量 ÷ 前 N 根平均（pandas `shift(1).rolling(N, min_periods=min(5,N)).mean()` 逐位重現） |
 | `side_ma` true | 收在第一條均線同側 |
