@@ -432,6 +432,7 @@ svg.ta-k .roll-t{fill:#9aa4b2;font-size:10px;paint-order:stroke;stroke:#0b0f15;s
 .ta-sctbl td{vertical-align:top}
 .ta-sctbl .sc-k{font-weight:700}
 .ta-sctbl .sc-k.stop{color:#ff6b6b} .ta-sctbl .sc-k.entry{color:#6fb8ff} .ta-sctbl .sc-k.ex1,.ta-sctbl .sc-k.ex2{color:#d9a400}
+html[data-theme="light"] .ta-sctbl .sc-k.stop{color:#c62828} html[data-theme="light"] .ta-sctbl .sc-k.entry{color:#1f63b0} html[data-theme="light"] .ta-sctbl .sc-k.ex1,html[data-theme="light"] .ta-sctbl .sc-k.ex2{color:#8a6500}
 .ta-sclv{margin:8px 0 0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 18px;font-size:calc(13px*var(--scale))}
 .ta-sclv .ta-rule{display:grid;grid-template-columns:minmax(150px,max-content) minmax(0,1fr);gap:8px}
 .ta-sclv dt{color:var(--dim)} .ta-sclv dt b{color:var(--text);font-weight:600} .ta-sclv dd{margin:0}

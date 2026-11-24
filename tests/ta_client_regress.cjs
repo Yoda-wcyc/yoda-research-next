@@ -1022,6 +1022,22 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     assert.ok(/class="ta-tab on none"/.test(tabs) && !/disabled/.test(tabs), "算不出的分頁照樣能點（點了顯示那行字）");
     const info = P.scInfo({ name: "x", dir: -1 }, { kind: "stop", name: "停損", cond: "c", p: 10, pnl: -2, pct: -1.5 });
     assert.strictEqual(info.sub, "示意段內未觸發（示意 K）"); assert.strictEqual(info.cls, "short");
+    // 11-24 審查：開劇本時圖下 ③ 的區間說明只算實際 K（結尾日期不空白、根數不含示意 K）
+    const ls0 = global.localStorage; global.localStorage = { getItem: (k) => (k === "yoda_ta_blk" ? "vol" : null), setItem() {} };
+    const ce = console.error; console.error = () => {};
+    let caps; try { caps = [null, "up"].map((sc) => (ca(sc).match(/③ 前五大量 <span class="mut">區間 ([^<]*?) 已定案/) || [])[1]); } finally { console.error = ce; global.localStorage = ls0; }
+    assert.ok(caps[0] && caps[0].endsWith(B[n - 1][0] + "（120 根）"), "沒開劇本 " + caps[0]);
+    assert.strictEqual(caps[1], caps[0], "開劇本後說明變了");
+    // 11-24 審查：K 棒合併（grp>1）不跨「今天」：實際 K 那組只含實際 K
+    const NN = 1600, AT = 1551, bb = [];
+    let c0 = 100; for (let i = 0; i < NN; i++) { const o = c0; c0 = i >= AT ? c0 + 5 : c0 + Math.sin(i) * 0.5; bb.push({ t: "2026-01-01 00:00", o, h: Math.max(o, c0) + 0.3, l: Math.min(o, c0) - 0.3, c: c0, v: 10 }); }
+    const kh = renderToString(React.createElement(P.KChart, { d: { tf: "1H", symbol: { yahoo: "X", market: "us", timezone: "America/New_York" }, chart: {} },
+      full: { bars: bb, c: bb.map((x) => x.c), k0: 0 }, smas: [], yr: null, a: 0, b: NN, gaps: [], islands: [], top: [], rolls: [], sc: { at: AT, dir: 1, name: "x", plan: [] } }));
+    const seg = (cls) => [...kh.matchAll(/<path class="(bd(?: sim)?)" d="([^"]*)"/g)].filter((x) => x[1] === cls).reduce((z, x) => z + (x[2].match(/M/g) || []).length, 0);
+    assert.deepStrictEqual([seg("bd"), seg("bd sim")], [Math.ceil(AT / 2), Math.ceil((NN - AT) / 2)], "合併跨過今天");
+    // 11-24 審查：在示意段裡放大再收起劇本 → 回預設區間（不是只剩 2 根）
+    const srcCA = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
+    assert.ok(/const gone = rng\[0\] > NX - 2;\s*const b = gone \? NX : Math\.min\(rng\[1\], NX\), a = gone \? def0 :/.test(srcCA), "收起劇本後區間回預設");
   });
   await t("pastHalf：TA 票過半才續；普通票、壞票、沒期限 → 要問 status", async () => {
     const tk = (p) => "h." + Buffer.from(JSON.stringify(p)).toString("base64url") + ".s", n = Date.now() / 1000;

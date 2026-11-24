@@ -55,6 +55,9 @@ t("四條路徑 OHLC 合法、對齊跳動單位、量 ≥ 0、根數在 1H 60�
     }
   }
   assert.strictEqual(all[0][5].tick, 0.25, "NQ 跳動 0.25");
+  // 較舊的 K 是除權息調整價（帶小數）、近 40 根都是 5 的倍數 → 跳動單位 5
+  const adj = Array.from({ length: 200 }, (_, i) => (i < 150 ? { o: 2316.62, h: 2320.37, l: 2311.08, c: 2317.9 } : { o: 2310, h: 2325, l: 2305, c: 2320 }));
+  assert.strictEqual(S.tickOf(adj), 5, "近期跳動單位");
 });
 
 // 另寫一份判斷（真實價格、方向 s）：規劃點必須是第一根成立
@@ -80,7 +83,7 @@ t("規劃點＝示意 K 上條件第一次成立那根（進場、出場1、出�
     assert.ok(e >= NA && x1 > e && x2 > x1 && x2 < B.length, nm + " " + p.name + " 順序 " + [e, x1, x2]);
     for (let k = NA; k < e; k++) assert.ok(!ok("entry", k), nm + " " + p.name + " 進場前 " + B[k].t + " 就成立");
     assert.ok(ok("entry", e), nm + " " + p.name + " 進場那根不成立");
-    for (let k = e + 1; k < x1; k++) assert.ok(!ok("ex1", k), nm + " " + p.name + " 出場1 前 " + B[k].t + " 就成立");
+    for (let k = e; k < x1; k++) assert.ok(!ok("ex1", k), nm + " " + p.name + " 出場1 前 " + B[k].t + " 就成立（含進場那根）");
     assert.ok(ok("ex1", x1), nm + " 出場1 那根不成立");
     for (let k = x1 + 1; k < x2; k++) assert.ok(!ok("ex2", k), nm + " " + p.name + " 出場2 前 " + B[k].t + " 就成立");
     assert.ok(ok("ex2", x2), nm + " 出場2 那根不成立");
@@ -119,7 +122,8 @@ t("鏡像：K 上下翻轉後跑空轉多 ＝ 原資料跑多轉空（同種子�
         if (x.pnl != null) assert.ok(Math.abs(y.pnl - x.pnl) < 1e-6, "損益點數相同");
       });
     });
-    up.lv.forEach((x, j) => { const y = dn.lv[j]; if (x.p != null && !/^(ATR|前 20)/.test(x.name)) assert.ok(Math.abs(y.p - (K - x.p)) <= 0.01 + 1e-9, nm + " " + x.name + "：" + y.p + " vs " + (K - x.p)); });   // 均線顯示到兩位小數，捨入差 0.01
+    const q = Math.pow(10, -(String(dn.tick).split(".")[1] || "").length);   // 均線顯示到跳動單位的小數位（2330＝整數），捨入差一個最小位
+    up.lv.forEach((x, j) => { const y = dn.lv[j]; if (x.p != null && !/^(ATR|前 20)/.test(x.name)) assert.ok(Math.abs(y.p - (K - x.p)) <= q + 1e-9, nm + " " + x.name + "：" + y.p + " vs " + (K - x.p)); });
   }
 });
 

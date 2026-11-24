@@ -527,8 +527,8 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
   // 一個寬度單位塞超過一根時，每 grp 根併成一根（開＝第一根開、收＝最後一根收、高低取極值、量取最大），path 才不會長到拖曳卡頓
   const grp = Math.max(1, Math.floor(1 / step));
   if (grp > 1) {
-    for (let i0 = 0; i0 < n; i0 += grp) {
-      const i9 = Math.min(n, i0 + grp);
+    for (let i0 = 0, i9; i0 < n; i0 = i9) {
+      i9 = Math.min(n, i0 + grp, sc && a + i0 < sc.at ? sc.at - a : n);   // 合併不跨「今天」：實際 K 和示意 K 不併在同一根
       let o = null, h = -Infinity, l = Infinity, c = null, v = 0;
       for (let i = i0; i < i9; i++) {
         const x = bars[i];
@@ -1107,7 +1107,9 @@ function ChartArea({ d, p = DEF_P, srOn, kkOn = true, b5On = false, c5On = false
   // 右端 Infinity＝貼著最右邊（開關劇本時跟著延伸／縮回）
   const [rng, setRng] = useState(() => [def0, Infinity]);   // 預設＝引擎的圖視窗（近 120 根）
   const setR = (r) => setRng([r[0], r[1] >= NX ? Infinity : r[1]]);
-  const b = Math.min(rng[1], NX), a = Math.max(0, Math.min(rng[0], b - 2));
+  // 在示意段裡放大後收起劇本：區間整段落在已經沒有的 K 上 → 回到預設區間
+  const gone = rng[0] > NX - 2;
+  const b = gone ? NX : Math.min(rng[1], NX), a = gone ? def0 : Math.max(0, Math.min(rng[0], b - 2));
   // 框選放大＋雙擊／重設（只桌機：pointer: fine；框選另外只認滑鼠）。位移不到 5px 當點擊，標記的 hover／點擊照舊
   const [fine, setFine] = useState(false);
   useEffect(() => { try { setFine(window.matchMedia("(pointer: fine)").matches); } catch (er) {} }, []);
@@ -1181,10 +1183,13 @@ function ChartArea({ d, p = DEF_P, srOn, kkOn = true, b5On = false, c5On = false
     }
     return { ...f5, blink: m };
   }, [f5, co5, ms, full]);
-  const view = useMemo(() => ({
-    a, b, from: full.bars[a] ? full.bars[a].t : "", to: full.bars[b - 1] ? full.bars[b - 1].t : "", top,
-    gaps: gapsAll.filter((x) => x.i >= a && x.i < b), islands: islAll.filter((x) => x.i1 >= a && x.i0 < b),
-  }), [a, b, full, top, gapsAll, islAll]);
+  const view = useMemo(() => {
+    const bv = cur ? Math.min(b, nf) : b, av = Math.min(a, bv);   // 圖下說明只算實際 K（示意段不算進區間根數）
+    return {
+      a: av, b: bv, from: av < bv && full.bars[av] ? full.bars[av].t : "", to: full.bars[bv - 1] ? full.bars[bv - 1].t : "", top,
+      gaps: gapsAll.filter((x) => x.i >= av && x.i < bv), islands: islAll.filter((x) => x.i1 >= av && x.i0 < bv),
+    };
+  }, [a, b, cur, nf, full, top, gapsAll, islAll]);
   // 進出場記號的浮動說明：滑鼠移上去／鍵盤聚焦就出現、離開就收；點一下（手機）會釘住，點別處或 Esc 才關
   const [tip, setTip] = useState(null);   // {kind, t, x, y, pin}
   const box = useRef(null);
