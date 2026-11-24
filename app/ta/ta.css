@@ -69,16 +69,17 @@
 .ta-tabs .sep{color:var(--dim);margin:0 2px}
 .ta-tab{font:inherit;font-size:calc(14px*var(--scale));color:var(--dim);background:none;border:1px solid transparent;border-radius:8px;
   padding:3px 14px;cursor:pointer}
-.ta-tabs .ta-tab{padding:3px 7px}   /* 14→7（11-23）：多了撐壓線、關鍵K，1440 寬工具列仍排一行（含「計算中…」） */
+.ta-tabs .ta-tab{padding:3px 3px;font-size:calc(13px*var(--scale));letter-spacing:-.3px}   /* 11-24：多了劇本兩顆、波浪 → 字 14→13、左右 7→3、字距收 .3px，1440 寬工具列仍排一行 */
 .ta-tab:hover{color:var(--text)}
 .ta-tab.on{color:var(--text);background:var(--surface2);border-color:var(--border);font-weight:700}
 .ta-kbd{margin-left:auto;color:var(--dim);font-size:calc(12px*var(--scale))}
+.ta-tabs{position:relative}
+.ta-tabs>.ta-kbd{position:absolute;right:12px;top:100%;margin-top:4px;padding:1px 8px;border-radius:6px;background:var(--surface2);z-index:2}   /* 11-24：「計算中…」浮在工具列右下，不占工具列寬度（1440 一行） */
 .ta-pane{flex:1;min-height:0;overflow:auto;padding:14px 20px 18px;overscroll-behavior:contain}
 .ta-pane[hidden]{display:none}
 /* 指數位階／區間強弱分頁（2026-11-11／11-13）：開著時週期／均線／訊號不顯示選中（點任一個就回 K 線）；iframe 高度由頁面程式跟內容走 */
 .ta-tabs:not([data-view="chart"]) .ta-seg:not(.ta-vseg) .ta-tab.on{color:var(--dim);background:none;border-color:transparent;font-weight:400}
 .ta-idxf{display:block;width:100%;height:600px;border:0}
-.ta-vseg .ta-tab{padding:3px 6px}   /* 兩個分頁鈕（指數位階、區間強弱）收窄，1200 寬時跟週期／均線／訊號同一列 */
 .ta-pane-all{padding:0}
 .ta-allcap{font-weight:700;font-size:calc(14.5px*var(--scale));padding:10px 14px 8px}
 .ta-pane-all .ta-hint{padding:0 14px 14px}
@@ -218,9 +219,12 @@ svg.ta-k .brush-t{font-size:12px;font-weight:700;paint-order:stroke;stroke:#0b0f
 .ta-out{float:right;margin-left:10px}
 .ta-link{font:inherit;font-size:calc(12.5px*var(--scale));color:var(--dim);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline}
 .ta-link:hover{color:var(--text)}
-.ta-tabs{gap:10px;flex-wrap:wrap}   /* 14→10（11-13）：多了「區間強弱」鈕，1200 寬中字級仍排一列 */
+.ta-tabs{gap:6px;flex-wrap:wrap;padding-left:8px;padding-right:8px}   /* 10→6、左右 12→8（11-24） */
 .ta-seg{display:flex;align-items:center;gap:2px}
 .ta-seglab{color:var(--dim);font-size:calc(13px*var(--scale));margin-right:4px}
+.ta-tabs .ta-seg{gap:1px}
+.ta-tabs .ta-seglab{font-size:calc(12px*var(--scale));margin-right:2px}
+.ta-glab{margin-left:6px}
 /* 圖下三個大分頁（11-09）：等寬大按鈕，緊貼圖＋導覽列下方，選中整格亮起 */
 .ta-blktabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0 12px}
 .ta-blktab{font:inherit;font-size:calc(16.5px*var(--scale));font-weight:700;min-height:46px;padding:6px 10px;color:var(--text);cursor:pointer;
@@ -259,9 +263,9 @@ svg.ta-k circle.s5co{stroke:#3fd08a;stroke-width:2px;animation:ta-s5co 1.2s ease
 @keyframes ta-s5co{50%{stroke-opacity:.15}}
 @media (prefers-reduced-motion:reduce){svg.ta-k rect.s5co,svg.ta-k circle.s5co{animation:none;stroke-width:2.8}}
 .ta-tipbox[class*="s5t-s"]{border-left-color:#d6dde6} .ta-tipbox[class*="s5t-l"]{border-left-color:#eadbc8}
-.ta-tipbox.s5t-s5{border-left-color:#3fd08a} .ta-tipbox.s5t-l5{border-left-color:#ff5f6b}
-.ta-tipbox.s5t-sstop,.ta-tipbox.s5t-lstop{border-left-color:#8b95a3}
-.ta-tipbox.s5t-sx{border-left-color:#b9ecd2} .ta-tipbox.s5t-lx{border-left-color:#ffc6cb}
+.ta-tipbox[class*="s5t-s"]{border-left-color:#ff5f6b} .ta-tipbox[class*="s5t-l"]{border-left-color:#3fd08a}   /* 同圖上標記（11-24 二改）：反彈紅系、修正綠系 */
+.ta-tipbox.s5t-sstop{border-left-color:#b07a80} .ta-tipbox.s5t-lstop{border-left-color:#7a9e8c}
+.ta-tipbox.s5t-sx{border-left-color:#ffb3b9} .ta-tipbox.s5t-lx{border-left-color:#a8e6c6}
 svg.ta-k .isl-t{fill:#ffc94a;font-size:12px;font-weight:700;paint-order:stroke;stroke:#0b0f15;stroke-width:3px}
 svg.ta-k .ckey{font-size:11px;font-weight:600;paint-order:stroke;stroke:#0b0f15;stroke-width:3px}
 svg.ta-k .mk-hit{cursor:pointer;outline:none}
@@ -421,7 +425,7 @@ svg.ta-k .roll-t{fill:#9aa4b2;font-size:10px;paint-order:stroke;stroke:#0b0f15;s
 @media (prefers-reduced-motion:reduce){.ta-tab.ta-blink{animation:none;box-shadow:0 0 0 2.5px var(--bc);background:color-mix(in srgb,var(--bc) 18%,transparent)}}
 
 /* 劇本（11-24）：工具列分隔、圖上方子分頁、圖下一行「示意，不是預測」、點位表＋價位由來；示意區在 SVG 裡（底色 .022、虛線框 .32） */
-.ta-vsep{display:inline-block;width:1px;height:18px;background:var(--border);margin:0 6px;flex:none}
+.ta-vsep{display:inline-block;width:1px;height:18px;background:var(--border);margin:0 4px;flex:none}
 .ta-sctabs{display:flex;align-items:center;flex-wrap:wrap;gap:2px;margin:0 0 6px}
 .ta-sctabs .ta-tab{padding:3px 9px}
 .ta-sctabs .ta-tab.none{color:var(--dim);opacity:.7}

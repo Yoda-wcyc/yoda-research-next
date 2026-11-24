@@ -125,15 +125,18 @@ t("共振：自己跟自己每個事件都配到；B 的①差 3 根算、4 根�
   assert.strictEqual(F.coincide5(r, fake.map((x) => ({ ...x, side: "l" }))).length, 0);
   assert.strictEqual(F.coincide5(r, fake.map((x) => ({ ...x, status: "void_reset" }))).length, 0);
 });
-t("浮動說明：⑤列停損歷程、②列量倍數與壓力、均／線列損益；名稱 彈1～彈5、彈均、彈線／修…（11-24 改名：利→均、停→線）", () => {
+t("浮動說明：⑤列停損歷程、②列量倍數與壓力、均／線列損益；名稱 ①～⑤＋階段名、彈均、彈線／修…（11-24 改名：利→均、停→線；二改：階段＝圈號＋名稱）", () => {
   const b = mk(cs7, V33, HL33), L = F.smaLines(b, MA), q = mine(F.fiveStageAll(b, L, "s")), nm = ["SMA2", "SMA3", "SMA20"];
   const i5 = F.info5("s", q, 5, b, L, nm), i2 = F.info5("s", q, 2, b, L, nm), ix = F.info5("s", q, "x", b, L, nm, "5/10/20 01-02 12:00、8/13/34 01-02 13:00");
-  assert.strictEqual(i5.title, "反彈五階段 彈5");
+  assert.strictEqual(i5.title, "反彈五階段 ⑤ 破支撐續空");
+  assert.strictEqual(F.info5("s", q, 3, b, L, nm).title, "反彈五階段 ③ 反彈結束");
   assert.ok(i5.rows.some(([k, v]) => k === "停損" && v.startsWith("114.5（反彈頂） → 97.7")), JSON.stringify(i5.rows));
   assert.ok(i2.rows.some(([k, v]) => k === "條件" && /碰到壓力 SMA20 114\.\d+.*量 — 倍/.test(v)), JSON.stringify(i2.rows));
   assert.ok(ix.rows.some(([k, v]) => k === "損益" && v.startsWith("+9.00 點")));
   assert.ok(ix.rows.some(([k]) => k === "共振"));
-  assert.deepStrictEqual([1, 5, "x", "stop"].map((k) => F.step5Name("l", k)), ["修1", "修5", "修均", "修線"]);
+  assert.deepStrictEqual([1, 5, "x", "stop"].map((k) => F.step5Name("l", k)), ["① 開始修正", "⑤ 破壓力續多", "修均", "修線"]);
+  assert.deepStrictEqual([1, 2, 3, 4, 5].map((k) => F.step5Name("s", k)), ["① 開始反彈", "② 反彈到頂", "③ 反彈結束", "④ 回測支撐", "⑤ 破支撐續空"]);
+  assert.deepStrictEqual([2, 3, 4].map((k) => F.step5Name("l", k)), ["② 修正到底", "③ 修正結束", "④ 回測壓力"]);
   assert.strictEqual(F.line5Info("s", q, "stop", b).title, "停損 94.2");
 });
 

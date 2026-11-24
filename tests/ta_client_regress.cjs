@@ -123,7 +123,8 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     .replace('"../../lib/ta-rs"', JSON.stringify(path.join(ROOT, "lib", "ta-rs.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-opt"', JSON.stringify(path.join(ROOT, "lib", "ta-opt.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-5stage"', JSON.stringify(path.join(ROOT, "lib", "ta-5stage.js").replace(/\\/g, "/")))
-    .replace('"../../lib/ta-scenario"', JSON.stringify(path.join(ROOT, "lib", "ta-scenario.js").replace(/\\/g, "/"))) + "\nexport { ScBtns, nextSc, ScTabs, ScPlan, scInfo, SC_TFS, readB5, readC5, barEndTf, co5Live, oldBuiltin, cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, mtfBlink, tzMs, barEnd, readSr, readKk, keyKAll, dropOld4, maSetOf, pickMaSet, MA_SETS, Legend, migrateRules, cleanRules };\n";
+    .replace('"../../lib/ta-scenario"', JSON.stringify(path.join(ROOT, "lib", "ta-scenario.js").replace(/\\/g, "/")))
+    .replace('"./WaveView"', JSON.stringify(path.join(ROOT, "app", "ta", "WaveView.jsx").replace(/\\/g, "/"))) + "\nexport { ScBtns, nextSc, ScTabs, ScPlan, scInfo, SC_TFS, readB5, readC5, barEndTf, co5Live, oldBuiltin, cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, mtfBlink, tzMs, barEnd, readSr, readKk, keyKAll, dropOld4, maSetOf, pickMaSet, MA_SETS, Legend, migrateRules, cleanRules };\n";
   const Mod = require("module");
   const libSrc = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-trade.js"), "utf8"), opts).code;
   const lib = new Mod(path.join(ROOT, "lib", "ta-trade.js")); lib.paths = Mod._nodeModulePaths(ROOT); lib._compile(libSrc, lib.id);
@@ -136,6 +137,8 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   s5Lib._compile(transformSync(fs.readFileSync(s5Lib.id, "utf8"), opts).code, s5Lib.id); require.cache[s5Lib.id] = s5Lib; s5Lib.loaded = true;
   const scLib = new Mod(path.join(ROOT, "lib", "ta-scenario.js")); scLib.filename = scLib.id; scLib.paths = Mod._nodeModulePaths(ROOT);   // 劇本（11-24）
   scLib._compile(transformSync(fs.readFileSync(scLib.id, "utf8"), opts).code, scLib.id); require.cache[scLib.id] = scLib; scLib.loaded = true;
+  const wvMod = new Mod(path.join(ROOT, "app", "ta", "WaveView.jsx")); wvMod.filename = wvMod.id; wvMod.paths = Mod._nodeModulePaths(ROOT);   // 波浪分頁（11-24）
+  wvMod._compile(transformSync(fs.readFileSync(wvMod.id, "utf8"), opts).code, wvMod.id); require.cache[wvMod.id] = wvMod; wvMod.loaded = true;
   const m = new Mod(path.join(ROOT, "app", "ta", "page.cjs")); m.paths = Mod._nodeModulePaths(ROOT);
   m._compile(transformSync(src, opts).code, m.id);
   const P = m.exports;
@@ -374,7 +377,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
     assert.ok(raw.includes("useEffect(dropOld4, [])"), "載入時刪");
   });
-  await t("反彈／修正五階段（11-24）：圖上 彈N／修N、彈5 綠、修5 紅、出場 彈均／修均（空心框）、彈線／修線（灰）；支撐／防線虛線、停損階梯線；作廢不畫；與關鍵K 不重疊；共振外框；不進回測、共振 1H／4H", async () => {
+  await t("反彈／修正五階段（11-24 二改）：圖上 1～5（反彈紅、修正綠，不再寫 彈1／修1）、出場 彈均／修均（空心框）、彈線／修線（同色系暗色）；支撐／防線虛線、停損階梯線；作廢不畫；與關鍵K 不重疊；共振外框；不進回測、共振 1H／4H", async () => {
     const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8"), F5 = require.cache[s5Lib.id].exports;
     for (const fn of ["function withTrade", "function mtfBlink", "function RulePanel", "function sideTrade"]) {
       const i = raw.indexOf(fn), body = raw.slice(i, raw.indexOf("\nfunction ", i + 10));
@@ -387,30 +390,41 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     const f5 = { s: F5.fiveStage(fb, lines, "s"), l: F5.fiveStage(fb, lines, "l"), lines, nm: ["SMA5", "SMA10", "SMA20"] };
     const a = n - 150, kc = (o) => renderToString(React.createElement(P.KChart, { d, full, smas: [], a, b: n, gaps: [], islands: [], top: [], rolls: [], onTip: () => {}, ...o })).replace(/<!-- -->/g, "");
     const off = kc({ kk }), on = kc({ kk, f5 });
-    assert.ok(!off.includes("s5l") && !/>彈\d</.test(off), "關掉不畫");
-    assert.ok(/class="s4t"[^>]*style="fill:#3fd08a"[^>]*>彈5</.test(on), "彈5 綠");
+    assert.ok(!off.includes("s5l") && !/data-step="[1-5]"/.test(off), "關掉不畫");
+    assert.ok(/class="s4t"[^>]*style="fill:#ff5f6b"[^>]*data-side="s" data-step="5"[^>]*>5</.test(on), "反彈 5 紅");
+    const ql = f5.l.find((q) => q.s1 && q.s1.i > 30), al = ql.s1.i - 30;   // 這段 NQ 最後 150 根沒有修正序列 → 另開一段有修正的
+    const onL = renderToString(React.createElement(P.KChart, { d, full, smas: [], a: al, b: al + 150, gaps: [], islands: [], top: [], rolls: [], onTip: () => {}, kk, f5 })).replace(/<!-- -->/g, "");
+    assert.ok(/class="s4t"[^>]*style="fill:#3fd08a"[^>]*data-side="l" data-step="1"[^>]*>1</.test(onL), "修正 1 綠");
+    for (const m of (on + onL).matchAll(/class="s4t"[^>]*style="fill:(#[0-9a-f]+)"[^>]*data-side="(s|l)" data-step="([1-5])"[^>]*>([^<]*)</g)) {
+      assert.strictEqual(m[4], m[3], "階段只寫數字：" + m[0].slice(0, 80));
+      assert.strictEqual(m[1], m[2] === "s" ? "#ff5f6b" : "#3fd08a", "反彈紅、修正綠");
+    }
+    assert.ok(!/(彈|修)[1-5]/.test(on + onL), "圖上不得再出現 彈1／修1 這類字");
+    assert.ok(/data-step="x"[^>]*>(彈|修)均</.test(on + onL) && /style="fill:#b07a80"[^>]*data-side="s" data-step="stop"|style="fill:#7a9e8c"[^>]*data-side="l" data-step="stop"/.test(on + onL), "出場 線＝同色系暗色");
+    assert.ok(/aria-label="反彈五階段 ③ 反彈結束|aria-label="反彈五階段 [①-⑤] /.test(on), "aria 用 圈號＋階段名");
     assert.ok(/class="s5l"[^>]*stroke-dasharray="5 4"[^>]*data-kind="sup"/.test(on) && /class="s5l"[^>]*stroke="#e8c35a"[^>]*data-kind="stop"/.test(on), "支撐虛線、停損階梯");
-    assert.ok(!/>(彈|修)[①②③④⑤]</.test(on) && !/>(反彈|修正)\d</.test(on), "只寫 彈N／修N");
+    assert.ok(!/>(彈|修)[①②③④⑤]</.test(on) && !/>(反彈|修正)\d</.test(on), "不寫 彈①／反彈1");
     assert.ok(/<rect[^>]*class="s4box"/.test(on) && /data-step="x"[^>]*>(彈|修)均</.test(on) && /data-step="stop"[^>]*>(彈|修)線</.test(on), "出場標籤 彈均／修均、彈線／修線（11-24 改名）");
     assert.ok(!/>(彈|修)(利|停)</.test(on), "舊名 彈利／彈停／修利／修停 不該再出現");
     const vis = (q) => [1, 2, 3, 4, 5].some((k) => q["s" + k] && q["s" + k].i >= a);
-    const ids = new Set([...on.matchAll(/data-side="(s|l)" data-step="1" data-i="(\d+)"[^>]*>(?:彈|修)1</g)].map((m) => m[1] + m[2]));
-    assert.ok(ids.size >= 1, "要有 彈1／修1");
+    const ids = new Set([...on.matchAll(/data-side="(s|l)" data-step="1" data-i="(\d+)"[^>]*>1</g)].map((m) => m[1] + m[2]));
+    assert.ok(ids.size >= 1, "要有第 1 階段");
     for (const sd of ["s", "l"]) for (const q of F5.fiveStageAll(fb, lines, sd)) if (q.s1.i >= a && F5.HIDE5.includes(q.status)) assert.ok(!ids.has(sd + q.s1.i), "作廢不畫：" + sd + q.s1.i);
     assert.ok(f5.s.concat(f5.l).filter(vis).length >= 3, "區間內要有序列");
     const tw = (s) => [...s].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? 12 : 6.8), 0);
     const boxes = [...on.matchAll(/<text[^>]*class="(s4t[^"]*|kk-b[^"]*|kk-n)"[^>]*x="([\d.]+)" y="([\d.]+)"[^>]*>([^<]+)</g)].map((m) => { const w = tw(m[4]) + (m[4].endsWith("均") ? 8 : 0); return [Number(m[2]) - w / 2, Number(m[3]) - 11, Number(m[2]) + w / 2, Number(m[3]) + 2, m[1] + ":" + m[4] + "@" + m[2] + "," + m[3]]; });
-    const f5n = boxes.filter((x) => /:(彈|修)/.test(x[4])).length;
+    const f5x = (x) => /:(彈|修)/.test(x[4]) || /^s4t[^:]*:[1-5]@/.test(x[4]);
+    const f5n = boxes.filter(f5x).length;
     assert.ok(f5n >= 8, "五階段標籤數 " + f5n);
     for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
       const p = boxes[i], q = boxes[j];
-      if (!/:(彈|修)/.test(p[4]) && !/:(彈|修)/.test(q[4])) continue;
+      if (!f5x(p) && !f5x(q)) continue;
       assert.ok(!(p[0] < q[2] && p[2] > q[0] && p[1] < q[3] && p[3] > q[1]), "重疊：" + p[4] + " ↔ " + q[4]);
     }
     // 共振外框：blink 指到的標記加 s5co 框（字本身不加 class，閃的是框）
     const q5 = f5.s.find((q) => q.s5 && q.s5.i >= a);
     const bl = kc({ kk, f5: { ...f5, blink: new Map([["s|5|" + q5.s5.i, { list: [{ id: "x" }], txt: "共振" }]]) } });
-    assert.ok(/class="s5co"/.test(bl) && /class="s4t"[^>]*data-co="1"[^>]*>彈5</.test(bl), "共振外框");
+    assert.ok(/class="s5co"/.test(bl) && /class="s4t"[^>]*data-co="1"[^>]*>5</.test(bl) && /class="s5co"[^>]*stroke="#3fd08a"/.test(bl), "共振外框（照舊：反彈綠框）");
     assert.ok(raw.includes('(bl ? " ta-blink b-dn" : "")') && raw.includes('k === "short" || k === "mid"'), "短、中一起閃（綠）");
   });
   await t("市場標籤：美國期貨・CME／指數／台股／美股·NASDAQ·ETF；怪值不崩", async () => {
@@ -929,7 +943,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   });
   await t("反彈／修正五階段：工具列兩顆鈕在關鍵K 旁、預設關、localStorage；共振閃爍 8 小時、點過就停；日K 收盤時間（台指期 13:45）", async () => {
     const src = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
-    assert.ok(/data-kk>關鍵K<\/button>\s*<button[^>]*data-b5>反彈五階段<\/button>\s*<button[^>]*data-c5>修正五階段<\/button>/.test(src), "鈕在關鍵K 旁");
+    assert.ok(/data-kk>關鍵K<\/button>\s*<span className="ta-seglab ta-glab"[^>]*>五階段<\/span>[^\n]*\s*<button[^>]*aria-label="反彈五階段" data-b5>反彈<\/button>\s*<button[^>]*aria-label="修正五階段" data-c5>修正<\/button>/.test(src), "鈕在關鍵K 旁（11-24：組名「五階段」＋反彈／修正，aria-label 全名）");
     assert.strictEqual(P.readB5(), false); assert.strictEqual(P.readC5(), false);
     assert.ok(src.includes('pickB5 = () => { setB5On(!b5On); lsSet(B5_KEY, b5On ? "0" : "1"); pickView("chart"); }'));
     assert.ok(!/fiveStage|co5|f5/.test(src.slice(src.indexOf("function RulePanel"), src.indexOf("function RulePanel") + 20000).split("\n// ")[0]), "不進面板");
@@ -974,10 +988,10 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   });
   await t("劇本（11-24）：工具列兩顆鈕在五階段後面、用分隔；一次只開一顆、再按收起；週K 停用＋一行字；不記 localStorage", async () => {
     const src = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
-    assert.ok(/data-c5>修正五階段<\/button>\s*<ScBtns sc=\{scOn\} tf=\{tf\} onPick=\{pickSc\} \/>/.test(src), "鈕緊接在修正五階段後面");
+    assert.ok(/data-c5>修正<\/button>\s*<ScBtns sc=\{scOn\} tf=\{tf\} onPick=\{pickSc\} \/>/.test(src), "鈕緊接在修正五階段後面");
     const html = (o) => renderToString(React.createElement("div", null, React.createElement(P.ScBtns, { sc: null, tf: "4H", onPick: () => {}, ...o }))).replace(/<!-- -->/g, "");
     const h0 = html({});
-    assert.ok(/<span class="ta-vsep" aria-hidden="true"><\/span><button[^>]*data-sc="up"[^>]*>空轉多劇本<\/button><button[^>]*data-sc="dn"[^>]*>多轉空劇本<\/button>/.test(h0), "分隔＋兩顆鈕：" + h0);
+    assert.ok(/<span class="ta-vsep" aria-hidden="true"><\/span><span class="ta-seglab" aria-hidden="true">劇本<\/span><button[^>]*aria-label="空轉多劇本" data-sc="up"[^>]*>空轉多<\/button><button[^>]*aria-label="多轉空劇本" data-sc="dn"[^>]*>多轉空<\/button>/.test(h0), "分隔＋組名「劇本」＋兩顆鈕（11-24 縮短，aria-label 全名）：" + h0);
     assert.strictEqual((h0.match(/aria-pressed="true"/g) || []).length, 0, "預設都沒開");
     const hu = html({ sc: "up" });
     assert.ok(/aria-pressed="true" class="ta-tab on"[^>]*data-sc="up"/.test(hu) && /aria-pressed="false" class="ta-tab"[^>]*data-sc="dn"/.test(hu), "開空轉多：只有那顆亮");
@@ -1047,6 +1061,16 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     assert.strictEqual(P.pastHalf(tk({ iat: n, exp: n + 3600 })), true);   // 普通票：換長效票
     assert.strictEqual(P.pastHalf(tk({ aud: "ta" })), true);
     assert.strictEqual(P.pastHalf("garbage"), true); assert.strictEqual(P.pastHalf(""), false);
+  });
+  await t("波浪分頁（11-24）：「指數位階」右邊有「波浪」鈕、readView 接受 wave、view===wave 才畫 WaveView（帶 call／gate）；工具列其他鈕照樣回 K 線", async () => {
+    const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
+    assert.ok(raw.includes('import WaveView from "./WaveView";'), "import WaveView");
+    assert.ok(/pickView\(view === "idx" \? "chart" : "idx"\)}>指數位階<\/button>\s*<button[^>]*aria-pressed={view === "wave"}[^>]*\s*onClick={\(\) => pickView\(view === "wave" \? "chart" : "wave"\)}>波浪<\/button>\s*<button[^]*?>區間強弱</.test(raw), "「波浪」緊接在「指數位階」右邊、「區間強弱」左邊");
+    assert.ok(/{view === "wave" \? \(\s*<div className="ta-pane">\s*<Boundary reset={view}><WaveView call={call} gate={gate} \/><\/Boundary>/.test(raw), "view===wave 才畫，帶 call／gate");
+    const st = {}; globalThis.localStorage = { getItem: (k) => (k in st ? st[k] : null), setItem: (k, v) => { st[k] = String(v); }, removeItem: (k) => { delete st[k]; } };
+    st.yoda_ta_view = "wave"; assert.strictEqual(P.readView(), "wave");
+    st.yoda_ta_view = "waves"; assert.strictEqual(P.readView(), "chart");
+    assert.ok(raw.includes('.ta-tabs:not([data-view="chart"])') || fs.readFileSync(path.join(ROOT, "app", "ta", "ta.css"), "utf8").includes('.ta-tabs:not([data-view="chart"])'), "非 K 線分頁時其他鈕不顯示選中（同指數位階）");
   });
 
   console.log(fails ? "FAILED " + fails : "all passed");

@@ -4,6 +4,7 @@ import { normParams, backtest, chartMarks, exitLine, ruleText, maName, maLines, 
 import { presetStart } from "../../lib/ta-rs";
 import { fiveStage, smaLines, co5Short, info5, line5Info, step5Name, ev5 } from "../../lib/ta-5stage";
 import { OPT_GROUPS, optSym, dte, fmtTs, candidates, cost as optCost, pnl as optPnl, retPct, maxGain, lots } from "../../lib/ta-opt";
+import WaveView from "./WaveView";
 import { scenarios, US_EARLY } from "../../lib/ta-scenario";
 
 // 會員技術分析（獨立網站版·2026-11-08 Yoda 定）
@@ -20,7 +21,7 @@ import { scenarios, US_EARLY } from "../../lib/ta-scenario";
 //   左欄「交易規則」面板（11-09）：勾選／填數字 → 瀏覽器用 lib/ta-trade.js 即時重算進出場與回測（不打伺服器、不扣額度）；
 //           5 組內建策略（唯讀）＋自己存的策略，只存在自己的瀏覽器（localStorage）。手機寬（≤760px）面板排到圖下方。
 //   圖上進出場記號：滑過（手機點一下）出自製浮動說明，逐條列進出場條件的實際數值（lib/ta-trade.js explainEntry／explainExit）。
-//   右上分頁「指數位階」「區間強弱」「趨勢樣板」（11-17：多空樣板檔數占比折線＋今天多空名單，/api/ta-rs op:'tt'；台股｜美股切換跟區間強弱共用）
+//   右上分頁「指數位階」「波浪」（11-24：會員版波浪理論互動圖，app/ta/WaveView.jsx＋/api/ta-wave）「區間強弱」「趨勢樣板」（11-17：多空樣板檔數占比折線＋今天多空名單，/api/ta-rs op:'tt'；台股｜美股切換跟區間強弱共用）
 //           「選擇權」（11-23）：下拉 11 檔美股／ETF（不跟 K 線代號連動）→ 看漲買 Call／看跌買 Put 的到期損益表＋試算（/api/ta-opt，CBOE 延遲報價；計算在 lib/ta-opt.js）
 //   週期列共振閃爍（11-23）：背景另抓同一檔的 1H、4H（跟點週期共用同一次請求），用面板規則回測、只看定案 K；同方向最近一次進場都在 8 小時內 → 1H／4H 鈕一起閃
 //           （多紅空綠，跟訊號篩選連動；hover 列兩邊進場時間；過 8 小時或點過那次就停，新訊號再閃；減少動態＝不閃、改外框）
@@ -280,10 +281,11 @@ function SortTable({ cols, rows, rowKey, className, rowClass, onRow, init }) {  
 
 // ───────── K 線圖（同 ta_local 的記號語言；底色固定深色，白色撐壓線才看得見）─────────
 const K_UP = "#e0525e", K_DN = "#3fae7a", GOLD = "#ffc94a";
-// 五階段顏色（11-24）：①～④ 中性、彈5 綠／修5 紅、出場 彈線／修線 灰、彈均／修均＝淡色空心框；line＝支撐／防線虛線、stop＝停損價階梯線
+// 五階段顏色（11-24 二改）：反彈＝紅系（1～5 紅、彈均 淡紅＋紅框、彈線 灰紅）、修正＝綠系（1～5 綠、修均 淡綠＋綠框、修線 灰綠）；
+// fr＝共振閃爍外框（照舊：反彈綠、修正紅）；line＝支撐／防線虛線、stop＝停損價階梯線
 const S5C = {
-  s: { nm: "反彈五階段 ", line: "#8fcfb0", stop: "#e8c35a", col: { 1: "#d6dde6", 2: "#d6dde6", 3: "#d6dde6", 4: "#d6dde6", 5: "#3fd08a", stop: "#8b95a3", x: "#b9ecd2" } },
-  l: { nm: "修正五階段 ", line: "#f0a0a8", stop: "#e8c35a", col: { 1: "#eadbc8", 2: "#eadbc8", 3: "#eadbc8", 4: "#eadbc8", 5: "#ff5f6b", stop: "#8b95a3", x: "#ffc6cb" } },
+  s: { nm: "反彈五階段 ", line: "#8fcfb0", stop: "#e8c35a", fr: "#3fd08a", col: { 1: "#ff5f6b", 2: "#ff5f6b", 3: "#ff5f6b", 4: "#ff5f6b", 5: "#ff5f6b", stop: "#b07a80", x: "#ffb3b9" } },
+  l: { nm: "修正五階段 ", line: "#f0a0a8", stop: "#e8c35a", fr: "#ff5f6b", col: { 1: "#3fd08a", 2: "#3fd08a", 3: "#3fd08a", 4: "#3fd08a", 5: "#3fd08a", stop: "#7a9e8c", x: "#a8e6c6" } },
 };
 const K5 = [1, 2, 3, 4, 5, "x", "stop"];
 const MA_COL = ["#ff4d4f", "#f5c518", "#3d8bfd"];   // 均線由短到長：紅、黃、藍（Yoda 2026-11-09）
@@ -835,7 +837,7 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
     placed.push(best[3]);
     tlab.push(<text key={"tlb" + tlab.length} className={cls + " mk-lab"} {...lt} x={best[0]} y={best[1]} textAnchor="start" style={{ fill: col }} data-ov={best[2] ? Math.round(best[2]) : undefined}>{s}</text>);
   });
-  // 五階段（11-24）：反彈標 K 上方、修正標 K 下方，只寫「彈1～彈5、彈均、彈線／修…」。
+  // 五階段（11-24）：反彈標 K 上方、修正標 K 下方，階段只寫數字「1～5」（反彈紅、修正綠），出場寫「彈均、彈線／修均、修線」。
   // 標籤最後放（避開進出場記號與字、關鍵K、線名）：一律放 K 外側，外側往外疊、往左右錯開找空位；字離 K 太遠拉引線；不翻面。可見區間外不畫字；超過 250 根只畫小點（滑過照樣有說明）
   // 虛線、階梯線、感應線插在 lnAt（壓在進出場記號、關鍵K、各種字下面，不搶它們的滑鼠說明）；共振的標記加閃爍外框（f5.blink：sd|階段|i → 說明）
   const f5Els = [], f5Late = [];
@@ -865,9 +867,9 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
     evs.sort((u, v) => u[3] - v[3] || K5.indexOf(u[2]) - K5.indexOf(v[2]));
     const cl = (y) => Math.min(T + PH - 2, Math.max(T + 12, y));
     for (const [sd, q, k, i] of evs) {
-      const S = S5C[sd], bk = full.bars[i], x = X(i - a), up = sd === "s", col = S.col[k], str = step5Name(sd, k);
+      const S = S5C[sd], bk = full.bars[i], x = X(i - a), up = sd === "s", col = S.col[k], str = typeof k === "number" ? String(k) : step5Name(sd, k);
       const co = f5.blink && f5.blink.get(sd + "|" + k + "|" + i), h = tipOf(info5(sd, q, k, full.bars, f5.lines, f5.nm, co ? co.txt : null), co ? co.list : null);
-      const aria = { tabIndex: 0, role: "button", "aria-label": S.nm + str + " " + bk.t, onFocus: h.onMouseEnter, onBlur: h.onMouseLeave, "data-side": sd, "data-step": k, "data-i": i, "data-co": co ? 1 : undefined };
+      const aria = { tabIndex: 0, role: "button", "aria-label": S.nm + step5Name(sd, k) + " " + bk.t, onFocus: h.onMouseEnter, onBlur: h.onMouseLeave, "data-side": sd, "data-step": k, "data-i": i, "data-co": co ? 1 : undefined };
       if (!showLab) { f5Els.push(<circle key={"f5d" + sd + q.s1.i + k} className={"s4t" + (co ? " s5co" : "")} cx={x} cy={up ? Y(bk.h) - 5 : Y(bk.l) + 5} r={co ? 3.5 : 2.5} fill={col} {...h} {...aria} />); continue; }
       const w = tw(str) * 1.05 + (k === "x" || co ? 8 : 2), dir = up ? -1 : 1, yo = up ? Y(bk.h) - 6 : Y(bk.l) + 15, cands = [];
       const cx = (dx) => Math.min(xr - w / 2, Math.max(L + w / 2, x + dx * w));
@@ -880,7 +882,7 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
       const ay = up ? Y(bk.h) - 2 : Y(bk.l) + 2, py = up ? ly + 2 : ly - 11;
       if (Math.abs(py - ay) > 16 || Math.abs(lx - x) > 10) f5Late.unshift(<line key={"f5ld" + sd + q.s1.i + k} className="s4lead" x1={lx} y1={py} x2={x} y2={ay} stroke={col} strokeWidth="1" strokeOpacity=".7" />);
       if (k === "x") f5Els.push(<rect key={"f5b" + sd + q.s1.i} className="s4box" x={lx - w / 2} y={ly - 12} width={w} height={16} rx="3" stroke={S.col[5]} />);
-      if (co) f5Els.push(<rect key={"f5c" + sd + q.s1.i + k} className="s5co" x={lx - w / 2 - 2} y={ly - 14} width={w + 4} height={20} rx="4" fill="none" stroke={S.col[5]} />);
+      if (co) f5Els.push(<rect key={"f5c" + sd + q.s1.i + k} className="s5co" x={lx - w / 2 - 2} y={ly - 14} width={w + 4} height={20} rx="4" fill="none" stroke={S.fr} />);
       f5Els.push(<text key={"f5t" + sd + q.s1.i + k} className="s4t" x={lx} y={ly} textAnchor="middle" style={{ fill: col }} data-t={bk.t} data-ov={free ? undefined : 1} {...h} {...aria}>{str}</text>);
     }
   }
@@ -943,9 +945,10 @@ function ScBtns({ sc, tf, onPick }) {
   return (
     <>
       <span className="ta-vsep" aria-hidden="true" />
+      <span className="ta-seglab" aria-hidden="true">劇本</span>
       {SC_DIRS.map(([k, nm]) => (
         <button key={k} type="button" aria-pressed={!off && sc === k} className={"ta-tab" + (!off && sc === k ? " on" : "")} disabled={off} title={off ? SC_ONLY_TXT : undefined}
-          onClick={() => onPick(k)} data-sc={k}>{nm}</button>
+          onClick={() => onPick(k)} aria-label={nm} data-sc={k}>{nm.replace("劇本", "")}</button>
       ))}
       {off ? <span className="ta-seglab ta-tfnote" data-sc-off="">{SC_ONLY_TXT}</span> : null}
     </>
@@ -1766,7 +1769,7 @@ function RulePanel({ draft, set, errors, status, saved, active, nm, setNm, rn, s
 // ───────── 指數位階分頁（2026-11-11）：最新美股報告「02 指數位階」整章原樣（/api/ta-idx）─────────
 // 章內腳本靠 document.currentScript／inline onclick，只能跑在自己的文件裡 → iframe srcdoc（同源：父頁直接量高度、換深淺）
 const VIEW_KEY = "yoda_ta_view";
-function readView() { const v = lsGet(VIEW_KEY); return v === "idx" || v === "rs" || v === "tt" || v === "opt" ? v : "chart"; }
+function readView() { const v = lsGet(VIEW_KEY); return v === "idx" || v === "wave" || v === "rs" || v === "tt" || v === "opt" ? v : "chart"; }
 const isLight = () => document.documentElement.getAttribute("data-theme") === "light";
 function IdxView({ x }) {
   const ifr = useRef(null);
@@ -2563,13 +2566,16 @@ export default function TaPage() {
             <div className="ta-seg" role="group" aria-label="圖上線條">
               <button type="button" aria-pressed={srOn} className={"ta-tab" + (srOn ? " on" : "")} onClick={pickSr} data-sr>撐壓線</button>
               <button type="button" aria-pressed={kkOn} className={"ta-tab" + (kkOn ? " on" : "")} onClick={pickKk} data-kk>關鍵K</button>
-              <button type="button" aria-pressed={b5On} className={"ta-tab" + (b5On ? " on" : "")} onClick={pickB5} data-b5>反彈五階段</button>
-              <button type="button" aria-pressed={c5On} className={"ta-tab" + (c5On ? " on" : "")} onClick={pickC5} data-c5>修正五階段</button>
+              <span className="ta-seglab ta-glab" aria-hidden="true">五階段</span>{/* 11-24：「五階段」「劇本」改成組名，鈕寫 反彈／修正、空轉多／多轉空（aria-label 全名），1440 寬工具列排一行 */}
+              <button type="button" aria-pressed={b5On} className={"ta-tab" + (b5On ? " on" : "")} onClick={pickB5} aria-label="反彈五階段" data-b5>反彈</button>
+              <button type="button" aria-pressed={c5On} className={"ta-tab" + (c5On ? " on" : "")} onClick={pickC5} aria-label="修正五階段" data-c5>修正</button>
               <ScBtns sc={scOn} tf={tf} onPick={pickSc} />
             </div>
             <div className="ta-seg ta-vseg">
               <button type="button" aria-pressed={view === "idx"} className={"ta-tab" + (view === "idx" ? " on" : "")}
                 onClick={() => pickView(view === "idx" ? "chart" : "idx")}>指數位階</button>
+              <button type="button" aria-pressed={view === "wave"} className={"ta-tab" + (view === "wave" ? " on" : "")}
+                onClick={() => pickView(view === "wave" ? "chart" : "wave")}>波浪</button>
               <button type="button" aria-pressed={view === "rs"} className={"ta-tab" + (view === "rs" ? " on" : "")}
                 onClick={() => pickView(view === "rs" ? "chart" : "rs")}>區間強弱</button>
               <button type="button" aria-pressed={view === "tt"} className={"ta-tab" + (view === "tt" ? " on" : "")}
@@ -2584,6 +2590,11 @@ export default function TaPage() {
               <Boundary reset={idx}>
                 {!idx ? <div className="ta-ph">讀取中…</div> : idx.error ? <div className="ta-err"><span>{idx.error}</span></div> : <IdxView x={idx} />}
               </Boundary>
+            </div>
+          ) : null}
+          {view === "wave" ? (
+            <div className="ta-pane">
+              <Boundary reset={view}><WaveView call={call} gate={gate} /></Boundary>
             </div>
           ) : null}
           {view === "rs" ? (
