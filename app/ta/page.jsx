@@ -346,16 +346,8 @@ function keyKAll(full, nf) {
 }
 
 // K 線圖畫整段歷史的 [a, b) 這一段；Y 軸依區間內高低。K 棒與量柱併成幾條 path（1H 五千根拖曳才不卡）
-// 框選放大／滾輪縮放（11-23，只桌機）：KW／KL／KR＝K 線圖 viewBox 寬與價格區左右留白，ChartArea 用來把滑鼠位置換成第幾根
+// 框選放大（11-23，只桌機；滾輪縮放 11-24 取消，滾輪在圖上＝一般頁面捲動）：KW／KL／KR＝K 線圖 viewBox 寬與價格區左右留白，ChartArea 用來把滑鼠位置換成第幾根
 const KW = 1000, KL = 62, KR = 178, ZOOM_MIN = 10;
-// 以 c（絕對位置，可帶小數）為中心縮放 f 倍（>1 縮小、<1 放大），游標下那根留在原處；最少 10 根、最多全段；每次至少動 1 根（觸控板一格很小）
-function zoomAt(a, b, N, c, f) {
-  const w0 = b - a, mn = Math.min(ZOOM_MIN, N);
-  const w = Math.max(mn, Math.min(N, f > 1 ? Math.max(w0 + 1, Math.round(w0 * f)) : Math.min(w0 - 1, Math.round(w0 * f))));
-  if (w === w0) return [a, b];
-  const a1 = Math.max(0, Math.min(N - w, Math.round(c - ((c - a) * w) / w0)));
-  return [a1, a1 + w];
-}
 
 function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, brush, srOn = true, kk = null, s4 = null }) {
   const ch = d.chart || {};
@@ -862,7 +854,7 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
 // 時間區間導覽列：整段收盤縮圖＋可拖的視窗（拖中間＝平移、拖兩邊把手＝縮放、點軌道＝跳過去）；鍵盤 ←→、Shift 加大步距
 const NAV_MIN = 20;
 function RangeNav({ bars, a, b, onChange }) {
-  const N = bars.length, MIN = Math.min(ZOOM_MIN, N);   // 跟框選／滾輪同一個下限
+  const N = bars.length, MIN = Math.min(ZOOM_MIN, N);   // 跟框選同一個下限
   const box = useRef(null), drag = useRef(null), raf = useRef(0), pend = useRef(null);
   useEffect(() => () => cancelAnimationFrame(raf.current), []);
   const line = useMemo(() => {
@@ -944,7 +936,7 @@ function ChartArea({ d, maSet, srOn, kkOn = true, s4On = false, l4On = false }) 
   const def0 = Math.max(0, Math.min(full.k0, N - 2));
   const [rng, setRng] = useState(() => [def0, N]);   // 預設＝引擎的圖視窗（近 120 根）
   const b = Math.min(rng[1], N), a = Math.max(0, Math.min(rng[0], b - 2));
-  // 框選放大＋滾輪縮放＋雙擊／重設（只桌機：pointer: fine；框選另外只認滑鼠）。位移不到 5px 當點擊，標記的 hover／點擊照舊
+  // 框選放大＋雙擊／重設（只桌機：pointer: fine；框選另外只認滑鼠）。位移不到 5px 當點擊，標記的 hover／點擊照舊
   const [fine, setFine] = useState(false);
   useEffect(() => { try { setFine(window.matchMedia("(pointer: fine)").matches); } catch (er) {} }, []);
   const [brush, setBrush] = useState(null);
@@ -993,20 +985,6 @@ function ChartArea({ d, maSet, srOn, kkOn = true, s4On = false, l4On = false }) 
     document.addEventListener("keydown", esc);
     return () => document.removeEventListener("keydown", esc);
   }, [brush]);
-  useEffect(() => {   // React 的 onWheel 是 passive、擋不住頁面捲動，改掛原生
-    const el = kref.current;
-    if (!fine || !el) return undefined;
-    const wh = (e) => {
-      const c = kAt(e);
-      if (c == null || !e.deltaY) return;
-      const { a: a0, b: b0, N: n0 } = live.current, r = zoomAt(a0, b0, n0, c, Math.min(2, Math.max(0.5, Math.exp(e.deltaY * (e.deltaMode ? 0.05 : 0.0015)))));
-      if (r[0] === a0 && r[1] === b0) return;   // 已全段再縮小／已 10 根再放大：不攔，頁面照常捲（zoomAt 每次至少動 1 根，只有到頭才會不變）
-      e.preventDefault();
-      setRng(r);
-    };
-    el.addEventListener("wheel", wh, { passive: false });
-    return () => el.removeEventListener("wheel", wh);
-  }, [fine]);   // eslint-disable-line react-hooks/exhaustive-deps
   const reset = () => setRng([def0, N]);
   const nf = d.bars_completed != null ? Math.min(d.bars_completed, N) : N;
   const gapsAll = useMemo(() => decodeGaps(g(ch, "overlays", "gaps"), full.bars), [ch.overlays, full]);   // eslint-disable-line react-hooks/exhaustive-deps

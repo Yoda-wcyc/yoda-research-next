@@ -122,7 +122,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     .replace('"../../lib/ta-trade"', JSON.stringify(path.join(ROOT, "lib", "ta-trade.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-rs"', JSON.stringify(path.join(ROOT, "lib", "ta-rs.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-opt"', JSON.stringify(path.join(ROOT, "lib", "ta-opt.js").replace(/\\/g, "/")))
-    .replace('"../../lib/ta-4step"', JSON.stringify(path.join(ROOT, "lib", "ta-4step.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, zoomAt, mtfBlink, tzMs, barEnd, readSr, readKk, keyKAll, readS4, readL4 };\n";
+    .replace('"../../lib/ta-4step"', JSON.stringify(path.join(ROOT, "lib", "ta-4step.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, mtfBlink, tzMs, barEnd, readSr, readKk, keyKAll, readS4, readL4 };\n";
   const Mod = require("module");
   const libSrc = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-trade.js"), "utf8"), opts).code;
   const lib = new Mod(path.join(ROOT, "lib", "ta-trade.js")); lib.paths = Mod._nodeModulePaths(ROOT); lib._compile(libSrc, lib.id);
@@ -277,16 +277,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   };
   const chartHtml = (d) => { const full = P.fullSeries(d); return renderToString(React.createElement(P.KChart, { d, full, smas: [], a: 0, b: full.bars.length, gaps: [], islands: [], top: [], rolls: g4(d) })); };
   const g4 = (d) => (Array.isArray(d.chart.overlays.rolls) ? d.chart.overlays.rolls : []);
-  await t("框選放大／滾輪縮放（11-23）：zoomAt 游標下那根不動、最少 10 根、最多全段；框選框＋「起～迄，共 N 根」，不到 10 根框變灰；重設鈕、雙擊", async () => {
-    const z = P.zoomAt;
-    assert.deepStrictEqual(z(380, 500, 500, 440, 0.5), [410, 470], "放大：以 440 為中心");
-    assert.deepStrictEqual(z(380, 500, 500, 499.5, 0.5), [440, 500], "游標在最右：右端不動");
-    assert.deepStrictEqual(z(380, 500, 500, 440, 2), [260, 500], "縮小：右邊到底就往左補");
-    assert.deepStrictEqual(z(0, 500, 500, 250, 2), [0, 500], "已是全段：不動");
-    assert.deepStrictEqual(z(100, 110, 500, 105, 0.5), [100, 110], "已是 10 根：不再放大");
-    const s = z(100, 200, 500, 150, 1.0001); assert.strictEqual(s[1] - s[0], 101, "觸控板小量也至少動 1 根");
-    const f = z(100, 200, 500, 150, 0.9999); assert.strictEqual(f[1] - f[0], 99);
-    assert.deepStrictEqual(z(0, 6, 6, 3, 0.5), [0, 6], "全段不到 10 根：不放大");
+  await t("框選放大（11-23）：框選框＋「起～迄，共 N 根」，不到 10 根框變灰；重設鈕、雙擊；滾輪縮放 11-24 取消：滾輪不改變可見區間、不攔頁面捲動", async () => {
     const d = mkD(), full = P.fullSeries(d);
     const h = renderToString(React.createElement(P.KChart, { d, full, smas: [], a: 10, b: 60, gaps: [], islands: [], top: [], rolls: [], brush: [20, 34] })).replace(/<!-- -->/g, "");
     assert.ok(/class="brush"[^>]*data-n="15"/.test(h) && h.includes(full.bars[20].t + "～" + full.bars[34].t + "，共 15 根"), "框選框與根數");
@@ -295,16 +286,9 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     assert.ok(!renderToString(React.createElement(P.KChart, { d, full, smas: [], a: 10, b: 60, gaps: [], islands: [], top: [], rolls: [] })).includes('class="brush"'), "沒框選不畫");
     const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
     assert.ok(raw.includes('matchMedia("(pointer: fine)")') && raw.includes('e.pointerType !== "mouse"'), "只桌機（觸控不啟用）");
-    assert.ok(raw.includes('onDoubleClick={fine ? reset : undefined}') && raw.includes(">重設</button>") && raw.includes('addEventListener("wheel", wh, { passive: false })'), "雙擊、重設鈕、滾輪");
-    // 滾輪到頭（11-23）：全段再縮小、10 根再放大 → zoomAt 不變 → 不 preventDefault，頁面照常捲；其他情況才攔
-    const wsrc = raw.slice(raw.indexOf("const wh = (e) => {"), raw.indexOf('el.addEventListener("wheel", wh'));
-    const iSame = wsrc.indexOf("if (r[0] === a0 && r[1] === b0) return;"), iPd = wsrc.indexOf("e.preventDefault()");
-    assert.ok(iSame > 0 && iPd > iSame && wsrc.split("e.preventDefault()").length === 2, "滾輪：先判斷到頭才 preventDefault：" + wsrc);
-    for (const [a0, b0, n0, c, f, edge] of [[0, 500, 500, 250, 2, true], [0, 500, 500, 250, 1.0001, true], [100, 110, 500, 105, 0.5, true], [100, 110, 500, 105, 0.9999, true], [0, 6, 6, 3, 0.5, true],
-      [0, 500, 500, 250, 0.9999, false], [100, 110, 500, 105, 1.0001, false], [380, 500, 500, 440, 2, false], [1, 501, 600, 250, 2, false]]) {
-      const r = z(a0, b0, n0, c, f);
-      assert.strictEqual(r[0] === a0 && r[1] === b0, edge, "到頭判斷 " + JSON.stringify([a0, b0, n0, f]) + " → " + JSON.stringify(r));
-    }
+    assert.ok(raw.includes('onDoubleClick={fine ? reset : undefined}') && raw.includes(">重設</button>"), "雙擊、重設鈕");
+    // 滾輪（11-24 取消縮放）：page.jsx 不掛任何 wheel 處理、不 preventDefault 滾輪 → 可見區間不變、頁面照常捲
+    assert.ok(!/wheel/i.test(raw) && !raw.includes("passive: false") && !("zoomAt" in P), "不得再有滾輪處理（wheel／onWheel／passive:false／zoomAt）");
   });
   await t("撐壓線開關（11-23）：關掉不畫兩條線與右側「撐／壓」標籤、撐壓不再撐大座標；預設開；localStorage 只有 \"0\" 算關、不能用＝開", async () => {
     const d = mkD(), full = P.fullSeries(d), hi = Math.max(...full.bars.map((x) => x.h));
