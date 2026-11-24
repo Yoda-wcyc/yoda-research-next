@@ -122,8 +122,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     .replace('"../../lib/ta-trade"', JSON.stringify(path.join(ROOT, "lib", "ta-trade.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-rs"', JSON.stringify(path.join(ROOT, "lib", "ta-rs.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-opt"', JSON.stringify(path.join(ROOT, "lib", "ta-opt.js").replace(/\\/g, "/")))
-    .replace('"../../lib/ta-4step"', JSON.stringify(path.join(ROOT, "lib", "ta-4step.js").replace(/\\/g, "/")))
-    .replace('"../../lib/ta-5stage"', JSON.stringify(path.join(ROOT, "lib", "ta-5stage.js").replace(/\\/g, "/"))) + "\nexport { readB5, readC5, barEndTf, co5Live, oldBuiltin, cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, mtfBlink, tzMs, barEnd, readSr, readKk, keyKAll, readS4, readL4, maSetOf, pickMaSet, MA_SETS, Legend, migrateRules, cleanRules };\n";
+    .replace('"../../lib/ta-5stage"', JSON.stringify(path.join(ROOT, "lib", "ta-5stage.js").replace(/\\/g, "/"))) + "\nexport { readB5, readC5, barEndTf, co5Live, oldBuiltin, cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, mtfBlink, tzMs, barEnd, readSr, readKk, keyKAll, dropOld4, maSetOf, pickMaSet, MA_SETS, Legend, migrateRules, cleanRules };\n";
   const Mod = require("module");
   const libSrc = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-trade.js"), "utf8"), opts).code;
   const lib = new Mod(path.join(ROOT, "lib", "ta-trade.js")); lib.paths = Mod._nodeModulePaths(ROOT); lib._compile(libSrc, lib.id);
@@ -132,9 +131,7 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   require.cache[rsLib.id] = rsLib; rsLib.loaded = true;
   const optLib = new Mod(path.join(ROOT, "lib", "ta-opt.js")); optLib._compile(transformSync(fs.readFileSync(optLib.id, "utf8"), opts).code, optLib.id);   // 選擇權（11-23）
   require.cache[optLib.id] = optLib; optLib.loaded = true;
-  const s4Lib = new Mod(path.join(ROOT, "lib", "ta-4step.js")); s4Lib.filename = s4Lib.id; s4Lib.paths = Mod._nodeModulePaths(ROOT);   // 四步（11-24）；filename＝它 require("./ta-trade") 才解得到
-  s4Lib._compile(transformSync(fs.readFileSync(s4Lib.id, "utf8"), opts).code, s4Lib.id); require.cache[s4Lib.id] = s4Lib; s4Lib.loaded = true;
-  const s5Lib = new Mod(path.join(ROOT, "lib", "ta-5stage.js")); s5Lib.filename = s5Lib.id; s5Lib.paths = Mod._nodeModulePaths(ROOT);   // 五階段（11-24）
+  const s5Lib = new Mod(path.join(ROOT, "lib", "ta-5stage.js")); s5Lib.filename = s5Lib.id; s5Lib.paths = Mod._nodeModulePaths(ROOT);   // 五階段（11-24）；filename＝它 require("./ta-trade") 才解得到
   s5Lib._compile(transformSync(fs.readFileSync(s5Lib.id, "utf8"), opts).code, s5Lib.id); require.cache[s5Lib.id] = s5Lib; s5Lib.loaded = true;
   const m = new Mod(path.join(ROOT, "app", "ta", "page.cjs")); m.paths = Mod._nodeModulePaths(ROOT);
   m._compile(transformSync(src, opts).code, m.id);
@@ -358,55 +355,24 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
     assert.ok(raw.includes(">關鍵K</button>") && raw.includes("aria-pressed={kkOn}") && raw.includes("kkOn={kkOn}") && raw.includes("kk={kk}"), "工具列按鈕接到圖");
   });
-  await t("空方四步／多方四步（11-24）：兩顆鈕預設關、只有 \"1\" 算開；圖上標籤（空3 綠、空利空心框、L2 虛線）、hover；標籤彼此與關鍵K 不重疊；作廢不畫；不進回測", async () => {
-    const st = {};
+  await t("⛔ 四步永久刪（Yoda 11-24）：page.jsx／lib 不得再有「空方四步」「多方四步」「空1」「多1」標籤、ta-4step 匯入；舊 localStorage key 載入時刪", async () => {
+    const files = [path.join(ROOT, "app", "ta", "page.jsx"), ...fs.readdirSync(path.join(ROOT, "lib")).filter((f) => /\.(js|jsx|mjs)$/.test(f)).map((f) => path.join(ROOT, "lib", f))];
+    for (const f of files) {
+      const x = fs.readFileSync(f, "utf8");
+      for (const bad of ["空方四步", "多方四步", "空1", "多1", "ta-4step", "fourStep"]) assert.ok(!x.includes(bad), path.basename(f) + " 不該再有「" + bad + "」");
+    }
+    assert.ok(!fs.existsSync(path.join(ROOT, "lib", "ta-4step.js")), "lib/ta-4step.js 要刪掉");
+    const st = { yoda_ta_s4: "1", yoda_ta_l4: "0", yoda_ta_b5: "1" };
     globalThis.localStorage = { getItem: (k) => (k in st ? st[k] : null), setItem: (k, v) => { st[k] = String(v); }, removeItem: (k) => { delete st[k]; } };
-    assert.strictEqual(P.readS4(), false, "沒存過＝關"); assert.strictEqual(P.readL4(), false, "沒存過＝關");
-    for (const [v, want] of [["1", true], ["0", false], ["", false], ["true", false]]) { st.yoda_ta_s4 = v; st.yoda_ta_l4 = v; assert.strictEqual(P.readS4(), want, v); assert.strictEqual(P.readL4(), want, v); }
-    globalThis.localStorage = { getItem: () => { throw new Error("blocked"); } };
-    assert.strictEqual(P.readS4(), false, "localStorage 不能用＝關"); assert.strictEqual(P.readL4(), false);
+    P.dropOld4();
+    assert.deepStrictEqual(st, { yoda_ta_b5: "1" }, "只刪四步的兩個 key");
+    globalThis.localStorage = { removeItem: () => { throw new Error("blocked"); } };
+    P.dropOld4();   // localStorage 不能用不崩
     const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
-    assert.ok(raw.includes(">空方四步</button>") && raw.includes(">多方四步</button>") && raw.includes("aria-pressed={s4On}") && raw.includes("aria-pressed={l4On}")
-      && raw.includes("s4On={s4On} l4On={l4On}") && raw.includes("s4={s4}"), "工具列兩顆鈕接到圖");
-    assert.ok(raw.includes('lsSet(S4_KEY, s4On ? "0" : "1"); pickView("chart")') && raw.includes('lsSet(L4_KEY, l4On ? "0" : "1"); pickView("chart")'), "點了寫 localStorage、回 K 線");
-    assert.ok(raw.indexOf(">關鍵K</button>") < raw.indexOf(">空方四步</button>") && raw.indexOf(">空方四步</button>") < raw.indexOf(">多方四步</button>"), "放在關鍵K 旁");
-    // 不是交易訊號：withTrade／mtfBlink／面板都不碰四步
-    for (const fn of ["function withTrade", "function mtfBlink", "function RulePanel", "function sideTrade"]) {
-      const i = raw.indexOf(fn), body = raw.slice(i, raw.indexOf("\nfunction ", i + 10));
-      assert.ok(i >= 0 && !/fourStep|s4On|l4On/.test(body), fn + " 不該碰四步");
-    }
-    // 圖：NQ 4H（tests/ta_4step_nq4h.json）10-14 起畫到最後，含 Yoda 定的 11-09 那組空方
-    const G = JSON.parse(fs.readFileSync(path.join(__dirname, "ta_4step_nq4h.json"), "utf8")), n = G.t.length, F4 = require.cache[s4Lib.id].exports;
-    const d = { tf: "4H", bars_completed: n, history: { n, t: G.t, o: G.o, h: G.h, l: G.l, c: G.c, v: G.v }, symbol: { market: "fut", yahoo: "NQ=F" },
-      chart: { bars: [], ma_sets: { short: [5, 10, 20] }, overlays: { gaps: { cols: [], rows: [] }, islands: [] }, legend: [] }, signals: {} };
-    const full = P.fullSeries(d), fb = full.bars.slice(0, n), s4 = { s: F4.fourStep(fb, "s"), l: F4.fourStep(fb, "l") }, kk = P.keyKAll(full, n);
-    const a = G.t.findIndex((x) => x >= "2026-10-14"), kc = (o) => renderToString(React.createElement(P.KChart, { d, full, smas: [], a, b: n, gaps: [], islands: [], top: [], rolls: [], onTip: () => {}, ...o })).replace(/<!-- -->/g, "");
-    const on = kc({ kk, s4 }), off = kc({ kk });
-    assert.ok(!off.includes("s4t") && !off.includes("s4l"), "關掉不畫");
-    assert.ok(/<text[^>]*class="s4t"[^>]*style="fill:#6fd6a0"[^>]*data-t="2026-11-19 14:00"[^>]*>空3<\/text>/.test(on), "空3（綠）在 11-19 14:00（美東＝台灣 11-20 03:00）");
-    assert.ok(/<rect[^>]*class="s4box"[^>]*stroke="#6fd6a0"/.test(on) && /data-t="2026-11-20 06:00"[^>]*>空利<\/text>/.test(on), "空利空心框在 11-20 06:00（台灣 19:00）");
-    assert.ok(/class="s4l"[^>]*data-l2="26751.25"/.test(on), "L2 26,751.25 虛線");
-    assert.ok(!/>(空|多)[①②③④]</.test(on) && /data-step="x"[^>]*>多利</.test(on), "標籤只寫 空N／多N、多利");
-    const ids = new Set([...on.matchAll(/data-side="(s|l)" data-step="1" data-i="(\d+)"/g)].map((m) => m[1] + m[2]));
-    for (const sd of ["s", "l"]) for (const q of F4.fourStepAll(fb, sd)) if (q.s1.i >= a && q.status.startsWith("void")) assert.ok(!ids.has(sd + q.s1.i), "作廢的不畫：" + sd + G.t[q.s1.i]);
-    // 不重疊：四步標籤彼此、與關鍵K「破①↑↓」／名次（字寬估計同 page.jsx：中文 12、英數 6.8）
-    const tw = (s) => [...s].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? 12 : 6.8), 0);
-    const boxes = [...on.matchAll(/<text[^>]*class="(s4t|kk-b[^"]*|kk-n)"[^>]*x="([\d.]+)" y="([\d.]+)"[^>]*>([^<]+)</g)].map((m) => { const w = tw(m[4]) + (m[4].endsWith("利") ? 8 : 0); return [Number(m[2]) - w / 2, Number(m[3]) - 11, Number(m[2]) + w / 2, Number(m[3]) + 2, m[1] + ":" + m[4] + "@" + m[2] + "," + m[3]]; });
-    assert.ok(boxes.filter((x) => x[4].startsWith("s4t")).length >= 20, "四步標籤數 " + boxes.length);
-    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
-      const p = boxes[i], q = boxes[j];
-      if (!p[4].startsWith("s4t") && !q[4].startsWith("s4t")) continue;
-      assert.ok(!(p[0] < q[2] && p[2] > q[0] && p[1] < q[3] && p[3] > q[1]), "重疊：" + p[4] + " ↔ " + q[4]);
-    }
-    // 拖導覽列（換可見區間）標記不變：同一根的空3 在兩個區間都標在同一個 data-t
-    const on2 = kc({ kk, s4, a: n - 40 });
-    assert.ok(/data-t="2026-11-19 14:00"[^>]*>空3</.test(on2) && !/data-t="2026-10-1/.test(on2.replace(/class="kk[^"]*"[^>]*/g, "")), "區間外的步驟不畫字");
-    // hover：步驟名、時間（商品當地）、條件
-    const q = s4.s.find((x) => G.t[x.s1.i] === "2026-11-08 18:00"), inf = F4.info4("s", q, 3, fb);
-    assert.ok(inf.title === "空方四步 空3" && inf.sub === "2026-11-19 14:00" && inf.rows.some(([k, v]) => k === "條件" && v === "收盤 26,505.5 跌破 L2 26,751.25"), JSON.stringify(inf));
+    assert.ok(raw.includes("useEffect(dropOld4, [])"), "載入時刪");
   });
-  await t("反彈／修正五階段（11-24）：圖上 彈N／修N、彈5 綠、修5 紅、利空心框、停灰；支撐／防線虛線、停損階梯線；作廢不畫；與四步、關鍵K 不重疊；共振外框；不進回測、共振 1H／4H", async () => {
-    const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8"), F5 = require.cache[s5Lib.id].exports, F4 = require.cache[s4Lib.id].exports;
+  await t("反彈／修正五階段（11-24）：圖上 彈N／修N、彈5 綠、修5 紅、出場 彈均／修均（空心框）、彈線／修線（灰）；支撐／防線虛線、停損階梯線；作廢不畫；與關鍵K 不重疊；共振外框；不進回測、共振 1H／4H", async () => {
+    const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8"), F5 = require.cache[s5Lib.id].exports;
     for (const fn of ["function withTrade", "function mtfBlink", "function RulePanel", "function sideTrade"]) {
       const i = raw.indexOf(fn), body = raw.slice(i, raw.indexOf("\nfunction ", i + 10));
       assert.ok(i >= 0 && !/fiveStage|b5On|c5On|co5/.test(body), fn + " 不該碰五階段");
@@ -415,20 +381,22 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     const d = { tf: "4H", bars_completed: n, history: { n, t: col(0), o: col(1), h: col(2), l: col(3), c: col(4), v: col(5) }, symbol: { market: "fut", yahoo: "NQ=F" },
       chart: { bars: [], overlays: { gaps: { cols: [], rows: [] }, islands: [] }, legend: [] }, signals: {} };
     const full = P.fullSeries(d), fb = full.bars.slice(0, n), lines = F5.smaLines(fb, [5, 10, 20]), kk = P.keyKAll(full, n);
-    const f5 = { s: F5.fiveStage(fb, lines, "s"), l: F5.fiveStage(fb, lines, "l"), lines, nm: ["SMA5", "SMA10", "SMA20"] }, s4 = { s: F4.fourStep(fb, "s"), l: F4.fourStep(fb, "l") };
+    const f5 = { s: F5.fiveStage(fb, lines, "s"), l: F5.fiveStage(fb, lines, "l"), lines, nm: ["SMA5", "SMA10", "SMA20"] };
     const a = n - 150, kc = (o) => renderToString(React.createElement(P.KChart, { d, full, smas: [], a, b: n, gaps: [], islands: [], top: [], rolls: [], onTip: () => {}, ...o })).replace(/<!-- -->/g, "");
-    const off = kc({ kk }), on = kc({ kk, f5, s4 });
+    const off = kc({ kk }), on = kc({ kk, f5 });
     assert.ok(!off.includes("s5l") && !/>彈\d</.test(off), "關掉不畫");
     assert.ok(/class="s4t"[^>]*style="fill:#3fd08a"[^>]*>彈5</.test(on), "彈5 綠");
     assert.ok(/class="s5l"[^>]*stroke-dasharray="5 4"[^>]*data-kind="sup"/.test(on) && /class="s5l"[^>]*stroke="#e8c35a"[^>]*data-kind="stop"/.test(on), "支撐虛線、停損階梯");
     assert.ok(!/>(彈|修)[①②③④⑤]</.test(on) && !/>(反彈|修正)\d</.test(on), "只寫 彈N／修N");
+    assert.ok(/<rect[^>]*class="s4box"/.test(on) && /data-step="x"[^>]*>(彈|修)均</.test(on) && /data-step="stop"[^>]*>(彈|修)線</.test(on), "出場標籤 彈均／修均、彈線／修線（11-24 改名）");
+    assert.ok(!/>(彈|修)(利|停)</.test(on), "舊名 彈利／彈停／修利／修停 不該再出現");
     const vis = (q) => [1, 2, 3, 4, 5].some((k) => q["s" + k] && q["s" + k].i >= a);
-    const ids = new Set([...on.matchAll(/data-side="(s|l)" data-step="1" data-i="(\d+)"[^>]*>(?:彈|修)1</g)].map((m) => m[1] + m[2]));   // 四步也用 data-step，只認 彈1／修1
+    const ids = new Set([...on.matchAll(/data-side="(s|l)" data-step="1" data-i="(\d+)"[^>]*>(?:彈|修)1</g)].map((m) => m[1] + m[2]));
     assert.ok(ids.size >= 1, "要有 彈1／修1");
     for (const sd of ["s", "l"]) for (const q of F5.fiveStageAll(fb, lines, sd)) if (q.s1.i >= a && F5.HIDE5.includes(q.status)) assert.ok(!ids.has(sd + q.s1.i), "作廢不畫：" + sd + q.s1.i);
     assert.ok(f5.s.concat(f5.l).filter(vis).length >= 3, "區間內要有序列");
     const tw = (s) => [...s].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? 12 : 6.8), 0);
-    const boxes = [...on.matchAll(/<text[^>]*class="(s4t[^"]*|kk-b[^"]*|kk-n)"[^>]*x="([\d.]+)" y="([\d.]+)"[^>]*>([^<]+)</g)].map((m) => { const w = tw(m[4]) + (m[4].endsWith("利") ? 8 : 0); return [Number(m[2]) - w / 2, Number(m[3]) - 11, Number(m[2]) + w / 2, Number(m[3]) + 2, m[1] + ":" + m[4] + "@" + m[2] + "," + m[3]]; });
+    const boxes = [...on.matchAll(/<text[^>]*class="(s4t[^"]*|kk-b[^"]*|kk-n)"[^>]*x="([\d.]+)" y="([\d.]+)"[^>]*>([^<]+)</g)].map((m) => { const w = tw(m[4]) + (m[4].endsWith("均") ? 8 : 0); return [Number(m[2]) - w / 2, Number(m[3]) - 11, Number(m[2]) + w / 2, Number(m[3]) + 2, m[1] + ":" + m[4] + "@" + m[2] + "," + m[3]]; });
     const f5n = boxes.filter((x) => /:(彈|修)/.test(x[4])).length;
     assert.ok(f5n >= 8, "五階段標籤數 " + f5n);
     for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
@@ -876,8 +844,8 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   await t("均線組＝交易均線（11-24）：短／中／長＝applied 換成該組 SMA（回測筆數三組不同）、圖上畫線＝applied、非三組（EMA／手改）不亮、內建前四組（SMA5/10/20）亮「短」、長線 SMA 亮「長」、預設 SMA5/10/20 亮「短」", async () => {
     const def = lib3.normParams({}).p;
     assert.ok(def.ma === "sma" && def.ma_n.join() === "5,10,20" && P.maSetOf(def) === "short", "預設 SMA5/10/20 且「短」亮");
-    const G = JSON.parse(fs.readFileSync(path.join(__dirname, "ta_4step_nq4h.json"), "utf8")), n = G.t.length;
-    const d = { tf: "4H", bars_completed: n, history: { n, t: G.t, o: G.o, h: G.h, l: G.l, c: G.c, v: G.v }, symbol: { market: "fut", yahoo: "NQ=F" },
+    const G = JSON.parse(fs.readFileSync(path.join(__dirname, "ta_5stage_nq4h.json"), "utf8")), n = G.bars.length, col = (k) => G.bars.map((x) => x[k]);   // NQ 4H（四步 fixture 11-24 刪了）
+    const d = { tf: "4H", bars_completed: n, history: { n, t: col(0), o: col(1), h: col(2), l: col(3), c: col(4), v: col(5) }, symbol: { market: "fut", yahoo: "NQ=F" },
       chart: { bars: [], ma_sets: { short: [5, 10, 20] }, overlays: { gaps: { cols: [], rows: [] }, islands: [] }, legend: [] }, signals: {} };
     const ca = (p) => { const ce = console.error; console.error = () => {}; try { return renderToString(React.createElement(P.ChartArea, { d, p })); } finally { console.error = ce; } };
     const cnt = {}, draft0 = { ...def, ma: "ema", ma_n: ["7", "11", "30"], stop: "atr" };   // 面板上是字串、別的欄位要留著
@@ -955,15 +923,25 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     assert.strictEqual(ls.active, null);
     assert.strictEqual(P.oldBuiltin(null), null); assert.strictEqual(P.oldBuiltin("x"), null);
   });
-  await t("反彈／修正五階段：工具列兩顆鈕在四步旁、預設關、localStorage；共振閃爍 8 小時、點過就停；日K 收盤時間", async () => {
+  await t("反彈／修正五階段：工具列兩顆鈕在關鍵K 旁、預設關、localStorage；共振閃爍 8 小時、點過就停；日K 收盤時間（台指期 13:45）", async () => {
     const src = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
-    assert.ok(/data-l4>多方四步<\/button>\s*<button[^>]*data-b5>反彈五階段<\/button>\s*<button[^>]*data-c5>修正五階段<\/button>/.test(src), "鈕在四步旁");
+    assert.ok(/data-kk>關鍵K<\/button>\s*<button[^>]*data-b5>反彈五階段<\/button>\s*<button[^>]*data-c5>修正五階段<\/button>/.test(src), "鈕在關鍵K 旁");
     assert.strictEqual(P.readB5(), false); assert.strictEqual(P.readC5(), false);
     assert.ok(src.includes('pickB5 = () => { setB5On(!b5On); lsSet(B5_KEY, b5On ? "0" : "1"); pickView("chart"); }'));
     assert.ok(!/fiveStage|co5|f5/.test(src.slice(src.indexOf("function RulePanel"), src.indexOf("function RulePanel") + 20000).split("\n// ")[0]), "不進面板");
     const TZ = "America/New_York", e = P.barEndTf("2026-11-23 14:00", "4H", TZ, "fut");
     assert.strictEqual(e, P.tzMs("2026-11-23 17:00", TZ), "期貨 4H 14:00 那根收在 17:00");
     assert.strictEqual(P.barEndTf("2026-11-23", "D", "Asia/Taipei", "tw"), P.tzMs("2026-11-23 13:30", "Asia/Taipei"));
+    // 台指期／費半期（期交所，market fut＋Asia/Taipei）：日K 那根＝前一天夜盤＋當天日盤，收在當天 13:45；美國期貨日K 照舊 17:00（美東）
+    const TPE = "Asia/Taipei", twfD = P.barEndTf("2026-11-23", "D", TPE, "fut");
+    assert.strictEqual(twfD, P.tzMs("2026-11-23 13:45", TPE), "台指期日K 收在 13:45");
+    assert.strictEqual(P.barEndTf("2026-11-23", "D", TZ, "fut"), P.tzMs("2026-11-23 17:00", TZ), "美國期貨日K 17:00");
+    assert.strictEqual(P.barEndTf("2026-11-23", "W", TPE, "fut"), P.tzMs("2026-11-27 13:45", TPE), "台指期週K 週五 13:45");
+    const dbars = [{ t: "2026-11-20" }, { t: "2026-11-23" }], dco = [{ side: "s", key: 3, iA: 0, iB: 1, late: 1 }];
+    assert.strictEqual(P.co5Live(dco, dbars, "D", TPE, "fut", twfD - 60e3, [], "TXF|D|").length, 0, "13:44 還沒收完不閃");
+    assert.strictEqual(P.co5Live(dco, dbars, "D", TPE, "fut", twfD + 60e3, [], "TXF|D|").length, 1, "13:46 起閃");
+    assert.strictEqual(P.co5Live(dco, dbars, "D", TPE, "fut", P.tzMs("2026-11-23 21:40", TPE), [], "TXF|D|").length, 1, "21:40（7 小時 55 分）還在閃");
+    assert.strictEqual(P.co5Live(dco, dbars, "D", TPE, "fut", P.tzMs("2026-11-23 21:50", TPE), [], "TXF|D|").length, 0, "21:50（過 8 小時）停");
     const bars = [{ t: "2026-11-23 10:00" }, { t: "2026-11-23 11:00" }, { t: "2026-11-23 12:00" }], cos = [{ side: "s", key: 2, iA: 0, iB: 2, late: 2 }];
     const end = P.barEndTf("2026-11-23 12:00", "1H", TZ, "us");
     assert.strictEqual(P.co5Live(cos, bars, "1H", TZ, "us", end + 3600e3, [], "NQ|1H|").length, 1, "1 小時後還在閃");

@@ -34,7 +34,7 @@ const b1 = mk(cs1, V33, { ...HL33, 37: [103.2, 101.5] });
 const cs2 = [...down, 104, 105, 106, 107, 106.4, 104.5, 101.5, 100];
 const cs7 = [...cs2.slice(0, 37), 98, 97.5, 93.5, 94, 90, 90.5, 92.5];
 
-t("走完五階段：①30 → 33 碰 L 帶量 → ②34（頂 114.5）→ ③35 → ④37（防線 101.5）→ ⑤39 → 41 收 115 越過停損＝停（同根也是新①，仍算停）", () => {
+t("走完五階段：①30 → 33 碰 L 帶量 → ②34（頂 114.5）→ ③35 → ④37（防線 101.5）→ ⑤39 → 41 收 115 越過停損＝線（同根也是新①，仍算線）", () => {
   const r = run(b1), q = mine(r);
   assert.strictEqual(q.sup, 101.8); assert.deepStrictEqual([q.touch.i, q.touch.kind, q.touch.vol_i], [33, "L", 33]);
   assert.deepStrictEqual([q.s2.i, q.top, q.s3.i, q.s4.i, q.def, q.s5.i, q.s5.p], [34, 114.5, 35, 37, 101.5, 39, 101.2]);
@@ -86,7 +86,7 @@ t("停損價：⑤36 停損＝頂 114.5；37 第 1 根長黑不動、39 第 2 �
   q = mine(run(mk(cs7, V33, HL33, { 41: 97.9 })));
   assert.deepStrictEqual(q.stops, [[36, 114.5], [39, 97.7]]);
 });
-t("四種出場：V1 持有中、V2 收站回 M＝利 +9、V3 持有中；V2 同根破停損算停；①～⑤ 跟出場無關；預設＝V2", () => {
+t("四種出場：V1 持有中、V2 收站回 M＝均 +9、V3 持有中；V2 同根破停損算線；①～⑤ 跟出場無關；預設＝V2", () => {
   assert.strictEqual(F.EXIT5, "V2");
   let q = mine(run(mk(cs7, V33, HL33), "s", "V1"));
   assert.deepStrictEqual([q.ex, q.status], [null, "open"]); assert.deepStrictEqual(q.stops, [[36, 114.5], [39, 97.7], [41, 94.2]]);
@@ -125,7 +125,7 @@ t("共振：自己跟自己每個事件都配到；B 的①差 3 根算、4 根�
   assert.strictEqual(F.coincide5(r, fake.map((x) => ({ ...x, side: "l" }))).length, 0);
   assert.strictEqual(F.coincide5(r, fake.map((x) => ({ ...x, status: "void_reset" }))).length, 0);
 });
-t("浮動說明：⑤列停損歷程、②列量倍數與壓力、利／停列損益；名稱 彈1～彈5、彈利、彈停／修…", () => {
+t("浮動說明：⑤列停損歷程、②列量倍數與壓力、均／線列損益；名稱 彈1～彈5、彈均、彈線／修…（11-24 改名：利→均、停→線）", () => {
   const b = mk(cs7, V33, HL33), L = F.smaLines(b, MA), q = mine(F.fiveStageAll(b, L, "s")), nm = ["SMA2", "SMA3", "SMA20"];
   const i5 = F.info5("s", q, 5, b, L, nm), i2 = F.info5("s", q, 2, b, L, nm), ix = F.info5("s", q, "x", b, L, nm, "5/10/20 01-02 12:00、8/13/34 01-02 13:00");
   assert.strictEqual(i5.title, "反彈五階段 彈5");
@@ -133,7 +133,7 @@ t("浮動說明：⑤列停損歷程、②列量倍數與壓力、利／停列�
   assert.ok(i2.rows.some(([k, v]) => k === "條件" && /碰到壓力 SMA20 114\.\d+.*量 — 倍/.test(v)), JSON.stringify(i2.rows));
   assert.ok(ix.rows.some(([k, v]) => k === "損益" && v.startsWith("+9.00 點")));
   assert.ok(ix.rows.some(([k]) => k === "共振"));
-  assert.deepStrictEqual([1, 5, "x", "stop"].map((k) => F.step5Name("l", k)), ["修1", "修5", "修利", "修停"]);
+  assert.deepStrictEqual([1, 5, "x", "stop"].map((k) => F.step5Name("l", k)), ["修1", "修5", "修均", "修線"]);
   assert.strictEqual(F.line5Info("s", q, "stop", b).title, "停損 94.2");
 });
 
