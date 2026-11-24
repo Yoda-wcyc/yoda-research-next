@@ -122,7 +122,8 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     .replace('"../../lib/ta-trade"', JSON.stringify(path.join(ROOT, "lib", "ta-trade.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-rs"', JSON.stringify(path.join(ROOT, "lib", "ta-rs.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-opt"', JSON.stringify(path.join(ROOT, "lib", "ta-opt.js").replace(/\\/g, "/")))
-    .replace('"../../lib/ta-4step"', JSON.stringify(path.join(ROOT, "lib", "ta-4step.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, mtfBlink, tzMs, barEnd, readSr, readKk, keyKAll, readS4, readL4, maSetOf, pickMaSet, MA_SETS, Legend, migrateRules, cleanRules };\n";
+    .replace('"../../lib/ta-4step"', JSON.stringify(path.join(ROOT, "lib", "ta-4step.js").replace(/\\/g, "/")))
+    .replace('"../../lib/ta-5stage"', JSON.stringify(path.join(ROOT, "lib", "ta-5stage.js").replace(/\\/g, "/"))) + "\nexport { readB5, readC5, barEndTf, co5Live, oldBuiltin, cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, mtfBlink, tzMs, barEnd, readSr, readKk, keyKAll, readS4, readL4, maSetOf, pickMaSet, MA_SETS, Legend, migrateRules, cleanRules };\n";
   const Mod = require("module");
   const libSrc = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-trade.js"), "utf8"), opts).code;
   const lib = new Mod(path.join(ROOT, "lib", "ta-trade.js")); lib.paths = Mod._nodeModulePaths(ROOT); lib._compile(libSrc, lib.id);
@@ -133,6 +134,8 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   require.cache[optLib.id] = optLib; optLib.loaded = true;
   const s4Lib = new Mod(path.join(ROOT, "lib", "ta-4step.js")); s4Lib.filename = s4Lib.id; s4Lib.paths = Mod._nodeModulePaths(ROOT);   // 四步（11-24）；filename＝它 require("./ta-trade") 才解得到
   s4Lib._compile(transformSync(fs.readFileSync(s4Lib.id, "utf8"), opts).code, s4Lib.id); require.cache[s4Lib.id] = s4Lib; s4Lib.loaded = true;
+  const s5Lib = new Mod(path.join(ROOT, "lib", "ta-5stage.js")); s5Lib.filename = s5Lib.id; s5Lib.paths = Mod._nodeModulePaths(ROOT);   // 五階段（11-24）
+  s5Lib._compile(transformSync(fs.readFileSync(s5Lib.id, "utf8"), opts).code, s5Lib.id); require.cache[s5Lib.id] = s5Lib; s5Lib.loaded = true;
   const m = new Mod(path.join(ROOT, "app", "ta", "page.cjs")); m.paths = Mod._nodeModulePaths(ROOT);
   m._compile(transformSync(src, opts).code, m.id);
   const P = m.exports;
@@ -401,6 +404,43 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     // hover：步驟名、時間（商品當地）、條件
     const q = s4.s.find((x) => G.t[x.s1.i] === "2026-11-08 18:00"), inf = F4.info4("s", q, 3, fb);
     assert.ok(inf.title === "空方四步 空3" && inf.sub === "2026-11-19 14:00" && inf.rows.some(([k, v]) => k === "條件" && v === "收盤 26,505.5 跌破 L2 26,751.25"), JSON.stringify(inf));
+  });
+  await t("反彈／修正五階段（11-24）：圖上 彈N／修N、彈5 綠、修5 紅、利空心框、停灰；支撐／防線虛線、停損階梯線；作廢不畫；與四步、關鍵K 不重疊；共振外框；不進回測、共振 1H／4H", async () => {
+    const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8"), F5 = require.cache[s5Lib.id].exports, F4 = require.cache[s4Lib.id].exports;
+    for (const fn of ["function withTrade", "function mtfBlink", "function RulePanel", "function sideTrade"]) {
+      const i = raw.indexOf(fn), body = raw.slice(i, raw.indexOf("\nfunction ", i + 10));
+      assert.ok(i >= 0 && !/fiveStage|b5On|c5On|co5/.test(body), fn + " 不該碰五階段");
+    }
+    const G = JSON.parse(fs.readFileSync(path.join(__dirname, "ta_5stage_nq4h.json"), "utf8")), n = G.bars.length, col = (k) => G.bars.map((x) => x[k]);
+    const d = { tf: "4H", bars_completed: n, history: { n, t: col(0), o: col(1), h: col(2), l: col(3), c: col(4), v: col(5) }, symbol: { market: "fut", yahoo: "NQ=F" },
+      chart: { bars: [], overlays: { gaps: { cols: [], rows: [] }, islands: [] }, legend: [] }, signals: {} };
+    const full = P.fullSeries(d), fb = full.bars.slice(0, n), lines = F5.smaLines(fb, [5, 10, 20]), kk = P.keyKAll(full, n);
+    const f5 = { s: F5.fiveStage(fb, lines, "s"), l: F5.fiveStage(fb, lines, "l"), lines, nm: ["SMA5", "SMA10", "SMA20"] }, s4 = { s: F4.fourStep(fb, "s"), l: F4.fourStep(fb, "l") };
+    const a = n - 150, kc = (o) => renderToString(React.createElement(P.KChart, { d, full, smas: [], a, b: n, gaps: [], islands: [], top: [], rolls: [], onTip: () => {}, ...o })).replace(/<!-- -->/g, "");
+    const off = kc({ kk }), on = kc({ kk, f5, s4 });
+    assert.ok(!off.includes("s5l") && !/>彈\d</.test(off), "關掉不畫");
+    assert.ok(/class="s4t"[^>]*style="fill:#3fd08a"[^>]*>彈5</.test(on), "彈5 綠");
+    assert.ok(/class="s5l"[^>]*stroke-dasharray="5 4"[^>]*data-kind="sup"/.test(on) && /class="s5l"[^>]*stroke="#e8c35a"[^>]*data-kind="stop"/.test(on), "支撐虛線、停損階梯");
+    assert.ok(!/>(彈|修)[①②③④⑤]</.test(on) && !/>(反彈|修正)\d</.test(on), "只寫 彈N／修N");
+    const vis = (q) => [1, 2, 3, 4, 5].some((k) => q["s" + k] && q["s" + k].i >= a);
+    const ids = new Set([...on.matchAll(/data-side="(s|l)" data-step="1" data-i="(\d+)"[^>]*>(?:彈|修)1</g)].map((m) => m[1] + m[2]));   // 四步也用 data-step，只認 彈1／修1
+    assert.ok(ids.size >= 1, "要有 彈1／修1");
+    for (const sd of ["s", "l"]) for (const q of F5.fiveStageAll(fb, lines, sd)) if (q.s1.i >= a && F5.HIDE5.includes(q.status)) assert.ok(!ids.has(sd + q.s1.i), "作廢不畫：" + sd + q.s1.i);
+    assert.ok(f5.s.concat(f5.l).filter(vis).length >= 3, "區間內要有序列");
+    const tw = (s) => [...s].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? 12 : 6.8), 0);
+    const boxes = [...on.matchAll(/<text[^>]*class="(s4t[^"]*|kk-b[^"]*|kk-n)"[^>]*x="([\d.]+)" y="([\d.]+)"[^>]*>([^<]+)</g)].map((m) => { const w = tw(m[4]) + (m[4].endsWith("利") ? 8 : 0); return [Number(m[2]) - w / 2, Number(m[3]) - 11, Number(m[2]) + w / 2, Number(m[3]) + 2, m[1] + ":" + m[4] + "@" + m[2] + "," + m[3]]; });
+    const f5n = boxes.filter((x) => /:(彈|修)/.test(x[4])).length;
+    assert.ok(f5n >= 8, "五階段標籤數 " + f5n);
+    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+      const p = boxes[i], q = boxes[j];
+      if (!/:(彈|修)/.test(p[4]) && !/:(彈|修)/.test(q[4])) continue;
+      assert.ok(!(p[0] < q[2] && p[2] > q[0] && p[1] < q[3] && p[3] > q[1]), "重疊：" + p[4] + " ↔ " + q[4]);
+    }
+    // 共振外框：blink 指到的標記加 s5co 框、字加 s5blink
+    const q5 = f5.s.find((q) => q.s5 && q.s5.i >= a);
+    const bl = kc({ kk, f5: { ...f5, blink: new Map([["s|5|" + q5.s5.i, { list: [{ id: "x" }], txt: "共振" }]]) } });
+    assert.ok(/class="s5co"/.test(bl) && /class="s4t s5blink"[^>]*data-co="1"[^>]*>彈5</.test(bl), "共振外框");
+    assert.ok(raw.includes('(bl ? " ta-blink b-dn" : "")') && raw.includes('k === "short" || k === "mid"'), "短、中一起閃（綠）");
   });
   await t("市場標籤：美國期貨・CME／指數／台股／美股·NASDAQ·ETF；怪值不崩", async () => {
     assert.strictEqual(P.mktBadge({ market: "fut", exchange: "CME" }), "美國期貨・CME");
@@ -888,6 +928,49 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     const ca = P.cleanRules({ cur: old, saved: sv, active: "舊預設存一份" });   // 套用中的是自己存的規則 → cur 不遷移
     assert.deepStrictEqual(ca.cur, old, "套用自己存的規則不遷移"); assert.strictEqual(ca.active, "舊預設存一份");
     assert.deepStrictEqual(P.cleanRules({ cur: old, saved: sv, active: "內建：預設規則" }).cur, def, "套用內建預設照樣遷移");
+  });
+  await t("舊版內建策略遷移（11-24 Yoda）：cur＝舊版（EMA）短線快出／波段抱長／只做多・固定 5% → 新版同名、active 指向它；套用自己存的規則照舊；saved 不動", async () => {
+    // 1edf010 lib/ta-trade.js 的 normParams(PRESETS[k].p).p 原文（git show 逐欄核對過）
+    const base = { ma: "ema", ma_n: [5, 10, 20], fresh_n: 3, vol_on: true, vol_in: 1.2, vol_n: 10, side_ma: true, stop: "low_n", stop_n: 3, stop_pct: 5, atr_n: 14, atr_k: 2,
+      stop_on: "touch", exit_ma: true, exit_k: 2, exit_delay: 0, vol_exit: true, vol_out: 2, max_hold_on: false, max_hold: 20, dir: "both", fee: 0, slip: 0, entry: "ma" };
+    const OLD = { "短線快出": { ...base, stop_n: 2, exit_k: 1 }, "波段抱長": { ...base, stop: "atr", exit_k: 3, exit_delay: 3 }, "只做多・固定 5%": { ...base, stop: "pct", max_hold_on: true, dir: "long" } };
+    const sv = [{ name: "我的", p: { ...base, stop_n: 5 } }];
+    for (const [nm, o] of Object.entries(OLD)) {
+      const nw = lib3.normParams(lib3.PRESETS.find((x) => x.name === nm).p).p;
+      assert.strictEqual(nw.ma, "sma"); assert.deepStrictEqual({ ...nw, ma: "ema" }, o, nm + "：新版跟舊版只差 ma");
+      for (const act of [null, "內建：" + nm, "內建：預設規則"]) {
+        const r = P.cleanRules({ cur: o, saved: sv, active: act });
+        assert.deepStrictEqual(r.cur, nw, nm + " active=" + act); assert.strictEqual(r.active, "內建：" + nm); assert.deepStrictEqual(r.saved, sv, "saved 不動");
+        assert.strictEqual(P.maSetOf(r.cur), "short");
+      }
+      const { entry, ...noEntry } = o;   // 11-23 前存的沒有 entry
+      assert.strictEqual(P.cleanRules({ cur: noEntry, saved: [], active: null }).active, "內建：" + nm);
+      const mine = P.cleanRules({ cur: o, saved: [{ name: "我的", p: o }], active: "我的" });   // 套用自己存的規則 → 不遷移
+      assert.deepStrictEqual([mine.cur, mine.active], [o, "我的"]);
+      const tweak = P.cleanRules({ cur: { ...o, fee: 0.1 }, saved: [], active: "內建：" + nm });   // 改過一欄 → 不是舊版內建
+      assert.strictEqual(tweak.cur.ma, "ema"); assert.strictEqual(tweak.cur.fee, 0.1);
+      assert.deepStrictEqual(P.cleanRules({ cur: nw, saved: [], active: "內建：" + nm }).cur, nw, "新版不動");
+    }
+    const ls = P.cleanRules({ cur: lib3.normParams(lib3.PRESETS[4].p).p, saved: [], active: null });   // 長線 SMA 本來就是 SMA、沒變 → 不認成舊版
+    assert.strictEqual(ls.active, null);
+    assert.strictEqual(P.oldBuiltin(null), null); assert.strictEqual(P.oldBuiltin("x"), null);
+  });
+  await t("反彈／修正五階段：工具列兩顆鈕在四步旁、預設關、localStorage；共振閃爍 8 小時、點過就停；日K 收盤時間", async () => {
+    const src = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
+    assert.ok(/data-l4>多方四步<\/button>\s*<button[^>]*data-b5>反彈五階段<\/button>\s*<button[^>]*data-c5>修正五階段<\/button>/.test(src), "鈕在四步旁");
+    assert.strictEqual(P.readB5(), false); assert.strictEqual(P.readC5(), false);
+    assert.ok(src.includes('pickB5 = () => { setB5On(!b5On); lsSet(B5_KEY, b5On ? "0" : "1"); pickView("chart"); }'));
+    assert.ok(!/fiveStage|co5|f5/.test(src.slice(src.indexOf("function RulePanel"), src.indexOf("function RulePanel") + 20000).split("\n// ")[0]), "不進面板");
+    const TZ = "America/New_York", e = P.barEndTf("2026-11-23 14:00", "4H", TZ, "fut");
+    assert.strictEqual(e, P.tzMs("2026-11-23 17:00", TZ), "期貨 4H 14:00 那根收在 17:00");
+    assert.strictEqual(P.barEndTf("2026-11-23", "D", "Asia/Taipei", "tw"), P.tzMs("2026-11-23 13:30", "Asia/Taipei"));
+    const bars = [{ t: "2026-11-23 10:00" }, { t: "2026-11-23 11:00" }, { t: "2026-11-23 12:00" }], cos = [{ side: "s", key: 2, iA: 0, iB: 2, late: 2 }];
+    const end = P.barEndTf("2026-11-23 12:00", "1H", TZ, "us");
+    assert.strictEqual(P.co5Live(cos, bars, "1H", TZ, "us", end + 3600e3, [], "NQ|1H|").length, 1, "1 小時後還在閃");
+    assert.strictEqual(P.co5Live(cos, bars, "1H", TZ, "us", end + 8.1 * 3600e3, [], "NQ|1H|").length, 0, "過 8 小時停");
+    assert.strictEqual(P.co5Live(cos, bars, "1H", TZ, "us", end - 60e3, [], "NQ|1H|").length, 0, "還沒收完不算");
+    const id = P.co5Live(cos, bars, "1H", TZ, "us", end + 60e3, [], "NQ|1H|")[0].id;
+    assert.strictEqual(P.co5Live(cos, bars, "1H", TZ, "us", end + 60e3, [id], "NQ|1H|").length, 0, "點過就停");
   });
   await t("pastHalf：TA 票過半才續；普通票、壞票、沒期限 → 要問 status", async () => {
     const tk = (p) => "h." + Buffer.from(JSON.stringify(p)).toString("base64url") + ".s", n = Date.now() / 1000;

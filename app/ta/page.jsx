@@ -3,6 +3,7 @@ import { Component, useCallback, useEffect, useLayoutEffect, useMemo, useRef, us
 import { normParams, backtest, chartMarks, exitLine, ruleText, maName, maLines, smaSeq, PRESETS, explainEntry, explainExit, fpx, fpc, statsOf, hasVolume, effParams, keyKEvents, volMult, KEYK_N, KEYK_TOP } from "../../lib/ta-trade";
 import { presetStart } from "../../lib/ta-rs";
 import { fourStep, info4, l2Info4, step4Name } from "../../lib/ta-4step";
+import { fiveStage, smaLines, co5Short, info5, line5Info, step5Name, ev5 } from "../../lib/ta-5stage";
 import { OPT_GROUPS, optSym, dte, fmtTs, candidates, cost as optCost, pnl as optPnl, retPct, maxGain, lots } from "../../lib/ta-opt";
 
 // 會員技術分析（獨立網站版·2026-11-08 Yoda 定）
@@ -27,6 +28,10 @@ import { OPT_GROUPS, optSym, dte, fmtTs, candidates, cost as optCost, pnl as opt
 //           「突破／跌破關鍵 K」同一份 lib/ta-trade.js keyKEvents，不跟可見區間走）；K 棒加白框＋名次，收盤第一次站上最高標「破①↑」（紅）、跌破最低「破①↓」（綠）
 //   空方四步／多方四步（11-24）：工具列兩顆鈕（記 localStorage yoda_ta_s4／yoda_ta_l4，預設關）；規則在 lib/ta-4step.js（整段已收完的 K、point-in-time），
 //           作廢的序列不畫；不是交易訊號：不進左側面板、回測統計、共振閃爍
+//   反彈五階段／修正五階段（11-24）：工具列兩顆鈕（記 localStorage yoda_ta_b5／yoda_ta_c5，預設關）；規則在 lib/ta-5stage.js（整段已收完的 K、point-in-time），
+//           均線＝交易用的三條（applied）；出場用 r2 回測選的 V2（停損價或收盤站回中均線）；作廢不畫；不進左側面板、回測統計。
+//           共振閃爍只做空方：背景另算 SMA5/10/20 與 8/13/34 的反彈五階段，同一階段 3 根內都成立 → 那個標記與「短」「中」一起閃，
+//           後成立那根收完起 8 小時（現在時鐘）自動停、點過就停（localStorage yoda_ta_b5co_gone）；減少動態＝不閃、改粗外框
 // 資料全部來自 Python 計算引擎（ta-engine，契約見 docs/ta-engine-contract.md）；最後一根盤中未定只上圖，不進訊號與回測。
 
 const TOK_KEY = "yoda_ta_jwt";
@@ -279,6 +284,12 @@ const S4C = {
   s: { nm: "空方四步 ", r2: "L2", line: "#8fcfb0", col: { 1: "#d6dde6", 2: "#d6dde6", 3: "#6fd6a0", 4: "#8b95a3", x: "#b9ecd2" } },
   l: { nm: "多方四步 ", r2: "H2", line: "#f0a0a8", col: { 1: "#eadbc8", 2: "#eadbc8", 3: "#ff8f96", 4: "#8b95a3", x: "#ffc6cb" } },
 };
+// 五階段顏色（11-24，比照四步）：①～④ 中性、彈5 綠／修5 紅、停灰、利＝淡色空心框；line＝支撐／防線虛線、stop＝停損價階梯線
+const S5C = {
+  s: { nm: "反彈五階段 ", line: "#8fcfb0", stop: "#e8c35a", col: { 1: "#d6dde6", 2: "#d6dde6", 3: "#d6dde6", 4: "#d6dde6", 5: "#3fd08a", stop: "#8b95a3", x: "#b9ecd2" } },
+  l: { nm: "修正五階段 ", line: "#f0a0a8", stop: "#e8c35a", col: { 1: "#eadbc8", 2: "#eadbc8", 3: "#eadbc8", 4: "#eadbc8", 5: "#ff5f6b", stop: "#8b95a3", x: "#ffc6cb" } },
+};
+const K5 = [1, 2, 3, 4, 5, "x", "stop"];
 const MA_COL = ["#ff4d4f", "#f5c518", "#3d8bfd"];   // 均線由短到長：紅、黃、藍（Yoda 2026-11-09）
 const EMA_COL = "#ff5ce1";
 const YR_COL = "#b9a3ff";   // 年線 SMA240（11-19）：日K 常駐細線；週K 對應 52 週線 SMA52（11-19）；不屬於均線組、不進交易計算
@@ -356,7 +367,7 @@ function keyKAll(full, nf) {
 // 框選放大（11-23，只桌機；滾輪縮放 11-24 取消，滾輪在圖上＝一般頁面捲動）：KW／KL／KR＝K 線圖 viewBox 寬與價格區左右留白，ChartArea 用來把滑鼠位置換成第幾根
 const KW = 1000, KL = 62, KR = 178, ZOOM_MIN = 10;
 
-function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, brush, srOn = true, kk = null, s4 = null }) {
+function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, brush, srOn = true, kk = null, s4 = null, f5 = null, onCo5 = null }) {
   const ch = d.chart || {};
   const bars = full.bars.slice(a, b), n = bars.length;
   if (n < 2) return <div className="ta-nochart">沒有 K 線資料</div>;
@@ -378,12 +389,20 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
   const reach = (hi - lo) * 0.2;
   // 四步（11-24）：L2／H2 虛線＝②到出場（未出場畫到右緣）；②在區間右邊或出場在區間左邊的不畫
   const s4L = s4 ? ["s", "l"].flatMap((sd) => (s4[sd] || []).filter((q) => q.s2 && q.s2.i < b && (!q.ex || q.ex.i >= a)).map((q) => [sd, q])) : [];
-  for (const y of [...srl.map(([x]) => x.price), ...tlines.map((ln) => ln.y), ...s4L.map(([, q]) => q.L2)]) {
+  // 五階段（11-24）：支撐（①→⑤）、防線（④→⑤）、停損階梯（⑤→出場）；還沒到⑤／還沒出場的畫到右緣
+  const f5L = [];
+  if (f5) for (const sd of ["s", "l"]) for (const q of f5[sd] || []) {
+    const e1 = q.s5 ? q.s5.i : null;
+    if (q.s1.i < b && (e1 == null || e1 >= a)) { f5L.push([sd, q, "sup", q.s1.i, e1, q.sup]); if (q.s4) f5L.push([sd, q, "def", q.s4.i, e1, q.def]); }
+    if (q.s5 && q.s5.i < b && (!q.ex || q.ex.i >= a)) f5L.push([sd, q, "stop", q.s5.i, q.ex ? q.ex.i : null, null]);
+  }
+  const f5P = f5L.flatMap(([, q, kind, , , p]) => (kind === "stop" ? q.stops.map((z) => z[1]) : [p]));
+  for (const y of [...srl.map(([x]) => x.price), ...tlines.map((ln) => ln.y), ...s4L.map(([, q]) => q.L2), ...f5P]) {
     if (y != null && y >= lo - reach && y <= hi + reach) { lo = Math.min(lo, y); hi = Math.max(hi, y); }
   }
   const pad = (hi - lo) * 0.05 || hi * 0.01 || 1;
-  // 四步開著：空方那顆開→頂端多留空間、多方那顆開→底部多留（標籤只放 K 外側，貼頂／貼底的 K 才放得下）；關著時跟原本一樣
-  lo -= pad * (s4 && s4.l ? 3 : 1); hi += pad * (s4 && s4.s ? 3 : 1);
+  // 四步／五階段開著：空方（反彈）那顆開→頂端多留空間、多方（修正）那顆開→底部多留（標籤只放 K 外側，貼頂／貼底的 K 才放得下）；關著時跟原本一樣
+  lo -= pad * ((s4 && s4.l) || (f5 && f5.l) ? 3 : 1); hi += pad * ((s4 && s4.s) || (f5 && f5.s) ? 3 : 1);
   const step = pw / n, bw = Math.max(1.2, step * 0.62);
   const Y = (p) => T + ((hi - p) / (hi - lo)) * PH;
   const X = (i) => L + step * (i + 0.5);
@@ -808,6 +827,53 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
       s4Els.push(<text key={"s4t" + sd + q.s1.i + k} className="s4t" x={lx} y={ly} textAnchor="middle" style={{ fill: col }} data-t={bk.t} data-ov={free ? undefined : 1} {...h} {...aria}>{str}</text>);
     }
   }
+  // 五階段（11-24）：反彈標 K 上方、修正標 K 下方，只寫「彈1～彈5、彈利、彈停／修…」；避讓同四步（最後放、只放 K 外側、遠了拉引線、不翻面）。
+  // 虛線、階梯線、感應線插在 s4At（壓在進出場記號、關鍵K、各種字下面，不搶它們的滑鼠說明）；共振的標記加閃爍外框（f5.blink：sd|階段|i → 說明）
+  const f5Els = [], f5Late = [];
+  if (f5) {
+    const tipOf = (info, co) => ({ "data-tip": "s5", onMouseEnter: (e) => onTip && onTip("s5", info, e, false), onMouseLeave: () => onTip && onTip(null),
+      onClick: (e) => { e.stopPropagation(); if (co && onCo5) onCo5(co); onTip && onTip("s5", info, e, true); } });
+    const f5Lines = [];
+    for (const [sd, q, kind, i0, i1, p] of f5L) {
+      const S = S5C[sd], x0 = XL(i0 - a), x1 = i1 == null ? xr : X(i1 - a), h = tipOf(line5Info(sd, q, kind, full.bars)), ky = "f5" + kind + sd + q.s1.i;
+      let dd;
+      if (kind === "stop") {
+        dd = "M" + f1d(x0) + " " + f1d(Y(q.stops[0][1]));
+        for (const [j, v] of q.stops.slice(1)) dd += "H" + f1d(XL(j - a)) + "V" + f1d(Y(v));
+        dd += "H" + f1d(x1);
+        if (!q.ex) lab.push({ y: Y(q.stops[q.stops.length - 1][1]), t: "停損 " + fpx(q.stops[q.stops.length - 1][1]), col: S.stop, nt: "", tip: h });
+      } else {
+        dd = "M" + f1d(x0) + " " + f1d(Y(p)) + "H" + f1d(x1);
+        if (i1 == null) lab.push({ y: Y(p), t: (kind === "sup" ? (sd === "s" ? "支撐 " : "壓力 ") : "防線 ") + fpx(p), col: S.line, nt: "", tip: h });
+      }
+      f5Lines.push(<path key={ky} className="s5l" d={dd} fill="none" stroke={kind === "stop" ? S.stop : S.line} strokeWidth={kind === "stop" ? 1.4 : 1.3}
+        strokeDasharray={kind === "sup" ? "5 4" : kind === "def" ? "2 3" : undefined} strokeOpacity=".85" clipPath={clip} data-kind={kind} data-side={sd} data-p={p ?? undefined} />,
+        <path key={ky + "h"} className="s4hit" d={dd} fill="none" stroke="transparent" strokeWidth="9" clipPath={clip} {...h} />);
+    }
+    els.splice(s4At, 0, ...f5Lines);
+    const evs = [];
+    for (const sd of ["s", "l"]) for (const q of f5[sd] || []) for (const k of K5) { const e = ev5(q, k); if (e && e.i >= a && e.i < b) evs.push([sd, q, k, e.i]); }
+    evs.sort((u, v) => u[3] - v[3] || K5.indexOf(u[2]) - K5.indexOf(v[2]));
+    const cl = (y) => Math.min(T + PH - 2, Math.max(T + 12, y));
+    for (const [sd, q, k, i] of evs) {
+      const S = S5C[sd], bk = full.bars[i], x = X(i - a), up = sd === "s", col = S.col[k], str = step5Name(sd, k);
+      const co = f5.blink && f5.blink.get(sd + "|" + k + "|" + i), h = tipOf(info5(sd, q, k, full.bars, f5.lines, f5.nm, co ? co.txt : null), co ? co.list : null);
+      const aria = { tabIndex: 0, role: "button", "aria-label": S.nm + str + " " + bk.t, onFocus: h.onMouseEnter, onBlur: h.onMouseLeave, "data-side": sd, "data-step": k, "data-i": i, "data-co": co ? 1 : undefined };
+      if (!showLab) { f5Els.push(<circle key={"f5d" + sd + q.s1.i + k} className={"s4t" + (co ? " s5co" : "")} cx={x} cy={up ? Y(bk.h) - 5 : Y(bk.l) + 5} r={co ? 3.5 : 2.5} fill={col} {...h} {...aria} />); continue; }
+      const w = tw(str) * 1.05 + (k === "x" || co ? 8 : 2), dir = up ? -1 : 1, yo = up ? Y(bk.h) - 6 : Y(bk.l) + 15, cands = [];
+      const cx = (dx) => Math.min(xr - w / 2, Math.max(L + w / 2, x + dx * w));
+      for (let r = 0; r < 17; r++) for (const dx of [0, 0.7, -0.7, 1.4, -1.4, 2.1, -2.1, 2.8, -2.8, 3.5, -3.5, 4.2, -4.2, 5, -5]) cands.push([cx(dx), cl(yo + dir * 11 * r), r * 11 + Math.abs(dx * w) * 1.5]);
+      cands.sort((u, v) => u[2] - v[2]);
+      const bx = ([u, v]) => [u - w / 2 - 3, v - 17, u + w / 2 + 3, v + 8];
+      const free = cands.find((c) => !busyAt(bx(c))), [lx, ly] = free || cands.reduce((u, c) => (hitArea(bx(c)) < hitArea(bx(u)) ? c : u), cands[0]);
+      placed.push([lx - w / 2, ly - 14, lx + w / 2, ly + 4]);
+      const ay = up ? Y(bk.h) - 2 : Y(bk.l) + 2, py = up ? ly + 2 : ly - 11;
+      if (Math.abs(py - ay) > 16 || Math.abs(lx - x) > 10) f5Late.unshift(<line key={"f5ld" + sd + q.s1.i + k} className="s4lead" x1={lx} y1={py} x2={x} y2={ay} stroke={col} strokeWidth="1" strokeOpacity=".7" />);
+      if (k === "x") f5Els.push(<rect key={"f5b" + sd + q.s1.i} className="s4box" x={lx - w / 2} y={ly - 12} width={w} height={16} rx="3" stroke={S.col[5]} />);
+      if (co) f5Els.push(<rect key={"f5c" + sd + q.s1.i + k} className="s5co" x={lx - w / 2 - 2} y={ly - 14} width={w + 4} height={20} rx="4" fill="none" stroke={S.col[5]} />);
+      f5Els.push(<text key={"f5t" + sd + q.s1.i + k} className={"s4t" + (co ? " s5blink" : "")} x={lx} y={ly} textAnchor="middle" style={{ fill: col }} data-t={bk.t} data-ov={free ? undefined : 1} {...h} {...aria}>{str}</text>);
+    }
+  }
   // 字被擠到離記號 >20px：畫 1px 同色細引線，從字框最近的點連到記號（停在記號外 8px，不蓋到記號）
   const leads = [];
   for (const { bx, mx, my, col, gone } of labs) {
@@ -817,7 +883,7 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
     const f = (dd - 8) / dd;
     leads.push(<line key={"ld" + leads.length} className="mk-lead" x1={px} y1={py} x2={px + (mx - px) * f} y2={py + (my - py) * f} stroke={col} strokeWidth="1" />);
   }
-  els.push(...kkEls, ...rkEls, ...islEls, ...unfEls, ...leads, ...tlab, ...s4Late, ...s4Els);  // 右側標籤避讓（由上到下排、不重疊、不超出價格區）；圖外的價位貼邊、加 ↑／↓
+  els.push(...kkEls, ...rkEls, ...islEls, ...unfEls, ...leads, ...tlab, ...s4Late, ...s4Els, ...f5Late, ...f5Els);  // 右側標籤避讓（由上到下排、不重疊、不超出價格區）；圖外的價位貼邊、加 ↑／↓
   for (const z of lab) {
     if (z.y < T) { z.y = T; z.t = "↑" + z.t; }
     else if (z.y > T + PH) { z.y = T + PH; z.t = "↓" + z.t; }
@@ -934,7 +1000,7 @@ function RangeNav({ bars, a, b, onChange }) {
 }
 
 // 圖＋導覽列＋圖下三個分頁：區間狀態放這裡（② 缺口、③ 前五大量的表跟著區間變）；父層用 key＝代號|週期，換代號或週期就重新掛載＝回到預設區間
-function ChartArea({ d, p = DEF_P, srOn, kkOn = true, s4On = false, l4On = false }) {
+function ChartArea({ d, p = DEF_P, srOn, kkOn = true, s4On = false, l4On = false, b5On = false, c5On = false, co5 = null, onCo5 = null }) {
   const ch = d.chart || {};
   const full = useMemo(() => fullSeries(d), [d.history, ch.bars, d.bars_completed]);   // eslint-disable-line react-hooks/exhaustive-deps
   const N = full.bars.length;
@@ -1006,6 +1072,24 @@ function ChartArea({ d, p = DEF_P, srOn, kkOn = true, s4On = false, l4On = false
     const fb = full.bars.slice(0, nf);
     return { s: s4On ? fourStep(fb, "s") : null, l: l4On ? fourStep(fb, "l") : null };
   }, [s4On, l4On, full, nf]);
+  // 五階段（11-24）：均線＝交易用的三條（SMA 用跟 Python 參考一樣的算法；EMA 用圖上那三條），只用已收完的 K、整段 history 算
+  const f5 = useMemo(() => {
+    if (!b5On && !c5On) return null;
+    const fb = full.bars.slice(0, nf), lines = p.ma === "sma" ? smaLines(fb, p.ma_n) : maLines(full.c, p);
+    return { s: b5On ? fiveStage(fb, lines, "s") : null, l: c5On ? fiveStage(fb, lines, "l") : null, lines, nm: [1, 2, 3].map((k) => maName(p, k)) };
+  }, [b5On, c5On, full, nf, p.ma, p.ma_n.join()]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // 共振閃爍（只空方）：交易均線是「短」→ 標 5/10/20 那組的位置、「中」→ 8/13/34 那組；其他均線只閃按鈕
+  const ms = maSetOf(p);
+  const f5b = useMemo(() => {
+    if (!f5 || !f5.s || !co5 || !co5.length || (ms !== "short" && ms !== "mid")) return f5;
+    const m = new Map();
+    for (const c of co5) {
+      const i = ms === "short" ? c.iA : c.iB, k = "s|" + c.key + "|" + i, o = m.get(k) || { list: [], txt: "" };
+      o.list.push(c); o.txt = "5/10/20 " + md(full.bars[c.iA].t) + "、8/13/34 " + md(full.bars[c.iB].t) + " 同一階段都成立（點一下停止閃爍）";
+      m.set(k, o);
+    }
+    return { ...f5, blink: m };
+  }, [f5, co5, ms, full]);
   const view = useMemo(() => ({
     a, b, from: full.bars[a] ? full.bars[a].t : "", to: full.bars[b - 1] ? full.bars[b - 1].t : "", top,
     gaps: gapsAll.filter((x) => x.i >= a && x.i < b), islands: islAll.filter((x) => x.i1 >= a && x.i0 < b),
@@ -1048,20 +1132,20 @@ function ChartArea({ d, p = DEF_P, srOn, kkOn = true, s4On = false, l4On = false
   }, [tip]);
   const trd = d.trade || {};
   useEffect(() => setTip(null), [d.trade]);   // 參數一改、交易就換了，舊的說明作廢
-  const info = !tip ? null : tip.kind === "s4" ? tip.t : trd.ctx && trd.p ? (tip.kind === "entry" ? explainEntry(trd, trd.p, tip.t) : explainExit(trd, trd.p, tip.t)) : null;
+  const info = !tip ? null : tip.kind === "s4" || tip.kind === "s5" ? tip.t : trd.ctx && trd.p ? (tip.kind === "entry" ? explainEntry(trd, trd.p, tip.t) : explainExit(trd, trd.p, tip.t)) : null;
   return (
     <>
       <div ref={kref} className={"ta-kwrap" + (fine ? " fine" : "")} onPointerDown={kDown} onPointerMove={kMove} onPointerUp={kUp} onPointerCancel={kUp}
         onClickCapture={(e) => { if (ate.current) { ate.current = false; e.stopPropagation(); } }} onDoubleClick={fine ? reset : undefined}>
-        <KChart d={d} full={full} smas={smas} yr={yr} a={a} b={b} onTip={onTip} gaps={gapsAll} islands={islAll} top={top} rolls={rollsAll} brush={brush} srOn={srOn} kk={kk} s4={s4} />
+        <KChart d={d} full={full} smas={smas} yr={yr} a={a} b={b} onTip={onTip} gaps={gapsAll} islands={islAll} top={top} rolls={rollsAll} brush={brush} srOn={srOn} kk={kk} s4={s4} f5={f5b} onCo5={onCo5} />
         {fine && (a !== def0 || b !== N) ? <button type="button" className="ta-kreset" onPointerDown={(e) => e.stopPropagation()} onClick={reset}>重設</button> : null}
       </div>
       {N > NAV_MIN ? <RangeNav bars={full.bars} a={a} b={b} onChange={setRng} /> : null}
       <BlockTabs d={d} view={view} />
       {info ? (
-        <div ref={box} className={"ta-tipbox " + (tip.kind === "s4" ? "s4t-" + info.cls : tip.t.side === 1 ? "long" : "short")} role="tooltip" style={{ left: 0, top: 0, visibility: "hidden" }}>
+        <div ref={box} className={"ta-tipbox " + (tip.kind === "s4" || tip.kind === "s5" ? tip.kind + "t-" + info.cls : tip.t.side === 1 ? "long" : "short")} role="tooltip" style={{ left: 0, top: 0, visibility: "hidden" }}>
           <div className="tt">{info.title}{tip.kind === "entry" && trd.open && trd.open.entry_i === tip.t.entry_i ? <span className="hold">持倉中</span>
-            : tip.kind === "s4" && info.status ? <span className="hold">{info.status}</span> : null}</div>
+            : (tip.kind === "s4" || tip.kind === "s5") && info.status ? <span className="hold">{info.status}</span> : null}</div>
           <div className="ts">{info.sub}</div>
           <dl>{info.rows.map(([k, v], j) => <div key={j} className="ta-rule"><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
         </div>
@@ -1352,13 +1436,22 @@ function cleanRules(o) {
   const active = typeof x.active === "string" && (saved.some((s) => s.name === x.active) || BUILTINS.some((s) => BI + s.name === x.active)) ? x.active : null;
   // 目前套用的是自己存的規則＝自己選的，不遷移（不然一進頁面就變「名稱（未存的修改）」）
   const mine = active && saved.some((s) => s.name === active);
-  return { cur: mine ? normParams(x.cur).p : migrateRules(x.cur), saved, active };
+  if (mine) return { cur: normParams(x.cur).p, saved, active };
+  const old = oldBuiltin(x.cur);   // 套用過舊版（EMA）內建策略 → 換成新版同名的、active 指向它
+  return old ? { cur: copyP(old.p), saved, active: BI + old.name } : { cur: migrateRules(x.cur), saved, active };
 }
 // 舊訪客遷移（Yoda 11-24）：頁面會自動把 cur 寫回 localStorage，11-24 前開過 /ta 的都存著舊預設 EMA5/10/20。
 // 存的 cur（缺的欄位補舊預設）跟舊預設每一欄都一樣＝沒自訂過 → 換新預設；有任何一欄不同＝自己改過 → 照舊。saved 不經過這裡、不動
 const OLD_DEF_P = normParams({ ma: "ema" }).p;   // 改版前 DEFAULT_PARAMS＝現在的預設只差 ma
 function migrateRules(cur) {
   return sameP(normParams(cur, OLD_DEF_P).p, OLD_DEF_P) ? copyP(DEF_P) : normParams(cur).p;
+}
+// 舊版內建策略（1edf010 lib/ta-trade.js：PRESETS 沒寫的欄位＝舊預設 EMA；長線 SMA 本來就寫死 SMA、沒變）。cur 每一欄都等於其中一組 → 那組的新版
+const OLD_BUILTINS = ["短線快出", "波段抱長", "只做多・固定 5%"].map((nm) => ({ name: nm, old: normParams(PRESETS.find((x) => x.name === nm).p, OLD_DEF_P).p }));
+function oldBuiltin(cur) {
+  if (!cur || typeof cur !== "object") return null;
+  const c = normParams(cur, OLD_DEF_P).p, o = OLD_BUILTINS.find((x) => sameP(c, x.old));
+  return o ? BUILTINS.find((x) => x.name === o.name) : null;
 }
 function readRules() { try { return cleanRules(JSON.parse(lsGet(RULES_KEY) || "null")); } catch (e) { return cleanRules(null); } }
 
@@ -1404,6 +1497,23 @@ function readKk() { return lsGet(KK_KEY) !== "0"; }
 const S4_KEY = "yoda_ta_s4", L4_KEY = "yoda_ta_l4";
 function readS4() { return lsGet(S4_KEY) === "1"; }
 function readL4() { return lsGet(L4_KEY) === "1"; }
+// 反彈五階段／修正五階段開關（11-24）：同四步，預設關
+const B5_KEY = "yoda_ta_b5", C5_KEY = "yoda_ta_c5", CO5_GONE_KEY = "yoda_ta_b5co_gone";
+function readB5() { return lsGet(B5_KEY) === "1"; }
+function readC5() { return lsGet(C5_KEY) === "1"; }
+function readCo5Gone() { try { const a = JSON.parse(lsGet(CO5_GONE_KEY) || "[]"); return Array.isArray(a) ? a.filter((x) => typeof x === "string") : []; } catch (e) { return []; } }
+// 那根 K 收完的時間：1H／4H 同共振閃爍 barEnd；日K＝當天收盤（期貨 17:00、台股 13:30、美股 16:00，其他 23:59）
+// shortcut: 週K 用週一那天收盤＋4 天、台指期日盤 13:45 收照 17:00 算（閃得比較久），要準得接交易所行事曆
+function barEndTf(t, tf, tz, mkt) {
+  if (tf === "1H" || tf === "4H") return barEnd(t, tf === "1H" ? 1 : 4, tz, mkt);
+  const e = tzMs(String(t).slice(0, 10) + " " + (mkt === "fut" ? "17:00" : MTF_CLOSE[tz] || "23:59"), tz);
+  return tf === "W" ? e + 4 * 86400e3 : e;
+}
+// 共振（已過濾）：後成立那根收完起 8 小時內、沒點掉 → [{key, iA, iB, late, id}]
+function co5Live(cos, bars, tf, tz, mkt, now, gone, pre) {
+  return (cos || []).map((c) => ({ ...c, id: pre + c.key + "|" + bars[c.iA].t + "|" + bars[c.iB].t }))
+    .filter((c) => { const e = barEndTf(bars[c.late].t, tf, tz, mkt); return now >= e && now - e <= MTF_WIN && !gone.includes(c.id); });
+}
 function sideTrade(d, side) {
   const S = SIDES.find(([k]) => k === side), trd = d && d.trade;
   if (!S || !S[2] || !trd) return d;
@@ -1998,6 +2108,10 @@ export default function TaPage() {
   const pickS4 = () => { setS4On(!s4On); lsSet(S4_KEY, s4On ? "0" : "1"); pickView("chart"); };
   const [l4On, setL4On] = useState(readL4);
   const pickL4 = () => { setL4On(!l4On); lsSet(L4_KEY, l4On ? "0" : "1"); pickView("chart"); };
+  const [b5On, setB5On] = useState(readB5);
+  const pickB5 = () => { setB5On(!b5On); lsSet(B5_KEY, b5On ? "0" : "1"); pickView("chart"); };
+  const [c5On, setC5On] = useState(readC5);
+  const pickC5 = () => { setC5On(!c5On); lsSet(C5_KEY, c5On ? "0" : "1"); pickView("chart"); };
   const dvs = useMemo(() => sideTrade(dv, side), [dv, side]);
   const bkey = useMemo(() => [dvs, maSet], [dvs, maSet]);   // Boundary 重試鍵：資料、交易參數、均線組、訊號篩選任一換了就重試
   const actB = BUILTINS.find((x) => BI + x.name === active);
@@ -2100,11 +2214,29 @@ export default function TaPage() {
     });
     return () => { live = false; };
   }, [phase, sym, data, busy, err, fetchTf]);
+  // 反彈五階段共振（11-24，只空方）：同一檔同一週期背景另算 5/10/20、8/13/34，反彈五階段開著才算、才閃
+  const co5All = useMemo(() => {
+    if (!b5On || !data || data.tf !== tf || !g(data, "history", "c")) return null;
+    try {
+      const fb = fullSeries(data).bars, nf = data.bars_completed != null ? Math.min(data.bars_completed, fb.length) : fb.length;
+      return { bars: fb, cos: co5Short(fb.slice(0, nf)), tz: g(data, "symbol", "timezone") || "Asia/Taipei", mkt: g(data, "symbol", "market") };
+    } catch (e) { console.error("[ta] 五階段共振計算失敗", e); return null; }
+  }, [b5On, data, tf]);
+  const [co5Gone, setCo5Gone] = useState([]);
+  useEffect(() => setCo5Gone(readCo5Gone()), []);
+  useEffect(() => { if (b5On) setNow(Date.now()); }, [b5On, data]);
+  const co5 = useMemo(() => (co5All ? co5Live(co5All.cos, co5All.bars, tf, co5All.tz, co5All.mkt, now, co5Gone, sym + "|" + tf + "|") : []), [co5All, tf, now, co5Gone, sym]);
+  const dropCo5 = (list) => {   // 點過閃的標記或「短」「中」就停這幾次；新的共振再閃
+    if (!list || !list.length) return;
+    const nx = [...list.map((c) => c.id), ...co5Gone].slice(0, 80);
+    setCo5Gone(nx); lsSet(CO5_GONE_KEY, JSON.stringify(nx));
+  };
+  const co5Tip = co5.length ? "反彈五階段共振（5/10/20 與 8/13/34）：" + co5.map((c) => step5Name("s", c.key) + " " + md(co5All.bars[c.late].t)).join("、") : "";
   useEffect(() => {   // 每分鐘看一次現在時間：過 8 小時自己停
-    if (!mtf) return;
+    if (!mtf && !b5On) return;
     const id = setInterval(() => setNow(Date.now()), 60e3);
     return () => clearInterval(id);
-  }, [mtf]);
+  }, [mtf, b5On]);
   const mtfRes = useMemo(() => {   // 面板規則一改就重算；只用定案 K（backtest 只吃前 bars_completed 根）
     if (!mtf || mtf.s !== sym || !g(mtf.h1, "history", "c") || !g(mtf.h4, "history", "c")) return null;
     try {
@@ -2305,10 +2437,13 @@ export default function TaPage() {
             <TfTabs tf={tf} tfs={symInfo.tfs} blink={blink} onPick={(k) => { if (MTF_TFS.includes(k)) dropBlink(); pickView("chart"); if (sym) load(sym, k); else setTf(k); }} />
             <div className="ta-seg" role="group" aria-label="均線組">
               <span className="ta-seglab">均線</span>
-              {MA_SETS.map(([k, nm]) => (
-                <button key={k} type="button" aria-pressed={maSet === k} className={"ta-tab" + (maSet === k ? " on" : "")} onClick={() => { setDraft((x) => pickMaSet(x, k)); pickView("chart"); }}
-                  title={MA_NM[k]}>{nm}</button>
-              ))}
+              {MA_SETS.map(([k, nm]) => {
+                const bl = co5.length > 0 && (k === "short" || k === "mid");   // 反彈五階段共振：「短」「中」一起閃（空方＝綠）
+                return (
+                  <button key={k} type="button" aria-pressed={maSet === k} className={"ta-tab" + (maSet === k ? " on" : "") + (bl ? " ta-blink b-dn" : "")} data-co5={bl ? 1 : undefined}
+                    onClick={() => { if (bl) dropCo5(co5); setDraft((x) => pickMaSet(x, k)); pickView("chart"); }} title={bl ? co5Tip : MA_NM[k]}>{nm}</button>
+                );
+              })}
             </div>
             <div className="ta-seg" role="group" aria-label="訊號篩選">
               <span className="ta-seglab">訊號</span>
@@ -2321,6 +2456,8 @@ export default function TaPage() {
               <button type="button" aria-pressed={kkOn} className={"ta-tab" + (kkOn ? " on" : "")} onClick={pickKk} data-kk>關鍵K</button>
               <button type="button" aria-pressed={s4On} className={"ta-tab" + (s4On ? " on" : "")} onClick={pickS4} data-s4>空方四步</button>
               <button type="button" aria-pressed={l4On} className={"ta-tab" + (l4On ? " on" : "")} onClick={pickL4} data-l4>多方四步</button>
+              <button type="button" aria-pressed={b5On} className={"ta-tab" + (b5On ? " on" : "")} onClick={pickB5} data-b5>反彈五階段</button>
+              <button type="button" aria-pressed={c5On} className={"ta-tab" + (c5On ? " on" : "")} onClick={pickC5} data-c5>修正五階段</button>
             </div>
             <div className="ta-seg ta-vseg">
               <button type="button" aria-pressed={view === "idx"} className={"ta-tab" + (view === "idx" ? " on" : "")}
@@ -2397,7 +2534,7 @@ export default function TaPage() {
                   </div>
                 ) : null}
                 <BadBanner d={d} />
-                <Boundary reset={bkey}><ChartArea key={(symInfo.yahoo || sym) + "|" + d.tf} d={d} p={applied} srOn={srOn} kkOn={kkOn} s4On={s4On} l4On={l4On} /></Boundary>
+                <Boundary reset={bkey}><ChartArea key={(symInfo.yahoo || sym) + "|" + d.tf} d={d} p={applied} srOn={srOn} kkOn={kkOn} s4On={s4On} l4On={l4On} b5On={b5On} c5On={c5On} co5={co5} onCo5={dropCo5} /></Boundary>
                 <Boundary reset={bkey}><Legend d={d} p={applied} /></Boundary>
                 {(d.notes || []).length ? <div className="ta-notes">資料註記：{d.notes.join("；")}</div> : null}
                 <Boundary reset={bkey}><SrLevels d={d} /></Boundary>

@@ -255,6 +255,16 @@ svg.ta-k .s4lead,svg.ta-k .s4l{pointer-events:none}
 .ta-tipbox.s4t-s1,.ta-tipbox.s4t-s2{border-left-color:#d6dde6} .ta-tipbox.s4t-l1,.ta-tipbox.s4t-l2{border-left-color:#eadbc8}
 .ta-tipbox.s4t-s3{border-left-color:#3fae7a} .ta-tipbox.s4t-l3{border-left-color:#e0525e} .ta-tipbox.s4t-s4,.ta-tipbox.s4t-l4{border-left-color:#8b95a3}
 .ta-tipbox.s4t-sx{border-left-color:#b9ecd2} .ta-tipbox.s4t-lx{border-left-color:#ffc6cb}
+/* 五階段（11-24）：字、框、引線沿用四步的 class；共振＝外框閃（減少動態＝不閃、粗外框） */
+svg.ta-k .s5l{pointer-events:none}
+svg.ta-k rect.s5co{stroke-width:1.6;pointer-events:none;animation:ta-s5co 1.2s ease-in-out infinite}
+svg.ta-k circle.s5co{stroke:#3fd08a;stroke-width:2px;animation:ta-s5co 1.2s ease-in-out infinite}
+@keyframes ta-s5co{50%{stroke-opacity:.15}}
+@media (prefers-reduced-motion:reduce){svg.ta-k rect.s5co,svg.ta-k circle.s5co{animation:none;stroke-width:2.8}}
+.ta-tipbox[class*="s5t-s"]{border-left-color:#d6dde6} .ta-tipbox[class*="s5t-l"]{border-left-color:#eadbc8}
+.ta-tipbox.s5t-s5{border-left-color:#3fd08a} .ta-tipbox.s5t-l5{border-left-color:#ff5f6b}
+.ta-tipbox.s5t-sstop,.ta-tipbox.s5t-lstop{border-left-color:#e8c35a}
+.ta-tipbox.s5t-sx{border-left-color:#b9ecd2} .ta-tipbox.s5t-lx{border-left-color:#ffc6cb}
 svg.ta-k .isl-t{fill:#ffc94a;font-size:12px;font-weight:700;paint-order:stroke;stroke:#0b0f15;stroke-width:3px}
 svg.ta-k .ckey{font-size:11px;font-weight:600;paint-order:stroke;stroke:#0b0f15;stroke-width:3px}
 svg.ta-k .mk-hit{cursor:pointer;outline:none}
