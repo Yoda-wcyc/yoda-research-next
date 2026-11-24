@@ -2,6 +2,7 @@
 import { Component, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { normParams, backtest, chartMarks, exitLine, ruleText, maName, smaSeq, PRESETS, explainEntry, explainExit, fpx, fpc, statsOf, hasVolume, effParams, keyKEvents, volMult, KEYK_N, KEYK_TOP } from "../../lib/ta-trade";
 import { presetStart } from "../../lib/ta-rs";
+import { fourStep, info4, l2Info4, step4Name } from "../../lib/ta-4step";
 import { OPT_GROUPS, optSym, dte, fmtTs, candidates, cost as optCost, pnl as optPnl, retPct, maxGain, lots } from "../../lib/ta-opt";
 
 // 會員技術分析（獨立網站版·2026-11-08 Yoda 定）
@@ -24,6 +25,8 @@ import { OPT_GROUPS, optSym, dte, fmtTs, candidates, cost as optCost, pnl as opt
 //           （多紅空綠，跟訊號篩選連動；hover 列兩邊進場時間；過 8 小時或點過那次就停，新訊號再閃；減少動態＝不閃、改外框）
 //   關鍵K（11-23）：工具列「關鍵K」鈕（記 localStorage yoda_ta_kk，預設開）；大量 K＝每根之前 120 根量最大 5 根（「當時可得」，跟面板進場選項
 //           「突破／跌破關鍵 K」同一份 lib/ta-trade.js keyKEvents，不跟可見區間走）；K 棒加白框＋名次，收盤第一次站上最高標「破①↑」（紅）、跌破最低「破①↓」（綠）
+//   空方四步／多方四步（11-24）：工具列兩顆鈕（記 localStorage yoda_ta_s4／yoda_ta_l4，預設關）；規則在 lib/ta-4step.js（整段已收完的 K、point-in-time），
+//           作廢的序列不畫；不是交易訊號：不進左側面板、回測統計、共振閃爍
 // 資料全部來自 Python 計算引擎（ta-engine，契約見 docs/ta-engine-contract.md）；最後一根盤中未定只上圖，不進訊號與回測。
 
 const TOK_KEY = "yoda_ta_jwt";
@@ -264,6 +267,11 @@ function SortTable({ cols, rows, rowKey, className, rowClass, onRow, init }) {  
 
 // ───────── K 線圖（同 ta_local 的記號語言；底色固定深色，白色撐壓線才看得見）─────────
 const K_UP = "#e0525e", K_DN = "#3fae7a", GOLD = "#ffc94a";
+// 四步顏色（11-24 demo）：①② 中性、空3 綠／多3 紅、4 灰、利＝淡色；line＝L2／H2 虛線
+const S4C = {
+  s: { nm: "空方四步 ", r2: "L2", line: "#8fcfb0", col: { 1: "#d6dde6", 2: "#d6dde6", 3: "#6fd6a0", 4: "#8b95a3", x: "#b9ecd2" } },
+  l: { nm: "多方四步 ", r2: "H2", line: "#f0a0a8", col: { 1: "#eadbc8", 2: "#eadbc8", 3: "#ff8f96", 4: "#8b95a3", x: "#ffc6cb" } },
+};
 const MA_COL = ["#ff4d4f", "#f5c518", "#3d8bfd"];   // 均線由短到長：紅、黃、藍（Yoda 2026-11-09）
 const EMA_COL = "#ff5ce1";
 const YR_COL = "#b9a3ff";   // 年線 SMA240（11-19）：日K 常駐細線；週K 對應 52 週線 SMA52（11-19）；不屬於均線組、不進交易計算
@@ -349,7 +357,7 @@ function zoomAt(a, b, N, c, f) {
   return [a1, a1 + w];
 }
 
-function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, brush, srOn = true, kk = null }) {
+function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, brush, srOn = true, kk = null, s4 = null }) {
   const ch = d.chart || {};
   const bars = full.bars.slice(a, b), n = bars.length;
   if (n < 2) return <div className="ta-nochart">沒有 K 線資料</div>;
@@ -369,7 +377,9 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
   let lo = Math.min(...vals), hi = Math.max(...vals);
   // 撐壓、進出場的線離 K 棒太遠就不撐大座標：線裁掉、右側標籤貼邊加 ↑／↓
   const reach = (hi - lo) * 0.2;
-  for (const y of [...srl.map(([x]) => x.price), ...tlines.map((ln) => ln.y)]) {
+  // 四步（11-24）：L2／H2 虛線＝②到出場（未出場畫到右緣）；②在區間右邊或出場在區間左邊的不畫
+  const s4L = s4 ? ["s", "l"].flatMap((sd) => (s4[sd] || []).filter((q) => q.s2 && q.s2.i < b && (!q.ex || q.ex.i >= a)).map((q) => [sd, q])) : [];
+  for (const y of [...srl.map(([x]) => x.price), ...tlines.map((ln) => ln.y), ...s4L.map(([, q]) => q.L2)]) {
     if (y != null && y >= lo - reach && y <= hi + reach) { lo = Math.min(lo, y); hi = Math.max(hi, y); }
   }
   const pad = (hi - lo) * 0.05 || hi * 0.01 || 1;
@@ -757,6 +767,41 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
     placed.push(best[3]);
     tlab.push(<text key={"tlb" + tlab.length} className={cls + " mk-lab"} {...lt} x={best[0]} y={best[1]} textAnchor="start" style={{ fill: col }} data-ov={best[2] ? Math.round(best[2]) : undefined}>{s}</text>);
   });
+  // 四步（11-24，不是交易訊號）：空方標 K 上方、多方標 K 下方，只寫「空1～空4、空利／多1～多4、多利」；①② 中性色、空3 綠／多3 紅、4 灰、利＝淡色空心框。
+  // 標籤最後放（避開進出場記號與字、關鍵K、線名）：外側往外疊 5 層×原位／左右，再試更遠的左右，外側貼頂／貼底沒位置就放 K 的另一側；字離 K 太遠拉引線。
+  // 可見區間外的步驟不畫字；超過 250 根只畫小點（滑過照樣有說明）
+  const s4Els = [], s4Late = [];
+  if (s4) {
+    const tipOf = (info) => ({ "data-tip": "s4", onMouseEnter: (e) => onTip && onTip("s4", info, e, false), onMouseLeave: () => onTip && onTip(null),
+      onClick: (e) => { e.stopPropagation(); onTip && onTip("s4", info, e, true); } });
+    for (const [sd, q] of s4L) {
+      const S = S4C[sd], ex = q.s4 || q.sx, x0 = XL(q.s2.i - a), x1 = ex ? X(ex.i - a) : xr, y = Y(q.L2), h = tipOf(l2Info4(sd, q, full.bars));
+      els.push(<line key={"s4l" + sd + q.s1.i} className="s4l" x1={x0} x2={x1} y1={y} y2={y} stroke={S.line} strokeWidth="1.3" strokeDasharray="5 4" strokeOpacity=".85"
+        clipPath={clip} data-l2={q.L2} data-side={sd} />);
+      s4Late.push(<line key={"s4h" + sd + q.s1.i} className="s4hit" x1={x0} x2={x1} y1={y} y2={y} stroke="transparent" strokeWidth="9" clipPath={clip} {...h} />);
+      if (!ex) lab.push({ y, t: S.r2 + " " + fpx(q.L2), col: S.line, nt: "", tip: h });
+    }
+    const evs = [];
+    for (const sd of ["s", "l"]) for (const q of s4[sd] || []) for (const k of [1, 2, 3, 4, "x"]) { const e = q["s" + k]; if (e && e.i >= a && e.i < b) evs.push([sd, q, k, e.i]); }
+    evs.sort((u, v) => u[3] - v[3] || (u[2] === "x" ? 4 : u[2]) - (v[2] === "x" ? 4 : v[2]));
+    const cl = (y) => Math.min(T + PH - 2, Math.max(T + 12, y));
+    for (const [sd, q, k, i] of evs) {
+      const S = S4C[sd], bk = full.bars[i], x = X(i - a), up = sd === "s", col = S.col[k], str = step4Name(sd, k), h = tipOf(info4(sd, q, k, full.bars));
+      const aria = { tabIndex: 0, role: "button", "aria-label": S.nm + str + " " + bk.t, onFocus: h.onMouseEnter, onBlur: h.onMouseLeave, "data-side": sd, "data-step": k, "data-i": i };
+      if (!showLab) { s4Els.push(<circle key={"s4d" + sd + q.s1.i + k} className="s4t" cx={x} cy={up ? Y(bk.h) - 5 : Y(bk.l) + 5} r="2.5" fill={col} {...h} {...aria} />); continue; }
+      const w = tw(str) * 1.05 + (k === "x" ? 8 : 2), dir = up ? -1 : 1, yo = up ? Y(bk.h) - 6 : Y(bk.l) + 15, yi = up ? Y(bk.l) + 15 : Y(bk.h) - 6, cands = [];
+      const cx = (dx) => Math.min(xr - w / 2, Math.max(L + w / 2, x + dx * w));
+      for (const dxs of [[0, 0.7, -0.7], [1.4, -1.4]]) for (let r = 0; r < 5; r++) for (const dx of dxs) cands.push([cx(dx), cl(yo + dir * 15 * r)]);
+      for (let r = 0; r < 3; r++) for (const dx of [0, 0.7, -0.7]) cands.push([cx(dx), cl(yi - dir * 15 * r)]);
+      const bx = ([u, v]) => [u - w / 2, v - 12, u + w / 2, v + 4];   // 字 12.5px＋利的框（高 16）
+      const [lx, ly] = cands.find((c) => !busyAt(bx(c))) || cands.reduce((u, c) => (hitArea(bx(c)) < hitArea(bx(u)) ? c : u), cands[0]);
+      placed.push(bx([lx, ly]));
+      const inner = up ? ly > Y(bk.l) : ly < Y(bk.h), ay = up === !inner ? Y(bk.h) - 2 : Y(bk.l) + 2, py = up === !inner ? ly + 2 : ly - 11;
+      if (Math.abs(py - ay) > 16 || Math.abs(lx - x) > 10) s4Late.unshift(<line key={"s4ld" + sd + q.s1.i + k} className="s4lead" x1={lx} y1={py} x2={x} y2={ay} stroke={col} strokeWidth="1" strokeOpacity=".7" />);
+      if (k === "x") s4Els.push(<rect key={"s4b" + sd + q.s1.i} className="s4box" x={lx - w / 2} y={ly - 12} width={w} height={16} rx="3" stroke={S.col[3]} />);
+      s4Els.push(<text key={"s4t" + sd + q.s1.i + k} className="s4t" x={lx} y={ly} textAnchor="middle" style={{ fill: col }} data-t={bk.t} {...h} {...aria}>{str}</text>);
+    }
+  }
   // 字被擠到離記號 >20px：畫 1px 同色細引線，從字框最近的點連到記號（停在記號外 8px，不蓋到記號）
   const leads = [];
   for (const { bx, mx, my, col, gone } of labs) {
@@ -766,7 +811,7 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
     const f = (dd - 8) / dd;
     leads.push(<line key={"ld" + leads.length} className="mk-lead" x1={px} y1={py} x2={px + (mx - px) * f} y2={py + (my - py) * f} stroke={col} strokeWidth="1" />);
   }
-  els.push(...kkEls, ...rkEls, ...islEls, ...unfEls, ...leads, ...tlab);  // 右側標籤避讓（由上到下排、不重疊、不超出價格區）；圖外的價位貼邊、加 ↑／↓
+  els.push(...kkEls, ...rkEls, ...islEls, ...unfEls, ...leads, ...tlab, ...s4Late, ...s4Els);  // 右側標籤避讓（由上到下排、不重疊、不超出價格區）；圖外的價位貼邊、加 ↑／↓
   for (const z of lab) {
     if (z.y < T) { z.y = T; z.t = "↑" + z.t; }
     else if (z.y > T + PH) { z.y = T + PH; z.t = "↓" + z.t; }
@@ -883,7 +928,7 @@ function RangeNav({ bars, a, b, onChange }) {
 }
 
 // 圖＋導覽列＋圖下三個分頁：區間狀態放這裡（② 缺口、③ 前五大量的表跟著區間變）；父層用 key＝代號|週期，換代號或週期就重新掛載＝回到預設區間
-function ChartArea({ d, maSet, srOn, kkOn = true }) {
+function ChartArea({ d, maSet, srOn, kkOn = true, s4On = false, l4On = false }) {
   const ch = d.chart || {};
   const full = useMemo(() => fullSeries(d), [d.history, ch.bars, d.bars_completed]);   // eslint-disable-line react-hooks/exhaustive-deps
   const N = full.bars.length;
@@ -962,6 +1007,12 @@ function ChartArea({ d, maSet, srOn, kkOn = true }) {
   const rollsAll = Array.isArray(g(ch, "overlays", "rolls")) ? ch.overlays.rolls : [];   // 舊回應沒有 rolls
   const top = useMemo(() => topVolume(full, a, b, nf, g(d, "signals", "top_volume", "items")), [full, a, b, nf, d.signals]);   // eslint-disable-line react-hooks/exhaustive-deps
   const kk = useMemo(() => (kkOn && !noVolume(d) ? keyKAll(full, nf) : null), [kkOn, full, nf]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // 四步（11-24）：只用已收完的 K、整段 history 算（不跟可見區間走）；不進回測、面板、共振閃爍
+  const s4 = useMemo(() => {
+    if (!s4On && !l4On) return null;
+    const fb = full.bars.slice(0, nf);
+    return { s: s4On ? fourStep(fb, "s") : null, l: l4On ? fourStep(fb, "l") : null };
+  }, [s4On, l4On, full, nf]);
   const view = useMemo(() => ({
     a, b, from: full.bars[a] ? full.bars[a].t : "", to: full.bars[b - 1] ? full.bars[b - 1].t : "", top,
     gaps: gapsAll.filter((x) => x.i >= a && x.i < b), islands: islAll.filter((x) => x.i1 >= a && x.i0 < b),
@@ -1004,19 +1055,20 @@ function ChartArea({ d, maSet, srOn, kkOn = true }) {
   }, [tip]);
   const trd = d.trade || {};
   useEffect(() => setTip(null), [d.trade]);   // 參數一改、交易就換了，舊的說明作廢
-  const info = tip && trd.ctx && trd.p ? (tip.kind === "entry" ? explainEntry(trd, trd.p, tip.t) : explainExit(trd, trd.p, tip.t)) : null;
+  const info = !tip ? null : tip.kind === "s4" ? tip.t : trd.ctx && trd.p ? (tip.kind === "entry" ? explainEntry(trd, trd.p, tip.t) : explainExit(trd, trd.p, tip.t)) : null;
   return (
     <>
       <div ref={kref} className={"ta-kwrap" + (fine ? " fine" : "")} onPointerDown={kDown} onPointerMove={kMove} onPointerUp={kUp} onPointerCancel={kUp}
         onClickCapture={(e) => { if (ate.current) { ate.current = false; e.stopPropagation(); } }} onDoubleClick={fine ? reset : undefined}>
-        <KChart d={d} full={full} smas={smas} yr={yr} a={a} b={b} onTip={onTip} gaps={gapsAll} islands={islAll} top={top} rolls={rollsAll} brush={brush} srOn={srOn} kk={kk} />
+        <KChart d={d} full={full} smas={smas} yr={yr} a={a} b={b} onTip={onTip} gaps={gapsAll} islands={islAll} top={top} rolls={rollsAll} brush={brush} srOn={srOn} kk={kk} s4={s4} />
         {fine && (a !== def0 || b !== N) ? <button type="button" className="ta-kreset" onPointerDown={(e) => e.stopPropagation()} onClick={reset}>重設</button> : null}
       </div>
       {N > NAV_MIN ? <RangeNav bars={full.bars} a={a} b={b} onChange={setRng} /> : null}
       <BlockTabs d={d} view={view} />
       {info ? (
-        <div ref={box} className={"ta-tipbox " + (tip.t.side === 1 ? "long" : "short")} role="tooltip" style={{ left: 0, top: 0, visibility: "hidden" }}>
-          <div className="tt">{info.title}{tip.kind === "entry" && trd.open && trd.open.entry_i === tip.t.entry_i ? <span className="hold">持倉中</span> : null}</div>
+        <div ref={box} className={"ta-tipbox " + (tip.kind === "s4" ? "s4t-" + info.cls : tip.t.side === 1 ? "long" : "short")} role="tooltip" style={{ left: 0, top: 0, visibility: "hidden" }}>
+          <div className="tt">{info.title}{tip.kind === "entry" && trd.open && trd.open.entry_i === tip.t.entry_i ? <span className="hold">持倉中</span>
+            : tip.kind === "s4" && info.status ? <span className="hold">{info.status}</span> : null}</div>
           <div className="ts">{info.sub}</div>
           <dl>{info.rows.map(([k, v], j) => <div key={j} className="ta-rule"><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
         </div>
@@ -1347,6 +1399,10 @@ function readSr() { return lsGet(SR_KEY) !== "0"; }
 // 關鍵K 開關（11-23）：同撐壓線，只有 "0" 算關
 const KK_KEY = "yoda_ta_kk";
 function readKk() { return lsGet(KK_KEY) !== "0"; }
+// 空方四步／多方四步開關（11-24）：預設關，只有 "1" 算開（讀不到＝關）
+const S4_KEY = "yoda_ta_s4", L4_KEY = "yoda_ta_l4";
+function readS4() { return lsGet(S4_KEY) === "1"; }
+function readL4() { return lsGet(L4_KEY) === "1"; }
 function sideTrade(d, side) {
   const S = SIDES.find(([k]) => k === side), trd = d && d.trade;
   if (!S || !S[2] || !trd) return d;
@@ -1937,6 +1993,10 @@ export default function TaPage() {
   const pickSr = () => { setSrOn(!srOn); lsSet(SR_KEY, srOn ? "0" : "1"); pickView("chart"); };
   const [kkOn, setKkOn] = useState(readKk);
   const pickKk = () => { setKkOn(!kkOn); lsSet(KK_KEY, kkOn ? "0" : "1"); pickView("chart"); };
+  const [s4On, setS4On] = useState(readS4);
+  const pickS4 = () => { setS4On(!s4On); lsSet(S4_KEY, s4On ? "0" : "1"); pickView("chart"); };
+  const [l4On, setL4On] = useState(readL4);
+  const pickL4 = () => { setL4On(!l4On); lsSet(L4_KEY, l4On ? "0" : "1"); pickView("chart"); };
   const dvs = useMemo(() => sideTrade(dv, side), [dv, side]);
   const bkey = useMemo(() => [dvs, maSet], [dvs, maSet]);   // Boundary 重試鍵：資料、交易參數、均線組、訊號篩選任一換了就重試
   const actB = BUILTINS.find((x) => BI + x.name === active);
@@ -2258,6 +2318,8 @@ export default function TaPage() {
             <div className="ta-seg" role="group" aria-label="圖上線條">
               <button type="button" aria-pressed={srOn} className={"ta-tab" + (srOn ? " on" : "")} onClick={pickSr} data-sr>撐壓線</button>
               <button type="button" aria-pressed={kkOn} className={"ta-tab" + (kkOn ? " on" : "")} onClick={pickKk} data-kk>關鍵K</button>
+              <button type="button" aria-pressed={s4On} className={"ta-tab" + (s4On ? " on" : "")} onClick={pickS4} data-s4>空方四步</button>
+              <button type="button" aria-pressed={l4On} className={"ta-tab" + (l4On ? " on" : "")} onClick={pickL4} data-l4>多方四步</button>
             </div>
             <div className="ta-seg ta-vseg">
               <button type="button" aria-pressed={view === "idx"} className={"ta-tab" + (view === "idx" ? " on" : "")}
@@ -2334,7 +2396,7 @@ export default function TaPage() {
                   </div>
                 ) : null}
                 <BadBanner d={d} />
-                <Boundary reset={bkey}><ChartArea key={(symInfo.yahoo || sym) + "|" + d.tf} d={d} maSet={maSet} srOn={srOn} kkOn={kkOn} /></Boundary>
+                <Boundary reset={bkey}><ChartArea key={(symInfo.yahoo || sym) + "|" + d.tf} d={d} maSet={maSet} srOn={srOn} kkOn={kkOn} s4On={s4On} l4On={l4On} /></Boundary>
                 <Boundary reset={bkey}><Legend d={d} maSet={maSet} /></Boundary>
                 {(d.notes || []).length ? <div className="ta-notes">資料註記：{d.notes.join("；")}</div> : null}
                 <Boundary reset={bkey}><SrLevels d={d} /></Boundary>

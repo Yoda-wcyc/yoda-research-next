@@ -121,7 +121,8 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   const src = 'const React = require("react");\n' + fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8")
     .replace('"../../lib/ta-trade"', JSON.stringify(path.join(ROOT, "lib", "ta-trade.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-rs"', JSON.stringify(path.join(ROOT, "lib", "ta-rs.js").replace(/\\/g, "/")))
-    .replace('"../../lib/ta-opt"', JSON.stringify(path.join(ROOT, "lib", "ta-opt.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, zoomAt, mtfBlink, tzMs, barEnd, readSr, readKk, keyKAll };\n";
+    .replace('"../../lib/ta-opt"', JSON.stringify(path.join(ROOT, "lib", "ta-opt.js").replace(/\\/g, "/")))
+    .replace('"../../lib/ta-4step"', JSON.stringify(path.join(ROOT, "lib", "ta-4step.js").replace(/\\/g, "/"))) + "\nexport { cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, Trade, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, zoomAt, mtfBlink, tzMs, barEnd, readSr, readKk, keyKAll, readS4, readL4 };\n";
   const Mod = require("module");
   const libSrc = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-trade.js"), "utf8"), opts).code;
   const lib = new Mod(path.join(ROOT, "lib", "ta-trade.js")); lib.paths = Mod._nodeModulePaths(ROOT); lib._compile(libSrc, lib.id);
@@ -130,6 +131,8 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   require.cache[rsLib.id] = rsLib; rsLib.loaded = true;
   const optLib = new Mod(path.join(ROOT, "lib", "ta-opt.js")); optLib._compile(transformSync(fs.readFileSync(optLib.id, "utf8"), opts).code, optLib.id);   // 選擇權（11-23）
   require.cache[optLib.id] = optLib; optLib.loaded = true;
+  const s4Lib = new Mod(path.join(ROOT, "lib", "ta-4step.js")); s4Lib.filename = s4Lib.id; s4Lib.paths = Mod._nodeModulePaths(ROOT);   // 四步（11-24）；filename＝它 require("./ta-trade") 才解得到
+  s4Lib._compile(transformSync(fs.readFileSync(s4Lib.id, "utf8"), opts).code, s4Lib.id); require.cache[s4Lib.id] = s4Lib; s4Lib.loaded = true;
   const m = new Mod(path.join(ROOT, "app", "ta", "page.cjs")); m.paths = Mod._nodeModulePaths(ROOT);
   m._compile(transformSync(src, opts).code, m.id);
   const P = m.exports;
@@ -367,6 +370,53 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     assert.strictEqual(P.readKk(), true);
     const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
     assert.ok(raw.includes(">關鍵K</button>") && raw.includes("aria-pressed={kkOn}") && raw.includes("kkOn={kkOn}") && raw.includes("kk={kk}"), "工具列按鈕接到圖");
+  });
+  await t("空方四步／多方四步（11-24）：兩顆鈕預設關、只有 \"1\" 算開；圖上標籤（空3 綠、空利空心框、L2 虛線）、hover；標籤彼此與關鍵K 不重疊；作廢不畫；不進回測", async () => {
+    const st = {};
+    globalThis.localStorage = { getItem: (k) => (k in st ? st[k] : null), setItem: (k, v) => { st[k] = String(v); }, removeItem: (k) => { delete st[k]; } };
+    assert.strictEqual(P.readS4(), false, "沒存過＝關"); assert.strictEqual(P.readL4(), false, "沒存過＝關");
+    for (const [v, want] of [["1", true], ["0", false], ["", false], ["true", false]]) { st.yoda_ta_s4 = v; st.yoda_ta_l4 = v; assert.strictEqual(P.readS4(), want, v); assert.strictEqual(P.readL4(), want, v); }
+    globalThis.localStorage = { getItem: () => { throw new Error("blocked"); } };
+    assert.strictEqual(P.readS4(), false, "localStorage 不能用＝關"); assert.strictEqual(P.readL4(), false);
+    const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
+    assert.ok(raw.includes(">空方四步</button>") && raw.includes(">多方四步</button>") && raw.includes("aria-pressed={s4On}") && raw.includes("aria-pressed={l4On}")
+      && raw.includes("s4On={s4On} l4On={l4On}") && raw.includes("s4={s4}"), "工具列兩顆鈕接到圖");
+    assert.ok(raw.includes('lsSet(S4_KEY, s4On ? "0" : "1"); pickView("chart")') && raw.includes('lsSet(L4_KEY, l4On ? "0" : "1"); pickView("chart")'), "點了寫 localStorage、回 K 線");
+    assert.ok(raw.indexOf(">關鍵K</button>") < raw.indexOf(">空方四步</button>") && raw.indexOf(">空方四步</button>") < raw.indexOf(">多方四步</button>"), "放在關鍵K 旁");
+    // 不是交易訊號：withTrade／mtfBlink／面板都不碰四步
+    for (const fn of ["function withTrade", "function mtfBlink", "function RulePanel", "function sideTrade"]) {
+      const i = raw.indexOf(fn), body = raw.slice(i, raw.indexOf("\nfunction ", i + 10));
+      assert.ok(i >= 0 && !/fourStep|s4On|l4On/.test(body), fn + " 不該碰四步");
+    }
+    // 圖：NQ 4H（tests/ta_4step_nq4h.json）10-14 起畫到最後，含 Yoda 定的 11-09 那組空方
+    const G = JSON.parse(fs.readFileSync(path.join(__dirname, "ta_4step_nq4h.json"), "utf8")), n = G.t.length, F4 = require.cache[s4Lib.id].exports;
+    const d = { tf: "4H", bars_completed: n, history: { n, t: G.t, o: G.o, h: G.h, l: G.l, c: G.c, v: G.v }, symbol: { market: "fut", yahoo: "NQ=F" },
+      chart: { bars: [], ma_sets: { short: [5, 10, 20] }, overlays: { gaps: { cols: [], rows: [] }, islands: [] }, legend: [] }, signals: {} };
+    const full = P.fullSeries(d), fb = full.bars.slice(0, n), s4 = { s: F4.fourStep(fb, "s"), l: F4.fourStep(fb, "l") }, kk = P.keyKAll(full, n);
+    const a = G.t.findIndex((x) => x >= "2026-10-14"), kc = (o) => renderToString(React.createElement(P.KChart, { d, full, smas: [], a, b: n, gaps: [], islands: [], top: [], rolls: [], onTip: () => {}, ...o })).replace(/<!-- -->/g, "");
+    const on = kc({ kk, s4 }), off = kc({ kk });
+    assert.ok(!off.includes("s4t") && !off.includes("s4l"), "關掉不畫");
+    assert.ok(/<text[^>]*class="s4t"[^>]*style="fill:#6fd6a0"[^>]*data-t="2026-11-19 14:00"[^>]*>空3<\/text>/.test(on), "空3（綠）在 11-19 14:00（美東＝台灣 11-20 03:00）");
+    assert.ok(/<rect[^>]*class="s4box"[^>]*stroke="#6fd6a0"/.test(on) && /data-t="2026-11-20 06:00"[^>]*>空利<\/text>/.test(on), "空利空心框在 11-20 06:00（台灣 19:00）");
+    assert.ok(/class="s4l"[^>]*data-l2="26751.25"/.test(on), "L2 26,751.25 虛線");
+    assert.ok(!/>(空|多)[①②③④]</.test(on) && /data-step="x"[^>]*>多利</.test(on), "標籤只寫 空N／多N、多利");
+    const ids = new Set([...on.matchAll(/data-side="(s|l)" data-step="1" data-i="(\d+)"/g)].map((m) => m[1] + m[2]));
+    for (const sd of ["s", "l"]) for (const q of F4.fourStepAll(fb, sd)) if (q.s1.i >= a && q.status.startsWith("void")) assert.ok(!ids.has(sd + q.s1.i), "作廢的不畫：" + sd + G.t[q.s1.i]);
+    // 不重疊：四步標籤彼此、與關鍵K「破①↑↓」／名次（字寬估計同 page.jsx：中文 12、英數 6.8）
+    const tw = (s) => [...s].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? 12 : 6.8), 0);
+    const boxes = [...on.matchAll(/<text[^>]*class="(s4t|kk-b[^"]*|kk-n)"[^>]*x="([\d.]+)" y="([\d.]+)"[^>]*>([^<]+)</g)].map((m) => { const w = tw(m[4]) + (m[4].endsWith("利") ? 8 : 0); return [Number(m[2]) - w / 2, Number(m[3]) - 11, Number(m[2]) + w / 2, Number(m[3]) + 2, m[1] + ":" + m[4] + "@" + m[2] + "," + m[3]]; });
+    assert.ok(boxes.filter((x) => x[4].startsWith("s4t")).length >= 20, "四步標籤數 " + boxes.length);
+    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+      const p = boxes[i], q = boxes[j];
+      if (!p[4].startsWith("s4t") && !q[4].startsWith("s4t")) continue;
+      assert.ok(!(p[0] < q[2] && p[2] > q[0] && p[1] < q[3] && p[3] > q[1]), "重疊：" + p[4] + " ↔ " + q[4]);
+    }
+    // 拖導覽列（換可見區間）標記不變：同一根的空3 在兩個區間都標在同一個 data-t
+    const on2 = kc({ kk, s4, a: n - 40 });
+    assert.ok(/data-t="2026-11-19 14:00"[^>]*>空3</.test(on2) && !/data-t="2026-10-1/.test(on2.replace(/class="kk[^"]*"[^>]*/g, "")), "區間外的步驟不畫字");
+    // hover：步驟名、時間（商品當地）、條件
+    const q = s4.s.find((x) => G.t[x.s1.i] === "2026-11-08 18:00"), inf = F4.info4("s", q, 3, fb);
+    assert.ok(inf.title === "空方四步 空3" && inf.sub === "2026-11-19 14:00" && inf.rows.some(([k, v]) => k === "條件" && v === "收盤 26,505.5 跌破 L2 26,751.25"), JSON.stringify(inf));
   });
   await t("市場標籤：美國期貨・CME／指數／台股／美股·NASDAQ·ETF；怪值不崩", async () => {
     assert.strictEqual(P.mktBadge({ market: "fut", exchange: "CME" }), "美國期貨・CME");
