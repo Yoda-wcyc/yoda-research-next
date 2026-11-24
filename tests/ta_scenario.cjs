@@ -36,9 +36,15 @@ t("決定性：同一份資料、同設定算兩次一模一樣（含 EMA）", (
   assert.ok(e1.names[0] === "回踩 EMA34 再攻", e1.names[0]);
 });
 
-t("NQ 4H 中均線兩個方向四條都算得出（demo 那份資料）；全部情境多數算得出", () => {
-  assert.ok(all.filter((x) => x[5].list.some(Boolean)).length >= all.length * 0.75, "算得出的情境太少");
-  for (const [nm, , , mn, , r] of all) if (nm.startsWith("NQ 4H") && mn[1] === 13) assert.ok(r.list.every(Boolean), nm + "：" + r.list.map(Boolean));
+t("NQ 4H 中均線（demo 那份資料，11-24 稽核加距離上限後）：空轉多 ①② 算得出、③ 卡報酬風險、④ 近期低點太遠；多轉空四條都卡距離；全部情境過半算得出", () => {
+  assert.ok(all.filter((x) => x[5].list.some(Boolean)).length >= all.length * 0.6, "算得出的情境太少");
+  const up = all.find((x) => x[0] === "NQ 4H 8/13/34 空轉多")[5], dn = all.find((x) => x[0] === "NQ 4H 8/13/34 多轉空")[5];
+  assert.deepStrictEqual(up.list.map(Boolean), [true, true, false, false]);
+  assert.strictEqual(up.nos[2], "停損 25,826.5（6.0%）比出場1 遠太多");
+  assert.strictEqual(up.nos[3], "近期波段低 24,976.5 離現價 26,734.25 有 3.7 ATR，太遠");
+  assert.deepStrictEqual(dn.list.map(Boolean), [false, false, false, false]);
+  assert.deepStrictEqual(dn.nos, ["回落底 24,976.5 離現價 26,734.25 有 3.7 ATR，太遠", "回落底 24,976.5 離現價 26,734.25 有 3.7 ATR，太遠",
+    "空方關鍵K 價位 28,583.75 離現價 26,734.25 有 3.9 ATR，太遠", "近期波段高 28,697 離現價 26,734.25 有 4.1 ATR，太遠"]);
 });
 
 t("四條路徑 OHLC 合法、對齊跳動單位、量 ≥ 0、根數在 1H 60～70／4H 50～60／日K 25～40（11-24 加長）；時間接在最後一根之後、不重複", () => {
@@ -132,7 +138,8 @@ t("算不出回 null：沒有成交量的 1H → 沒有多方關鍵K → W 底�
   const nv = NQ.map((b) => ({ ...b, v: 0 })), r = run(nv, { ...CASES[0][2], tf: "1H" }, [8, 13, 34], 1);
   assert.strictEqual(r.list[2], null, "W 底");
   assert.ok(r.lv.find((x) => x.k === "KK").p === null && !r.lv.some((x) => x.k === "V20"), "關鍵K 寫沒有、不列均量");
-  assert.ok(/^這檔沒有成交量，1H 認不出放量長紅/.test(r.nos[2]) && !/1\.3 ATR|等出現/.test(r.nos[2]), "沒量的 1H 不寫等出現：" + r.nos[2]);
+  assert.strictEqual(r.nos[2], "這檔沒有成交量，1H 認不出關鍵K", "沒量的 1H 不寫等出現、不寫放量");
+  assert.strictEqual(r.lv.find((x) => x.k === "KK").why, "這檔沒有成交量，1H 認不出關鍵K", "關鍵K 列跟原因句同口徑");
   for (const p of r.list) if (p) { assert.ok(!/量 ≥/.test(p.plan[0].cond), "沒有量就不寫量的條件"); assert.ok(p.sim.every((b) => b.v === 0)); }
   const few = run(NQ.slice(-60), CASES[0][2], [8, 13, 34], 1);
   assert.deepStrictEqual(few.list, [null, null, null, null]); assert.ok(few.why && few.names.length === 4);
@@ -185,11 +192,11 @@ t("算不出時回原因句：每條 null 都有一句、算得出＝null；長�
     if (p) assert.strictEqual(r.nos[i], null, nm); else assert.ok(typeof r.nos[i] === "string" && r.nos[i].length > 8, nm + " 第 " + (i + 1) + " 條沒有原因");
   });
   const tw = run(TW, CASES[1][2], [20, 60, 120], 1);
-  assert.ok(/^SMA120 [\d,.]+ 在反彈頂 [\d,.]+ 之上（空頭排列），要先站回 SMA120 才有回踩劇本$/.test(tw.nos[0]), tw.nos[0]);
-  assert.strictEqual(tw.nos[2], "低點後還沒有長紅 K（量放大或實體 ≥1.3 ATR），等出現再看");
+  assert.ok(/^SMA120 [\d,.]+ 在反彈頂 [\d,.]+ 之上（均線糾結），要先站回 SMA120 才有回踩劇本$/.test(tw.nos[0]), tw.nos[0]);
+  assert.strictEqual(tw.nos[2], "低點後還沒有長紅 K（量 ≥1.5 倍且實體 ≥1 ATR，或實體 ≥1.3 ATR），等出現再看");
   assert.ok(/^這段資料走不出這個劇本的路徑（最常卡在：.+）$/.test(tw.nos[1]) && !/[a-z]{3}|前提/.test(tw.nos[1]), tw.nos[1]);
-  const dn = run(NQ, CASES[0][2], [20, 60, 120], -1);
-  assert.ok(/^這段資料走不出這個劇本的路徑（最常卡在：.+）$/.test(dn.nos[0]), dn.nos[0]);
+  const seedNo = all.flatMap((x) => x[5].nos).filter((x) => x && x.startsWith("這段"));   // 種子全沒過的句型
+  assert.ok(seedNo.length && seedNo.every((x) => /^這段資料走不出這個劇本的路徑（最常卡在：.+）$/.test(x) && !/[a-z]{3}|前提/.test(x)), seedNo.join("｜"));
   const few = run(NQ.slice(-60), CASES[0][2], [8, 13, 34], 1);
   assert.deepStrictEqual(few.nos, Array(4).fill("K 線不足 80 根"));
 });
@@ -200,7 +207,15 @@ t("缺量 K（Yahoo 期貨最後一根 None）：不進均量、不當關鍵K候
   const big = TW.map((b, i) => (i === N - 1 ? { ...b, o: pc, l: pc, c: cc, h: cc, v: 10 * TW[N - 2].v } : b));
   assert.strictEqual(kkRow(run(big, o, [8, 13, 34], 1)).p, pc, "有量時最後一根是放量長紅");
   const nul = big.map((b, i) => (i === N - 1 ? { ...b, v: null } : b)), r = run(nul, o, [8, 13, 34], 1);
-  assert.strictEqual(kkRow(r).p, null, "缺量那根不當關鍵K（也不走退路）");
+  // 11-24 稽核（ES1! 日K）：退路本來就不看量 → 缺量那根實體 ≥ 1.3 ATR 照當關鍵K，標「資料源還沒給量」
+  assert.strictEqual(kkRow(r).p, pc, "缺量長紅走退路");
+  assert.ok(kkRow(r).name.includes("長紅、資料源還沒給量") && kkRow(r).why.includes("資料源還沒給量") && !kkRow(r).why.includes("量 —"), kkRow(r).name + "／" + kkRow(r).why);
+  // 缺量那根實體只有 1.1 ATR（要看量才算）→ 沒有關鍵K，原因寫「那根資料源還沒給量」、不寫「沒有長紅」
+  const c11 = Math.round((pc + 1.1 * A) / tk) * tk, mid = TW.map((b, i) => (i === N - 1 ? { ...b, o: pc, l: pc, c: c11, h: c11, v: null } : b)), rm = run(mid, o, [8, 13, 34], 1);
+  assert.strictEqual(kkRow(rm).p, null);
+  assert.strictEqual(rm.nos[2], "低點後的長紅 K（" + TW[N - 1].t.slice(5) + "）那根資料源還沒給量，等量出來再看");
+  assert.ok(kkRow(rm).why.includes("資料源還沒給量") && !/^低點後沒有放量/.test(kkRow(rm).why), kkRow(rm).why);
+  assert.ok(!kkRow(run(mid.map((b, i) => (i === N - 1 ? { ...b, v: 10 * TW[N - 2].v } : b)), o, [8, 13, 34], 1)).name.includes("資料源"), "有量時不寫資料源");
   const xs = TW.slice(N - 20, N - 1).map((b) => b.v), avg = xs.reduce((s, x) => s + x, 0) / xs.length;
   assert.strictEqual(r.lv.find((x) => x.k === "V20").p, Math.round(avg), "前 20 根均量只算 19 根有量的");
   for (const p of r.list) if (p) assert.ok(p.sim.every((b) => Number.isInteger(b.v) && b.v > 0), "示意 K 的量照樣有");
@@ -257,6 +272,96 @@ t("效能：一次算四條（兩個方向、三組均線）每次 < 300ms", () 
     ms.push(d); assert.ok(d < 300, nm + " " + mn + " " + dir + "：" + d.toFixed(0) + "ms");
   }
   console.log("     最慢 " + Math.max(...ms).toFixed(1) + "ms、平均 " + (ms.reduce((a, b) => a + b, 0) / ms.length).toFixed(1) + "ms");
+});
+
+// ───── 11-24 稽核（標普／SOX）每條規則一條測試：兩份資料往前切幾段 × 三組均線 × 兩個方向，規則對每條算得出的劇本都成立 ─────
+const VAR = [];
+for (const [nm, bars, o] of CASES) for (const cut of [0, 20, 60, 80, 100, 150]) for (const mn of SETS) for (const dir of [1, -1]) {
+  const b = cut ? bars.slice(0, -cut) : bars;
+  VAR.push([nm + " −" + cut + " " + mn.join("/") + " " + dir, b, o, mn, dir, run(b, o, mn, dir)]);
+}
+const LV = (r) => Object.fromEntries(r.lv.map((x) => [x.k, x.p]));
+const ROW = (p) => Object.fromEntries(p.plan.map((x) => [x.kind, x]));
+t("距離上限 3 ATR：進場前要先走到的關鍵價（① 反彈頂、長均線；② 反彈頂；③ 關鍵K；④ 近期低點）離現價超過就不畫，原因句「X 離現價 Y 有 Z ATR，太遠」", () => {
+  let far = 0, drawn = 0;
+  for (const [nm, b, , , s, r] of VAR) {
+    const L = LV(r), C0 = b[b.length - 1].c, d = (x) => (s * x) / r.A;
+    const key = [Math.max(d(L.T - C0), d(C0 - L.M2)), d(L.T - C0), L.KK == null ? 0 : d(C0 - L.KK), d(C0 - L.LOW)];
+    r.list.forEach((p, i) => {
+      if (p) { drawn++; assert.ok(key[i] <= 3.01, nm + " 第 " + (i + 1) + " 條要先走 " + key[i].toFixed(2) + " ATR"); return; }
+      if (/離現價 [\d,.]+ 有 [\d.]+ ATR，太遠$/.test(r.nos[i])) { far++; assert.ok(key[i] > 2.99, nm + " " + r.nos[i]); }
+    });
+  }
+  assert.ok(far >= 10 && drawn >= 30, "far=" + far + " drawn=" + drawn);
+  // ③ 關鍵K 太遠（2330 日K 多轉空：空方關鍵K 在現價上方 3.5 ATR）
+  const tw = run(TW, CASES[1][2], [8, 13, 34], -1);
+  assert.strictEqual(tw.list[2], null); assert.ok(/^空方關鍵K 價位 2,320 離現價 2,030 有 3\.\d ATR，太遠$/.test(tw.nos[2]), tw.nos[2]);
+  // 1H 的 ② 也用同一個 3 ATR（舊的 n×0.25 根放寬到十幾 ATR）
+  const h = run(NQ, { ...CASES[0][2], tf: "1H" }, [8, 13, 34], -1);
+  assert.strictEqual(h.list[1], null); assert.ok(/^回落底 24,976\.5 離現價 26,734\.25 有 3\.7 ATR，太遠$/.test(h.nos[1]), h.nos[1]);
+});
+
+t("上方壓力（下方支撐）離進場超過 4 ATR → 出場1 改取進場 ± 3 ATR，由來寫「太遠」；算得出的出場1 都在進場 4 ATR 內", () => {
+  const b = TW.slice(0, -60), r = run(b, CASES[1][2], [8, 13, 34], -1), L = LV(r), R = r.lv.find((x) => x.k === "RES");
+  assert.ok(/^支撐 [\d,.]+（\d\d-\d\d 大量 K）太遠（[\d.]+ ATR），出場1 改取進場 − 3 ATR$/.test(R.why), R.why);
+  assert.ok(Math.abs(R.p - (L.T - 3 * r.A)) <= r.tick + 0.01, R.p + " vs " + (L.T - 3 * r.A));
+  let sp = 0;
+  for (const [nm, , , , s, r2] of VAR) for (const p of r2.list) {
+    if (!p) continue;
+    const g = ROW(p);
+    if (p.id === "spring" && /太遠）$/.test(g.ex1.cond)) {   // ④ 出場1＝反彈頂，太遠也改取進場 ± 3 ATR
+      sp++; assert.ok(Math.abs(g.ex1.level - (g.entry.level + s * 3 * r2.A)) <= r2.tick + 0.01, nm + " ④ 出場1 " + g.ex1.level);
+      assert.ok(/^最[高低]價觸及進場 [+−] 3 ATR [\d,.]+（(反彈頂|回落底) [\d,.]+ 太遠）$/.test(g.ex1.cond), g.ex1.cond);
+    }
+    assert.ok((s * (g.ex1.p - g.entry.p)) / r2.A <= 4.01, nm + " " + p.name + " 出場1 離進場 " + ((s * (g.ex1.p - g.entry.p)) / r2.A).toFixed(2) + " ATR");
+  }
+  assert.ok(sp >= 1, "沒測到 ④ 出場1 太遠");
+});
+
+t("報酬風險：出場1 距離 ≥ 0.5 × 停損距離；種子全部只卡這條＝不畫，原因句「停損 X（Z%）比出場1 遠太多」", () => {
+  let rr = 0;
+  for (const [nm, , , , s, r] of VAR) r.list.forEach((p, i) => {
+    if (!p) { if (/比出場1/.test(r.nos[i])) { rr++; assert.ok(/^停損 [\d,.]+（\d+\.\d%）比出場1 遠太多$/.test(r.nos[i]), r.nos[i]); } return; }
+    const g = ROW(p), x1 = s * (g.ex1.p - g.entry.p), st = s * (g.entry.p - g.stop.level);
+    assert.ok(x1 >= 0.5 * st - r.tick, nm + " " + p.name + " 出場1 " + x1 + " < 0.5 × 停損 " + st);
+  });
+  assert.ok(rr >= 3, "rr=" + rr);
+});
+
+t("① 前提原因句的排列照三條均線實際大小（空頭排列／多頭排列／均線糾結）", () => {
+  const seen = new Set();
+  for (const [nm, b, , mn, s, r] of VAR) {
+    if (!/才有(回踩|反彈測)劇本$/.test(r.nos[0] || "")) continue;
+    const M = TT.maLines(b.map((x) => x.c), { ma: "sma", ma_n: mn }).map((x) => x[b.length - 1]);
+    const w = M[0] < M[1] && M[1] < M[2] ? "空頭排列" : M[0] > M[1] && M[1] > M[2] ? "多頭排列" : "均線糾結";
+    assert.ok(r.nos[0].includes("（" + w + "）"), nm + "：" + M.map((x) => x.toFixed(1)) + " → " + r.nos[0]);
+    seen.add(w);
+  }
+  assert.ok(seen.has("均線糾結") && seen.size >= 2, [...seen].join());
+});
+
+t("無量商品：原因句、關鍵K 列不寫「放量／量放大」，寫「長紅（實體 ≥1.3 ATR）」；有量商品括號寫齊「量 ≥1.5 倍且實體 ≥1 ATR，或實體 ≥1.3 ATR」", () => {
+  let n0 = 0;
+  for (const [nm, bars, o] of CASES) for (const tf of o.tf === "4H" ? ["4H", "1H"] : [o.tf]) for (const dir of [1, -1]) for (const cut of [0, 60, 100]) {   // 日K 資料沒有時刻、不能當 1H
+    const nv = bars.slice(0, bars.length - cut).map((b) => ({ ...b, v: 0 })), r = run(nv, { ...o, tf }, [8, 13, 34], dir), kk = kkRow(r);
+    const txt = [kk.name, kk.why, ...r.nos.filter(Boolean)].join("｜");
+    assert.ok(!/放量|量放大|量 ≥/.test(txt), nm + " " + tf + " " + dir + "：" + txt);
+    if (tf !== "1H" && kk.p == null) { n0++; assert.ok(kk.why.endsWith("（實體 ≥ 1.3 ATR）") && r.nos[2].endsWith("K（實體 ≥1.3 ATR），等出現再看"), kk.why + "／" + r.nos[2]); }
+    if (tf !== "1H" && kk.p != null) assert.ok(kk.why.startsWith("這檔沒有成交量，取"), kk.why);
+  }
+  assert.ok(n0 >= 1, "沒有測到無量、無關鍵K 的情形");
+  for (const [, , , , , r] of VAR) if (/還沒有長[紅黑] K（/.test(r.nos[2] || "") && !/1H/.test(r.nos[2])) assert.ok(r.nos[2].includes("（量 ≥1.5 倍且實體 ≥1 ATR，或實體 ≥1.3 ATR）"), r.nos[2]);
+});
+
+t("④ 進場那根不寫量倍數（站回不看量）；①②③ 進場照寫（量是條件）", () => {
+  const ids = new Set();
+  for (const [nm, , , , , r] of VAR) for (const p of r.list) {
+    if (!p) continue;
+    ids.add(p.id);
+    if (p.id === "spring") assert.strictEqual(p.plan[0].vmul, undefined, nm + " ④ 進場寫了量");
+    else assert.ok(typeof p.plan[0].vmul === "number" && p.plan[0].vmul >= 1.5, nm + " " + p.id + " 進場量");
+  }
+  assert.ok(ids.has("spring") && ids.size >= 3, [...ids].join());
 });
 
 t("用字：劇本名稱、條件、價位由來、算不出的原因不寫機率與操作用語", () => {

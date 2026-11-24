@@ -292,6 +292,7 @@ const MA_COL = ["#ff4d4f", "#f5c518", "#3d8bfd"];   // 均線由短到長：紅�
 const EMA_COL = "#ff5ce1";
 const YR_COL = "#b9a3ff";   // 年線 SMA240（11-19）：日K 常駐細線；週K 對應 52 週線 SMA52（11-19）；不屬於均線組、不進交易計算
 const TR_STOP = "#ff4d4d", TR_ENT = "#9ad0ff";
+const SC_COL = { entry: "#c4b5fd", stop: "#e879f9", ex1: "#a78bfa", ex2: "#a78bfa" };   // 劇本價位線（紫色系，深色底看得清楚；跟策略的 TR_STOP／TR_ENT 分開）
 const LINE_STYLE = { stop: [TR_STOP, "5 3"], open_entry: [TR_ENT, ""], open_stop: [TR_STOP, "5 3"] };
 const MARKS = "①②③④⑤";
 const SR_BEYOND = "10% 內無，取範圍外最強";
@@ -611,8 +612,8 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
     els.push(<line key={"tl" + k} className={"trl " + ln.kind} x1={x0} x2={x1} y1={Y(ln.y)} y2={Y(ln.y)} stroke={col} strokeWidth={open ? 1.6 : 1.3}
       strokeDasharray={dash || undefined} clipPath={clip} data-kind={ln.kind} />);
   });
-  // 劇本規劃點的價位線：進場淡藍、停損紅、出場金色虛線，從「今天」畫到右緣；右側標籤滑過出那一點的說明
-  const scCol = { entry: TR_ENT, stop: TR_STOP, ex1: GOLD, ex2: GOLD };
+  // 劇本規劃點的價位線：統一紫色系（跟策略的停損紅、進場淡藍分開），從「今天」畫到右緣；右側標籤寫「劇本進場／劇本停損…」、滑過出那一點的說明
+  const scCol = SC_COL;
   const scTip = (r) => {
     const info = scInfo(sc, r);
     return { "data-tip": "sc", onMouseEnter: (e) => onTip && onTip("sc", info, e, false), onMouseLeave: () => onTip && onTip(null), onClick: (e) => { e.stopPropagation(); onTip && onTip("sc", info, e, true); } };
@@ -620,7 +621,7 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
   if (scX != null) scL.forEach((r) => {
     els.push(<line key={"scl" + r.kind} className={"sc-lv " + r.kind} x1={scX} x2={xr} y1={Y(r.p)} y2={Y(r.p)} stroke={scCol[r.kind]} strokeWidth="1.2"
       strokeDasharray={r.kind === "entry" ? "2 3" : "6 4"} strokeOpacity=".85" clipPath={clip} pointerEvents="none" data-kind={r.kind} data-p={r.p} />);
-    lab.push({ y: Y(r.p), t: r.name + " " + fpx(r.p), col: scCol[r.kind], nt: "", tip: scTip(r) });
+    lab.push({ y: Y(r.p), t: "劇本" + r.name + " " + fpx(r.p), col: scCol[r.kind], nt: "", tip: scTip(r) });
   });
   // 持倉中：右側標籤（跟撐壓一起避讓）
   const op = trd.open;
@@ -762,11 +763,11 @@ function KChart({ d, full, smas, yr, a, b, onTip, gaps, islands, top, rolls, bru
       placed.push([x - 6, y - 6, x + 6, y + 6]);
       ly = s === 1 ? y - 10 : y + 19;
     }
-    const w = tw(r.name);
+    const w = tw("劇本" + r.name);
     for (let q = 0; q < 4 && busyAt([x - w / 2, ly - 12, x + w / 2, ly + 3]); q++) ly += (r.kind === "entry" ? s : -s) * 13;
     ly = Math.min(T + PH - 2, Math.max(T + 12, ly));
     placed.push([x - w / 2, ly - 12, x + w / 2, ly + 3]);
-    scEls.push(<text key={"sct" + r.kind} className="sc-t mk-lab" x={x} y={ly} textAnchor="middle" style={{ fill: col }} {...h}>{r.name}</text>);
+    scEls.push(<text key={"sct" + r.kind} className="sc-t mk-lab" x={x} y={ly} textAnchor="middle" style={{ fill: col }} {...h}>{"劇本" + r.name}</text>);
   }
   // 島狀反轉的字：進出場記號放好之後才放，畫在 K 棒和記號上面
   const islEls = [];

@@ -1058,15 +1058,18 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   });
   await t("劇本點位一個數字（11-24）：同一點的價位虛線、右側標籤、點位表都是成交價；觸發價寫在條件欄（NQ 4H 兩個方向，進場成交價≠觸發價）", async () => {
     const fx = JSON.parse(fs.readFileSync(path.join(ROOT, "tests", "ta_5stage_nq4h.json"), "utf8"));
-    const B = fx.bars, n = B.length, col = (j) => B.map((x) => x[j]);
-    const d = { tf: "4H", symbol: { yahoo: "NQ=F", code: "NQ1!", market: "fut", timezone: "America/New_York" }, bars_completed: n,
-      history: { t: col(0), o: col(1), h: col(2), l: col(3), c: col(4), v: col(5) }, chart: { bars: B.slice(-120).map((x) => ({ t: x[0], o: x[1], h: x[2], l: x[3], c: x[4], v: x[5] })) } };
+    // 11-24 稽核加距離上限後 NQ 4H 多轉空四條都算不出：多轉空改用上下翻轉的 NQ（＝原資料空轉多的鏡像，四條照樣有）
+    const NB = fx.bars, K = scLib.exports.mirrorK(NB.map((x) => ({ h: x[2], l: x[3] })), scLib.exports.tickOf(NB.map((x) => ({ o: x[1], h: x[2], l: x[3], c: x[4] }))));
+    const FB = NB.map(([t0, o, h, l, c, v]) => [t0, K - o, K - l, K - h, K - c, v]);
+    const dOf = (B) => { const n = B.length, col = (j) => B.map((x) => x[j]); return { tf: "4H", symbol: { yahoo: "NQ=F", code: "NQ1!", market: "fut", timezone: "America/New_York" }, bars_completed: n,
+      history: { t: col(0), o: col(1), h: col(2), l: col(3), c: col(4), v: col(5) }, chart: { bars: B.slice(-120).map((x) => ({ t: x[0], o: x[1], h: x[2], l: x[3], c: x[4], v: x[5] })) } }; };
     const fp = (x) => Number(x).toLocaleString("en-US", { maximumFractionDigits: 4 });
     for (const ma_n of [[5, 10, 20], [8, 13, 34]]) for (const [sc, dir] of [["up", 1], ["dn", -1]]) {
-      const p = lib3.normParams({ ma: "sma", ma_n }).p, nm = ma_n.join("/") + " " + sc;
+      const p = lib3.normParams({ ma: "sma", ma_n }).p, nm = ma_n.join("/") + " " + sc, B = dir === 1 ? NB : FB, d = dOf(B);
       const h = renderToString(React.createElement(P.ChartArea, { d, p, srOn: false, kkOn: false, sc })).replace(/<!-- -->/g, "");
       const lines = Object.fromEntries([...h.matchAll(/<line class="sc-lv (\w+)"[^>]*data-p="([^"]+)"/g)].map((x) => [x[1], +x[2]]));
-      const labs = Object.fromEntries([...h.matchAll(/<text class="srl mk-lab"[^>]*>[↑↓]?(進場|停損|出場1|出場2) ([^<]+)<\/text>/g)].map((x) => [x[1], x[2]]));
+      // 11-24 稽核：右側標籤寫「劇本進場／劇本停損／劇本出場1／劇本出場2」（跟策略的停損、進場分開）；點位表欄名不變
+      const labs = Object.fromEntries([...h.matchAll(/<text class="srl mk-lab"[^>]*>[↑↓]?劇本(進場|停損|出場1|出場2) ([^<]+)<\/text>/g)].map((x) => [x[1], x[2]]));
       const rows = [...h.matchAll(/<span class="sc-k (\w+)">([^<]*)<\/span><\/td><td[^>]*>([^<]*)<\/td><td[^>]*>([^<]*)<\/td>/g)].map((x) => ({ kind: x[1], name: x[2], cond: x[3], px: x[4] }));
       assert.strictEqual(rows.length, 4, nm + " 點位表四列");
       const plan = scLib.exports.scenarios(B.map((x) => ({ t: x[0], o: x[1], h: x[2], l: x[3], c: x[4], v: x[5] })), { tf: "4H", mkt: "fut", tz: "America/New_York", ma: "sma", ma_n, dir }).list[0].plan;
@@ -1078,18 +1081,24 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
         assert.ok(r.cond.includes(fp(pr.level)), nm + " " + r.name + " 條件要寫觸發價 " + fp(pr.level) + "：" + r.cond);
       }
       const en = plan.find((z) => z.kind === "entry");
-      assert.ok(en.p !== en.level && labs["進場"] === fp(en.p) && !h.includes("進場 " + fp(en.level) + "<"), nm + " 進場標籤是成交價、不是觸發價");
+      assert.ok(en.p !== en.level && labs["進場"] === fp(en.p) && !h.includes("劇本進場 " + fp(en.level) + "<"), nm + " 進場標籤是成交價、不是觸發價");
+      const mk = [...h.matchAll(/<text class="sc-t mk-lab"[^>]*>([^<]+)<\/text>/g)].map((x) => x[1]);
+      assert.deepStrictEqual(mk, ["劇本進場", "劇本出場1", "劇本出場2"], nm + " 記號文字");
+      const cols = [...h.matchAll(/<line class="sc-lv \w+"[^>]*stroke="([^"]+)"/g)].map((x) => x[1].toLowerCase());
+      assert.ok(cols.length === rows.filter((r) => plan.find((z) => z.kind === r.kind).level != null).length && cols.length >= 3 && cols.every((c) => c !== "#ff4d4d" && c !== "#9ad0ff" && c !== "#ffc94a"), nm + " 劇本線色跟策略停損紅／進場淡藍分開：" + cols);
     }
   });
   await t("劇本只看路徑（11-24）：亮＝只剩示意 K（示意區、今天線、延伸均線），沒有規劃點記號／虛線／右側標籤／點位表；熄＝照舊；記 localStorage、讀不到＝熄；劇本關時不顯示", async () => {
     const fx = JSON.parse(fs.readFileSync(path.join(ROOT, "tests", "ta_5stage_nq4h.json"), "utf8"));
-    const B = fx.bars, n = B.length, col = (j) => B.map((x) => x[j]);
-    const d = { tf: "4H", symbol: { yahoo: "NQ=F", code: "NQ1!", market: "fut", timezone: "America/New_York" }, bars_completed: n,
-      history: { t: col(0), o: col(1), h: col(2), l: col(3), c: col(4), v: col(5) }, chart: { bars: B.slice(-120).map((x) => ({ t: x[0], o: x[1], h: x[2], l: x[3], c: x[4], v: x[5] })) } };
+    const NB = fx.bars, K = scLib.exports.mirrorK(NB.map((x) => ({ h: x[2], l: x[3] })), scLib.exports.tickOf(NB.map((x) => ({ o: x[1], h: x[2], l: x[3], c: x[4] }))));
+    const dOf = (B) => { const n = B.length, col = (j) => B.map((x) => x[j]); return { tf: "4H", symbol: { yahoo: "NQ=F", code: "NQ1!", market: "fut", timezone: "America/New_York" }, bars_completed: n,
+      history: { t: col(0), o: col(1), h: col(2), l: col(3), c: col(4), v: col(5) }, chart: { bars: B.slice(-120).map((x) => ({ t: x[0], o: x[1], h: x[2], l: x[3], c: x[4], v: x[5] })) } }; };
+    // 多轉空用上下翻轉的 NQ（11-24 距離上限後原資料多轉空四條都算不出）
+    const d = dOf(NB), dF = dOf(NB.map(([t0, o, h, l, c, v]) => [t0, K - o, K - l, K - h, K - c, v]));
     const p = lib3.normParams({ ma: "sma", ma_n: [8, 13, 34] }).p;
     const ls0 = global.localStorage, st = {};
     global.localStorage = { getItem: (k) => (k in st ? st[k] : null), setItem: (k, v) => { st[k] = String(v); }, removeItem: (k) => { delete st[k]; } };
-    const ca = (sc) => renderToString(React.createElement(P.ChartArea, { d, p, srOn: false, kkOn: false, sc })).replace(/<!-- -->/g, "");
+    const ca = (sc) => renderToString(React.createElement(P.ChartArea, { d: sc === "dn" ? dF : d, p, srOn: false, kkOn: false, sc })).replace(/<!-- -->/g, "");
     try {
       for (const sc of ["up", "dn"]) {
         delete st.yoda_ta_path;
