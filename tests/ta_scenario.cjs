@@ -339,6 +339,27 @@ t("上方壓力（下方支撐）離進場超過 門檻＋1 ATR → 出場1 改�
   assert.strictEqual(dn.ex1.cond, "最低價觸及進場 − 5 ATR 26,311.25（回落底 24,976.5 太遠）");
 });
 
+t("邊界：壓力／④ 反彈頂「太遠」⇔ 離進場 > 門檻＋1 ATR；③ 改取一半 ⇔ 壓力離頸線 < 1 ATR（審查 ca15241：改成 > 門檻、< 2 ATR 時漏抓）", () => {
+  const n = { res: 0, sp: 0, w: 0 };
+  for (const [nm, , o, , s, r] of VAR) {
+    const F = FARTF[o.tf], L = LV(r), R = r.lv.find((x) => x.k === "RES"), m = R && R.why.match(/太遠（([\d.]+) ATR）/);
+    if (!R) continue;
+    if (m) assert.ok(+m[1] >= F + 0.95, nm + " " + R.why);
+    else { assert.ok((s * (R.p - L.T)) / r.A <= F + 1.01, nm + " 壓力 " + R.p + " 沒改取"); if ((s * (R.p - L.T)) / r.A > F) n.res++; }
+    const p = r.list[3];
+    if (p) { const g = ROW(p), dT = (s * (L.T - L.LOW)) / r.A; assert.strictEqual(/太遠）$/.test(g.ex1.cond), dT > F + 1, nm + " ④ " + dT.toFixed(2) + " " + g.ex1.cond);
+      if (dT <= F + 1) assert.ok(Math.abs(g.ex1.level - L.T) <= r.tick + 0.01, nm + " ④ 出場1 " + g.ex1.level + " 不是反彈頂 " + L.T); if (dT > F && dT <= F + 1) n.sp++; }
+  }
+  for (const [nm, bars, o] of CASES) for (const cut of [0, 20, 60, 80, 100, 150]) for (const dir of [1, -1]) {
+    const r = S.scenarios(cut ? bars.slice(0, -cut) : bars, { ...o, ma: "sma", ma_n: [8, 13, 34], dir, rrMin: 0 }), p = r.list[2];
+    if (!p) continue;
+    const L = LV(r), dR = (dir * (L.RES - L.T)) / r.A, near = /離進場不到 1 ATR/.test(ROW(p).ex1.cond);
+    assert.strictEqual(near, dR < 1, nm + " −" + cut + " " + dir + " 壓力離頸線 " + dR.toFixed(2) + " ATR");
+    if (dR >= 1 && dR < 2) n.w++;
+  }
+  assert.ok(n.res >= 1 && n.sp >= 1 && n.w >= 1, JSON.stringify(n));
+});
+
 t("③ 壓力（支撐）離進場（頸線）不到 1 ATR → 出場1 改取頸線到量測目標的一半，條件寫由來；之後照跑報酬風險 0.5", () => {
   const o = CASES[0][2];
   // NQ 4H 空轉多：上方壓力 27,587.75 離頸線 27,137 只有 0.94 ATR；報酬風險 0.5 時卡住，關掉才看得到出場1 的取法
