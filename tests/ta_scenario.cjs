@@ -36,15 +36,13 @@ t("決定性：同一份資料、同設定算兩次一模一樣（含 EMA）", (
   assert.ok(e1.names[0] === "回踩 EMA34 再攻", e1.names[0]);
 });
 
-t("NQ 4H 中均線（demo 那份資料，11-24 稽核加距離上限後）：空轉多 ①② 算得出、③ 卡報酬風險、④ 近期低點太遠；多轉空四條都卡距離；全部情境過半算得出", () => {
+t("NQ 4H 中均線（demo 那份資料，11-25 4H 門檻 5 ATR）：兩個方向 ①②④ 算得出、③ 卡報酬風險；全部情境過半算得出", () => {
   assert.ok(all.filter((x) => x[5].list.some(Boolean)).length >= all.length * 0.6, "算得出的情境太少");
   const up = all.find((x) => x[0] === "NQ 4H 8/13/34 空轉多")[5], dn = all.find((x) => x[0] === "NQ 4H 8/13/34 多轉空")[5];
-  assert.deepStrictEqual(up.list.map(Boolean), [true, true, false, false]);
+  assert.deepStrictEqual(up.list.map(Boolean), [true, true, false, true]);
   assert.strictEqual(up.nos[2], "停損 25,826.5（6.0%）比出場1 遠太多");
-  assert.strictEqual(up.nos[3], "近期波段低 24,976.5 離現價 26,734.25 有 3.7 ATR，太遠");
-  assert.deepStrictEqual(dn.list.map(Boolean), [false, false, false, false]);
-  assert.deepStrictEqual(dn.nos, ["回落底 24,976.5 離現價 26,734.25 有 3.7 ATR，太遠", "回落底 24,976.5 離現價 26,734.25 有 3.7 ATR，太遠",
-    "空方關鍵K 價位 28,583.75 離現價 26,734.25 有 3.9 ATR，太遠", "近期波段高 28,697 離現價 26,734.25 有 4.1 ATR，太遠"]);
+  assert.deepStrictEqual(dn.list.map(Boolean), [true, true, false, true]);
+  assert.strictEqual(dn.nos[2], "停損 28,581.25（15.7%）比出場1 遠太多");
 });
 
 t("四條路徑 OHLC 合法、對齊跳動單位、量 ≥ 0、根數在 1H 60～70／4H 50～60／日K 25～40（11-24 加長）；時間接在最後一根之後、不重複", () => {
@@ -280,42 +278,82 @@ for (const [nm, bars, o] of CASES) for (const cut of [0, 20, 60, 80, 100, 150]) 
   const b = cut ? bars.slice(0, -cut) : bars;
   VAR.push([nm + " −" + cut + " " + mn.join("/") + " " + dir, b, o, mn, dir, run(b, o, mn, dir)]);
 }
+for (const cut of [0, 20, 60, 100]) for (const dir of [1, -1]) {   // NQ 也當 1H 跑（門檻 6 ATR）
+  const b = cut ? NQ.slice(0, -cut) : NQ, o = { ...CASES[0][2], tf: "1H" };
+  VAR.push(["NQ 1H −" + cut + " 8/13/34 " + dir, b, o, [8, 13, 34], dir, run(b, o, [8, 13, 34], dir)]);
+}
 const LV = (r) => Object.fromEntries(r.lv.map((x) => [x.k, x.p]));
 const ROW = (p) => Object.fromEntries(p.plan.map((x) => [x.kind, x]));
-t("距離上限 3 ATR：進場前要先走到的關鍵價（① 反彈頂、長均線；② 反彈頂；③ 關鍵K；④ 近期低點）離現價超過就不畫，原因句「X 離現價 Y 有 Z ATR，太遠」", () => {
-  let far = 0, drawn = 0;
-  for (const [nm, b, , , s, r] of VAR) {
-    const L = LV(r), C0 = b[b.length - 1].c, d = (x) => (s * x) / r.A;
+const FARTF = { "1H": 6, "4H": 5, D: 3 };   // 11-25：距離門檻依週期
+t("距離門檻依週期（1H 6／4H 5／日K 3 ATR）：進場前要先走到的關鍵價（① 反彈頂、長均線；② 反彈頂；③ 關鍵K；④ 近期低點）離現價超過就不畫，原因句「X 離現價 Y 有 Z ATR，太遠」", () => {
+  const far = { "1H": 0, "4H": 0, D: 0 }, drawn = { "1H": 0, "4H": 0, D: 0 };
+  for (const [nm, b, o, , s, r] of VAR) {
+    const L = LV(r), C0 = b[b.length - 1].c, d = (x) => (s * x) / r.A, F = FARTF[o.tf];
     const key = [Math.max(d(L.T - C0), d(C0 - L.M2)), d(L.T - C0), L.KK == null ? 0 : d(C0 - L.KK), d(C0 - L.LOW)];
     r.list.forEach((p, i) => {
-      if (p) { drawn++; assert.ok(key[i] <= 3.01, nm + " 第 " + (i + 1) + " 條要先走 " + key[i].toFixed(2) + " ATR"); return; }
-      if (/離現價 [\d,.]+ 有 [\d.]+ ATR，太遠$/.test(r.nos[i])) { far++; assert.ok(key[i] > 2.99, nm + " " + r.nos[i]); }
+      if (p) { drawn[o.tf]++; assert.ok(key[i] <= F + 0.01, nm + " 第 " + (i + 1) + " 條要先走 " + key[i].toFixed(2) + " ATR"); return; }
+      if (/離現價 [\d,.]+ 有 [\d.]+ ATR，太遠$/.test(r.nos[i])) { far[o.tf]++; assert.ok(key[i] > F - 0.01, nm + " " + r.nos[i]); }
     });
   }
-  assert.ok(far >= 10 && drawn >= 30, "far=" + far + " drawn=" + drawn);
-  // ③ 關鍵K 太遠（2330 日K 多轉空：空方關鍵K 在現價上方 3.5 ATR）
-  const tw = run(TW, CASES[1][2], [8, 13, 34], -1);
-  assert.strictEqual(tw.list[2], null); assert.ok(/^空方關鍵K 價位 2,320 離現價 2,030 有 3\.\d ATR，太遠$/.test(tw.nos[2]), tw.nos[2]);
-  // 1H 的 ② 也用同一個 3 ATR（舊的 n×0.25 根放寬到十幾 ATR）
-  const h = run(NQ, { ...CASES[0][2], tf: "1H" }, [8, 13, 34], -1);
-  assert.strictEqual(h.list[1], null); assert.ok(/^回落底 24,976\.5 離現價 26,734\.25 有 3\.7 ATR，太遠$/.test(h.nos[1]), h.nos[1]);
+  for (const tf of ["1H", "4H", "D"]) assert.ok(far[tf] >= 3 && drawn[tf] >= 8, tf + " far=" + far[tf] + " drawn=" + drawn[tf]);
 });
 
-t("上方壓力（下方支撐）離進場超過 4 ATR → 出場1 改取進場 ± 3 ATR，由來寫「太遠」；算得出的出場1 都在進場 4 ATR 內", () => {
+t("日K 門檻 3 ATR：2330 日K 多轉空 ① SMA34 3.8 ATR、③ 空方關鍵K 3.5 ATR 太遠", () => {
+  const tw = run(TW, CASES[1][2], [8, 13, 34], -1);
+  assert.strictEqual(tw.list[0], null); assert.strictEqual(tw.nos[0], "SMA34 2,349 離現價 2,030 有 3.8 ATR，太遠");
+  assert.strictEqual(tw.list[2], null); assert.ok(/^空方關鍵K 價位 2,320 離現價 2,030 有 3\.\d ATR，太遠$/.test(tw.nos[2]), tw.nos[2]);
+});
+
+t("4H 門檻 5 ATR：NQ 4H 空轉多 ④ 近期低點 3.7 ATR、多轉空 ④ 近期高點 4.1 ATR 畫得出；往前切 60 根的多轉空 ④ 5.1 ATR 太遠", () => {
+  const o = CASES[0][2], up = run(NQ, o, [8, 13, 34], 1), dn = run(NQ, o, [8, 13, 34], -1), dn60 = run(NQ.slice(0, -60), o, [8, 13, 34], -1);
+  assert.ok(up.list[3] && dn.list[3], up.nos[3] + "／" + dn.nos[3]);
+  assert.strictEqual(dn60.list[3], null); assert.strictEqual(dn60.nos[3], "近期波段高 30,178 離現價 27,989.25 有 5.1 ATR，太遠");
+});
+
+t("1H 門檻 6 ATR：NQ 當 1H 多轉空 ①② 回落底 3.7 ATR 畫得出；④ 近期高點 7.2 ATR 太遠", () => {
+  const h = run(NQ, { ...CASES[0][2], tf: "1H" }, [8, 13, 34], -1);
+  assert.ok(h.list[0] && h.list[1], h.nos[0] + "／" + h.nos[1]);
+  assert.strictEqual(h.list[3], null); assert.strictEqual(h.nos[3], "近期波段高 30,178 離現價 26,734.25 有 7.2 ATR，太遠");
+});
+
+t("上方壓力（下方支撐）離進場超過 門檻＋1 ATR → 出場1 改取進場 ± 門檻 ATR（1H 6／4H 5／日K 3），由來寫「太遠」；算得出的出場1 都在進場 門檻＋1 ATR 內", () => {
   const b = TW.slice(0, -60), r = run(b, CASES[1][2], [8, 13, 34], -1), L = LV(r), R = r.lv.find((x) => x.k === "RES");
   assert.ok(/^支撐 [\d,.]+（\d\d-\d\d 大量 K）太遠（[\d.]+ ATR），出場1 改取進場 − 3 ATR$/.test(R.why), R.why);
   assert.ok(Math.abs(R.p - (L.T - 3 * r.A)) <= r.tick + 0.01, R.p + " vs " + (L.T - 3 * r.A));
   let sp = 0;
-  for (const [nm, , , , s, r2] of VAR) for (const p of r2.list) {
-    if (!p) continue;
-    const g = ROW(p);
-    if (p.id === "spring" && /太遠）$/.test(g.ex1.cond)) {   // ④ 出場1＝反彈頂，太遠也改取進場 ± 3 ATR
-      sp++; assert.ok(Math.abs(g.ex1.level - (g.entry.level + s * 3 * r2.A)) <= r2.tick + 0.01, nm + " ④ 出場1 " + g.ex1.level);
-      assert.ok(/^最[高低]價觸及進場 [+−] 3 ATR [\d,.]+（(反彈頂|回落底) [\d,.]+ 太遠）$/.test(g.ex1.cond), g.ex1.cond);
+  for (const [nm, , o, , s, r2] of VAR) {
+    const F = FARTF[o.tf], R2 = r2.lv.find((x) => x.k === "RES");
+    if (R2 && /太遠/.test(R2.why)) assert.ok(R2.why.endsWith("出場1 改取進場 " + (s === 1 ? "+" : "−") + " " + F + " ATR") && Math.abs(R2.p - (LV(r2).T + s * F * r2.A)) <= r2.tick + 0.01, nm + " " + R2.why);
+    for (const p of r2.list) {
+      if (!p) continue;
+      const g = ROW(p);
+      if (p.id === "spring" && /太遠）$/.test(g.ex1.cond)) {   // ④ 出場1＝反彈頂，太遠也改取進場 ± 門檻 ATR
+        sp++; assert.ok(Math.abs(g.ex1.level - (g.entry.level + s * F * r2.A)) <= r2.tick + 0.01, nm + " ④ 出場1 " + g.ex1.level);
+        assert.ok(new RegExp("^最[高低]價觸及進場 [+−] " + F + " ATR [\\d,.]+（(反彈頂|回落底) [\\d,.]+ 太遠）$").test(g.ex1.cond), g.ex1.cond);
+      }
+      assert.ok((s * (g.ex1.p - g.entry.p)) / r2.A <= F + 1.01, nm + " " + p.name + " 出場1 離進場 " + ((s * (g.ex1.p - g.entry.p)) / r2.A).toFixed(2) + " ATR");
     }
-    assert.ok((s * (g.ex1.p - g.entry.p)) / r2.A <= 4.01, nm + " " + p.name + " 出場1 離進場 " + ((s * (g.ex1.p - g.entry.p)) / r2.A).toFixed(2) + " ATR");
   }
   assert.ok(sp >= 1, "沒測到 ④ 出場1 太遠");
+  const dn = ROW(run(NQ, CASES[0][2], [8, 13, 34], -1).list[3]);   // 4H：回落底離進場 7.6 ATR > 6 → 進場 − 5 ATR
+  assert.strictEqual(dn.ex1.cond, "最低價觸及進場 − 5 ATR 26,311.25（回落底 24,976.5 太遠）");
+});
+
+t("③ 壓力（支撐）離進場（頸線）不到 1 ATR → 出場1 改取頸線到量測目標的一半，條件寫由來；之後照跑報酬風險 0.5", () => {
+  const o = CASES[0][2];
+  // NQ 4H 空轉多：上方壓力 27,587.75 離頸線 27,137 只有 0.94 ATR；報酬風險 0.5 時卡住，關掉才看得到出場1 的取法
+  const up = run(NQ, o, [8, 13, 34], 1);
+  assert.strictEqual(up.list[2], null); assert.ok(/比出場1 遠太多$/.test(up.nos[2]), up.nos[2]);
+  for (const [b, dir, r0] of [[NQ, 1, "27,587.75"], [NQ.slice(0, -15), -1, null]]) {
+    const r = S.scenarios(b, { ...o, ma: "sma", ma_n: [8, 13, 34], dir, rrMin: 0 }), L = LV(r), p = r.list[2];
+    assert.ok((dir * (L.RES - L.T)) / r.A < 1, "這組資料壓力要在 1 ATR 內");
+    assert.ok(p, dir + "：" + r.nos[2]);
+    const g = ROW(p), mid = Math.round((L.T + g.ex2.level) / 2 / r.tick) * r.tick;
+    assert.ok(Math.abs(g.ex1.level - mid) <= r.tick, g.ex1.level + " vs " + mid);
+    assert.strictEqual(g.ex1.cond, (dir === 1 ? "最高價觸及 " : "最低價觸及 ") + TT.fpx(g.ex1.level) + "（" + (dir === 1 ? "壓力 " : "支撐 ") + TT.fpx(L.RES)
+      + " 離進場不到 1 ATR，出場1 改取頸線到量測目標的一半 " + TT.fpx(g.ex1.level) + "）");
+    if (r0) assert.strictEqual(TT.fpx(L.RES), r0);
+  }
 });
 
 t("報酬風險：出場1 距離 ≥ 0.5 × 停損距離；種子全部只卡這條＝不畫，原因句「停損 X（Z%）比出場1 遠太多」", () => {
