@@ -406,6 +406,16 @@ t("停損離進場 ≤ 5 ATR（11-25）；種子全部只卡這條＝不畫，�
   assert.ok(sf >= 1, "sf=" + sf);
 });
 
+t("邊界：停損 4.9997 ATR 畫、① 5.1 ATR 不畫；日K ③ 量測目標太遠仍改取進場 − 3 ATR（審查 2f02500：門檻改 4／5.5、③ 太遠那段改壞時漏抓）", () => {
+  const cut = (b, o, k, dir) => S.scenarios(b.slice(0, -k), { ...o, ma: "sma", ma_n: [8, 13, 34], dir });
+  const r1 = cut(NQ, CASES[0][2], 210, 1), g1 = ROW(r1.list[2]), z = (g1.entry.p - g1.stop.level) / r1.A;
+  assert.ok(z > 4.99 && z <= 5, "NQ 4H −210 ③ 停損 " + z);
+  const r2 = cut(NQ, CASES[0][2], 35, -1);
+  assert.strictEqual(r2.list[0], null); assert.strictEqual(r2.nos[0], "停損 27,662.46 離進場 26,168 有 5.1 ATR，太遠");
+  const g3 = ROW(cut(TW, CASES[1][2], 5, -1).list[2]);
+  assert.strictEqual(g3.ex1.cond, "最低價觸及進場 − 3 ATR 1,820（量測目標 1,720 太遠）");
+});
+
 t("① 前提原因句的排列照三條均線實際大小（空頭排列／多頭排列／均線糾結）", () => {
   const seen = new Set();
   for (const [nm, b, , mn, s, r] of VAR) {
