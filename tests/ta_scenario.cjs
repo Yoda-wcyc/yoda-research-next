@@ -40,9 +40,9 @@ t("NQ 4H 中均線（demo 那份資料，11-25 4H 門檻 5 ATR）：兩個方向
   assert.ok(all.filter((x) => x[5].list.some(Boolean)).length >= all.length * 0.6, "算得出的情境太少");
   const up = all.find((x) => x[0] === "NQ 4H 8/13/34 空轉多")[5], dn = all.find((x) => x[0] === "NQ 4H 8/13/34 多轉空")[5];
   assert.deepStrictEqual(up.list.map(Boolean), [true, true, true, true], up.nos[2]);
-  assert.deepStrictEqual(dn.list.map(Boolean), [true, true, true, true], dn.nos[2]);
+  assert.deepStrictEqual(dn.list.map(Boolean), [true, true, false, true], dn.nos[2]);
   assert.strictEqual(up.list[2].plan[2].cond, "最高價觸及量測目標 28,447.5");
-  assert.strictEqual(dn.list[2].plan[2].cond, "最低價觸及進場 − 5 ATR 22,590.75（量測目標 21,371.75 太遠）");
+  assert.strictEqual(dn.nos[2], "停損 28,581.25 離進場 24,693 有 8.1 ATR，太遠");   // 11-25：停損 > 5 ATR 不畫（原本出場1 改取進場 − 5 ATR）
 });
 
 t("四條路徑 OHLC 合法、對齊跳動單位、量 ≥ 0、根數在 1H 60～70／4H 50～60／日K 25～40（11-24 加長）；時間接在最後一根之後、不重複", () => {
@@ -381,7 +381,7 @@ t("③ 出場1＝量測目標（頸線 ±（頸線 − 右腳／右肩））、�
     const path = p.sim.slice(g.entry.k - b.length + 1, g.ex2.k - b.length);
     assert.ok(path.some((x) => (s === 1 ? x.h >= tgt - r.tick - 0.01 : x.l <= tgt + r.tick + 0.01)), nm + " 出場2 前沒走到量測目標 " + tgt);
   }
-  assert.ok(n >= 10 && nf >= 2, "n=" + n + " nf=" + nf);
+  assert.ok(n >= 10, "n=" + n + " nf=" + nf);   // 11-25 停損 ≤ 5 ATR 後：停損距離 ≥ 量測目標離頸線，1H／4H 的「太遠」（> 7／6 ATR）不會畫出來，只剩日K 可能（邊界那條測 rrMin 0 的 far）
   const up = ROW(run(NQ, CASES[0][2], [8, 13, 34], 1).list[2]);   // NQ 4H 空轉多：c03e4cf 卡報酬風險（出場1 取壓力的一半），改量測目標後回來
   assert.deepStrictEqual([up.stop.level, up.ex1.level, up.ex2.cond], [25826.5, 28447.5, "出場1 之後收盤跌破 SMA13"]);
 });
@@ -394,6 +394,16 @@ t("報酬風險：出場1 距離 ≥ 0.5 × 停損距離；種子全部只卡這
     assert.ok(x1 >= 0.5 * st - r.tick, nm + " " + p.name + " 出場1 " + x1 + " < 0.5 × 停損 " + st);
   });
   assert.ok(rr >= 3, "rr=" + rr);
+});
+
+t("停損離進場 ≤ 5 ATR（11-25）；種子全部只卡這條＝不畫，原因句「停損 X 離進場 Y 有 Z ATR，太遠」", () => {
+  let sf = 0;
+  for (const [nm, , , , s, r] of VAR) r.list.forEach((p, i) => {
+    if (!p) { if (/^停損 .*離進場/.test(r.nos[i])) { sf++; assert.ok(/^停損 [\d,.]+ 離進場 [\d,.]+ 有 (\d+\.\d|5\.\d\d) ATR，太遠$/.test(r.nos[i]), r.nos[i]); } return; }
+    const g = ROW(p);
+    assert.ok((s * (g.entry.p - g.stop.level)) / r.A <= 5 + 1e-9, nm + " " + p.name + " 停損離進場 " + ((s * (g.entry.p - g.stop.level)) / r.A).toFixed(2) + " ATR");
+  });
+  assert.ok(sf >= 1, "sf=" + sf);
 });
 
 t("① 前提原因句的排列照三條均線實際大小（空頭排列／多頭排列／均線糾結）", () => {
