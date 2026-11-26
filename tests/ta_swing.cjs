@@ -43,6 +43,8 @@ t("inject：換掉佔位、</ 跳脫、佔位不對回 null", () => {
   assert.deepStrictEqual(JSON.parse(h.slice(h.indexOf("CKD=") + 4, h.indexOf(";</script>"))), D.ck);
   assert.strictEqual(S.inject("no placeholder", D), null);
   assert.strictEqual(S.inject(S.PH_CK + S.PH_CK + S.PH_CDT, D), null);
+  const k = { ...D, ck: { ...D.ck, __SW_CDT_DATA__: 1 } };   // 資料裡的 key 撞到佔位字串
+  assert.strictEqual(S.inject("A" + S.PH_CDT + "B" + S.PH_CK + "C", k), "A" + JSON.stringify(D.cdt) + "B" + JSON.stringify(k.ck).replace(/<\//g, "\\u003c/") + "C");
 });
 t("valid：格式不符都擋", () => {
   assert.ok(S.valid(D));
@@ -116,6 +118,34 @@ t("路由：op:'page' 回注入好的頁（佔位不見、資料在、外殼切�
   assert.deepStrictEqual(Object.keys(b.j).sort(), ["built_at", "conds", "day", "ok", "score", "through"]);
   assert.deepStrictEqual(b.j.conds, S.summary(D).conds);
   const n = reads; await ask(rt, {}); assert.strictEqual(reads, n, "10 分鐘內不重讀 Blob");
+});
+t("路由：Blob 丟例外 → 503 資料不足（不露原始訊息）；壞版＋有舊資料 → 用舊的且 10 分鐘內不重下", async () => {
+  const boom = { get: async () => { throw new Error("blob down SECRET"); } };
+  const live = { authOf: () => ({ sub: "m" }), owners: () => [], store: async () => ({ isOwner: async () => false, allowed: async () => true }) };
+  const r1 = await ask(esm(path.join(ROOT, "app", "api", "ta-swing", "route.js"), { "../../../lib/ta-live": live, "../../../lib/data-blob": boom }), {});
+  assert.strictEqual(r1.status, 503); assert.ok(r1.j.error.startsWith("資料不足")); assert.ok(!r1.j.error.includes("SECRET"));
+  upload(D); const rt = route("m");
+  assert.strictEqual((await ask(rt, {})).status, 200);
+  upload({ ...D, v: 9 }, "20261126-badbad00");
+  const real = Date.now; Date.now = () => real() + 11 * 60 * 1000;   // 過了 10 分鐘
+  try {
+    assert.strictEqual((await ask(rt, { op: "ck" })).status, 200, "壞版先用舊的");
+    const n = reads; await ask(rt, { op: "ck" }); assert.strictEqual(reads, n, "壞版不每次重下");
+  } finally { Date.now = real; }
+});
+t("admin-put-data：swing 用 valid() 擋壞版、資料日要跟 through 一致", async () => {
+  const store = {};
+  const fb = { put: async (p, b) => { store[p] = Buffer.from(b); }, get: async (p) => (p in store ? { stream: store[p] } : null) };
+  const rt = esm(path.join(ROOT, "app", "api", "admin-put-data", "route.js"), { "../../../lib/data-blob": fb });
+  process.env.ADMIN_KEY = "k";
+  const send = (d, through) => {
+    const gz = zlib.gzipSync(Buffer.from(JSON.stringify(d)));
+    const body = { key: "k", name: "swing", ver: through + "-abcdef12", part: 0, parts: 1, through, bytes: gz.length, sha256: P.sha256(gz), data: gz.toString("base64") };
+    return rt.POST(new Request("http://x/api/admin-put-data", { method: "POST", body: JSON.stringify(body) })).then((r) => r.status);
+  };
+  assert.strictEqual(await send({ v: 1, through: "2026-11-26", ck: { a: 1 }, cdt: { a: 1 } }, "20261126"), 409);
+  assert.strictEqual(await send(D, "20261126"), 409, "資料日 2026-11-25 ≠ through 20261126");
+  assert.strictEqual(await send(D, "20261125"), 200);
 });
 
 (async () => {

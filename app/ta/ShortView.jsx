@@ -252,7 +252,8 @@ export default function ShortView({ call, gate, SortTable }) {
     if (!live) return { ...c, i };
     if (!x) return { ...c, i, now: "資料不足：檢查表沒有這一條", st: 3, gr: "—", g: -1 };
     const one = c.k !== "bear_16";
-    return { ...c, i, st: stOf(x, live.day), g: GR[x.grade] === undefined ? -1 : GR[x.grade], gr: <>{x.grade}{one ? <small>{c.gr}</small> : <small>跟「{x.t}」一起算</small>}</>,
+    // 即時：單條的項目名改用檢查表的 x.t，舊快照的回測說明不再顯示（會跟即時分級打架）；bear_16 三列保留各自子項名
+    return { ...c, i, it: one ? x.t : c.it, st: stOf(x, live.day), g: GR[x.grade] === undefined ? -1 : GR[x.grade], gr: <>{x.grade}{one ? null : <small>跟「{x.t}」一起算</small>}</>,
       now: (x.on === null ? "無法判斷（當天缺資料）" : x.on ? "成立" : "不成立") + "・" + (x.last_on ? "最近一次成立 " + (x.last_on.slice(0, 4) === live.day.slice(0, 4) ? mdOf(x.last_on).replace("-", "/") : x.last_on) : "資料期間內沒成立過") + (one ? "" : "（" + x.t + "）") };
   });
   const ckNum = (i) => { const x = +ckv[i] || 0; return x < 0 ? 0 : x; };

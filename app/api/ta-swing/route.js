@@ -41,7 +41,10 @@ async function data() {
     const gz = assemble(bufs, m.sha256);
     d = gz && JSON.parse(gunzipSync(gz).toString('utf8'));
   } catch (e) { d = null; }
-  if (!valid(d)) return C.d || 'updating';   // 段對不上／解不開／格式不符：有舊的先用，不快取壞版
+  if (!valid(d)) {   // 段對不上／解不開／格式不符：有舊的先用（10 分鐘內不再重下壞版），不快取壞版
+    if (C.d) { C.t = Date.now(); return C.d; }
+    return 'updating';
+  }
   C = { t: Date.now(), ver: m.ver, d, page: null };
   return d;
 }
@@ -75,7 +78,9 @@ export async function POST(req) {
     }
     return R({ ok: true, through: d.through, html: C.page });
   } catch (e) {
-    return R({ ok: false, reason: 'error', error: '伺服器錯誤：' + String((e && e.message) || e).slice(0, 200) }, 500);
+    // 服務掛掉（Blob／會員庫丟例外）一律寫「資料不足」，原始訊息只進 log
+    console.error('ta-swing', e);
+    return R({ ok: false, reason: 'error', error: '資料不足：多空波段資料暫時讀不到，稍後再試' }, 503);
   }
 }
 export async function GET() { return R({ ok: false, error: 'POST only' }, 405); }

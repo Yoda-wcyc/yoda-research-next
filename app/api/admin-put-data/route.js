@@ -1,6 +1,7 @@
 import { J, preflight } from '../../../lib/cors';
 import { put, get } from '../../../lib/data-blob';
 import { checkPart, partsComplete, assemble, partPath, latestPath, SCHEMA_OF, schemaOf } from '../../../lib/data-parts';
+import { valid as validSwing } from '../../../lib/ta-swing';
 import { gunzipSync } from 'zlib';
 
 export const runtime = 'nodejs';
@@ -49,9 +50,13 @@ export async function POST(req) {
     const gz = assemble(bufs, m.sha256);
     if (!gz) return J({ ok: false, error: '各段接起來 sha256 對不上，不更新 latest', sha256: m.sha256 }, 409);
     // 資料名 ↔ schema 要對上（例：台股面板傳成 us_rs_panel）：解 gzip 讀 schema（台股面板約 16MB，每次上傳解一次）
-    let schema = null;
-    try { schema = schemaOf(JSON.parse(gunzipSync(gz, { maxOutputLength: 3e8 }).toString('utf8'))); } catch (e) { schema = null; }
+    let schema = null, doc = null;
+    try { doc = JSON.parse(gunzipSync(gz, { maxOutputLength: 3e8 }).toString('utf8')); schema = schemaOf(doc); } catch (e) { schema = null; }
     if (schema !== SCHEMA_OF[m.name]) return J({ ok: false, error: m.name + ' 要 schema ' + SCHEMA_OF[m.name] + '，收到 ' + String(schema).slice(0, 40) + '，不更新 latest' }, 409);
+    // swing：跟 /api/ta-swing 讀取用同一套 valid()，資料日也要跟 meta 一致——壞版不會變成 latest
+    if (m.name === 'swing' && !(validSwing(doc) && doc.through.replace(/-/g, '') === m.through)) {
+      return J({ ok: false, error: 'swing 資料格式不符或資料日跟 through 對不上，不更新 latest' }, 409);
+    }
     // 不准倒退：新 through 比現在 latest 舊 → 409（body.force===true 才放行）。latest 壞掉讀不懂＝當作沒有
     const cr = await get(latestPath(m.name), { access: 'private', useCache: false });
     let cur = null;
