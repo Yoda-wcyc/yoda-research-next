@@ -78,18 +78,27 @@ export function Tip({ t, children }) {
 }
 const Sw = ({ i }) => <span className="ta-sh-sw" style={{ background: COLORS[i] }} />;
 
-// 接檢查表分批：11-25 快照（每日條件分數帳本另一軌在做，接好再換成即時）
+// 接檢查表分批：讀 /api/ta-swing op:'ck'（多空波段每天的條件矩陣）；抓不到才退回下面 11-25 快照並標日期。k＝條件代碼（bull＝頂部訊號、bear＝底部訊號）
+// 十年期／美元／BTC 三列在檢查表是同一條「跨資產底部確認」（bear_16），即時狀態一起算
 const CK_DATE = "11-25";
 const CK = [
-  { it: "股債溢價落在兩季前 10%", now: "兩個口徑都列：FactSet 日頻 +0.99（兩季前 10%）、長歷史口徑 −0.89（兩季前 10%，成立；Shiller trailing E 延後 3 個月，延後 5 個月 −1.19 也成立）。長歷史「創兩季新高」11-05、11-20 觸發過，今天不成立。Shiller 新版最近幾個月 E 可能含 S&P 預估，有輕微估計污染", st: 2, gr: "長歷史口徑：「創兩季新高」SPX 有效但 2012 年後失效、NDX 偏有效；「前 10%」SPX／NDX／TWII 偏有效。FactSet 口徑：資料不足", g: 3 },
-  { it: "HY 利差從兩季高點回落 ≥30bp", now: "3.72%（11/20 高點 3.76%），只回落 4bp；要 ≤3.46% 才成立", st: 0, gr: "NDX 有效、台股偏有效、SPX 無效（50bp 版 NDX、台股有效）", g: 3 },
-  { it: "NQ 4H 恐慌爆量", now: "11-03、11-05、11-20 出現（創 20 根新低、量 ≥2 倍、收在下半部）；11-25 沒有", st: 1, gr: "NQ 4H 有效（之後 5～10 根偏漲；20 根不顯著）、ES 4H 偏有效", g: 3 },
-  { it: "十年期殖利率從 10/5 高點回落 ≥50bp", now: "已回落 46bp，差 4bp", st: 1, gr: "未回測", g: 0 },
-  { it: "美元指數從高點回落確認", now: "11/23 高點 104.32 未確認，約 100.15 才算", st: 0, gr: "未回測", g: 0 },
-  { it: "BTC 與黃金同步止跌", now: "11/20 同日低點，還沒確認", st: 0, gr: "未回測", g: 0 },
-  { it: "#11 多：指數在高點附近、新低家數偏多", warn: "頂部訊號，不是止跌訊號", now: "不成立：指數離高點遠（NDX 離一年高點 −16.6%）", st: 0, gr: "NDX 有效、台股有效（只在 20 日）、SPX 偏有效；這裡的「有效」是之後偏跌：NDX 之後 20 日中位數 −0.90%，同樣在高點附近的日子 +1.27%", g: 3 },
+  { k: "bear_2b", it: "股債溢價落在兩季前 10%", now: "兩個口徑都列：FactSet 日頻 +0.99（兩季前 10%）、長歷史口徑 −0.89（兩季前 10%，成立；Shiller trailing E 延後 3 個月，延後 5 個月 −1.19 也成立）。長歷史「創兩季新高」11-05、11-20 觸發過，今天不成立。Shiller 新版最近幾個月 E 可能含 S&P 預估，有輕微估計污染", st: 2, gr: "長歷史口徑：「創兩季新高」SPX 有效但 2012 年後失效、NDX 偏有效；「前 10%」SPX／NDX／TWII 偏有效。FactSet 口徑：資料不足", g: 3 },
+  { k: "bear_1a", it: "HY 利差從兩季高點回落 ≥30bp", now: "3.72%（11/20 高點 3.76%），只回落 4bp；要 ≤3.46% 才成立", st: 0, gr: "NDX 有效、台股偏有效、SPX 無效（50bp 版 NDX、台股有效）", g: 3 },
+  { k: "bear_15a", it: "NQ 4H 恐慌爆量", now: "11-03、11-05、11-20 出現（創 20 根新低、量 ≥2 倍、收在下半部）；11-25 沒有", st: 1, gr: "NQ 4H 有效（之後 5～10 根偏漲；20 根不顯著）、ES 4H 偏有效", g: 3 },
+  { k: "bear_16", it: "十年期殖利率從 10/5 高點回落 ≥50bp", now: "已回落 46bp，差 4bp", st: 1, gr: "未回測", g: 0 },
+  { k: "bear_16", it: "美元指數從高點回落確認", now: "11/23 高點 104.32 未確認，約 100.15 才算", st: 0, gr: "未回測", g: 0 },
+  { k: "bear_16", it: "BTC 與黃金同步止跌", now: "11/20 同日低點，還沒確認", st: 0, gr: "未回測", g: 0 },
+  { k: "bull_11", it: "#11 多：指數在高點附近、新低家數偏多", warn: "頂部訊號，不是止跌訊號", now: "不成立：指數離高點遠（NDX 離一年高點 −16.6%）", st: 0, gr: "NDX 有效、台股有效（只在 20 日）、SPX 偏有效；這裡的「有效」是之後偏跌：NDX 之後 20 日中位數 −0.90%，同樣在高點附近的日子 +1.27%", g: 3 },
 ];
-const ST = ["未亮", "接近／亮過", "亮"];
+const ST = ["未亮", "接近／亮過", "亮", "無法判斷"];
+const GR = { 有效: 3, 偏有效: 2, 資料不足: 1, 無效: 0 };
+const mdOf = (s) => String(s || "").slice(5);
+// 即時：成立＝亮；不成立但 14 天內成立過＝亮過；當天缺資料＝無法判斷
+function stOf(c, day) {
+  if (c.on === null) return 3;
+  if (c.on) return 2;
+  return c.last_on && Date.parse(day) - Date.parse(c.last_on) <= 14 * 864e5 ? 1 : 0;
+}
 
 export default function ShortView({ call, gate, SortTable }) {
   const [sym, setSymS] = useState(() => { const s = lsGet(SYM_KEY); return ORDER.includes(s) ? s : "QQQ"; });
@@ -97,10 +106,20 @@ export default function ShortView({ call, gate, SortTable }) {
   const [db, setDb] = useState(() => ({ ...MEMO }));
   const [err, setErr] = useState({});          // 代號 → 錯誤字
   const [ckv, setCkv] = useState({});
+  const [live, setLive] = useState(null);       // op:'ck' 結果；null＝讀取中或抓不到（用快照）
+  const [liveErr, setLiveErr] = useState("");
   const tgt = useRef(DEF_DAYS.slice());          // 換標的時保留三個到期日的天數
   const burry = useRef({});
   useEffect(() => { FORM0 = f; }, [f]);
   useEffect(() => { try { setCkv(JSON.parse(lsGet(CK_KEY) || "{}") || {}); } catch (e) {} }, []);
+  useEffect(() => {   // 抓不到（沒資料、網路）不打斷頁面，只標「用 11-25 快照」；登入過期照走閘門
+    let on = true;
+    call("/api/ta-swing", { op: "ck" }).then((j) => {
+      if (!on || gate(j)) return;
+      if (j.ok && j.conds && typeof j.conds === "object") setLive(j); else setLiveErr(j.error || "讀取失敗");
+    });
+    return () => { on = false; };
+  }, [call, gate]);
   const set = (k, v) => setF((o) => ({ ...o, [k]: v }));
   const put = (s, v) => { MEMO[s] = { ...(MEMO[s] || {}), ...v, by: { ...((MEMO[s] || {}).by || {}), ...(v.by || {}) } }; setDb({ ...MEMO }); };
 
@@ -227,14 +246,22 @@ export default function ShortView({ call, gate, SortTable }) {
     { label: "結構", render: (x) => <>{nm(x)}{x.o ? <small>{x.o.N.toLocaleString("en-US")} 口，一年換 {x.o.cycles} 次</small> : null}</>, sort: (x) => x.i },
     ...SCN.map((label, j) => ({ label, ...v((o) => <><span className={ud(o.sc[j])}>{sgn(o.sc[j])}</span><small>占總資金 {pct((o.sc[j] / cap) * 100, 2)}</small></>, (o) => o.sc[j]) })),
   ];
-  const ckRows = CK.map((c, i) => ({ ...c, i }));
+  const ckDate = live ? mdOf(live.day) : CK_DATE;
+  const ckRows = CK.map((c, i) => {
+    const x = live && live.conds[c.k];
+    if (!live) return { ...c, i };
+    if (!x) return { ...c, i, now: "資料不足：檢查表沒有這一條", st: 3, gr: "—", g: -1 };
+    const one = c.k !== "bear_16";
+    return { ...c, i, st: stOf(x, live.day), g: GR[x.grade] === undefined ? -1 : GR[x.grade], gr: <>{x.grade}{one ? <small>{c.gr}</small> : <small>跟「{x.t}」一起算</small>}</>,
+      now: (x.on === null ? "無法判斷（當天缺資料）" : x.on ? "成立" : "不成立") + "・" + (x.last_on ? "最近一次成立 " + (x.last_on.slice(0, 4) === live.day.slice(0, 4) ? mdOf(x.last_on).replace("-", "/") : x.last_on) : "資料期間內沒成立過") + (one ? "" : "（" + x.t + "）") };
+  });
   const ckNum = (i) => { const x = +ckv[i] || 0; return x < 0 ? 0 : x; };
   const ckSum = CK.reduce((a, _, i) => a + ckNum(i), 0);
   const setCk = (i, val) => { const nx = { ...ckv, [i]: val }; setCkv(nx); lsSet(CK_KEY, JSON.stringify(nx)); };
   const colsC = [
     { label: "項目", render: (c) => <>{c.it}{c.warn ? <small className="warn">{c.warn}</small> : null}</>, sort: (c) => c.it, cls: "l" },
-    { label: "目前（" + CK_DATE + "）", render: (c) => c.now, sort: (c) => c.now, cls: "l" },
-    { label: "狀態", render: (c) => <span className={"ta-sh-pill" + (c.st === 2 ? " on" : c.st === 1 ? " near" : "")}>{ST[c.st]}</span>, sort: (c) => c.st, num: 1 },
+    { label: "目前（" + ckDate + "）", render: (c) => c.now, sort: (c) => c.now, cls: "l" },
+    { label: "狀態", render: (c) => <span className={"ta-sh-pill" + (c.st === 2 ? " on" : c.st === 1 ? " near" : c.st === 3 ? " na" : "")}>{live && c.st === 1 ? "亮過" : ST[c.st]}</span>, sort: (c) => c.st, num: 1 },
     { label: <Tip t="檢查表回測（2026-11-26）。有效＝方向對、20 日 p<0.05、去重後 ≥8 次；偏有效＝方向對、p<0.15（次數少時 p<0.3，標事件少）；無效＝跟同情境的一般日子沒差或方向反；未回測＝這一輪沒做。">回測分級</Tip>, render: (c) => c.gr, sort: (c) => c.g, cls: "l" },
     { label: "這批金額（美元）", render: (c) => <input type="number" className="ta-q ta-sh-amt" min="0" step="1000" value={ckv[c.i] || ""} placeholder="自己填" onChange={(e) => setCk(c.i, e.target.value)} aria-label={"這批金額：" + c.it} />, sort: (c) => ckNum(c.i), num: 1 },
     { label: "占總資金", render: (c) => (+ckv[c.i] < 0 ? <span className="warn">不能是負的，不計入</span> : ckNum(c.i) && cap > 0 ? ((ckNum(c.i) / cap) * 100).toFixed(1) + "%" : ""), sort: (c) => ckNum(c.i), num: 1 },
@@ -304,10 +331,10 @@ export default function ShortView({ call, gate, SortTable }) {
         </>
       )}
 
-      <div className="ta-cap ta-sh-h2">接檢查表分批<span className="mut">多方波段檢查表 {CK_DATE} 快照的狀態與回測分級（每日分數帳本接好後改成即時）；每一批要放多少自己填，本頁不判斷什麼時候買。</span></div>
+      <div className="ta-cap ta-sh-h2">接檢查表分批<span className="mut">{live ? "多空波段檢查表 " + live.day + " 收盤的狀態（每天更新）與回測分級" : "多空波段檢查表 " + CK_DATE + " 快照的狀態與回測分級" + (liveErr ? "（即時資料抓不到：" + liveErr + "）" : "")}；每一批要放多少自己填，本頁不判斷什麼時候買。</span></div>
       <SortTable className="ta-dt ta-sh-tbl ta-sh-ck" cols={colsC} rows={ckRows} rowKey={(c) => "c" + c.i} />
       <div className="ta-sh-sum">合計 <b className="mono">{usd(ckSum)}</b><span className={"mono" + (ckSum > cap ? " warn" : "")}>（占總資金 {cap > 0 ? ((ckSum / cap) * 100).toFixed(1) + "%" : "—"}）</span></div>
-      <p className="ta-notes">金額只存在這台瀏覽器（重新整理還在）。狀態：亮＝{CK_DATE} 成立；接近／亮過＝差一點或最近出現過；未亮＝不成立。</p>
+      <p className="ta-notes">金額只存在這台瀏覽器（重新整理還在）。狀態：{live ? <>亮＝{ckDate} 成立；亮過＝不成立但 14 天內成立過；未亮＝不成立；無法判斷＝當天缺資料。</> : <>亮＝{CK_DATE} 成立；接近／亮過＝差一點或最近出現過；未亮＝不成立。</>}</p>
 
       <div className="ta-cap ta-sh-h2">Burry 怎麼做（公開資料整理）<span className="mut">2025-11-10 Scion 終止投資顧問登記之後，持倉只剩他 Substack 自述，沒有申報文件可以驗證。</span></div>
       <div className="ta-sh-bc">

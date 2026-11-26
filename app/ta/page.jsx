@@ -6,6 +6,7 @@ import { fiveStage, smaLines, co5Short, info5, line5Info, step5Name, ev5 } from 
 import { OPT_GROUPS, optSym, dte, fmtTs, candidates, cost as optCost, pnl as optPnl, retPct, maxGain, lots } from "../../lib/ta-opt";
 import WaveView from "./WaveView";
 import ShortView from "./ShortView";
+import SwingView from "./SwingView";
 import { scenarios, US_EARLY } from "../../lib/ta-scenario";
 
 // 會員技術分析（獨立網站版·2026-11-08 Yoda 定）
@@ -1823,7 +1824,7 @@ function RulePanel({ draft, set, errors, status, saved, active, nm, setNm, rn, s
 // ───────── 指數位階分頁（2026-11-11）：最新美股報告「02 指數位階」整章原樣（/api/ta-idx）─────────
 // 章內腳本靠 document.currentScript／inline onclick，只能跑在自己的文件裡 → iframe srcdoc（同源：父頁直接量高度、換深淺）
 const VIEW_KEY = "yoda_ta_view";
-function readView() { const v = lsGet(VIEW_KEY); return v === "idx" || v === "wave" || v === "rs" || v === "tt" || v === "opt" ? v : "chart"; }
+function readView() { const v = lsGet(VIEW_KEY); return v === "idx" || v === "wave" || v === "rs" || v === "tt" || v === "opt" || v === "swing" ? v : "chart"; }
 const isLight = () => document.documentElement.getAttribute("data-theme") === "light";
 function IdxView({ x }) {
   const ifr = useRef(null);
@@ -2661,6 +2662,8 @@ export default function TaPage() {
                 onClick={() => pickView(view === "tt" ? "chart" : "tt")}>趨勢樣板</button>
               <button type="button" aria-pressed={view === "opt"} className={"ta-tab" + (view === "opt" ? " on" : "")}
                 onClick={() => pickView(view === "opt" ? "chart" : "opt")}>選擇權</button>
+              <button type="button" aria-pressed={view === "swing"} className={"ta-tab" + (view === "swing" ? " on" : "")}
+                onClick={() => pickView(view === "swing" ? "chart" : "swing")}>多空波段</button>
             </div>
             {busy ? <span className="ta-kbd">計算中…</span> : null}
           </div>
@@ -2705,6 +2708,11 @@ export default function TaPage() {
               </div>
               {optSub === "short" ? <Boundary reset={optSub}><ShortView call={call} gate={gate} SortTable={SortTable} /></Boundary>
                 : <Boundary reset={opt}>{opt.sym ? <OptView opt={opt} run={runOpt} /> : <div className="ta-ph">讀取中…</div>}</Boundary>}
+            </div>
+          ) : null}
+          {view === "swing" ? (
+            <div className="ta-pane">
+              <Boundary reset={view}><SwingView call={call} gate={gate} /></Boundary>
             </div>
           ) : null}
           <div className="ta-pane" hidden={view !== "chart"}>

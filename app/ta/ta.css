@@ -485,7 +485,7 @@ html[data-theme="light"] .ta-sh{--sh-purple:#8944ab}
 .ta-sh .ta-sh-amt{width:9em;text-align:right}
 .ta-sh-sum{margin:6px 0;font-size:calc(13.5px*var(--scale))} .ta-sh-sum b{margin:0 6px}
 .ta-sh-pill{display:inline-block;border-radius:10px;padding:0 8px;font-size:calc(12px*var(--scale));border:1px solid var(--border)}
-.ta-sh-pill.on{border-color:var(--red);color:var(--red)} .ta-sh-pill.near{border-color:var(--orange);color:var(--orange)}
+.ta-sh-pill.on{border-color:var(--red);color:var(--red)} .ta-sh-pill.near{border-color:var(--orange);color:var(--orange)} .ta-sh-pill.na{border:1px dashed var(--yellow);color:var(--yellow)}
 .ta-sh-chart{display:block;width:100%;height:auto;margin-top:12px}
 .ta-sh-chart text{fill:var(--dim);font-size:15px}
 .ta-sh-chart .zero{stroke:var(--dim);stroke-width:1} .ta-sh-chart .gl{stroke:var(--divider);stroke-width:1}

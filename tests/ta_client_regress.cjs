@@ -125,7 +125,8 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     .replace('"../../lib/ta-5stage"', JSON.stringify(path.join(ROOT, "lib", "ta-5stage.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-scenario"', JSON.stringify(path.join(ROOT, "lib", "ta-scenario.js").replace(/\\/g, "/")))
     .replace('"./WaveView"', JSON.stringify(path.join(ROOT, "app", "ta", "WaveView.jsx").replace(/\\/g, "/")))
-    .replace('"./ShortView"', JSON.stringify(path.join(ROOT, "app", "ta", "ShortView.jsx").replace(/\\/g, "/"))) + "\nexport { toggleFs, readPo, ScBtns, nextSc, ScTabs, ScPlan, scInfo, SC_TFS, readB5, readC5, barEndTf, co5Live, oldBuiltin, cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, nextSide, Trade, BadBanner, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, mtfBlink, tzMs, barEnd, readSr, readKk, keyKAll, dropOld4, maSetOf, pickMaSet, MA_SETS, Legend, migrateRules, cleanRules };\n";
+    .replace('"./ShortView"', JSON.stringify(path.join(ROOT, "app", "ta", "ShortView.jsx").replace(/\\/g, "/")))
+    .replace('"./SwingView"', JSON.stringify(path.join(ROOT, "app", "ta", "SwingView.jsx").replace(/\\/g, "/"))) + "\nexport { toggleFs, readPo, ScBtns, nextSc, ScTabs, ScPlan, scInfo, SC_TFS, readB5, readC5, barEndTf, co5Live, oldBuiltin, cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, nextSide, Trade, BadBanner, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, mtfBlink, tzMs, barEnd, readSr, readKk, keyKAll, dropOld4, maSetOf, pickMaSet, MA_SETS, Legend, migrateRules, cleanRules };\n";
   const Mod = require("module");
   const libSrc = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-trade.js"), "utf8"), opts).code;
   const lib = new Mod(path.join(ROOT, "lib", "ta-trade.js")); lib.paths = Mod._nodeModulePaths(ROOT); lib._compile(libSrc, lib.id);
@@ -143,6 +144,8 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   const shLib = new Mod(path.join(ROOT, "lib", "ta-short.js")); shLib._compile(transformSync(fs.readFileSync(shLib.id, "utf8"), opts).code, shLib.id); require.cache[shLib.id] = shLib; shLib.loaded = true;   // 作空試算子分頁（11-26；測試在 tests/ta_short.cjs）
   const shMod = new Mod(path.join(ROOT, "app", "ta", "ShortView.jsx")); shMod.filename = shMod.id; shMod.paths = Mod._nodeModulePaths(ROOT);
   shMod._compile(transformSync(fs.readFileSync(shMod.id, "utf8"), opts).code, shMod.id); require.cache[shMod.id] = shMod; shMod.loaded = true;
+  const swMod = new Mod(path.join(ROOT, "app", "ta", "SwingView.jsx")); swMod.filename = swMod.id; swMod.paths = Mod._nodeModulePaths(ROOT);   // 多空波段分頁（11-26；測試在 tests/ta_swing.cjs）
+  swMod._compile(transformSync(fs.readFileSync(swMod.id, "utf8"), opts).code, swMod.id); require.cache[swMod.id] = swMod; swMod.loaded = true;
   const m = new Mod(path.join(ROOT, "app", "ta", "page.cjs")); m.paths = Mod._nodeModulePaths(ROOT);
   m._compile(transformSync(src, opts).code, m.id);
   const P = m.exports;
@@ -1190,6 +1193,15 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     st.yoda_ta_view = "wave"; assert.strictEqual(P.readView(), "wave");
     st.yoda_ta_view = "waves"; assert.strictEqual(P.readView(), "chart");
     assert.ok(raw.includes('.ta-tabs:not([data-view="chart"])') || fs.readFileSync(path.join(ROOT, "app", "ta", "ta.css"), "utf8").includes('.ta-tabs:not([data-view="chart"])'), "非 K 線分頁時其他鈕不顯示選中（同指數位階）");
+  });
+
+  await t("多空波段分頁（11-26）：「選擇權」右邊有「多空波段」鈕、readView 接受 swing、view===swing 才畫 SwingView（帶 call／gate）", async () => {
+    const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
+    assert.ok(raw.includes('import SwingView from "./SwingView";'));
+    assert.ok(/>選擇權<\/button>\s*<button[^>]*aria-pressed={view === "swing"}[^>]*\s*onClick={\(\) => pickView\(view === "swing" \? "chart" : "swing"\)}>多空波段<\/button>/.test(raw), "「多空波段」緊接在「選擇權」右邊");
+    assert.ok(/{view === "swing" \? \(\s*<div className="ta-pane">\s*<Boundary reset={view}><SwingView call={call} gate={gate} \/><\/Boundary>/.test(raw), "view===swing 才畫");
+    const st = {}; globalThis.localStorage = { getItem: (k) => (k in st ? st[k] : null), setItem: (k, v) => { st[k] = String(v); }, removeItem: (k) => { delete st[k]; } };
+    st.yoda_ta_view = "swing"; assert.strictEqual(P.readView(), "swing");
   });
 
   await t("訊號開關式（11-24）：點亮著的那顆＝全關 none、全關點哪顆切哪顆；none 存得住；圖上無 ▲▼✕／停損線／出場線；不閃；① 只寫「訊號已全關」；回測照算", async () => {
