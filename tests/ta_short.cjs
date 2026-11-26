@@ -179,6 +179,12 @@ t("ShortView：NQ 標「估算，非報價」、到期接季月、估算 IV 預�
   const nv = view("NVDA", { NVDA: { base: { ...nb, symbol: "NVDA", price: 180, root: undefined, rows: qRows(180) }, by: {} } });
   assert.ok(nv.includes("帶入 Burry 2026-04 那組"));
   assert.ok(view("SMH", {}).includes("讀取中"));
+  // 估算 IV 填 0：只講一次「估算 IV 要大於 0」，不再三個結構各報「權利金是 0」
+  const React2 = React, orig = React2.useState;
+  React2.useState = (init) => orig(typeof init === "function" && String(init).includes("FORM0") ? () => ({ cap: "1000000", bp: "5", rf: "4.0", ivA: "10", ivB: "25", nqiv: "0", k1: "80", k2a: "90", k2b: "65", k3: "90", e1: "", e2: "", e3: "" }) : init);
+  let hz;
+  try { hz = view("NQ", { NDX: { base: nb, by: { [day(51)]: qRows(26000), [day(180)]: qRows(26000) } }, QQQ: { base: qb, by: {} } }); } finally { React2.useState = orig; }
+  assert.ok(hz.includes("估算 IV 要大於 0") && !hz.includes("權利金是 0"), (hz.match(/輸入有誤[^<]*/) || [""])[0]);
 });
 t("page.jsx：選擇權分頁多一排子分頁（原試算｜作空試算）；原試算照舊用 OptView", () => {
   const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");

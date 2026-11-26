@@ -24,6 +24,7 @@ const NAMES = ["① 長天期價外賣權", "② 賣權價差", "③ 短天期�
 const DEF = { cap: "1000000", bp: "5", rf: "4.0", ivA: "10", ivB: "25", nqiv: "", k1: "80", k2a: "90", k2b: "65", k3: "90", e1: "", e2: "", e3: "" };
 const DEF_DAYS = [182, 182, 91];
 let FORM0 = null;          // 切回原試算再切回來，輸入還在（這個分頁的記憶體）
+let IV_SEEDED = false;     // NQ／MNQ 估算 IV 已用 QQQ 價平 IV 預填過
 export const MEMO = {};    // 代號 → {base, by:{到期日: rows}}；shortcut: 抓到就留著，要新報價重新整理頁面
 
 function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -101,7 +102,8 @@ export default function ShortView({ call, gate, SortTable }) {
   // NQ／MNQ 估算 IV 預設＝QQQ 價平 IV（使用者改過就不蓋）
   const qb = db.QQQ && db.QQQ.base;
   const qIv = qb ? atmIv(qb.rows, qb.price) : null;
-  useEffect(() => { if (fut && f.nqiv === "" && qIv) set("nqiv", (qIv * 100).toFixed(2)); }, [fut, qIv, f.nqiv]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // 只回填一次（審查 3a0dc3a：清空後不再被填回）
+  useEffect(() => { if (!fut || IV_SEEDED || !qIv) return; IV_SEEDED = true; if (f.nqiv === "") set("nqiv", (qIv * 100).toFixed(2)); }, [fut, qIv]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const setSym = (k) => {
     if (k === sym) return;
@@ -140,7 +142,8 @@ export default function ShortView({ call, gate, SortTable }) {
   const cap = +f.cap, B = (cap * +f.bp) / 100;
   const ctx = { m: def.m, r, fut, ivA: (+f.ivA || 0) / 100, ivB: (+f.ivB || 0) / 100 };
   const res = sts.map((x) => (gErr.length || !x.st ? null : calc(x.st, cap, B, ctx)));
-  const errs = [...gErr, ...sts.flatMap((x) => x.e.filter((s) => !s.endsWith("讀取中")))];
+  const ivBad = fut && !(+f.nqiv > 0);   // 估算 IV 不對時「權利金是 0」是同一個原因，不重複列
+  const errs = [...gErr, ...sts.flatMap((x) => x.e.filter((s) => !s.endsWith("讀取中") && !(ivBad && s.includes("權利金是 0"))))];
   const mny = (l) => pct((l.K / l.S0 - 1) * 100);
   const futName = (ex) => (sym === "MNQ" ? "MNQ" : "NQ") + ex.fut.code;
   const legTxt = (ex, l, p) => {
