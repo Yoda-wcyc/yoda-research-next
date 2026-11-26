@@ -1,5 +1,6 @@
 // /ta「多空波段」：lib/ta-swing.js＋app/api/ta-swing/route.js（2026-11-26）。跑法：node tests/ta_swing.cjs（失敗 exit 1）
-// 真資料（G:\Yoda x Claude\demo\merge_swing\out\swing_data.json 與 demo\多空波段_demo.html，唯讀；不在就略過）驗注入逐字相同、分數 3／19
+// 真資料（G:\Yoda x Claude\demo\merge_swing\out\swing_data.json、swing_embed_page.html、Skill\data\swing_score\scores.json，唯讀；不在就略過）
+//   驗注入＝外殼模式頁逐字相同、分數＝scores.json
 const fs = require("fs"), path = require("path"), zlib = require("zlib"), assert = require("assert");
 const ROOT = path.join(__dirname, "..");
 const { transformSync } = require(path.join(ROOT, "node_modules", "next", "dist", "build", "swc"));
@@ -66,14 +67,26 @@ t("data-parts：swing 收進白名單、沒 schema 欄位以 v:1＋ck＋cdt 認"
   assert.strictEqual(P.schemaOf({ schema: "tw-rs-1" }), "tw-rs-1"); assert.strictEqual(P.schemaOf({ v: 1 }), null);
 });
 
-const REAL = "G:/Yoda x Claude/demo/merge_swing/out/swing_data.json", DEMO = "G:/Yoda x Claude/demo/多空波段_demo.html";
-t("真資料：注入後跟 compose 一般模式頁逐字相同；今天分數頂部 3、底部 19", () => {
-  if (!fs.existsSync(REAL) || !fs.existsSync(DEMO)) { console.log("     （真資料不在，略過）"); return; }
+t("外殼是外殼模式（sw-embed）：無 viewport 1280、無 DEMO 徽章、外框不設最小寬、層名欄 72px", () => {
+  assert.strictEqual(cnt(SHELL, 'class="sw-embed"'), 1);
+  assert.ok(!SHELL.includes("width=1280") && !SHELL.includes('badge-demo">DEMO'));
+  assert.ok(SHELL.includes(".sw-embed .sw-bar,.sw-embed .sw-wrap{min-width:0}") && SHELL.includes('html[class~="sw-embed"] .ck-root .wrap{min-width:0}'));
+  assert.ok(SHELL.includes('<col style="width:72px">'));
+});
+
+// 合約：外殼模式頁＝外殼＋資料（compose --shell --data 同次寫出 out/swing_embed_page.html；一般模式 demo 頁另有 viewport 1280／DEMO，不再拿來比）
+const REAL = "G:/Yoda x Claude/demo/merge_swing/out/swing_data.json", EPAGE = "G:/Yoda x Claude/demo/merge_swing/out/swing_embed_page.html";
+const SCORES = "G:/Yoda x Claude/Skill/data/swing_score/scores.json";
+t("真資料：注入後跟 compose 外殼模式頁逐字相同；今天分數＝帳本 scores.json 同一天", () => {
+  if (!fs.existsSync(REAL) || !fs.existsSync(EPAGE) || !fs.existsSync(SCORES)) { console.log("     （真資料不在，略過）"); return; }
   const d = JSON.parse(fs.readFileSync(REAL, "utf8"));
   assert.ok(S.valid(d));
-  assert.ok(S.inject(SHELL, d) === fs.readFileSync(DEMO, "utf8"), "跟 demo 頁不同（外殼或資料不是同一次 compose？）");
+  assert.ok(S.inject(SHELL, d) === fs.readFileSync(EPAGE, "utf8"), "跟外殼模式頁不同（外殼或資料不是同一次 compose？）");
   const x = S.summary(d);
-  assert.strictEqual(Math.round(x.score.top), 3); assert.strictEqual(Math.round(x.score.bottom), 19);
+  // 分數對帳本的 scores.json 同一天（11/25：頂部 2.86、底部 20.93；舊版寫死的 3／19 是來源頁內嵌矩陣，落後帳本）
+  const sc = JSON.parse(fs.readFileSync(SCORES, "utf8")).days.find((z) => z.d === x.day);
+  assert.ok(sc, "scores.json 沒有 " + x.day);
+  assert.ok(Math.abs(x.score.top - sc.bull) < 0.06 && Math.abs(x.score.bottom - sc.bear) < 0.06, JSON.stringify([x.score, sc.bull, sc.bear]));
   assert.strictEqual(Object.keys(x.conds).length, 45);
 });
 

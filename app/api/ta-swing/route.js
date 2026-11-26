@@ -49,9 +49,9 @@ async function data() {
   return d;
 }
 
-// 單獨放進 /ta 的 iframe：外觀由 /ta 的亮暗切換帶（父頁點 iframe 裡的 .sw-th），自己的切換鈕藏起來；
-// 外殼桌機版寬 1280 起跳，/ta 右側窗格約 1000px → 拿掉最小寬度讓它照窗格寬排；真的還放不下才橫向捲（不出直向捲軸，高度由父頁量）
-const FIT = '<style>.sw-theme{display:none!important}.sw-bar,.sw-wrap,.ck-root .wrap{min-width:0!important}html,body{overflow-y:hidden!important;min-height:0!important}</style>';
+// 單獨放進 /ta 的 iframe：外觀由 /ta 的亮暗切換帶（父頁點 iframe 裡的 .sw-th），自己的切換鈕藏起來。
+// 窄寬版面（不設最小寬、表頭換行）在外殼本身（compose --shell 的外殼模式 sw-embed），這裡只藏切換鈕
+const FIT = '<style>.sw-theme{display:none!important}</style>';
 
 export async function POST(req) {
   const p = authOf(req);
