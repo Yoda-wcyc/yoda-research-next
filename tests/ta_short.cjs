@@ -231,6 +231,28 @@ t("ShortView：NQ 有真報價＝顯示 NQ 價、合約、抓取時間、持有�
   const u = view("NQ", memo({ nq: { price: 26100, contract: "??", ts: "" } }));
   assert.ok(u.includes("估算，非報價") && u.includes("合約月份認不出來"), u.slice(0, 2000));
 });
+t("路由 → ShortView：off（非正規盤）由 /api/ta-opt 帶出（單一與 expiries 回應都有）；off＝不反推持有成本、寫原因、頁首提示；正規盤＝照常反推", async () => {
+  const E51 = day(51), E180 = day(180), occ = (e, k) => "NDX" + e.slice(2).replace(/-/g, "") + "P" + String(k * 1000).padStart(8, "0");
+  const raw = (ts) => ({ timestamp: ts, data: { current_price: 26000, close: 26000, last_trade_time: "", options: [E51, E180].flatMap((e) => qRows(26000).map((r) => ({ option: occ(e, r.k), bid: r.p.b, ask: r.p.a, iv: r.p.iv, open_interest: 100 }))) } });
+  const fr = L.futOf(day(10)), mon = { H: "Mar", M: "Jun", U: "Sep", Z: "Dec" }[fr.code[0]];
+  const qb = { ok: true, symbol: "QQQ", price: 600, ts: "", expiries: [day(30)], expiry: day(30), rows: qRows(600) };
+  const saved = globalThis.fetch;
+  const viaRoute = async (ts) => {
+    globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => raw(ts) });
+    try {
+      const rt = route("m"), a = (await ask(rt, { symbol: "NDX" })).j, b = (await ask(rt, { symbol: "NDX", expiries: [E51, E180] })).j;
+      assert.ok(a.ok && b.ok, JSON.stringify(a).slice(0, 300));
+      return { a, b, h: view("NQ", { NDX: { base: a, by: b.by }, QQQ: { base: qb, by: {} }, NQ: { base: { ok: true, symbol: "NQ", nq: { price: 26100, contract: "Nasdaq 100 " + mon + " " + fr.code.slice(1), ts: "" } }, by: {} } }) };
+    } finally { globalThis.fetch = saved; }
+  };
+  const o = await viaRoute("2026-11-26 01:05:14");   // 美東 11-25 20:05＝盤後
+  assert.ok(o.a.off === true && o.b.off === true, "單一與 expiries 回應都帶 off");
+  assert.ok(o.h.includes("持有成本用無風險利率（NDX 是上一個正規盤收盤價，跟 NQ 夜盤時間對不上，不反推）") && !o.h.includes("NQ 與 NDX 價差反推"), o.h.slice(0, 3000));
+  assert.ok(o.h.includes("｜非正規盤時段，用上一個正規盤收盤價"), "頁首提示");
+  const g = await viaRoute("2026-11-25 15:00:00");   // 美東 11-25 10:00＝正規盤
+  assert.ok(g.a.off === false && g.b.off === false);
+  assert.ok(/持有成本 年化 -?\d+\.\d\d%（NQ 與 NDX 價差反推）/.test(g.h) && !g.h.includes("跟 NQ 夜盤時間對不上") && !g.h.includes("非正規盤時段"), g.h.slice(0, 3000));
+});
 t("ShortView：ⓘ 不用原生 title（手機無效），改成可聚焦的按鈕；說明框只在打開時畫", () => {
   const base = { ok: true, symbol: "QQQ", price: 600, ts: "2026-11-26 01:05:16", expiries: [E3, E1], expiry: E3, rows: qRows(600) };
   const h = view("QQQ", { QQQ: { base, by: { [E1]: qRows(600), [E3]: qRows(600) } } });

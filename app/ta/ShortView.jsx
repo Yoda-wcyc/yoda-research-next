@@ -244,7 +244,7 @@ export default function ShortView({ call, gate, SortTable }) {
   const ts = base ? fmtTs(base.ts, "Asia/Taipei") : "";
   const futWhy = !fut || cy || !nqDone ? "" : nqQ ? "NQ 報價的合約月份認不出來（" + (nqQ.contract || "空白") + "）" : (nqB && nqB.error) || (err.NQ ? "資料不足：NQ 期貨報價暫時抓不到（" + err.NQ + "）" : "資料不足：NQ 期貨報價暫時抓不到");
   const futSrc = !fut ? "" : cy
-    ? "各到期對應的季月期貨價：近月用 NQ 報價，其他季月＝NQ 近月 × e^(持有成本 × 跟近月差幾天)；持有成本" + (cy.implied ? "＝NQ 與 NDX 價差反推（年化，已含股利）。" : "用無風險利率（" + (base && base.off ? "NDX 是上一個正規盤收盤價、跟 NQ 時間對不上" : Number.isFinite(cy.raw) ? "價差反推出年化 " + (cy.raw * 100).toFixed(1) + "%，不合理，多半是 NQ 與 NDX 報價時間對不上（NQ 幾乎 24 小時交易、NDX 只有正規盤）" : "近月剩不到 7 天") + "，不反推）。")
+    ? "各到期對應的季月期貨價：近月用 NQ 報價，其他季月＝NQ 近月 × e^(持有成本 × 跟近月差幾天)；持有成本" + (cy.implied ? "＝NQ 與 NDX 價差反推（年化，已含股利）。" : "用無風險利率（" + (base && base.off ? "NDX 是上一個正規盤收盤價，跟 NQ 夜盤時間對不上" : Number.isFinite(cy.raw) ? "價差反推出年化 " + (cy.raw * 100).toFixed(1) + "%，不合理，多半是 NQ 與 NDX 報價時間對不上（NQ 幾乎 24 小時交易、NDX 只有正規盤）" : "近月剩不到 7 天") + "，不反推）。")
     : "各到期對應的季月期貨價＝NDX 現價 × e^(無風險利率 × 到期天數)，沒扣股利（估算）。";
   const note = fut ? "沒有期貨選擇權報價：權利金全部用 Black-76、所有履約價同一個 IV 估出來（預設＝QQQ 價平 IV）。" + futSrc + "實際買賣價差、波動率微笑都沒算進去，價外賣權實際 IV 通常比較高，每腳附 NDX 同到期、同價外程度的報價 IV 對照。"
     : sym === "XND" ? "XND 自己的 CBOE 報價停在 11-20 收盤、跟其他標的不同時間，所以這頁用 NDX 報價 ÷ 100 換算；XND 實際成交量小、買賣價差通常比 NDX 寬。到期選單標「借 NDX（AM 結算）」的那幾天，NDX 是開盤結算、XND 是收盤結算，結算價會不一樣；XND 實際有沒有掛這些到期日，本頁沒查。"

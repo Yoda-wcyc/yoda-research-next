@@ -121,7 +121,7 @@ t("路由：帶 Referer／Origin、同代號同時請求只打一次、60 秒內
   const [a, b] = await Promise.all([ask(rt, { symbol: "nvda" }), ask(rt, { symbol: "NVDA", expiry: "2026-11-27" })]);
   assert.strictEqual(fetched.length, 1, "同時兩個請求只打一次");
   assert.ok(fetched[0][0].endsWith("/options/NVDA.json") && fetched[0][1].headers.Referer === "https://www.cboe.com/" && fetched[0][1].headers.Origin === "https://www.cboe.com");
-  assert.strictEqual(a.status, 200); assert.deepStrictEqual(Object.keys(a.j).sort(), ["expiries", "expiry", "last", "ok", "price", "rows", "symbol", "ts"]);
+  assert.strictEqual(a.status, 200); assert.deepStrictEqual(Object.keys(a.j).sort(), ["expiries", "expiry", "last", "off", "ok", "price", "rows", "symbol", "ts"]);
   assert.strictEqual(b.j.expiry, "2026-11-27"); assert.deepStrictEqual(b.j.rows, [{ k: 127.5, c: { b: 4, a: 0, iv: 0.6, oi: 1 }, p: { b: 3, a: 3.2, iv: 0.6, oi: 1 } }]);
   assert.ok(!a.j.expiries.includes("2026-12-04"));
   const c = await ask(rt, { symbol: "NVDA", expiry: "2030-01-01" });
