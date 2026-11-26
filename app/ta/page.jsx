@@ -5,6 +5,7 @@ import { presetStart } from "../../lib/ta-rs";
 import { fiveStage, smaLines, co5Short, info5, line5Info, step5Name, ev5 } from "../../lib/ta-5stage";
 import { OPT_GROUPS, optSym, dte, fmtTs, candidates, cost as optCost, pnl as optPnl, retPct, maxGain, lots } from "../../lib/ta-opt";
 import WaveView from "./WaveView";
+import ShortView from "./ShortView";
 import { scenarios, US_EARLY } from "../../lib/ta-scenario";
 
 // 會員技術分析（獨立網站版·2026-11-08 Yoda 定）
@@ -2066,6 +2067,9 @@ function TtView({ x, mk = "tw", onCode }) {
 // ───────── 選擇權分頁（2026-11-23 Yoda 定案）：只做看漲買 Call／看跌買 Put、一次算一個（/api/ta-opt；數字全在 lib/ta-opt.js）─────────
 // ⛔ 不放：賣出、價差、Covered Call、Roll、隱含波動率／Delta 等欄位（機率欄除外）、說明段落
 const OPT_KEY = "yoda_ta_opt_sym";
+const OPT_SUB_KEY = "yoda_ta_opt_sub";   // 選擇權子分頁（11-26）：calc＝原試算｜short＝作空試算（ShortView.jsx，Yoda 11-26 只對它放寬規則）
+const OPT_SUBS = [["calc", "原試算"], ["short", "作空試算"]];
+function readOptSub() { return lsGet(OPT_SUB_KEY) === "short" ? "short" : "calc"; }
 function readOptSym() { return optSym(lsGet(OPT_KEY)) || "QQQ"; }
 const usd0 = (v, sign) => (typeof v === "number" && Number.isFinite(v) ? (v < 0 ? "−" : sign && v > 0 ? "+" : "") + "$" + Math.round(Math.abs(v)).toLocaleString("en-US") : "—");
 const cpName = (cp) => (cp === "C" ? "Call" : "Put");
@@ -2265,6 +2269,8 @@ export default function TaPage() {
   const [tt, setTt] = useState({});             // 趨勢樣板：市場 → {busy}｜{data}｜{error}；市場切換跟區間強弱共用 rsMkt
   const [opt, setOpt] = useState({});           // 選擇權：{sym, exp, busy, data（同商品換到期日時留著上一份）}｜{sym, exp, error}
   const optSeq = useRef(0);
+  const [optSub, setOptSub] = useState(readOptSub);
+  const pickOptSub = (k) => { setOptSub(k); lsSet(OPT_SUB_KEY, k); };
   const pickSide = (k) => { const v = nextSide(side, k); setSide(v); lsSet(SIDE_KEY, v); pickView("chart"); };
   const [srOn, setSrOn] = useState(readSr);
   const pickSr = () => { setSrOn(!srOn); lsSet(SR_KEY, srOn ? "0" : "1"); pickView("chart"); };
@@ -2511,7 +2517,7 @@ export default function TaPage() {
     if (gate(j)) { setOpt({}); return; }   // 重新登入後 !opt.sym 會自動再抓
     setOpt(j.ok ? { sym: s, exp: j.expiry, data: j } : { sym: s, exp: e, error: j.error || "讀取失敗" });
   }, [gate, call]);
-  useEffect(() => { if (phase === "app" && view === "opt" && !opt.sym) runOpt(readOptSym(), ""); }, [phase, view, opt.sym, runOpt]);
+  useEffect(() => { if (phase === "app" && view === "opt" && optSub === "calc" && !opt.sym) runOpt(readOptSym(), ""); }, [phase, view, optSub, opt.sym, runOpt]);
   const mktSeg = (
     <div className="ta-seg ta-rs-mkt" role="group" aria-label="市場">
       {RS_MKTS.map(([k, nm]) => <button key={k} type="button" aria-pressed={rsMkt === k} className={"ta-tab" + (rsMkt === k ? " on" : "")} onClick={() => pickRsMkt(k)}>{nm}</button>)}
@@ -2694,7 +2700,11 @@ export default function TaPage() {
           ) : null}
           {view === "opt" ? (
             <div className="ta-pane">
-              <Boundary reset={opt}>{opt.sym ? <OptView opt={opt} run={runOpt} /> : <div className="ta-ph">讀取中…</div>}</Boundary>
+              <div className="ta-seg ta-opt-sub" role="group" aria-label="選擇權子分頁">
+                {OPT_SUBS.map(([k, nm]) => <button key={k} type="button" aria-pressed={optSub === k} className={"ta-tab" + (optSub === k ? " on" : "")} onClick={() => pickOptSub(k)} data-sub={k}>{nm}</button>)}
+              </div>
+              {optSub === "short" ? <Boundary reset={optSub}><ShortView call={call} gate={gate} SortTable={SortTable} /></Boundary>
+                : <Boundary reset={opt}>{opt.sym ? <OptView opt={opt} run={runOpt} /> : <div className="ta-ph">讀取中…</div>}</Boundary>}
             </div>
           ) : null}
           <div className="ta-pane" hidden={view !== "chart"}>

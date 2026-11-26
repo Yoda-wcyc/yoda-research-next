@@ -451,3 +451,47 @@ svg.ta-k .sc-t{font-size:12px;font-weight:700;paint-order:stroke;stroke:#0b0f15;
 .ta-right.ta-fs{border:0;border-radius:0}
 html:not([data-theme="light"]) .ta-right.ta-fs{background:#0b0f15}
 .ta-right.ta-fsfb{position:fixed;inset:0;z-index:9000}
+/* 選擇權 → 作空試算（11-26，ShortView.jsx）：子分頁鈕；三結構色＝藍／橘／紫；圖放情境表正下方 */
+.ta-opt-sub{margin:0 0 12px}
+.ta-sh{--sh-purple:#bf5af2}
+html[data-theme="light"] .ta-sh{--sh-purple:#8944ab}
+.ta-sh-sym{flex-wrap:wrap;margin:0 0 8px}
+.ta-sh-meta{display:flex;gap:16px;align-items:baseline;flex-wrap:wrap;margin-bottom:4px}
+.ta-sh-meta b{font-size:calc(21px*var(--scale))}
+.ta-sh-spec{font-size:calc(13px*var(--scale));margin:0 0 4px}
+.ta-sh-est{display:inline-block;border:1px solid var(--yellow);color:var(--yellow);border-radius:6px;padding:0 6px;font-size:calc(12px*var(--scale));margin-left:6px}
+.ta-sh-i::after{content:"ⓘ";font-size:.78em;margin-left:2px;color:var(--dim);vertical-align:super}
+.ta-sh-ctl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:6px 0 10px;font-size:calc(13.5px*var(--scale))}
+.ta-sh-ctl>div{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 12px}
+.ta-sh-ctl label{display:flex;align-items:center;gap:6px;margin:4px 0;white-space:nowrap;color:var(--dim)}
+.ta-sh-ctl .ta-q{width:auto;padding:3px 6px;color:var(--text)}
+.ta-sh-ctl select.ta-q{min-width:0;max-width:100%}
+.ta-sh-glob{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:2px 26px;align-items:center}
+.ta-sh .ta-sh-n{width:8em} .ta-sh .ta-sh-s{width:5em}
+.ta-sh-leg h4{margin:0 0 2px;font-size:calc(13.5px*var(--scale))}
+.ta-sh-q{font-size:calc(12px*var(--scale));color:var(--dim);line-height:1.5;margin:0 0 4px;min-height:3em}
+.ta-sh-sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.ta-sh-err{color:var(--yellow);border:1px dashed var(--yellow);border-radius:6px;padding:6px 10px;margin:8px 0}
+.ta-sh-h{margin-top:14px} .ta-sh-h2{margin-top:26px}
+.ta-sh-tbl td small{display:block;color:var(--dim);font-size:calc(12px*var(--scale));white-space:normal}
+.ta-sh-tbl td small.warn{color:var(--yellow)}
+.ta-sh-tbl td.l{white-space:normal}
+.ta-sh-tbl td{font-variant-numeric:tabular-nums}
+.ta-sh-tbl th,.ta-sh-tbl td{padding:5px 6px} .ta-sh-tbl th{white-space:normal;vertical-align:bottom}   /* 成本表 11 欄：表頭可折行，右欄寬 1440 也放得下 */
+.ta-sh-wrap{overflow-x:auto}
+.ta-sh-ck th{white-space:nowrap}
+.ta-sh .ta-sh-amt{width:9em;text-align:right}
+.ta-sh-sum{margin:6px 0;font-size:calc(13.5px*var(--scale))} .ta-sh-sum b{margin:0 6px}
+.ta-sh-pill{display:inline-block;border-radius:10px;padding:0 8px;font-size:calc(12px*var(--scale));border:1px solid var(--border)}
+.ta-sh-pill.on{border-color:var(--red);color:var(--red)} .ta-sh-pill.near{border-color:var(--orange);color:var(--orange)}
+.ta-sh-chart{display:block;width:100%;height:auto;margin-top:12px}
+.ta-sh-chart text{fill:var(--dim);font-size:15px}
+.ta-sh-chart .zero{stroke:var(--dim);stroke-width:1} .ta-sh-chart .gl{stroke:var(--divider);stroke-width:1}
+.ta-sh-chart .vx{stroke:var(--dim);stroke-width:1;stroke-dasharray:3 3}
+.ta-sh-no{font-size:calc(13px*var(--scale));margin:8px 0 0;padding:6px 10px;border-left:3px solid var(--border)}
+.ta-sh-bc{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.ta-sh-bc>div{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:calc(13px*var(--scale))}
+.ta-sh-bc>div.wide{grid-column:1/-1}
+.ta-sh-bc h3{margin:0 0 6px;font-size:calc(14px*var(--scale))}
+.ta-sh-bc p{margin:4px 0} .ta-sh-bc ul{margin:4px 0;padding-left:18px} .ta-sh-bc li{margin:3px 0}
+.ta-sh-bc .src{font-size:calc(12px*var(--scale));color:var(--dim);margin-top:6px}

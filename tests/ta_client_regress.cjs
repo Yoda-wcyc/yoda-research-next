@@ -124,7 +124,8 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
     .replace('"../../lib/ta-opt"', JSON.stringify(path.join(ROOT, "lib", "ta-opt.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-5stage"', JSON.stringify(path.join(ROOT, "lib", "ta-5stage.js").replace(/\\/g, "/")))
     .replace('"../../lib/ta-scenario"', JSON.stringify(path.join(ROOT, "lib", "ta-scenario.js").replace(/\\/g, "/")))
-    .replace('"./WaveView"', JSON.stringify(path.join(ROOT, "app", "ta", "WaveView.jsx").replace(/\\/g, "/"))) + "\nexport { toggleFs, readPo, ScBtns, nextSc, ScTabs, ScPlan, scInfo, SC_TFS, readB5, readC5, barEndTf, co5Live, oldBuiltin, cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, nextSide, Trade, BadBanner, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, mtfBlink, tzMs, barEnd, readSr, readKk, keyKAll, dropOld4, maSetOf, pickMaSet, MA_SETS, Legend, migrateRules, cleanRules };\n";
+    .replace('"./WaveView"', JSON.stringify(path.join(ROOT, "app", "ta", "WaveView.jsx").replace(/\\/g, "/")))
+    .replace('"./ShortView"', JSON.stringify(path.join(ROOT, "app", "ta", "ShortView.jsx").replace(/\\/g, "/"))) + "\nexport { toggleFs, readPo, ScBtns, nextSc, ScTabs, ScPlan, scInfo, SC_TFS, readB5, readC5, barEndTf, co5Live, oldBuiltin, cleanRecent, readRecent, Boundary, headInfo, sideTrade, readSide, nextSide, Trade, BadBanner, noVolume, mktBadge, KChart, TopVolume, RulePanel, withTrade, fullSeries, TfTabs, FutInfo, RecentDrop, RsView, TtView, ttCols, readView, pastHalf, titleName, ChartArea, OptView, OptTry, optionCols, readOptSym, mtfBlink, tzMs, barEnd, readSr, readKk, keyKAll, dropOld4, maSetOf, pickMaSet, MA_SETS, Legend, migrateRules, cleanRules };\n";
   const Mod = require("module");
   const libSrc = transformSync(fs.readFileSync(path.join(ROOT, "lib", "ta-trade.js"), "utf8"), opts).code;
   const lib = new Mod(path.join(ROOT, "lib", "ta-trade.js")); lib.paths = Mod._nodeModulePaths(ROOT); lib._compile(libSrc, lib.id);
@@ -139,6 +140,9 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
   scLib._compile(transformSync(fs.readFileSync(scLib.id, "utf8"), opts).code, scLib.id); require.cache[scLib.id] = scLib; scLib.loaded = true;
   const wvMod = new Mod(path.join(ROOT, "app", "ta", "WaveView.jsx")); wvMod.filename = wvMod.id; wvMod.paths = Mod._nodeModulePaths(ROOT);   // 波浪分頁（11-24）
   wvMod._compile(transformSync(fs.readFileSync(wvMod.id, "utf8"), opts).code, wvMod.id); require.cache[wvMod.id] = wvMod; wvMod.loaded = true;
+  const shLib = new Mod(path.join(ROOT, "lib", "ta-short.js")); shLib._compile(transformSync(fs.readFileSync(shLib.id, "utf8"), opts).code, shLib.id); require.cache[shLib.id] = shLib; shLib.loaded = true;   // 作空試算子分頁（11-26；測試在 tests/ta_short.cjs）
+  const shMod = new Mod(path.join(ROOT, "app", "ta", "ShortView.jsx")); shMod.filename = shMod.id; shMod.paths = Mod._nodeModulePaths(ROOT);
+  shMod._compile(transformSync(fs.readFileSync(shMod.id, "utf8"), opts).code, shMod.id); require.cache[shMod.id] = shMod; shMod.loaded = true;
   const m = new Mod(path.join(ROOT, "app", "ta", "page.cjs")); m.paths = Mod._nodeModulePaths(ROOT);
   m._compile(transformSync(src, opts).code, m.id);
   const P = m.exports;
