@@ -186,6 +186,61 @@ t("ShortView：NQ 標「估算，非報價」、到期接季月、估算 IV 預�
   try { hz = view("NQ", { NDX: { base: nb, by: { [day(51)]: qRows(26000), [day(180)]: qRows(26000) } }, QQQ: { base: qb, by: {} } }); } finally { React2.useState = orig; }
   assert.ok(hz.includes("估算 IV 要大於 0") && !hz.includes("權利金是 0"), (hz.match(/輸入有誤[^<]*/) || [""])[0]);
 });
+// ───── NQ 近月真報價（11-26）─────
+t("lib：contractOf 認 Yahoo 合約名、carryOf 反推持有成本（不合理／太近到期／沒 NDX 退回 r）、futPx 錨在近月", () => {
+  assert.deepStrictEqual(L.contractOf("Nasdaq 100 Dec 26"), { code: "Z26", fe: "2026-12-18" });
+  assert.deepStrictEqual(L.contractOf("E-Mini Nasdaq 100 Mar 27"), { code: "H27", fe: "2027-03-19" });
+  for (const s of ["", null, "Nasdaq 100 Jan 27", "NQ=F"]) assert.strictEqual(L.contractOf(s), null, String(s));
+  const c = L.carryOf(26100, 26000, 22, 0.04);
+  assert.ok(c.implied); near(c.c, Math.log(26100 / 26000) / (22 / 365));
+  const no = (x) => assert.ok(x.c === 0.04 && x.implied === false, JSON.stringify(x));
+  no(L.carryOf(26100, 26000, 5, 0.04)); assert.ok(Number.isNaN(L.carryOf(26100, 26000, 5, 0.04).raw), "近月剩不到 7 天");
+  const hi = L.carryOf(26334.75, 26046.9, 22, 0.04); no(hi); assert.ok(hi.raw > 0.15, "11-26 實測：NDX 收盤 vs NQ 盤後，反推 18%");
+  no(L.carryOf(26100, null, 22, 0.04)); no(L.carryOf(0, 26000, 22, 0.04)); no(L.carryOf(25000, 26000, 22, 0.04));
+  near(L.futPx(26100, 0.05, 22, 22), 26100); near(L.futPx(26100, 0.05, 22, 113), 26100 * Math.exp(0.05 * 91 / 365));
+  // 反推的持有成本代回去：近月＝NQ、用 NDX 算也一致
+  near(L.futPx(26100, c.c, 22, 113), 26000 * Math.exp(c.c * 113 / 365));
+});
+t("路由 symbol:'NQ'：走 callEngine('NQ=F','D') 取最後一根收盤＋合約、不打 CBOE、不寫額度；引擎失敗回 ok:true＋nq:null；沒登入 401", async () => {
+  let calls = [], added = 0, eng = { status: 200, body: { ok: true, fetched_at: 1795654800, symbol: { contract: "Nasdaq 100 Dec 26" }, chart: { bars: [{ c: 25900 }, { c: 26123.5 }] } } };
+  const live = { authOf: (r) => (r.headers.get("x-no") ? null : { sub: "m" }), owners: () => [], callEngine: async (s, tf) => { calls.push(s + "|" + tf); return eng; },
+    store: async () => ({ isOwner: async () => false, allowed: async () => true, add: async () => { added++; }, used: async () => [] }) };
+  const rt = esm(path.join(ROOT, "app", "api", "ta-opt", "route.js"), { "../../../lib/ta-live": live });
+  fetched = [];
+  const a = await ask(rt, { symbol: "NQ" });
+  assert.strictEqual(a.status, 200); assert.deepStrictEqual(a.j, { ok: true, symbol: "NQ", nq: { price: 26123.5, contract: "Nasdaq 100 Dec 26", ts: "2026-11-26 01:00:00" } });
+  assert.deepStrictEqual(calls, ["NQ=F|D"]); assert.strictEqual(fetched.length, 0, "不打 CBOE"); assert.strictEqual(added, 0, "不扣額度");
+  eng = { status: 502, body: { ok: false, error: { message: "計算引擎沒有回應" } } };
+  const b = await ask(rt, { symbol: "NQ" });
+  assert.ok(b.status === 200 && b.j.ok && b.j.nq === null && b.j.error.includes("資料不足") && b.j.error.includes("計算引擎沒有回應"), JSON.stringify(b.j));
+  const r401 = await rt.POST(new Request("http://x/api/ta-opt", { method: "POST", headers: { "x-no": "1" }, body: JSON.stringify({ symbol: "NQ" }) }));
+  assert.strictEqual(r401.status, 401);
+  assert.strictEqual(calls.length, 2, "沒登入不打引擎");
+});
+t("ShortView：NQ 有真報價＝顯示 NQ 價、合約、抓取時間、持有成本，不標估算；抓不到＝退回估算並寫原因；MNQ 合約名", () => {
+  const nb = { ok: true, symbol: "NDX", price: 26000, ts: "2026-11-26 01:05:14", expiries: [day(51), day(180)], expiry: day(51), rows: qRows(26000), root: { [day(51)]: "NDX", [day(180)]: "NDX" } };
+  const qb = { ok: true, symbol: "QQQ", price: 600, ts: "", expiries: [day(30)], expiry: day(30), rows: qRows(600) };
+  const fr = L.futOf(day(10)), memo = (nq) => ({ NDX: { base: nb, by: { [day(51)]: qRows(26000), [day(180)]: qRows(26000) } }, QQQ: { base: qb, by: {} }, NQ: { base: { ok: true, symbol: "NQ", ...nq }, by: {} } });
+  const mon = { H: "Mar", M: "Jun", U: "Sep", Z: "Dec" }[fr.code[0]];
+  const h = view("NQ", memo({ nq: { price: 26100, contract: "Nasdaq 100 " + mon + " " + fr.code.slice(1), ts: "2026-11-26 01:00:00" } }));
+  assert.ok(!h.includes("估算，非報價") && h.includes("期貨價＝NQ 近月報價") && h.includes("<b class=\"mono\">26,100.00</b>") && h.includes("NQ" + fr.code + "（Yahoo NQ=F") && h.includes("抓取時間 2026-11-26 09:00（台灣）") && /持有成本 年化 -?\d+\.\d\d%（NQ 與 NDX 價差反推）/.test(h), h.slice(0, 2500));
+  const m = view("MNQ", memo({ nq: { price: 26100, contract: "Nasdaq 100 " + mon + " " + fr.code.slice(1), ts: "" } }));
+  assert.ok(m.includes("MNQ" + fr.code + "（Yahoo NQ=F"), m.slice(0, 2000));
+  const x = view("NQ", memo({ nq: null, error: "資料不足：NQ 期貨報價暫時抓不到（引擎掛了）" }));
+  assert.ok(x.includes("估算，非報價") && x.includes("資料不足：NQ 期貨報價暫時抓不到（引擎掛了），期貨價改用估算") && x.includes("NDX 現價 × e^(無風險利率") && !x.includes("ta-err"), x.slice(0, 2500));
+  const u = view("NQ", memo({ nq: { price: 26100, contract: "??", ts: "" } }));
+  assert.ok(u.includes("估算，非報價") && u.includes("合約月份認不出來"), u.slice(0, 2000));
+});
+t("ShortView：ⓘ 不用原生 title（手機無效），改成可聚焦的按鈕；說明框只在打開時畫", () => {
+  const base = { ok: true, symbol: "QQQ", price: 600, ts: "2026-11-26 01:05:16", expiries: [E3, E1], expiry: E3, rows: qRows(600) };
+  const h = view("QQQ", { QQQ: { base, by: { [E1]: qRows(600), [E3]: qRows(600) } } });
+  const tips = [...h.matchAll(/<span[^>]*class="ta-tip ta-sh-i"[^>]*>/g)].map((x) => x[0]);
+  assert.ok(tips.length >= 10, tips.length);
+  for (const s of tips) assert.ok(s.includes('tabindex="0"') && s.includes('role="button"') && !s.includes("title="), s);
+  assert.ok(!h.includes("ta-tipbox"), "框只在打開時畫"); assert.ok(h.includes("滑鼠移上去或點一下看說明"), (h.match(/標 ⓘ[^<]*/) || [""])[0]);
+  const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "ShortView.jsx"), "utf8");
+  assert.ok(raw.includes('document.addEventListener("pointerdown", off)') && raw.includes('e.key === "Escape"') && raw.includes("ta-tipbox ta-sh-tb"), "點別處／Esc 關、用 ta-tipbox");
+});
 t("page.jsx：選擇權分頁多一排子分頁（原試算｜作空試算）；原試算照舊用 OptView", () => {
   const raw = fs.readFileSync(path.join(ROOT, "app", "ta", "page.jsx"), "utf8");
   assert.ok(raw.includes('[["calc", "原試算"], ["short", "作空試算"]]') && raw.includes("<ShortView call={call} gate={gate} SortTable={SortTable} />") && raw.includes("<OptView opt={opt} run={runOpt} />"));

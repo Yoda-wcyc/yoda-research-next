@@ -1,4 +1,4 @@
-import { authOf, owners, store } from '../../../lib/ta-live';
+import { authOf, owners, store, callEngine } from '../../../lib/ta-live';
 import { cboeSym, cboeCode, parseChain, defaultExpiry } from '../../../lib/ta-opt';
 
 export const runtime = 'nodejs';
@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 // /ta「選擇權」分頁（2026-11-23）：CBOE 延遲報價（同 Skill\opt_cboe.py），閘門同 /api/ta-rs
 //   POST  Authorization: Bearer <票>  body {symbol（只收 lib/ta-opt OPT_SYMS 那 11 檔）, expiry?（YYYY-MM-DD；沒給或不在清單＝第一個 ≥ 14 天的）}
 //   → {ok, symbol, price, ts（UTC）, last（標的最後成交，美東）, expiries:[…], expiry, rows:[{k, c:{b,a,iv,oi}|null, p:同}]}；失敗 {ok:false, reason, error}
-//   作空試算子分頁（11-26）：symbol 另收 SMH、NDX（抓 _NDX）；可選 expiries:[最多 6 個到期日] → 多回 by:{到期日: rows}（不在清單的略過）；NDX 多回 root:{到期日: NDX|NDXP}
+//   作空試算子分頁（11-26）：symbol 另收 SMH、NDX（抓 _NDX）；可選 expiries:[最多 6 個到期日] → 多回 by:{到期日: rows}（不在清單的略過）；NDX 多回 root:{到期日: NDX|NDXP}；symbol:'NQ' 只回 NQ 近月期貨現價（見 nqQuote）
 // CBOE 307 轉到 cdn-api.cboe.com，沒帶 Referer／Origin 一律 403（opt_cboe.py 2026-11-20 實測）；值是 CBOE 官網自己的網址，不帶個人資訊
 const URL = 'https://cdn.cboe.com/api/global/delayed_quotes/options/';
 const HEADERS = { 'User-Agent': 'Mozilla/5.0 (compatible; market-data-client/1.0)', Accept: 'application/json', Referer: 'https://www.cboe.com/', Origin: 'https://www.cboe.com' };
@@ -34,6 +34,24 @@ async function chain(sym) {
   return INFLIGHT.get(sym);
 }
 
+// symbol:'NQ'（11-26）：只回 NQ 近月期貨現價 → {ok:true, symbol:'NQ', nq:{price, contract, ts（UTC，引擎抓 Yahoo 的時間）}|null, error?}
+// 走網站既有的計算引擎 NQ=F 日K（callEngine 自己有 15 分鐘快取）；不經 /api/ta-live、不寫 ta_quota → 不扣每天 30 檔額度
+// 抓不到也回 ok:true、nq:null：頁面退回「NDX × e^(rT)」估算，不擋整頁
+async function nqQuote() {
+  let e = '';
+  try {
+    const { status, body } = await callEngine('NQ=F', 'D');
+    const bars = status === 200 && body && body.ok && body.chart && body.chart.bars;
+    const last = bars && bars[bars.length - 1];
+    if (last && last.c > 0) {
+      const t = Number(body.fetched_at) > 0 ? new Date(body.fetched_at * 1000).toISOString().slice(0, 19).replace('T', ' ') : '';
+      return { ok: true, symbol: 'NQ', nq: { price: last.c, contract: String((body.symbol && body.symbol.contract) || ''), ts: t } };
+    }
+    e = (body && body.error && body.error.message) || '引擎沒有回 NQ 報價';
+  } catch (x) { e = String((x && x.message) || x); }
+  return { ok: true, symbol: 'NQ', nq: null, error: '資料不足：NQ 期貨報價暫時抓不到（' + String(e).slice(0, 80) + '）' };
+}
+
 export async function POST(req) {
   const p = authOf(req);
   if (!p) return R({ ok: false, reason: 'need-login', error: '請先登入會員' }, 401);
@@ -45,6 +63,7 @@ export async function POST(req) {
 
     let b = {};
     try { b = (await req.json()) || {}; } catch (e) { b = {}; }
+    if (b && b.symbol === 'NQ') return R(await nqQuote());
     const sym = cboeSym(b && b.symbol);
     if (!sym) return R({ ok: false, reason: 'bad-input', error: '不支援這個代號' }, 400);
     const e0 = b.expiry;

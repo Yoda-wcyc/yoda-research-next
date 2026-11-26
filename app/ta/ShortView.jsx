@@ -1,11 +1,12 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { dte, fmtTs } from "../../lib/ta-opt";
-import { calc, checkStruct, checkGlobal, nearExp, nearPut, atmIv, b76Put, putDelta, ivUp, futOf, XS } from "../../lib/ta-short";
+import { calc, checkStruct, checkGlobal, nearExp, nearPut, atmIv, b76Put, putDelta, ivUp, futOf, contractOf, carryOf, futPx, XS } from "../../lib/ta-short";
 
 // /ta「選擇權 → 作空試算」子分頁（2026-11-26 Yoda）：範本 demo\ta_選擇權作空試算_demo.html；數字全在 lib/ta-short.js
 // Yoda 11-26：這個技術分析網站是自己要看的、只對這個子分頁放寬（可以有價差、Theta、轉倉、指引卡，不放尾句）。原本的選擇權試算（page.jsx OptView）不動。
-// 報價走 /api/ta-opt（CBOE 延遲）：XND 借 NDX ÷ 100；NQ／MNQ 沒有報價 → Black-76 估（期貨價＝NDX × e^(r·T)，IV 預設 QQQ 價平 IV）
+// 報價走 /api/ta-opt（CBOE 延遲）：XND 借 NDX ÷ 100；NQ／MNQ 沒有選擇權報價 → Black-76 估（IV 預設 QQQ 價平 IV）
+//   期貨價（11-26）：/api/ta-opt symbol:'NQ' 取 NQ 近月真報價（不扣額度），用 NQ 與 NDX 價差反推持有成本給各季月；抓不到＝NDX × e^(r·T)、標「估算」
 // props：call／gate＝page.jsx 的同名函式；SortTable＝page.jsx 的可排序表格
 const SY = {
   QQQ: { k: "eq", m: 100, spec: "合約：每口 100 股；美式（可提前履約），履約時交割 QQQ 股票。標的 Invesco QQQ，追蹤那斯達克 100。" },
@@ -36,7 +37,45 @@ const ud = (v) => (rnd(v) > 0 ? "up" : rnd(v) < 0 ? "dn" : "");
 const pct = (v, d = 1) => (Number.isFinite(v) ? (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(d) + "%" : "—");
 const fx = (v, d = 2) => (+v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 const kx = (K) => fx(K, K < 1000 && K % 1 ? 2 : 0);
-const Tip = ({ t, children }) => <span className="ta-tip ta-sh-i" title={t}>{children}</span>;
+// ⓘ 說明（11-26）：滑鼠移上去／鍵盤聚焦就出現、離開就收；點一下（手機）釘住，點別處、Esc 或捲動才關。框用 /ta 的 ta-tipbox（同 page.jsx 進出場說明）
+// 框是 span（Tip 會放在 <p>、<label>、表頭裡）；點框不排序、不跳到輸入框
+export function Tip({ t, children }) {
+  const [o, setO] = useState(null);   // {x, y, pin}
+  const me = useRef(null), box = useRef(null), id = useId();
+  const at = (pin) => { const r = me.current.getBoundingClientRect(); return { x: r.left, y: r.bottom, pin }; };
+  const hide = () => setO((v) => (v && v.pin ? v : null));
+  const flip = (e) => { e.preventDefault(); e.stopPropagation(); setO((v) => (v && v.pin ? null : at(true))); };
+  useEffect(() => {
+    if (!o) return undefined;
+    const off = (e) => { if (!me.current.contains(e.target) && !(box.current && box.current.contains(e.target))) setO(null); };
+    const esc = (e) => { if (e.key === "Escape") setO(null); };
+    const gone = () => setO(null);
+    document.addEventListener("pointerdown", off); document.addEventListener("keydown", esc); window.addEventListener("scroll", gone, true);
+    return () => { document.removeEventListener("pointerdown", off); document.removeEventListener("keydown", esc); window.removeEventListener("scroll", gone, true); };
+  }, [!!o]);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {   // 量好框再擺：預設在字的下方，超出看得到的範圍就往上翻／貼邊（同 page.jsx，用 visualViewport）
+    const el = box.current;
+    if (!o || !el) return;
+    const vv = window.visualViewport, ox = vv ? vv.offsetLeft : 0, oy = vv ? vv.offsetTop : 0;
+    const vw = vv ? vv.width : document.documentElement.clientWidth, vh = vv ? vv.height : window.innerHeight;
+    el.style.maxWidth = Math.max(160, Math.min(440, vw - 16)) + "px";
+    const w = el.offsetWidth, h = el.offsetHeight;
+    let y = o.y + 6;
+    if (y + h > oy + vh - 8) y = o.y - me.current.offsetHeight - 6 - h;
+    el.style.left = Math.max(ox + 8, Math.min(o.x, ox + vw - w - 8)) + "px";
+    el.style.top = Math.max(oy + 8, y) + "px";
+    el.style.visibility = "visible";
+  }, [o]);
+  return (
+    <>
+      <span ref={me} className="ta-tip ta-sh-i" tabIndex={0} role="button" aria-describedby={o ? id : undefined}
+        onMouseEnter={() => setO((v) => v || at(false))} onMouseLeave={hide} onFocus={() => setO((v) => v || at(false))} onBlur={hide}
+        onClick={flip} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") flip(e); }}>{children}</span>
+      {o ? <span ref={box} id={id} className="ta-tipbox ta-sh-tb" role="tooltip" style={{ left: 0, top: 0, visibility: "hidden" }}
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>{t}</span> : null}
+    </>
+  );
+}
 const Sw = ({ i }) => <span className="ta-sh-sw" style={{ background: COLORS[i] }} />;
 
 // 接檢查表分批：11-25 快照（每日條件分數帳本另一軌在做，接好再換成即時）
@@ -66,7 +105,7 @@ export default function ShortView({ call, gate, SortTable }) {
   const put = (s, v) => { MEMO[s] = { ...(MEMO[s] || {}), ...v, by: { ...((MEMO[s] || {}).by || {}), ...(v.by || {}) } }; setDb({ ...MEMO }); };
 
   const def = SY[sym], fut = def.k === "fut", src = srcOf(sym), sc = sym === "XND" ? 0.01 : 1;
-  const need = fut ? [src, "QQQ"] : [src];
+  const need = fut ? [src, "QQQ", "NQ"] : [src];   // "NQ"＝只抓 NQ 近月期貨現價（/api/ta-opt symbol:'NQ'，抓不到也回 ok）
   // ① 每個要用的代號抓一次（到期日清單＋價平 IV 用的預設到期日）
   useEffect(() => {   // err[s]：「…」＝抓取中、其他字＝失敗（按重試清掉才再抓）；結果收進 MEMO，換標的途中回來的也照收
     for (const s of need) {
@@ -74,7 +113,7 @@ export default function ShortView({ call, gate, SortTable }) {
       setErr((e) => ({ ...e, [s]: "…" }));
       call("/api/ta-opt", { symbol: s }).then((j) => {
         if (gate(j)) { setErr((e) => ({ ...e, [s]: "" })); return; }
-        if (j.ok) { put(s, { base: j, by: { [j.expiry]: j.rows } }); setErr((e) => ({ ...e, [s]: "" })); }
+        if (j.ok) { put(s, { base: j, by: j.expiry ? { [j.expiry]: j.rows } : {} }); setErr((e) => ({ ...e, [s]: "" })); }
         else setErr((e) => ({ ...e, [s]: j.error || "讀取失敗" }));
       });
     }
@@ -118,13 +157,18 @@ export default function ShortView({ call, gate, SortTable }) {
 
   // ───── 計算 ─────
   const r = (+f.rf || 0) / 100, S = base ? base.price * sc : null, ndx = fut && base ? base.price : null;
+  // NQ 近月真報價：合約認得出來才用（認不出＝不知道它剩幾天，照舊估算）；NDX 非正規盤（off）＝兩邊時間對不上，不反推持有成本
+  const nqB = db.NQ && db.NQ.base, nqQ = nqB && nqB.nq, nqDone = !fut || !!nqB || (!!err.NQ && err.NQ !== "…");
+  const front = fut && nqQ ? contractOf(nqQ.contract) : null, d0 = front ? dte(front.fe) : null;
+  const cy = front && d0 !== null ? carryOf(nqQ.price, base && !base.off ? ndx : null, d0, r) : null;
+  const fOf = (ex) => (cy ? futPx(nqQ.price, cy.c, d0, dte(ex.fut.fe)) : ndx * Math.exp((r * dte(ex.fut.fe)) / 365));
   const tick = fut ? 0.25 : 0.01, unit = fut ? " 點" : " 美元";
   const exOf = (e) => list.find((x) => x.e === e);
   const leg = (ex, p) => {
     if (!ex || !(p >= 30 && p <= 105)) return null;
     if (fut) {
-      if (!ex.fut) return null;
-      const F = ndx * Math.exp((r * dte(ex.fut.fe)) / 365), K = Math.round((F * p) / 100 / 50) * 50, iv = (+f.nqiv || 0) / 100;
+      if (!ex.fut || !nqDone) return null;
+      const F = fOf(ex), K = Math.round((F * p) / 100 / 50) * 50, iv = (+f.nqiv || 0) / 100;
       const rl = nearPut(by[ex.e], (K / F) * ndx), ref = rl && Math.abs(rl.K / ((K / F) * ndx) - 1) < 0.03 ? rl.iv : null;
       return { K, iv, mid: b76Put(F, K, ex.n / 365, iv, r), est: 1, S0: F, ref };
     }
@@ -136,7 +180,7 @@ export default function ShortView({ call, gate, SortTable }) {
   const sts = defs.map(([ek, ks], i) => {
     const ex = exOf(E[ek]);
     const legs = ks.map((k, j) => { const l = leg(ex, +f[k]); return l && { ...l, q: j ? -1 : 1 }; });
-    const e = !ex ? [NAMES[i] + "：讀取中"] : !fut && !by[ex.e] ? [NAMES[i] + "：報價讀取中"] : checkStruct(NAMES[i], legs, ex.n, tick, unit);
+    const e = !ex ? [NAMES[i] + "：讀取中"] : (!fut && !by[ex.e]) || !nqDone ? [NAMES[i] + "：報價讀取中"] : checkStruct(NAMES[i], legs, ex.n, tick, unit);
     return { ex, legs, e, st: e.length ? null : { legs, n: ex.n, S0: legs[0].S0, e: ex.e } };
   });
   const cap = +f.cap, B = (cap * +f.bp) / 100;
@@ -148,7 +192,7 @@ export default function ShortView({ call, gate, SortTable }) {
   const futName = (ex) => (sym === "MNQ" ? "MNQ" : "NQ") + ex.fut.code;
   const legTxt = (ex, l, p) => {
     if (!(p >= 30 && p <= 105)) return "履約價要在現價的 30%～105% 之間";
-    if (!ex || (!fut && !by[ex.e])) return "讀取中…";
+    if (!ex || (!fut && !by[ex.e]) || !nqDone) return "讀取中…";
     if (!l) return "資料不足：這個到期日沒有報價";
     const dl = putDelta(fut, l.S0, l.K, ex.n / 365, l.iv, r).toFixed(2);
     if (l.est) return `履約價 ${fx(l.K, 0)}（比 ${futName(ex)} ${mny(l)}）｜估算 ${fx(l.mid)} 點｜IV ${(l.iv * 100).toFixed(1)}%｜Delta ${dl}` + (l.ref ? `｜NDX 同條件報價 IV ${(l.ref * 100).toFixed(1)}%` : "");
@@ -196,9 +240,13 @@ export default function ShortView({ call, gate, SortTable }) {
     { label: "占總資金", render: (c) => (+ckv[c.i] < 0 ? <span className="warn">不能是負的，不計入</span> : ckNum(c.i) && cap > 0 ? ((ckNum(c.i) / cap) * 100).toFixed(1) + "%" : ""), sort: (c) => ckNum(c.i), num: 1 },
   ];
 
-  const anyErr = need.map((s) => err[s]).find((x) => x && x !== "…");
+  const anyErr = need.filter((s) => s !== "NQ").map((s) => err[s]).find((x) => x && x !== "…");   // NQ 抓不到＝退回估算，不擋整頁
   const ts = base ? fmtTs(base.ts, "Asia/Taipei") : "";
-  const note = fut ? "沒有期貨選擇權報價：權利金全部用 Black-76、所有履約價同一個 IV 估出來（預設＝QQQ 價平 IV）。各到期對應的季月期貨價＝NDX 現價 × e^(無風險利率 × 到期天數)，沒扣股利；實際買賣價差、波動率微笑都沒算進去，價外賣權實際 IV 通常比較高，每腳附 NDX 同到期、同價外程度的報價 IV 對照。"
+  const futWhy = !fut || cy || !nqDone ? "" : nqQ ? "NQ 報價的合約月份認不出來（" + (nqQ.contract || "空白") + "）" : (nqB && nqB.error) || (err.NQ ? "資料不足：NQ 期貨報價暫時抓不到（" + err.NQ + "）" : "資料不足：NQ 期貨報價暫時抓不到");
+  const futSrc = !fut ? "" : cy
+    ? "各到期對應的季月期貨價：近月用 NQ 報價，其他季月＝NQ 近月 × e^(持有成本 × 跟近月差幾天)；持有成本" + (cy.implied ? "＝NQ 與 NDX 價差反推（年化，已含股利）。" : "用無風險利率（" + (base && base.off ? "NDX 是上一個正規盤收盤價、跟 NQ 時間對不上" : Number.isFinite(cy.raw) ? "價差反推出年化 " + (cy.raw * 100).toFixed(1) + "%，不合理，多半是 NQ 與 NDX 報價時間對不上（NQ 幾乎 24 小時交易、NDX 只有正規盤）" : "近月剩不到 7 天") + "，不反推）。")
+    : "各到期對應的季月期貨價＝NDX 現價 × e^(無風險利率 × 到期天數)，沒扣股利（估算）。";
+  const note = fut ? "沒有期貨選擇權報價：權利金全部用 Black-76、所有履約價同一個 IV 估出來（預設＝QQQ 價平 IV）。" + futSrc + "實際買賣價差、波動率微笑都沒算進去，價外賣權實際 IV 通常比較高，每腳附 NDX 同到期、同價外程度的報價 IV 對照。"
     : sym === "XND" ? "XND 自己的 CBOE 報價停在 11-20 收盤、跟其他標的不同時間，所以這頁用 NDX 報價 ÷ 100 換算；XND 實際成交量小、買賣價差通常比 NDX 寬。到期選單標「借 NDX（AM 結算）」的那幾天，NDX 是開盤結算、XND 是收盤結算，結算價會不一樣；XND 實際有沒有掛這些到期日，本頁沒查。"
     : sym === "NDX" ? "報價含 NDX（AM 結算月選）與 NDXP（PM 結算）兩種代號，到期選單上標 NDXP 的是後者。指數不配息但成分股有，本頁 Black-Scholes 沒放股利，價外賣權估值會略低於報價。"
     : "美式選擇權可以提前履約，本頁 Black-Scholes 是歐式公式、也沒放股利，深價內時會略低估。";
@@ -209,9 +257,10 @@ export default function ShortView({ call, gate, SortTable }) {
         {ORDER.map((k) => <button key={k} type="button" aria-pressed={k === sym} className={"ta-tab" + (k === sym ? " on" : "")} onClick={() => setSym(k)} data-s={k}>{SY[k].k === "fut" ? k + " 期貨" : k}</button>)}
       </div>
       <div className="ta-sh-meta">
-        <span>{sym}{fut ? <><span className="mut">（期貨價由 NDX 估）</span><span className="ta-sh-est">估算，非報價</span></> : null}</span>
-        {S ? <b className="mono">{fx(fut ? ndx : S)}</b> : null}
-        {fut && S ? <span className="mut">NDX 現價</span> : null}
+        <span>{sym}{fut ? (cy ? <span className="mut">（期貨價＝NQ 近月報價）</span> : <><span className="mut">（期貨價由 NDX 估）</span><span className="ta-sh-est">估算，非報價</span></>) : null}</span>
+        {S ? <b className="mono">{fx(fut ? (cy ? nqQ.price : ndx) : S)}</b> : null}
+        {fut && S && cy ? <span className="mut" data-nq="1">{futName({ fut: front })}（Yahoo NQ=F，期貨約延遲 10 分鐘｜抓取時間 {fmtTs(nqQ.ts, "Asia/Taipei") || "—"}（台灣））｜NDX {fx(ndx)}｜持有成本 年化 {(cy.c * 100).toFixed(2)}%{cy.implied ? "（NQ 與 NDX 價差反推）" : "（用無風險利率）"}</span>
+          : fut && S ? <span className="mut">NDX 現價{futWhy ? "｜" + futWhy + "，期貨價改用估算" : ""}</span> : null}
         {base ? <span className="mut">CBOE 延遲報價（約 15 分鐘）｜資料時間 {ts || "—"}（台灣）{base.off ? "｜非正規盤時段，用上一個正規盤收盤價" : ""}</span> : null}
       </div>
       <p className="ta-sh-spec">{def.spec}</p>
@@ -219,7 +268,7 @@ export default function ShortView({ call, gate, SortTable }) {
       {anyErr ? <div className="ta-err" role="alert"><span>{anyErr.startsWith("資料不足") ? anyErr : "資料不足：" + anyErr}</span><button type="button" className="ta-btn" onClick={() => setErr({})}>重試</button></div>
         : !base ? <div className="ta-ph">讀取中…</div> : (
         <>
-          <div className="ta-cap">情境：AI 泡沫破裂、指數一年內腰斬<span className="mut">三種結構都用同一筆年保險費預算；標 ⓘ 的字，滑鼠移上去看說明。</span></div>
+          <div className="ta-cap">情境：AI 泡沫破裂、指數一年內腰斬<span className="mut">三種結構都用同一筆年保險費預算；標 ⓘ 的字，滑鼠移上去或點一下看說明。</span></div>
           <div className="ta-sh-ctl">
             <div className="ta-sh-glob">
               <label>總資金 <input type="number" className="ta-q ta-sh-n" step="10000" value={f.cap} onChange={inp("cap")} /> <span className="mut">美元</span></label>
