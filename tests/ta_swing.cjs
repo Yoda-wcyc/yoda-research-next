@@ -1,5 +1,5 @@
 // /ta「多空波段」：lib/ta-swing.js＋app/api/ta-swing/route.js（2026-11-26）。跑法：node tests/ta_swing.cjs（失敗 exit 1）
-// 真資料（G:\Yoda x Claude\demo\merge_swing\out\swing_data.json、swing_embed_page.html、Skill\data\swing_score\scores.json，唯讀；不在就略過）
+// 真資料（G:\Yoda x Claude\Skill\swing_page\out\swing_data.json、swing_embed_page.html、Skill\data\swing_score\scores.json，唯讀；不在就略過）
 //   驗注入＝外殼模式頁逐字相同、分數＝scores.json
 const fs = require("fs"), path = require("path"), zlib = require("zlib"), assert = require("assert");
 const ROOT = path.join(__dirname, "..");
@@ -72,10 +72,14 @@ t("外殼是外殼模式（sw-embed）：無 viewport 1280、無 DEMO 徽章、�
   assert.ok(!SHELL.includes("width=1280") && !SHELL.includes('badge-demo">DEMO'));
   assert.ok(SHELL.includes(".sw-embed .sw-bar,.sw-embed .sw-wrap{min-width:0}") && SHELL.includes('html[class~="sw-embed"] .ck-root .wrap{min-width:0}'));
   assert.ok(SHELL.includes('<col style="width:72px">'));
+  // 緊湊明細（11-26）：每邊 條件定義｜回測結論｜目前，「10 月亮了沒」「兩季首見」兩欄進 ⓘ
+  assert.ok(SHELL.includes('<colgroup><col style="width:72px"><col><col style="width:92px"><col style="width:112px"><col><col style="width:92px"><col style="width:112px"></colgroup>'));
+  assert.strictEqual(cnt(SHELL, 'colspan="5"'), 0); assert.strictEqual(cnt(SHELL, 'colspan="3"'), 5);
+  assert.ok(!SHELL.includes('{k:s+"_o"') && !SHELL.includes('{k:s+"_f"') && SHELL.includes('class="tipk octf"'));
 });
 
 // 合約：外殼模式頁＝外殼＋資料（compose --shell --data 同次寫出 out/swing_embed_page.html；一般模式 demo 頁另有 viewport 1280／DEMO，不再拿來比）
-const REAL = "G:/Yoda x Claude/demo/merge_swing/out/swing_data.json", EPAGE = "G:/Yoda x Claude/demo/merge_swing/out/swing_embed_page.html";
+const REAL = "G:/Yoda x Claude/Skill/swing_page/out/swing_data.json", EPAGE = "G:/Yoda x Claude/Skill/swing_page/out/swing_embed_page.html";
 const SCORES = "G:/Yoda x Claude/Skill/data/swing_score/scores.json";
 t("真資料：注入後跟 compose 外殼模式頁逐字相同；今天分數＝帳本 scores.json 同一天", () => {
   if (!fs.existsSync(REAL) || !fs.existsSync(EPAGE) || !fs.existsSync(SCORES)) { console.log("     （真資料不在，略過）"); return; }
