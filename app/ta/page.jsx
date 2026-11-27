@@ -1980,17 +1980,29 @@ function ttCols(onCode, exit) {
   ]);
 }
 // 折線：x＝日期、y＝檔數 ÷ 母體 %；滑過（手機按住拖）看當天多方／空方／母體幾檔
-function TtChart({ hist }) {
+// 指數線（11-27）：history 的 ix＝當天加權指數／標普 500 收盤，右軸自己的刻度；沒有 ix（舊面板、null）那段不畫，全沒有就沒有右軸
+const ixStep = (r) => { const p = 10 ** Math.floor(Math.log10(r)); return [1, 2, 2.5, 5, 10].map((m) => m * p).find((v) => v >= r); };
+function TtChart({ hist, ixName }) {
   const [hi, setHi] = useState(null);
-  const pts = hist.filter((h) => h && h.n > 0).map((h) => ({ d: String(h.d), nl: h.nl, ns: h.ns, n: h.n, pl: (h.nl / h.n) * 100, ps: (h.ns / h.n) * 100 }));
+  const pts = hist.filter((h) => h && h.n > 0).map((h) => ({ d: String(h.d), nl: h.nl, ns: h.ns, n: h.n, pl: (h.nl / h.n) * 100, ps: (h.ns / h.n) * 100, ix: typeof h.ix === "number" && Number.isFinite(h.ix) && h.ix > 0 ? h.ix : null }));
   const N = pts.length;
   if (N < 2) return <div className="ta-nochart">歷史天數不足</div>;
-  const W = 1000, H = 260, L = 44, R = 12, T = 22, B = 24, pw = W - L - R, ph = H - T - B;
+  const ixv = pts.map((p) => p.ix).filter((v) => v !== null), hasIx = ixv.length > 0;
+  const W = 1000, H = 260, L = 44, R = hasIx ? 58 : 12, T = 22, B = 24, pw = W - L - R, ph = H - T - B;
   const top = Math.max(5, Math.ceil(Math.max(...pts.map((p) => Math.max(p.pl, p.ps))) / 5) * 5);
   const X = (i) => L + (pw * i) / (N - 1), Y = (v) => T + ph - (v / top) * ph;
   const line = (k) => pts.map((p, i) => X(i).toFixed(1) + "," + Y(p[k]).toFixed(1)).join(" ");
   const step = top <= 20 ? 5 : 10, grid = [];
   for (let v = 0; v <= top; v += step) grid.push(v);
+  let ixLo = 0, ixHi = 1, ixPath = "";
+  const ixT = [], YI = (v) => T + ph - ((v - ixLo) / (ixHi - ixLo)) * ph;
+  if (hasIx) {
+    const lo = Math.min(...ixv), hi2 = Math.max(...ixv), st = ixStep(Math.max((hi2 - lo) / 4, hi2 * 1e-4));
+    ixLo = Math.floor(lo / st) * st; ixHi = Math.max(Math.ceil(hi2 / st) * st, ixLo + st);
+    for (let v = ixLo; v <= ixHi + st / 2; v += st) ixT.push(v);
+    let pen = "M";   // 缺 ix 的日子斷開、不連過去
+    pts.forEach((p, i) => { if (p.ix === null) { pen = "M"; return; } ixPath += pen + X(i).toFixed(1) + "," + YI(p.ix).toFixed(1); pen = "L"; });
+  }
   const ticks = [];
   let lastX = -1e9;
   pts.forEach((p, i) => { if ((i === 0 || p.d.slice(0, 6) !== pts[i - 1].d.slice(0, 6)) && X(i) - lastX >= 70 && X(i) < W - R - 30) { ticks.push(i); lastX = X(i); } });
@@ -2007,16 +2019,23 @@ function TtChart({ hist }) {
         {ticks.map((i) => <text key={i} className="ax" x={X(i)} y={H - 6} textAnchor="middle">{pts[i].d.slice(0, 4) + "/" + pts[i].d.slice(4, 6)}</text>)}
         <polyline className="tt-l" points={line("pl")} fill="none" />
         <polyline className="tt-s" points={line("ps")} fill="none" />
+        {hasIx ? <g>
+          {ixT.map((v) => <text key={v} className="ax" x={W - R + 6} y={YI(v) + 4} textAnchor="start">{Math.round(v).toLocaleString("en-US")}</text>)}
+          <path className="tt-ix" d={ixPath} fill="none" />
+        </g> : null}
         <text className="tt-k tt-kl" x={L + 6} y={13}>多方樣板檔數占比 %</text>
         <text className="tt-k tt-ks" x={L + 150} y={13}>空方樣板檔數占比 %</text>
+        {hasIx ? <text className="tt-k tt-kx" x={W - R} y={13} textAnchor="end">{ixName}（右軸）</text> : null}
         {p ? <g>
           <line className="tt-hl" x1={X(hi)} x2={X(hi)} y1={T} y2={T + ph} />
           <circle className="tt-dl" cx={X(hi)} cy={Y(p.pl)} r="4" /><circle className="tt-ds" cx={X(hi)} cy={Y(p.ps)} r="4" />
+          {hasIx && p.ix !== null ? <circle className="tt-dx" cx={X(hi)} cy={YI(p.ix)} r="4" /> : null}
         </g> : null}
       </svg>
       {p ? (
         <div className={"ta-tt-tip" + (hi > N / 2 ? " l" : "")} style={hi > N / 2 ? { right: (100 - (X(hi) / W) * 100) + "%" } : { left: (X(hi) / W) * 100 + "%" }}>
           <b>{isoD(p.d)}</b><br /><span className="up">多方 {p.nl} 檔（{p.pl.toFixed(1)}%）</span><br /><span className="dn">空方 {p.ns} 檔（{p.ps.toFixed(1)}%）</span><br />母體 {p.n} 檔
+          {hasIx ? <><br /><span className="tt-tx">{ixName} {p.ix === null ? "—" : p.ix.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></> : null}
         </div>
       ) : null}
     </div>
@@ -2045,7 +2064,7 @@ function TtView({ x, mk = "tw", onCode }) {
           <span className="sep">｜</span>空方新進 {short.filter(ttNew).length}／跳出 {exS.length}
         </> : null}
       </div>
-      <TtChart hist={hist} />
+      <TtChart hist={hist} ixName={mk === "us" ? "標普 500" : "加權指數"} />
       <div className="ta-rs-two">
         {[["多方樣板", long], ["空方樣板", short]].map(([t, a]) => (
           <div key={t}>

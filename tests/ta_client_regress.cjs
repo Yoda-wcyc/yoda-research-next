@@ -738,6 +738,26 @@ const OLD = { body: "OLD cached /ta (page-eed625…js)" };
       const b = renderToString(React.createElement(P.TtView, { x: bad, mk: "tw", onCode: () => {} }));
       assert.ok(b.includes("歷史天數不足") && b.includes("今天沒有符合的個股"), b.slice(0, 300));
     }
+    // 指數線（11-27）：沒有 ix（上面的舊面板）＝沒有右軸、沒有指數線、沒有圖例
+    assert.ok(!h.includes("tt-ix") && !h.includes("右軸") && !us.includes("tt-ix"), "沒有 ix 不該畫指數線");
+  });
+  await t("趨勢樣板指數線（11-27）：有 ix＝白線＋右軸＋圖例（台股加權指數／美股標普 500）；缺日斷開不連；全 null＝不畫；亮色改深灰", async () => {
+    const hs = [{ d: "20261112", nl: 80, ns: 30, n: 640, ix: 27000.5 }, { d: "20261113", nl: 88, ns: 33, n: 642, ix: 27500 }, { d: "20261114", nl: 70, ns: 35, n: 642, ix: null },
+      { d: "20261115", nl: 60, ns: 36, n: 643 }, { d: "20261116", nl: 64, ns: 37, n: 643, ix: 28012.34 }, { d: "20261117", nl: 65, ns: 38, n: 643, ix: 28100 }];
+    const r = (mk, history) => renderToString(React.createElement(P.TtView, { x: { day: "20261117", long: [], short: [], history }, mk, onCode: () => {} })).replace(/<!-- -->/g, "");
+    const tw = r("tw", hs), us = r("us", hs);
+    assert.ok(tw.includes('class="tt-ix"') && tw.includes("加權指數（右軸）") && !tw.includes("標普 500（右軸）"), "台股要有加權指數線與圖例");
+    assert.ok(us.includes('class="tt-ix"') && us.includes("標普 500（右軸）") && !us.includes("加權指數（右軸）"), "美股要有標普 500 線與圖例");
+    const d = (tw.match(/class="tt-ix" d="([^"]+)"/) || [])[1] || "";
+    assert.strictEqual((d.match(/M/g) || []).length, 2, "缺 ix 的兩天要斷開成兩段：" + d);
+    assert.strictEqual((d.match(/L/g) || []).length, 2, "每段兩點各一條：" + d);
+    assert.ok(/text-anchor="start">27,000</.test(tw) && /text-anchor="start">28,500</.test(tw) && !/text-anchor="start">29,000</.test(tw), "右軸刻度（千分位、步距 500、包住最高最低）");
+    assert.ok(tw.includes('class="tt-l"') && tw.includes('class="tt-s"'), "多空線照舊");
+    // 全 null／非數字＝跟舊面板一樣不畫
+    const none = r("tw", hs.map((h) => ({ ...h, ix: h.ix === undefined ? "x" : null })));
+    assert.ok(!none.includes("tt-ix") && !none.includes("右軸"), "全 null 不該畫");
+    const css = fs.readFileSync(path.join(ROOT, "app", "ta", "ta.css"), "utf8");
+    assert.ok(/\.ta-tt-svg \.tt-ix\{stroke:#fff/.test(css) && /html\[data-theme="light"\] \.ta-tt-svg \.tt-ix\{stroke:var\(--text\);stroke-opacity:\.8\}/.test(css), "暗色白線、亮色深灰");
   });
   await t("趨勢樣板進出訊號（11-17）：天數＋符合以來 % 兩欄、新進排最前、摘要新進／跳出、今日跳出兩張表＋原因轉中文、沒有＝今天沒有；守門字", async () => {
     const row = (code, rs, days, chg, o) => ({ code, name: "名" + code, group: "半導體業", close: 100, dhi: -3, dlo: 80, rs, since: "20261101", days, chg, ...o });

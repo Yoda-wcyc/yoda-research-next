@@ -390,6 +390,9 @@ svg.ta-k .roll-t{fill:#9aa4b2;font-size:10px;paint-order:stroke;stroke:#0b0f15;s
 .ta-tt-svg .tt-kl{fill:var(--red)} .ta-tt-svg .tt-ks{fill:var(--green)}
 .ta-tt-svg .tt-hl{stroke:var(--dim);stroke-width:1;stroke-dasharray:3 3}
 .ta-tt-svg .tt-dl{fill:var(--red)} .ta-tt-svg .tt-ds{fill:var(--green)}
+/* 指數線（11-27 Yoda：白色）：暗色白線；亮色淺底看不到白線 → 改深灰（--text 80%） */
+.ta-tt-svg .tt-ix{stroke:#fff;stroke-width:1.6} .ta-tt-svg .tt-kx,.ta-tt-svg .tt-dx{fill:#fff} .ta-tt-tip .tt-tx{color:#fff}
+html[data-theme="light"] .ta-tt-svg .tt-ix{stroke:var(--text);stroke-opacity:.8} html[data-theme="light"] .ta-tt-svg .tt-kx,html[data-theme="light"] .ta-tt-svg .tt-dx{fill:var(--text);fill-opacity:.8} html[data-theme="light"] .ta-tt-tip .tt-tx{color:var(--text)}
 /* 選擇權（11-23）：表頭不折行（十列視窗照一列高算）；到期損益圖賺紅賠綠 */
 .ta-optv .ta-rs-form .sep{color:var(--dim);margin:0 6px}
 .ta-opt-view>b{font-size:calc(14px*var(--scale))}
