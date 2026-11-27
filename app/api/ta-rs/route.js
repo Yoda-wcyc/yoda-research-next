@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic';
 //   POST  Authorization: Bearer <會員登入票>  body {market?（'tw'｜'us'，預設 tw）, start?, end?（YYYY-MM-DD）,
 //         minAmt?（該市場貨幣，0..1e11，預設 tw 5e7／us 0）, n?（5..100，預設 20）}
 //   → {ok, market, currency, ...compute 結果（含 groups_ver）, range:{min,max}}；沒給日期＝近 1 月。失敗 → {ok:false, reason, error}；閘門同 /api/ta-idx
-//   op:'tt'（market 同上）→ {ok, market, day, long, short, funnel_long, funnel_short, history:[{d,nl,ns,n}]}（Skill tw_rs_export／us_tt 寫進面板的 tt）
+//   op:'tt'（market 同上）→ {ok, market, day, long, short, funnel_long, funnel_short, history:[{d,nl,ns,n,ix}]}（Skill tw_rs_export／us_tt 寫進面板的 tt；ix＝當天加權指數／標普 500 收盤，舊資料沒有或 null）
 function R(data, status) {
   return Response.json(data, { status: status || 200, headers: { 'Cache-Control': 'private, no-store' } });
 }
